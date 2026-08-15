@@ -97,14 +97,10 @@ export default function HowItWorks() {
           {STEPS.map((step, i) => (
             <div
               key={step.n}
-              className="row-hover"
+              className="row-hover step-row"
               style={{
                 borderTop: "2px solid var(--color-divider)",
                 borderBottom: i === STEPS.length - 1 ? "2px solid var(--color-divider)" : undefined,
-                display: "grid",
-                gridTemplateColumns: "minmax(56px,90px) minmax(0,300px) minmax(0,1fr)",
-                gap: "16px clamp(20px,4vw,64px)",
-                alignItems: "start",
                 padding: "clamp(28px,3.5vw,44px) 0",
               }}
             >
@@ -133,7 +129,7 @@ export default function HowItWorks() {
                     <th style={{ fontSize: 12, letterSpacing: "0.1em", padding: "12px 10px" }}>Hiring staff</th>
                     <th style={{ fontSize: 12, letterSpacing: "0.1em", padding: "12px 10px" }}>A generic chatbot</th>
                     <th style={{ fontSize: 12, letterSpacing: "0.1em", padding: "12px 10px", color: "var(--color-accent)" }}>
-                      VentriqAI
+                      VantriqAI
                     </th>
                   </tr>
                 </thead>

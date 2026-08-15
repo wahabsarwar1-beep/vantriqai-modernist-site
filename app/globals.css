@@ -260,6 +260,17 @@ textarea.input { min-height: 90px; resize: vertical; }
   .nav { gap: 10px 14px; padding-block: 12px; }
 }
 
+/* — ruled step row (index / heading / body), How it works — */
+.step-row {
+  display: grid;
+  grid-template-columns: minmax(56px, 90px) minmax(0, 300px) minmax(0, 1fr);
+  gap: 16px clamp(20px, 4vw, 64px);
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .step-row { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+}
+
 /* — tables — */
 .table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .table th {
@@ -300,7 +311,7 @@ textarea.input { min-height: 90px; resize: vertical; }
   padding-top: 22px;
 }
 @media (max-width: 860px) {
-  .split-header { grid-template-columns: 1fr; gap: 12px; }
+  .split-header { grid-template-columns: minmax(0, 1fr); gap: 12px; }
 }
 
 /* — cell/row hover tints used across the ruled grid sections — */

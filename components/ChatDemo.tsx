@@ -205,7 +205,7 @@ export default function ChatDemo() {
               style={{ width: 22, height: 22, flex: "none", display: "block" }}
             />
             <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 13, letterSpacing: "-0.01em" }}>
-              Ventriq<span style={{ color: "var(--color-accent)" }}>AI</span> agent
+              Vantriq<span style={{ color: "var(--color-accent)" }}>AI</span> agent
             </span>
             <span
               style={{

@@ -89,7 +89,7 @@ export default function Home() {
                 color: "var(--color-text)",
               }}
             >
-              Ventriq<span style={{ color: "var(--color-accent)" }}>AI</span>
+              Vantriq<span style={{ color: "var(--color-accent)" }}>AI</span>
             </span>
             <span style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
           </div>
@@ -240,7 +240,7 @@ export default function Home() {
         </section>
 
         <section style={{ padding: "0 0 clamp(56px,8vw,104px)" }}>
-          <SplitHeader kicker={<>03 — Why <span style={{ color: "var(--color-text)" }}>Ventriq</span>AI</>}>
+          <SplitHeader kicker={<>03 — Why <span style={{ color: "var(--color-text)" }}>Vantriq</span>AI</>}>
             <h2 style={{ fontSize: "clamp(30px,4.2vw,58px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 44px", maxWidth: "22ch" }}>
               A local partner, not a faceless subscription
             </h2>

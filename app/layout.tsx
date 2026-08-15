@@ -11,7 +11,7 @@ const archivo = Archivo({
 });
 
 export const metadata: Metadata = {
-  title: "VentriqAI — WhatsApp AI agents for Pakistani SMEs",
+  title: "VantriqAI — WhatsApp AI agents for Pakistani SMEs",
   description:
     "AI agents that reply, qualify, and book — 24 hours a day. On WhatsApp, Instagram, and your website, in seconds, at any volume.",
 };
