@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 100" width="1680" height="400">
+  <path d="M10 10 H90 V90 H10 Z M28 28 V72 H72 V28 Z" fill="#201e1d" fill-rule="evenodd"></path>
+  <rect x="10" y="28" width="28" height="10" fill="#ec3013"></rect>
+  <rect x="28" y="10" width="10" height="28" fill="#ec3013"></rect>
+  <text x="104" y="50" font-family="Archivo, Helvetica, Arial, sans-serif" font-size="56" font-weight="700" letter-spacing="-1.7" dominant-baseline="central" fill="#201e1d">Ventriq<tspan fill="#ec3013">AI</tspan></text>
+</svg>

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/nocturne-342bff79-b6cd-4462-ab4c-bd6aec352c70/styles.css">
+<script src="_ds/nocturne-342bff79-b6cd-4462-ab4c-bd6aec352c70/_ds_bundle.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+body { margin:0; text-wrap:pretty; background:
+  radial-gradient(1200px 720px at 82% -160px, color-mix(in srgb, var(--color-accent-900) 75%, transparent), transparent 60%),
+  radial-gradient(1100px 800px at -10% 100%, color-mix(in srgb, black 30%, transparent), transparent 55%),
+  var(--color-bg); }
+a { color: var(--color-accent); text-decoration: none; }
+a:hover { color: var(--color-accent-300); }
+@keyframes reveal { from { opacity:0; transform:translateY(16px) } to { opacity:1; transform:none } }
+[data-reveal] { opacity: 0 }
+[data-reveal].in { animation: reveal .62s cubic-bezier(.2,.7,.2,1) both }
+@media (prefers-reduced-motion: reduce) { [data-reveal] { opacity:1 } [data-reveal].in { animation:none } }
+.btn, .card, .tag { transition: transform .18s ease, border-color .18s ease, background-color .18s ease, box-shadow .18s ease }
+.card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg) }
+.btn:hover { transform: translateY(-1px) }
+summary { cursor: pointer; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+details[open] summary span[data-chev] { transform: rotate(45deg); }
+</style>
+</helmet>
+
+<nav class="nav" style="position:sticky;top:0;z-index:20;padding-inline:max(clamp(20px,5vw,72px), calc((100% - 1200px) / 2 + clamp(20px,5vw,72px)));background:color-mix(in srgb, var(--color-bg) 88%, transparent);backdrop-filter:blur(10px)">
+  <span class="nav-brand" style="display:inline-flex;align-items:center;gap:8px;margin-right:auto;font-size:24px"><img src="assets/vantriq-logo.png" alt="Vantriq AI" style="width:40px;height:40px;flex:none;display:block;border-radius:9px">Vantriq AI</span>
+  <a href="Home.dc.html">Home</a>
+  <a href="How-It-Works.dc.html">How it works</a>
+  <a href="Industries.dc.html">Industries</a>
+  <a href="Pricing.dc.html" style="color:var(--color-accent)">Packages</a>
+  <a href="Contact.dc.html">Contact</a>
+  <a class="btn btn-primary" href="{{ waLink }}" target="_blank" rel="noopener">WhatsApp us</a>
+</nav>
+
+<div style="max-width:1200px;margin:0 auto;padding:0 clamp(20px,5vw,72px)">
+  <section style="padding:84px 0 56px">
+    <div style="display:flex;align-items:center;gap:20px;margin-bottom:14px">
+      <span style="width:44px;height:1px;background:var(--color-accent);flex:none"></span>
+      <span style="font-size:13px;line-height:14px;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-accent)">Packages</span>
+    </div>
+    <h1 style="font-size:clamp(36px,5vw,64px);line-height:1.11;letter-spacing:-0.015em;margin:0 0 0 -0.06em;max-width:20ch;color:#ecdcb4">Six tiers. One clear path as you grow.</h1>
+    <p style="font-size:17px;line-height:28px;max-width:56ch;margin:32px 0 0">A one-time setup fee plus a simple monthly plan, quoted in PKR after we scope your workflow. No USD surprises, and no charge for normal business volume.</p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:28px">
+      <a class="btn btn-primary" href="{{ waLink }}" target="_blank" rel="noopener" style="min-height:38px;padding-inline:16px">Request a quote on WhatsApp</a>
+      <a class="btn btn-ghost" href="Contact.dc.html" style="min-height:38px;padding-inline:16px">Send a brief</a>
+    </div>
+  </section>
+
+  <section style="padding:0 0 84px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px">
+      <div class="card elev-sm" style="padding:28px 26px 30px;gap:0">
+        <span class="card-kicker">Tier 01</span>
+        <h2 style="font-size:22px;line-height:1.2;margin:10px 0 6px">Starter</h2>
+        <p style="font-size:13px;letter-spacing:0.06em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 62%, transparent);margin:0 0 18px">Small business</p>
+        <p style="font-size:15px;line-height:26px;color:color-mix(in srgb, var(--color-text) 78%, transparent);margin:0 0 20px">WhatsApp only. One agent, your catalogue and FAQs, replying around the clock.</p>
+        <a class="btn btn-ghost" href="{{ waLink }}" target="_blank" rel="noopener" style="align-self:start">Request a quote</a>
+      </div>
+      <div class="card elev-sm" style="padding:28px 26px 30px;gap:0">
+        <span class="card-kicker">Tier 02</span>
+        <h2 style="font-size:22px;line-height:1.2;margin:10px 0 6px">Growth</h2>
+        <p style="font-size:13px;letter-spacing:0.06em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 62%, transparent);margin:0 0 18px">Medium corporate</p>
+        <p style="font-size:15px;line-height:26px;color:color-mix(in srgb, var(--color-text) 78%, transparent);margin:0 0 20px">Everything in Starter, plus CRM sync so every lead lands in your pipeline.</p>
+        <a class="btn btn-ghost" href="{{ waLink }}" target="_blank" rel="noopener" style="align-self:start">Request a quote</a>
+      </div>
+      <div class="card elev-sm" style="padding:28px 26px 30px;gap:0;box-shadow:var(--shadow-md);outline:1px solid var(--color-accent);outline-offset:-1px">
+        <span class="card-kicker">Tier 03 · Most chosen</span>
+        <h2 style="font-size:22px;line-height:1.2;margin:10px 0 6px">Scale</h2>
+        <p style="font-size:13px;letter-spacing:0.06em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 62%, transparent);margin:0 0 18px">Multi-location business</p>
+        <p style="font-size:15px;line-height:26px;color:color-mix(in srgb, var(--color-text) 78%, transparent);margin:0 0 20px">Adds your website as a channel, with location-aware routing and availability.</p>
+        <a class="btn btn-primary" href="{{ waLink }}" target="_blank" rel="noopener" style="align-self:start">Request a quote</a>
+      </div>
+      <div class="card elev-sm" style="padding:28px 26px 30px;gap:0">
+        <span class="card-kicker">Tier 04</span>
+        <h2 style="font-size:22px;line-height:1.2;margin:10px 0 6px">Pro</h2>
+        <p style="font-size:13px;letter-spacing:0.06em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 62%, transparent);margin:0 0 18px">Established corporate</p>
+        <p style="font-size:15px;line-height:26px;color:color-mix(in srgb, var(--color-text) 78%, transparent);margin:0 0 20px">Top-tier AI models across every channel your customers already use.</p>
+        <a class="btn btn-ghost" href="{{ waLink }}" target="_blank" rel="noopener" style="align-self:start">Request a quote</a>
+      </div>
+      <div class="card elev-sm" style="padding:28px 26px 30px;gap:0">
+        <span class="card-kicker">Tier 05</span>
+        <h2 style="font-size:22px;line-height:1.2;margin:10px 0 6px">Enterprise</h2>
+        <p style="font-size:13px;letter-spacing:0.06em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 62%, transparent);margin:0 0 18px">Large enterprise</p>
+        <p style="font-size:15px;line-height:26px;color:color-mix(in srgb, var(--color-text) 78%, transparent);margin:0 0 20px">Adds a private on-premise deployment option for strict data residency.</p>
+        <a class="btn btn-ghost" href="{{ waLink }}" target="_blank" rel="noopener" style="align-self:start">Request a quote</a>
+      </div>
+      <div class="card elev-sm" style="padding:28px 26px 30px;gap:0">
+        <span class="card-kicker">Tier 06</span>
+        <h2 style="font-size:22px;line-height:1.2;margin:10px 0 6px">Enterprise+</h2>
+        <p style="font-size:13px;letter-spacing:0.06em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 62%, transparent);margin:0 0 18px">Highest volume, custom</p>
+        <p style="font-size:15px;line-height:26px;color:color-mix(in srgb, var(--color-text) 78%, transparent);margin:0 0 20px">Custom SLA, custom integrations, and capacity for the highest message volumes.</p>
+        <a class="btn btn-ghost" href="{{ waLink }}" target="_blank" rel="noopener" style="align-self:start">Request a quote</a>
+      </div>
+    </div>
+    <p style="font-size:15px;line-height:28px;color:color-mix(in srgb, var(--color-text) 78%, transparent);margin:28px 0 0;max-width:64ch">Every plan includes a generous monthly conversation allowance, monthly tuning, and support — no surprise charges for normal business volume.</p>
+    <sc-if value="{{ showApiNote }}" hint-placeholder-val="{{ true }}">
+      <p style="font-size:13px;line-height:28px;color:color-mix(in srgb, var(--color-text) 55%, transparent);margin:8px 0 0">The WhatsApp Business API subscription is billed to you directly by the provider.</p>
+    </sc-if>
+  </section>
+
+  <hr style="height:1px;border:0;margin:0;background:linear-gradient(to right, transparent, var(--color-divider) 48px calc(100% - 48px), transparent)">
+
+  <section style="padding:84px 0">
+    <div style="display:flex;align-items:center;gap:20px;margin-bottom:14px">
+      <span style="width:44px;height:1px;background:var(--color-accent);flex:none"></span>
+      <span style="font-size:13px;line-height:14px;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-accent)">Questions</span>
+    </div>
+    <h2 style="font-size:clamp(28px,3.4vw,40px);line-height:1.15;letter-spacing:-0.012em;margin:0 0 40px">Before you ask us</h2>
+    <div style="display:grid;gap:1px;background:var(--color-neutral-700);max-width:900px">
+      <details style="background:var(--color-bg);padding:22px 0">
+        <summary style="display:flex;gap:20px;align-items:baseline;font-family:var(--font-heading);font-weight:500;font-size:18px;line-height:1.4"><span data-chev="" style="color:var(--color-accent);font-size:15px;transition:transform .18s ease">+</span>Why don't you list prices?</summary>
+        <p style="font-size:15.5px;line-height:28px;color:color-mix(in srgb, var(--color-text) 78%, transparent);margin:12px 0 0 35px;max-width:56ch">Because the setup fee depends on what the agent has to connect to. We quote a fixed setup fee and a fixed monthly plan in writing after a fifteen-minute discovery call — nothing is estimated after that.</p>
+      </details>
+      <details style="background:var(--color-bg);padding:22px 0">
+        <summary style="display:flex;gap:20px;align-items:baseline;font-family:var(--font-heading);font-weight:500;font-size:18px;line-height:1.4"><span data-chev="" style="color:var(--color-accent);font-size:15px;transition:transform .18s ease">+</span>How long until it is live?</summary>
+        <p style="font-size:15.5px;line-height:28px;color:color-mix(in srgb, var(--color-text) 78%, transparent);margin:12px 0 0 35px;max-width:56ch">Most agents are built, tested alongside your team, and live within a few weeks of scope sign-off. Complex integrations and on-premise deployments take longer, and we say so up front.</p>
+      </details>
+      <details style="background:var(--color-bg);padding:22px 0">
+        <summary style="display:flex;gap:20px;align-items:baseline;font-family:var(--font-heading);font-weight:500;font-size:18px;line-height:1.4"><span data-chev="" style="color:var(--color-accent);font-size:15px;transition:transform .18s ease">+</span>Will it answer in Urdu?</summary>
+        <p style="font-size:15.5px;line-height:28px;color:color-mix(in srgb, var(--color-text) 78%, transparent);margin:12px 0 0 35px;max-width:56ch">Yes — customers write the way they normally write, including Roman Urdu, and the agent replies in kind. Tone and vocabulary are tuned to your brand during configuration.</p>
+      </details>
+      <details style="background:var(--color-bg);padding:22px 0">
+        <summary style="display:flex;gap:20px;align-items:baseline;font-family:var(--font-heading);font-weight:500;font-size:18px;line-height:1.4"><span data-chev="" style="color:var(--color-accent);font-size:15px;transition:transform .18s ease">+</span>What happens when it doesn't know?</summary>
+        <p style="font-size:15.5px;line-height:28px;color:color-mix(in srgb, var(--color-text) 78%, transparent);margin:12px 0 0 35px;max-width:56ch">It escalates to your team with the full conversation attached, rather than guessing or looping. Recurring escalations are folded into the next monthly tuning round.</p>
+      </details>
+      <details style="background:var(--color-bg);padding:22px 0">
+        <summary style="display:flex;gap:20px;align-items:baseline;font-family:var(--font-heading);font-weight:500;font-size:18px;line-height:1.4"><span data-chev="" style="color:var(--color-accent);font-size:15px;transition:transform .18s ease">+</span>Where does our data live?</summary>
+        <p style="font-size:15.5px;line-height:28px;color:color-mix(in srgb, var(--color-text) 78%, transparent);margin:12px 0 0 35px;max-width:56ch">From simple catalogues to enterprise databases, we match handling to your sensitivity — including fully private, self-hosted deployment for strict data-residency requirements.</p>
+      </details>
+      <details style="background:var(--color-bg);padding:22px 0">
+        <summary style="display:flex;gap:20px;align-items:baseline;font-family:var(--font-heading);font-weight:500;font-size:18px;line-height:1.4"><span data-chev="" style="color:var(--color-accent);font-size:15px;transition:transform .18s ease">+</span>Can we move up a tier later?</summary>
+        <p style="font-size:15.5px;line-height:28px;color:color-mix(in srgb, var(--color-text) 78%, transparent);margin:12px 0 0 35px;max-width:56ch">Yes. Tiers are a path, not a lock-in — most clients start on the channel that matters most and add CRM, website, or extra channels as volume grows.</p>
+      </details>
+    </div>
+  </section>
+</div>
+
+<section style="background:radial-gradient(900px 420px at 85% -40%, color-mix(in srgb, var(--color-section-glow) 70%, transparent), transparent 64%), var(--color-section);padding:84px 0">
+  <div style="max-width:1200px;margin:0 auto;padding:0 clamp(20px,5vw,72px)">
+    <h2 style="font-size:clamp(28px,3.4vw,40px);line-height:1.15;letter-spacing:-0.012em;margin:0 0 12px">Get your numbers in writing.</h2>
+    <p style="font-size:16px;line-height:28px;color:color-mix(in srgb, var(--color-text) 82%, transparent);margin:0 0 28px;max-width:52ch">A fixed setup fee and monthly plan for your workflow, after one call.</p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <a class="btn btn-primary" href="{{ waLink }}" target="_blank" rel="noopener" style="min-height:38px;padding-inline:16px">Message us on WhatsApp</a>
+      <a class="btn btn-ghost" href="Contact.dc.html" style="min-height:38px;padding-inline:16px">Send a brief</a>
+    </div>
+  </div>
+</section>
+
+<footer style="max-width:1200px;margin:0 auto;padding:56px clamp(20px,5vw,72px);display:flex;flex-wrap:wrap;gap:20px 40px;justify-content:space-between;font-size:13px;line-height:28px;color:color-mix(in srgb, var(--color-text) 55%, transparent)">
+  <span>Vantriq AI · Intelligent automation for business · Islamabad, Pakistan</span>
+  <span style="display:flex;gap:20px;flex-wrap:wrap">
+    <a href="Home.dc.html">Home</a>
+    <a href="How-It-Works.dc.html">How it works</a>
+    <a href="Industries.dc.html">Industries</a>
+    <a href="Contact.dc.html">Contact</a>
+  </span>
+</footer>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;whatsappNumber&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;92XXXXXXXXXX&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Contact&quot;},&quot;showApiNote&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Packages&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const els = Array.from(document.querySelectorAll("section > *, footer > *"));
+    els.forEach((el) => el.setAttribute("data-reveal", ""));
+    const show = (el) => {
+      if (el.classList.contains("in")) return;
+      const sibs = Array.from(el.parentElement.children);
+      el.style.animationDelay = Math.min(sibs.indexOf(el), 5) * 70 + "ms";
+      el.classList.add("in");
+    };
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting || e.boundingClientRect.top < window.innerHeight) { show(e.target); io.unobserve(e.target); }
+      });
+      els.forEach((el) => { if (el.getBoundingClientRect().bottom < 0) { show(el); io.unobserve(el); } });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.05 });
+    els.forEach((el) => io.observe(el));
+    setTimeout(() => els.forEach(show), 2000);
+  }
+  renderVals() {
+    const num = (this.props.whatsappNumber ?? "92XXXXXXXXXX").replace(/[^0-9]/g, "");
+    return { waLink: "https://wa.me/" + num, showApiNote: this.props.showApiNote ?? true };
+  }
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/nocturne-342bff79-b6cd-4462-ab4c-bd6aec352c70/styles.css">
+<script src="_ds/nocturne-342bff79-b6cd-4462-ab4c-bd6aec352c70/_ds_bundle.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+body { margin:0; text-wrap:pretty; background:
+  radial-gradient(1200px 720px at 82% -160px, color-mix(in srgb, var(--color-accent-900) 75%, transparent), transparent 60%),
+  radial-gradient(1100px 800px at -10% 100%, color-mix(in srgb, black 30%, transparent), transparent 55%),
+  var(--color-bg); }
+a { color: var(--color-accent); text-decoration: none; }
+a:hover { color: var(--color-accent-300); }
+@keyframes reveal { from { opacity:0; transform:translateY(16px) } to { opacity:1; transform:none } }
+[data-reveal] { opacity: 0 }
+[data-reveal].in { animation: reveal .62s cubic-bezier(.2,.7,.2,1) both }
+@media (prefers-reduced-motion: reduce) { [data-reveal] { opacity:1 } [data-reveal].in { animation:none } }
+.btn, .card, .tag { transition: transform .18s ease, border-color .18s ease, background-color .18s ease, box-shadow .18s ease }
+.card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg) }
+.btn:hover { transform: translateY(-1px) }
+</style>
+</helmet>
+
+<nav class="nav" style="position:sticky;top:0;z-index:20;padding-inline:max(clamp(20px,5vw,72px), calc((100% - 1200px) / 2 + clamp(20px,5vw,72px)));background:color-mix(in srgb, var(--color-bg) 88%, transparent);backdrop-filter:blur(10px)">
+  <span class="nav-brand" style="display:inline-flex;align-items:center;gap:8px;margin-right:auto;font-size:24px"><img src="assets/vantriq-logo.png" alt="Vantriq AI" style="width:40px;height:40px;flex:none;display:block;border-radius:9px">Vantriq AI</span>
+  <a href="Home.dc.html">Home</a>
+  <a href="How-It-Works.dc.html" style="color:var(--color-accent)">How it works</a>
+  <a href="Industries.dc.html">Industries</a>
+  <a href="Pricing.dc.html">Packages</a>
+  <a href="Contact.dc.html">Contact</a>
+  <a class="btn btn-primary" href="{{ waLink }}" target="_blank" rel="noopener">WhatsApp us</a>
+</nav>
+
+<div style="max-width:1200px;margin:0 auto;padding:0 clamp(20px,5vw,72px)">
+  <section style="padding:84px 0 56px">
+    <div style="display:flex;align-items:center;gap:20px;margin-bottom:14px">
+      <span style="width:44px;height:1px;background:var(--color-accent);flex:none"></span>
+      <span style="font-size:13px;line-height:14px;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-accent)">How it works</span>
+    </div>
+    <h1 style="font-size:clamp(36px,5vw,64px);line-height:1.11;letter-spacing:-0.015em;margin:0 0 0 -0.06em;max-width:20ch;color:#ecdcb4">Three things your agent does, on repeat</h1>
+    <p style="font-size:17px;line-height:28px;max-width:54ch;margin:32px 0 0">One AI agent, configured around how your business actually runs.</p>
+  </section>
+
+  <section style="padding:0 0 84px;display:grid;gap:0">
+    <div style="display:grid;grid-template-columns:minmax(64px,120px) minmax(0,340px) minmax(0,1fr);gap:20px clamp(24px,4vw,72px);align-items:baseline;padding:42px 0">
+      <p style="font-family:var(--font-heading);font-weight:500;font-size:15px;color:var(--color-accent);margin:0;font-feature-settings:'tnum' 1">01</p>
+      <h2 style="font-size:26px;line-height:1.2;margin:0">Engage</h2>
+      <p style="font-size:15.5px;line-height:28px;color:color-mix(in srgb, var(--color-text) 78%, transparent);margin:0;max-width:52ch">Replies instantly on WhatsApp, Instagram, or your website — any hour, any volume, no queue. Natural language, not a menu tree: customers ask the way they actually speak, in English or Urdu, and get an answer in seconds.</p>
+    </div>
+    <div style="height:1px;background:linear-gradient(to right, transparent, var(--color-neutral-700) 48px calc(100% - 48px), transparent)"></div>
+    <div style="display:grid;grid-template-columns:minmax(64px,120px) minmax(0,340px) minmax(0,1fr);gap:20px clamp(24px,4vw,72px);align-items:baseline;padding:42px 0">
+      <p style="font-family:var(--font-heading);font-weight:500;font-size:15px;color:var(--color-accent);margin:0;font-feature-settings:'tnum' 1">02</p>
+      <h2 style="font-size:26px;line-height:1.2;margin:0">Execute</h2>
+      <p style="font-size:15.5px;line-height:28px;color:color-mix(in srgb, var(--color-text) 78%, transparent);margin:0;max-width:52ch">Books the appointment, shares the catalogue, checks availability, logs the lead in your CRM. Actions actually happen — the agent is connected to your calendar, inventory, and records, not just talking about them.</p>
+    </div>
+    <div style="height:1px;background:linear-gradient(to right, transparent, var(--color-neutral-700) 48px calc(100% - 48px), transparent)"></div>
+    <div style="display:grid;grid-template-columns:minmax(64px,120px) minmax(0,340px) minmax(0,1fr);gap:20px clamp(24px,4vw,72px);align-items:baseline;padding:42px 0">
+      <p style="font-family:var(--font-heading);font-weight:500;font-size:15px;color:var(--color-accent);margin:0;font-feature-settings:'tnum' 1">03</p>
+      <h2 style="font-size:26px;line-height:1.2;margin:0">Escalate</h2>
+      <p style="font-size:15.5px;line-height:28px;color:color-mix(in srgb, var(--color-text) 78%, transparent);margin:0;max-width:52ch">Hands to your team the moment judgement is needed — with the full conversation attached. Nothing is lost in the handover, and your staff spend their hours on the conversations that need a person.</p>
+    </div>
+  </section>
+
+  <hr style="height:1px;border:0;margin:0;background:linear-gradient(to right, transparent, var(--color-divider) 48px calc(100% - 48px), transparent)">
+
+  <section style="padding:84px 0">
+    <div style="display:flex;align-items:center;gap:20px;margin-bottom:14px">
+      <span style="width:44px;height:1px;background:var(--color-accent);flex:none"></span>
+      <span style="font-size:13px;line-height:14px;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-accent)">The difference</span>
+    </div>
+    <h2 style="font-size:clamp(28px,3.4vw,40px);line-height:1.15;letter-spacing:-0.012em;margin:0 0 12px">Not a chatbot. Not another hire.</h2>
+    <p style="font-size:15.5px;line-height:28px;color:color-mix(in srgb, var(--color-text) 78%, transparent);margin:0 0 36px;max-width:54ch">Compared honestly against the two things you're probably weighing instead.</p>
+    <div style="overflow-x:auto">
+      <table class="table" style="min-width:760px">
+        <thead>
+          <tr>
+            <th style="width:22%"></th>
+            <th>Hiring staff</th>
+            <th>A generic chatbot</th>
+            <th style="color:var(--color-accent)">Vantriq AI</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td style="color:color-mix(in srgb, var(--color-text) 62%, transparent)">24/7 cost</td><td>Two to three shifts of salary</td><td>A low monthly fee</td><td>Included in your plan</td></tr>
+          <tr><td style="color:color-mix(in srgb, var(--color-text) 62%, transparent)">Understanding</td><td>Full — but only on shift</td><td>Menu-driven only</td><td>Natural language, any hour</td></tr>
+          <tr><td style="color:color-mix(in srgb, var(--color-text) 62%, transparent)">Gets things done</td><td>Manually, yes</td><td>Static answers only</td><td>Books, checks stock, updates CRM</td></tr>
+          <tr><td style="color:color-mix(in srgb, var(--color-text) 62%, transparent)">The unexpected</td><td>Handles it — until hour eight</td><td>Breaks or loops</td><td>Handles new questions gracefully</td></tr>
+          <tr><td style="color:color-mix(in srgb, var(--color-text) 62%, transparent)">Consistency</td><td>Varies with mood and fatigue</td><td>Consistent but rigid</td><td>Consistent and flexible</td></tr>
+          <tr><td style="color:color-mix(in srgb, var(--color-text) 62%, transparent)">Long run</td><td>Learns, then eventually leaves</td><td>Frozen until reprogrammed</td><td>Tuned monthly, stays</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:13px;line-height:28px;color:color-mix(in srgb, var(--color-text) 55%, transparent);margin:20px 0 0">Cost comparison based on typical Pakistan market shift-coverage rates. <a href="Pricing.dc.html">Request a quote</a> for your figures.</p>
+  </section>
+
+  <hr style="height:1px;border:0;margin:0;background:linear-gradient(to right, transparent, var(--color-divider) 48px calc(100% - 48px), transparent)">
+
+  <section style="padding:84px 0">
+    <div style="display:flex;align-items:center;gap:20px;margin-bottom:14px">
+      <span style="width:44px;height:1px;background:var(--color-accent);flex:none"></span>
+      <span style="font-size:13px;line-height:14px;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-accent)">Under the hood</span>
+    </div>
+    <h2 style="font-size:clamp(28px,3.4vw,40px);line-height:1.15;letter-spacing:-0.012em;margin:0 0 12px;max-width:26ch">Enterprise-grade, without the enterprise headache</h2>
+    <p style="font-size:15.5px;line-height:28px;color:color-mix(in srgb, var(--color-text) 78%, transparent);margin:0 0 40px;max-width:54ch">You never touch the infrastructure — we run, monitor, and tune all of it.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
+      <div class="card elev-sm" style="padding:26px 24px 30px;gap:10px">
+        <span class="card-kicker">01</span>
+        <h3 class="card-title" style="font-size:19px">Smart AI models</h3>
+        <p class="card-body" style="font-size:15px;line-height:26px;color:color-mix(in srgb, var(--color-text) 78%, transparent);margin:0">The reasoning behind every reply, matched to your business's complexity and data sensitivity.</p>
+      </div>
+      <div class="card elev-sm" style="padding:26px 24px 30px;gap:10px">
+        <span class="card-kicker">02</span>
+        <h3 class="card-title" style="font-size:19px">Reliable automation</h3>
+        <p class="card-body" style="font-size:15px;line-height:26px;color:color-mix(in srgb, var(--color-text) 78%, transparent);margin:0">Connects to your calendar, CRM, and inventory so actions actually happen — not just chat.</p>
+      </div>
+      <div class="card elev-sm" style="padding:26px 24px 30px;gap:10px">
+        <span class="card-kicker">03</span>
+        <h3 class="card-title" style="font-size:19px">Secure data handling</h3>
+        <p class="card-body" style="font-size:15px;line-height:26px;color:color-mix(in srgb, var(--color-text) 78%, transparent);margin:0">From simple catalogues to enterprise databases, including fully private on-premise options.</p>
+      </div>
+      <div class="card elev-sm" style="padding:26px 24px 30px;gap:10px">
+        <span class="card-kicker">04</span>
+        <h3 class="card-title" style="font-size:19px">Where customers already are</h3>
+        <p class="card-body" style="font-size:15px;line-height:26px;color:color-mix(in srgb, var(--color-text) 78%, transparent);margin:0">WhatsApp, Instagram, Facebook — no app downloads, no new habits to teach.</p>
+      </div>
+    </div>
+    <p style="font-size:13px;line-height:28px;color:color-mix(in srgb, var(--color-text) 55%, transparent);margin:20px 0 0">Private, self-hosted deployment available for strict data-residency requirements.</p>
+  </section>
+
+  <hr style="height:1px;border:0;margin:0;background:linear-gradient(to right, transparent, var(--color-divider) 48px calc(100% - 48px), transparent)">
+
+  <section style="padding:84px 0">
+    <div style="display:flex;align-items:center;gap:20px;margin-bottom:14px">
+      <span style="width:44px;height:1px;background:var(--color-accent);flex:none"></span>
+      <span style="font-size:13px;line-height:14px;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-accent)">Getting started</span>
+    </div>
+    <h2 style="font-size:clamp(28px,3.4vw,40px);line-height:1.15;letter-spacing:-0.012em;margin:0 0 44px">How we get started</h2>
+    <ol style="list-style:none;margin:0;padding:0;display:grid;gap:1px;background:var(--color-neutral-700)">
+      <li style="background:var(--color-bg);display:grid;grid-template-columns:56px minmax(0,1fr);gap:24px;padding:24px 0">
+        <span style="font-family:var(--font-heading);font-weight:500;font-size:15px;color:var(--color-accent);font-feature-settings:'tnum' 1">1</span>
+        <span style="font-size:16px;line-height:28px">Discovery call — we map your customer workflow and where AI adds the most value</span>
+      </li>
+      <li style="background:var(--color-bg);display:grid;grid-template-columns:56px minmax(0,1fr);gap:24px;padding:24px 0">
+        <span style="font-family:var(--font-heading);font-weight:500;font-size:15px;color:var(--color-accent);font-feature-settings:'tnum' 1">2</span>
+        <span style="font-size:16px;line-height:28px">Proposal &amp; scope — a fixed setup fee and monthly plan, in writing, no surprises</span>
+      </li>
+      <li style="background:var(--color-bg);display:grid;grid-template-columns:56px minmax(0,1fr);gap:24px;padding:24px 0">
+        <span style="font-family:var(--font-heading);font-weight:500;font-size:15px;color:var(--color-accent);font-feature-settings:'tnum' 1">3</span>
+        <span style="font-size:16px;line-height:28px">Build &amp; configure — your agent trained on your catalogue, FAQs, and booking rules</span>
+      </li>
+      <li style="background:var(--color-bg);display:grid;grid-template-columns:56px minmax(0,1fr);gap:24px;padding:24px 0">
+        <span style="font-family:var(--font-heading);font-weight:500;font-size:15px;color:var(--color-accent);font-feature-settings:'tnum' 1">4</span>
+        <span style="font-size:16px;line-height:28px">Test &amp; launch — we run it alongside your team before it goes fully live</span>
+      </li>
+      <li style="background:var(--color-bg);display:grid;grid-template-columns:56px minmax(0,1fr);gap:24px;padding:24px 0">
+        <span style="font-family:var(--font-heading);font-weight:500;font-size:15px;color:var(--color-accent);font-feature-settings:'tnum' 1">5</span>
+        <span style="font-size:16px;line-height:28px">Ongoing management — monthly tuning, reporting, and support included in your plan</span>
+      </li>
+    </ol>
+  </section>
+</div>
+
+<section style="background:radial-gradient(900px 420px at 85% -40%, color-mix(in srgb, var(--color-section-glow) 70%, transparent), transparent 64%), var(--color-section);padding:84px 0">
+  <div style="max-width:1200px;margin:0 auto;padding:0 clamp(20px,5vw,72px)">
+    <h2 style="font-size:clamp(28px,3.4vw,40px);line-height:1.15;letter-spacing:-0.012em;margin:0 0 12px">Start with a discovery call.</h2>
+    <p style="font-size:16px;line-height:28px;color:color-mix(in srgb, var(--color-text) 82%, transparent);margin:0 0 28px;max-width:52ch">Fifteen minutes on how your customers message you today, and where an agent would earn its keep.</p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <a class="btn btn-primary" href="{{ waLink }}" target="_blank" rel="noopener" style="min-height:38px;padding-inline:16px">Message us on WhatsApp</a>
+      <a class="btn btn-ghost" href="Contact.dc.html" style="min-height:38px;padding-inline:16px">Send a brief instead</a>
+    </div>
+  </div>
+</section>
+
+<footer style="max-width:1200px;margin:0 auto;padding:56px clamp(20px,5vw,72px);display:flex;flex-wrap:wrap;gap:20px 40px;justify-content:space-between;font-size:13px;line-height:28px;color:color-mix(in srgb, var(--color-text) 55%, transparent)">
+  <span>Vantriq AI · Intelligent automation for business · Islamabad, Pakistan</span>
+  <span style="display:flex;gap:20px;flex-wrap:wrap">
+    <a href="Home.dc.html">Home</a>
+    <a href="Industries.dc.html">Industries</a>
+    <a href="Pricing.dc.html">Packages</a>
+    <a href="Contact.dc.html">Contact</a>
+  </span>
+</footer>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;whatsappNumber&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;92XXXXXXXXXX&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Contact&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const els = Array.from(document.querySelectorAll("section > *, footer > *"));
+    els.forEach((el) => el.setAttribute("data-reveal", ""));
+    const show = (el) => {
+      if (el.classList.contains("in")) return;
+      const sibs = Array.from(el.parentElement.children);
+      el.style.animationDelay = Math.min(sibs.indexOf(el), 5) * 70 + "ms";
+      el.classList.add("in");
+    };
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting || e.boundingClientRect.top < window.innerHeight) { show(e.target); io.unobserve(e.target); }
+      });
+      els.forEach((el) => { if (el.getBoundingClientRect().bottom < 0) { show(el); io.unobserve(el); } });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.05 });
+    els.forEach((el) => io.observe(el));
+    setTimeout(() => els.forEach(show), 2000);
+  }
+  renderVals() {
+    const num = (this.props.whatsappNumber ?? "92XXXXXXXXXX").replace(/[^0-9]/g, "");
+    return { waLink: "https://wa.me/" + num };
+  }
+}
+
+</script>
+</body>
+</html>
