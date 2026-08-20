@@ -1,5 +1,6 @@
 import CtaBand from "@/components/CtaBand";
 import Footer from "@/components/Footer";
+import MotionBackground from "@/components/MotionBackground";
 import SplitHeader from "@/components/SplitHeader";
 import { waLink } from "@/lib/whatsapp";
 
@@ -84,55 +85,58 @@ export default function Pricing() {
   return (
     <>
       <div style={shell}>
-        <section style={{ padding: "clamp(48px,7vw,88px) 0 clamp(40px,6vw,72px)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(24px,4vw,44px)" }}>
-            <span
+        <section style={{ padding: "clamp(48px,7vw,88px) 0 clamp(40px,6vw,72px)", position: "relative", overflow: "hidden" }}>
+          <MotionBackground />
+          <div style={{ position: "relative", zIndex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(24px,4vw,44px)" }}>
+              <span
+                style={{
+                  fontFamily: "var(--font-heading)",
+                  fontWeight: 800,
+                  fontSize: 12,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: "var(--color-accent)",
+                }}
+              >
+                Packages
+              </span>
+              <span style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
+            </div>
+            <h1 style={{ fontSize: "clamp(32px,5vw,62px)", lineHeight: 1, letterSpacing: "-0.03em", margin: 0, maxWidth: "17ch" }}>
+              Six tiers. One clear path as you grow.
+            </h1>
+            <div
               style={{
-                fontFamily: "var(--font-heading)",
-                fontWeight: 800,
-                fontSize: 12,
-                letterSpacing: "0.14em",
-                textTransform: "uppercase",
-                color: "var(--color-accent)",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))",
+                gap: "24px clamp(24px,5vw,80px)",
+                marginTop: "clamp(28px,4vw,48px)",
+                alignItems: "end",
               }}
             >
-              Packages
-            </span>
-            <span style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
-          </div>
-          <h1 style={{ fontSize: "clamp(32px,5vw,62px)", lineHeight: 1, letterSpacing: "-0.03em", margin: 0, maxWidth: "17ch" }}>
-            Six tiers. One clear path as you grow.
-          </h1>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))",
-              gap: "24px clamp(24px,5vw,80px)",
-              marginTop: "clamp(28px,4vw,48px)",
-              alignItems: "end",
-            }}
-          >
-            <p style={{ fontSize: 17, lineHeight: "29px", maxWidth: "52ch", margin: 0 }}>
-              A one-time setup fee plus a simple monthly plan, quoted in PKR after we scope your workflow. No USD
-              surprises, and no charge for normal business volume.
-            </p>
-            <div style={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-              <a
-                className="btn btn-primary"
-                href={waLink()}
-                target="_blank"
-                rel="noopener"
-                style={{ minHeight: 52, paddingInline: 22, fontSize: 15, justifyContent: "flex-start" }}
-              >
-                Request a quote on WhatsApp
-              </a>
-              <a
-                className="btn btn-secondary"
-                href="/contact"
-                style={{ minHeight: 52, paddingInline: 22, fontSize: 15, justifyContent: "flex-start", borderWidth: 2 }}
-              >
-                Send a brief
-              </a>
+              <p style={{ fontSize: 17, lineHeight: "29px", maxWidth: "52ch", margin: 0 }}>
+                A one-time setup fee plus a simple monthly plan, quoted in PKR after we scope your workflow. No USD
+                surprises, and no charge for normal business volume.
+              </p>
+              <div style={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                <a
+                  className="btn btn-primary"
+                  href={waLink()}
+                  target="_blank"
+                  rel="noopener"
+                  style={{ minHeight: 52, paddingInline: 22, fontSize: 15, justifyContent: "flex-start" }}
+                >
+                  Request a quote on WhatsApp
+                </a>
+                <a
+                  className="btn btn-secondary"
+                  href="/contact"
+                  style={{ minHeight: 52, paddingInline: 22, fontSize: 15, justifyContent: "flex-start", borderWidth: 2 }}
+                >
+                  Send a brief
+                </a>
+              </div>
             </div>
           </div>
         </section>

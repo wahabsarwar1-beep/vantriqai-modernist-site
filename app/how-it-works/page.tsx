@@ -1,5 +1,6 @@
 import CtaBand from "@/components/CtaBand";
 import Footer from "@/components/Footer";
+import MotionBackground from "@/components/MotionBackground";
 import SplitHeader from "@/components/SplitHeader";
 
 const bodyMuted = { color: "color-mix(in srgb, var(--color-text) 78%, transparent)" };
@@ -69,28 +70,31 @@ export default function HowItWorks() {
   return (
     <>
       <div style={shell}>
-        <section style={{ padding: "clamp(48px,7vw,88px) 0 clamp(40px,6vw,72px)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(24px,4vw,44px)" }}>
-            <span
-              style={{
-                fontFamily: "var(--font-heading)",
-                fontWeight: 800,
-                fontSize: 12,
-                letterSpacing: "0.14em",
-                textTransform: "uppercase",
-                color: "var(--color-accent)",
-              }}
-            >
-              How it works
-            </span>
-            <span style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
+        <section style={{ padding: "clamp(48px,7vw,88px) 0 clamp(40px,6vw,72px)", position: "relative", overflow: "hidden" }}>
+          <MotionBackground />
+          <div style={{ position: "relative", zIndex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(24px,4vw,44px)" }}>
+              <span
+                style={{
+                  fontFamily: "var(--font-heading)",
+                  fontWeight: 800,
+                  fontSize: 12,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: "var(--color-accent)",
+                }}
+              >
+                How it works
+              </span>
+              <span style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
+            </div>
+            <h1 style={{ fontSize: "clamp(32px,5vw,60px)", lineHeight: 1, letterSpacing: "-0.03em", margin: 0, maxWidth: "18ch" }}>
+              Three things your agent does, on repeat
+            </h1>
+            <p style={{ fontSize: 18, lineHeight: "30px", maxWidth: "52ch", margin: "32px 0 0" }}>
+              One AI agent, configured around how your business actually runs.
+            </p>
           </div>
-          <h1 style={{ fontSize: "clamp(32px,5vw,60px)", lineHeight: 1, letterSpacing: "-0.03em", margin: 0, maxWidth: "18ch" }}>
-            Three things your agent does, on repeat
-          </h1>
-          <p style={{ fontSize: 18, lineHeight: "30px", maxWidth: "52ch", margin: "32px 0 0" }}>
-            One AI agent, configured around how your business actually runs.
-          </p>
         </section>
 
         <section style={{ padding: "0 0 clamp(56px,8vw,96px)" }}>

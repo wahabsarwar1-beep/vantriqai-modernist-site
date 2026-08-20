@@ -12,7 +12,7 @@ export default function Nav() {
   return (
     <nav className="nav" style={{ position: "sticky", top: 0, zIndex: 20 }}>
       <Link href="/" className="nav-brand">
-        <Logo height={46} />
+        <Logo className="nav-logo" />
       </Link>
 
       <div className="nav-links">
@@ -28,7 +28,7 @@ export default function Nav() {
       </div>
 
       <a
-        className="btn btn-primary"
+        className="btn btn-primary nav-cta"
         href={waLink()}
         target="_blank"
         rel="noopener"

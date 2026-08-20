@@ -1,5 +1,6 @@
 import CtaBand from "@/components/CtaBand";
 import Footer from "@/components/Footer";
+import MotionBackground from "@/components/MotionBackground";
 
 const SECTORS = [
   {
@@ -58,28 +59,31 @@ export default function Industries() {
   return (
     <>
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" }}>
-        <section style={{ padding: "clamp(48px,7vw,88px) 0 clamp(40px,6vw,72px)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(24px,4vw,44px)" }}>
-            <span
-              style={{
-                fontFamily: "var(--font-heading)",
-                fontWeight: 800,
-                fontSize: 12,
-                letterSpacing: "0.14em",
-                textTransform: "uppercase",
-                color: "var(--color-accent)",
-              }}
-            >
-              Where it applies
-            </span>
-            <span style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
+        <section style={{ padding: "clamp(48px,7vw,88px) 0 clamp(40px,6vw,72px)", position: "relative", overflow: "hidden" }}>
+          <MotionBackground />
+          <div style={{ position: "relative", zIndex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(24px,4vw,44px)" }}>
+              <span
+                style={{
+                  fontFamily: "var(--font-heading)",
+                  fontWeight: 800,
+                  fontSize: 12,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: "var(--color-accent)",
+                }}
+              >
+                Where it applies
+              </span>
+              <span style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
+            </div>
+            <h1 style={{ fontSize: "clamp(34px,5.4vw,68px)", lineHeight: 0.98, letterSpacing: "-0.03em", margin: 0, maxWidth: "16ch" }}>
+              <span style={{ color: "var(--color-accent)" }}>Every</span> sector, one platform
+            </h1>
+            <p style={{ fontSize: 18, lineHeight: "30px", maxWidth: "52ch", margin: "32px 0 0" }}>
+              The same core agent, tuned to the workflow of each sector — your catalogue, your booking rules, your tone.
+            </p>
           </div>
-          <h1 style={{ fontSize: "clamp(34px,5.4vw,68px)", lineHeight: 0.98, letterSpacing: "-0.03em", margin: 0, maxWidth: "16ch" }}>
-            <span style={{ color: "var(--color-accent)" }}>Every</span> sector, one platform
-          </h1>
-          <p style={{ fontSize: 18, lineHeight: "30px", maxWidth: "52ch", margin: "32px 0 0" }}>
-            The same core agent, tuned to the workflow of each sector — your catalogue, your booking rules, your tone.
-          </p>
         </section>
       </div>
 

@@ -1,6 +1,7 @@
 import ChatDemo from "@/components/ChatDemo";
 import CtaBand from "@/components/CtaBand";
 import Footer from "@/components/Footer";
+import MotionBackground from "@/components/MotionBackground";
 import SplitHeader from "@/components/SplitHeader";
 import { waLink } from "@/lib/whatsapp";
 
@@ -77,56 +78,59 @@ export default function Home() {
   return (
     <>
       <div style={shell}>
-        <section style={{ padding: "clamp(56px,9vw,110px) 0 clamp(48px,7vw,90px)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(28px,5vw,54px)" }}>
-            <span
+        <section style={{ padding: "clamp(56px,9vw,110px) 0 clamp(48px,7vw,90px)", position: "relative", overflow: "hidden" }}>
+          <MotionBackground />
+          <div style={{ position: "relative", zIndex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(28px,5vw,54px)" }}>
+              <span
+                style={{
+                  fontFamily: "var(--font-heading)",
+                  fontWeight: 800,
+                  fontSize: 12,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: "var(--color-text)",
+                }}
+              >
+                Vantriq<span style={{ color: "var(--color-accent)" }}>AI</span>
+              </span>
+              <span style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
+            </div>
+            <h1 style={{ fontSize: "clamp(38px,6vw,76px)", lineHeight: 0.98, letterSpacing: "-0.03em", margin: 0, maxWidth: "16ch" }}>
+              <span style={{ display: "block" }}>Never miss another</span>
+              <span style={{ display: "block", color: "var(--color-accent)" }}>customer message.</span>
+            </h1>
+            <div
               style={{
-                fontFamily: "var(--font-heading)",
-                fontWeight: 800,
-                fontSize: 12,
-                letterSpacing: "0.14em",
-                textTransform: "uppercase",
-                color: "var(--color-text)",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))",
+                gap: "24px clamp(24px,5vw,80px)",
+                marginTop: "clamp(32px,4vw,56px)",
+                alignItems: "end",
               }}
             >
-              Vantriq<span style={{ color: "var(--color-accent)" }}>AI</span>
-            </span>
-            <span style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
-          </div>
-          <h1 style={{ fontSize: "clamp(38px,6vw,76px)", lineHeight: 0.98, letterSpacing: "-0.03em", margin: 0, maxWidth: "16ch" }}>
-            <span style={{ display: "block" }}>Never miss another</span>
-            <span style={{ display: "block", color: "var(--color-accent)" }}>customer message.</span>
-          </h1>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))",
-              gap: "24px clamp(24px,5vw,80px)",
-              marginTop: "clamp(32px,4vw,56px)",
-              alignItems: "end",
-            }}
-          >
-            <p style={{ fontSize: 18, lineHeight: "30px", maxWidth: "48ch", margin: 0 }}>
-              AI agents that reply, qualify, and book — 24 hours a day. On WhatsApp, Instagram, and your website, in
-              seconds, at any volume.
-            </p>
-            <div style={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-              <a
-                className="btn btn-primary"
-                href={waLink()}
-                target="_blank"
-                rel="noopener"
-                style={{ minHeight: 52, paddingInline: 22, justifyContent: "flex-start", fontSize: 15, letterSpacing: "0.02em" }}
-              >
-                Message us on WhatsApp
-              </a>
-              <a
-                className="btn btn-secondary"
-                href="/how-it-works"
-                style={{ minHeight: 52, paddingInline: 22, justifyContent: "flex-start", fontSize: 15, letterSpacing: "0.02em", borderWidth: 2 }}
-              >
-                See how it works
-              </a>
+              <p style={{ fontSize: 18, lineHeight: "30px", maxWidth: "48ch", margin: 0 }}>
+                AI agents that reply, qualify, and book — 24 hours a day. On WhatsApp, Instagram, and your website, in
+                seconds, at any volume.
+              </p>
+              <div style={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                <a
+                  className="btn btn-primary"
+                  href={waLink()}
+                  target="_blank"
+                  rel="noopener"
+                  style={{ minHeight: 52, paddingInline: 22, justifyContent: "flex-start", fontSize: 15, letterSpacing: "0.02em" }}
+                >
+                  Message us on WhatsApp
+                </a>
+                <a
+                  className="btn btn-secondary"
+                  href="/how-it-works"
+                  style={{ minHeight: 52, paddingInline: 22, justifyContent: "flex-start", fontSize: 15, letterSpacing: "0.02em", borderWidth: 2 }}
+                >
+                  See how it works
+                </a>
+              </div>
             </div>
           </div>
         </section>
