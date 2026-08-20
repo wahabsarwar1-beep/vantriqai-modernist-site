@@ -11,6 +11,7 @@ export default function SplitHeader({ kicker, children }: SplitHeaderProps) {
   return (
     <div className="split-header">
       <p
+        data-anim="rise"
         style={{
           fontFamily: "var(--font-heading)",
           fontWeight: 800,

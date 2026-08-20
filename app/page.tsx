@@ -1,3 +1,4 @@
+import BrandName from "@/components/BrandName";
 import ChatDemo from "@/components/ChatDemo";
 import CtaBand from "@/components/CtaBand";
 import Footer from "@/components/Footer";
@@ -9,15 +10,27 @@ const bodyMuted = { color: "color-mix(in srgb, var(--color-text) 78%, transparen
 
 const STATS = [
   {
-    value: "~400%",
+    value: (
+      <>
+        ~<span data-count="400">400</span>%
+      </>
+    ),
     label: "More leads convert when you reply within two minutes instead of hours",
   },
   {
-    value: "20–30%",
+    value: (
+      <>
+        <span data-count="20">20</span>–<span data-count="30">30</span>%
+      </>
+    ),
     label: "Revenue typically lost to after-hours and peak-rush messages that go unanswered",
   },
   {
-    value: "24/7",
+    value: (
+      <>
+        <span data-count="24">24</span>/<span data-count="7">7</span>
+      </>
+    ),
     label: "The coverage your AI-equipped competitors already have — and you may not",
   },
 ];
@@ -74,31 +87,74 @@ const WHY = [
 
 const shell = { maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" };
 
+function MarqueeTrack({ ariaHidden }: { ariaHidden?: boolean }) {
+  return (
+    <div aria-hidden={ariaHidden} style={{ display: "flex", alignItems: "center" }}>
+      {INDUSTRIES.map((name) => (
+        <span
+          key={name}
+          style={{
+            fontFamily: "var(--font-heading)",
+            fontWeight: 800,
+            fontSize: "clamp(26px,3.6vw,50px)",
+            letterSpacing: "-0.03em",
+            padding: "0 26px",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {name}
+          <span style={{ color: "var(--color-accent)", paddingLeft: 26 }}>/</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function Home() {
   return (
     <>
       <div style={shell}>
         <section style={{ padding: "clamp(56px,9vw,110px) 0 clamp(48px,7vw,90px)", position: "relative", overflow: "hidden" }}>
           <MotionBackground />
+          <span
+            data-par="0.10"
+            aria-hidden="true"
+            style={{ position: "absolute", right: "6%", top: "12%", width: 120, height: 120, border: "2px solid var(--color-accent)", pointerEvents: "none" }}
+          />
+          <span
+            data-par="-0.10"
+            aria-hidden="true"
+            style={{ position: "absolute", right: "13%", top: "30%", width: 56, height: 56, background: "var(--color-accent)", opacity: 0.9, pointerEvents: "none" }}
+          />
+          <span
+            data-par="0.22"
+            aria-hidden="true"
+            style={{ position: "absolute", right: "34%", top: "8%", width: 22, height: 22, background: "var(--color-text)", pointerEvents: "none" }}
+          />
+          <span
+            data-par="-0.08"
+            aria-hidden="true"
+            style={{ position: "absolute", right: "2%", top: "70%", width: 180, height: 2, background: "var(--color-text)", opacity: 0.5, pointerEvents: "none" }}
+          />
+
           <div style={{ position: "relative", zIndex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(28px,5vw,54px)" }}>
-              <span
-                style={{
-                  fontFamily: "var(--font-heading)",
-                  fontWeight: 800,
-                  fontSize: 12,
-                  letterSpacing: "0.14em",
-                  textTransform: "uppercase",
-                  color: "var(--color-text)",
-                }}
-              >
-                Vantriq<span style={{ color: "var(--color-accent)" }}>AI</span>
+              <span data-anim="rise" style={{ fontSize: 13, letterSpacing: "0.08em" }}>
+                <BrandName inkColor="var(--color-text)" />
               </span>
-              <span style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
+              <span data-anim="rule" style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
             </div>
             <h1 style={{ fontSize: "clamp(38px,6vw,76px)", lineHeight: 0.98, letterSpacing: "-0.03em", margin: 0, maxWidth: "16ch" }}>
-              <span style={{ display: "block" }}>Never miss another</span>
-              <span style={{ display: "block", color: "var(--color-accent)" }}>customer message.</span>
+              <span style={{ display: "block", overflow: "hidden" }}>
+                <span data-line="" style={{ display: "block" }}>
+                  Never miss another
+                </span>
+              </span>
+              <span style={{ display: "block", overflow: "hidden" }}>
+                <span data-line="" style={{ display: "block", color: "var(--color-accent)" }}>
+                  customer message.
+                </span>
+              </span>
             </h1>
             <div
               style={{
@@ -109,11 +165,11 @@ export default function Home() {
                 alignItems: "end",
               }}
             >
-              <p style={{ fontSize: 18, lineHeight: "30px", maxWidth: "48ch", margin: 0 }}>
+              <p data-anim="rise" style={{ fontSize: 18, lineHeight: "30px", maxWidth: "48ch", margin: 0 }}>
                 AI agents that reply, qualify, and book — 24 hours a day. On WhatsApp, Instagram, and your website, in
                 seconds, at any volume.
               </p>
-              <div style={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+              <div data-anim="rise" style={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
                 <a
                   className="btn btn-primary"
                   href={waLink()}
@@ -137,9 +193,24 @@ export default function Home() {
       </div>
 
       <section style={{ borderTop: "2px solid var(--color-divider)", borderBottom: "2px solid var(--color-divider)", background: "var(--color-divider)" }}>
-        <div style={{ maxWidth: 1280, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 2 }}>
-          {STATS.map((stat) => (
-            <div key={stat.value} className="cell-hover" style={{ background: "var(--color-bg)", padding: "clamp(28px,4vw,52px) clamp(20px,3vw,44px)" }}>
+        <div
+          style={{
+            maxWidth: 1280,
+            margin: "0 auto",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))",
+            gap: 2,
+            background: "var(--color-bg)",
+            overflow: "hidden",
+          }}
+        >
+          {STATS.map((stat, i) => (
+            <div
+              key={i}
+              data-anim="rise"
+              className="cell-hover"
+              style={{ background: "var(--color-bg)", padding: "clamp(28px,4vw,52px) clamp(20px,3vw,44px)", boxShadow: "2px 2px 0 0 var(--color-divider)" }}
+            >
               <p
                 style={{
                   fontFamily: "var(--font-heading)",
@@ -174,83 +245,103 @@ export default function Home() {
       <div style={shell}>
         <section style={{ padding: "clamp(56px,8vw,104px) 0 clamp(24px,3vw,40px)" }}>
           <SplitHeader kicker="Live — the agent answering">
-            <h2 style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px", maxWidth: "20ch" }}>
+            <h2 data-anim="rise" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px", maxWidth: "20ch" }}>
               This is what your customer sees.
             </h2>
-            <p style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 32px", maxWidth: "50ch", ...bodyMuted }}>
+            <p data-anim="rise" style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 32px", maxWidth: "50ch", ...bodyMuted }}>
               An exchange replayed at the speed the agent actually answers — no queue, no office hours.
             </p>
-            <ChatDemo />
+            <div data-anim="rise">
+              <ChatDemo />
+            </div>
           </SplitHeader>
         </section>
+      </div>
 
-        <section style={{ padding: "clamp(56px,8vw,104px) 0 clamp(32px,4vw,48px)" }}>
-          <SplitHeader kicker="01 — The problem">
-            <h2 style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: 0, maxWidth: "20ch" }}>
-              Your customers message at midnight. Does anyone reply?
-            </h2>
-            <p style={{ fontSize: 16, lineHeight: "28px", margin: "24px 0 0", maxWidth: "52ch", ...bodyMuted }}>
-              WhatsApp is where business happens in Pakistan — but most businesses still answer it by hand. Every
-              missed message is a customer who found someone faster.
-            </p>
-          </SplitHeader>
-        </section>
+      {/* scroll-pinned three-step stage */}
+        <div data-pin="" style={{ position: "relative", height: "320vh", borderTop: "2px solid var(--color-divider)", background: "var(--color-bg)" }}>
+          <div style={{ position: "sticky", top: 0, height: "100vh", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+            <div style={{ maxWidth: 1280, width: "100%", margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(24px,4vw,44px)" }}>
+                <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)" }}>
+                  01 — What it does
+                </span>
+                <span style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
+                <span data-pin-count="" style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.14em" }}>
+                  01 / 03
+                </span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: "clamp(24px,5vw,72px)", alignItems: "center" }}>
+                <div style={{ position: "relative", minHeight: "min(46vh,340px)" }}>
+                  {STEPS.map((step) => (
+                    <div key={step.n} data-pin-panel="" style={{ position: "absolute", inset: 0 }}>
+                      <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(64px,12vw,150px)", lineHeight: 0.86, letterSpacing: "-0.05em", margin: 0, color: "var(--color-accent)" }}>
+                        {step.n}
+                      </p>
+                      <h2 style={{ fontSize: "clamp(30px,4.4vw,58px)", lineHeight: 1, letterSpacing: "-0.03em", margin: "12px 0 18px" }}>{step.title}</h2>
+                      <p style={{ fontSize: 17, lineHeight: "29px", margin: 0, maxWidth: "44ch", ...bodyMuted }}>{step.body}</p>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "grid", gap: 2, background: "var(--color-divider)", border: "2px solid var(--color-divider)" }}>
+                  {STEPS.map((step) => (
+                    <div
+                      key={step.n}
+                      data-pin-row=""
+                      style={{ background: "var(--color-bg)", padding: "22px 24px", display: "flex", alignItems: "baseline", gap: 18, transition: "background-color .35s ease, color .35s ease" }}
+                    >
+                      <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.12em" }}>{step.n}</span>
+                      <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(20px,2.4vw,30px)", letterSpacing: "-0.02em" }}>{step.title}</span>
+                    </div>
+                  ))}
+                  <div style={{ background: "var(--color-bg)", padding: "18px 24px" }}>
+                    <span data-pin-rail="" style={{ display: "block", height: 4, background: "var(--color-accent)", transformOrigin: "left", transform: "scaleX(0.04)" }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
-        <section style={{ padding: "0 0 clamp(56px,8vw,96px)" }}>
-          <div
+        {/* industries marquee */}
+        <section style={{ borderTop: "2px solid var(--color-divider)", borderBottom: "2px solid var(--color-divider)", padding: "clamp(28px,4vw,48px) 0", overflow: "hidden" }}>
+          <p
+            data-anim="rise"
             style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))",
-              gap: 2,
-              background: "var(--color-divider)",
-              borderTop: "2px solid var(--color-divider)",
-              borderBottom: "2px solid var(--color-divider)",
+              maxWidth: 1280,
+              margin: "0 auto 22px",
+              padding: "0 clamp(20px,5vw,64px)",
+              fontFamily: "var(--font-heading)",
+              fontWeight: 800,
+              fontSize: 12,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: "var(--color-accent)",
             }}
           >
-            {STEPS.map((step) => (
-              <div key={step.n} className="cell-hover" style={{ background: "var(--color-bg)", padding: "32px 28px 40px" }}>
-                <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 13, letterSpacing: "0.1em", color: "var(--color-accent)", margin: "0 0 22px", fontFeatureSettings: "'tnum' 1" }}>
-                  {step.n}
-                </p>
-                <h3 style={{ fontSize: 28, lineHeight: 1.05, letterSpacing: "-0.025em", margin: "0 0 14px" }}>{step.title}</h3>
-                <p style={{ fontSize: 15.5, lineHeight: "27px", margin: 0, ...bodyMuted }}>{step.body}</p>
-              </div>
-            ))}
-          </div>
-          <p style={{ fontSize: 13, lineHeight: "26px", color: "color-mix(in srgb, var(--color-text) 55%, transparent)", margin: "20px 0 0" }}>
-            One partner — strategy, build, and ongoing management. <a href="/how-it-works">See what runs under the hood</a>
+            02 — Where it applies
           </p>
+          <div style={{ display: "flex", width: "max-content", animation: "marquee 34s linear infinite" }}>
+            <MarqueeTrack />
+            <MarqueeTrack ariaHidden />
+          </div>
         </section>
 
-        <section style={{ padding: "0 0 clamp(56px,8vw,96px)" }}>
-          <SplitHeader kicker="02 — Where it applies">
-            <h2 style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px" }}>
-              Built for your industry
-            </h2>
-            <p style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 34px", maxWidth: "52ch", ...bodyMuted }}>
-              The same core agent, tuned to the workflow of each sector.
-            </p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {INDUSTRIES.map((name) => (
-                <span key={name} className="tag tag-outline" style={{ fontSize: 13, padding: "9px 16px", fontFamily: "var(--font-heading)", fontWeight: 800, letterSpacing: "0.02em" }}>
-                  {name}
-                </span>
-              ))}
-            </div>
-            <p style={{ fontSize: 13, lineHeight: "26px", color: "color-mix(in srgb, var(--color-text) 55%, transparent)", margin: "24px 0 0" }}>
-              Not listed? The agent adapts — <a href="/industries">see the sector workflows</a>.
-            </p>
-          </SplitHeader>
-        </section>
-
-        <section style={{ padding: "0 0 clamp(56px,8vw,104px)" }}>
-          <SplitHeader kicker={<>03 — Why <span style={{ color: "var(--color-text)" }}>Vantriq</span>AI</>}>
-            <h2 style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 44px", maxWidth: "22ch" }}>
+      <div style={shell}>
+        <section style={{ padding: "clamp(56px,8vw,96px) 0" }}>
+          <SplitHeader
+            kicker={
+              <>
+                03 — Why <BrandName inkColor="var(--color-text)" />
+              </>
+            }
+          >
+            <h2 data-anim="rise" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 44px", maxWidth: "22ch" }}>
               A local partner, not a faceless subscription
             </h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: "36px clamp(24px,4vw,64px)" }}>
               {WHY.map((item) => (
-                <div key={item.title} className="why-block" style={{ borderTop: "2px solid var(--color-divider)", paddingTop: 18 }}>
+                <div key={item.title} data-anim="rise" className="why-block" style={{ borderTop: "2px solid var(--color-divider)", paddingTop: 18 }}>
                   <h3 style={{ fontSize: 21, lineHeight: 1.15, letterSpacing: "-0.02em", margin: "0 0 12px" }}>{item.title}</h3>
                   <p style={{ fontSize: 15.5, lineHeight: "27px", margin: 0, maxWidth: "44ch", ...bodyMuted }}>{item.body}</p>
                 </div>

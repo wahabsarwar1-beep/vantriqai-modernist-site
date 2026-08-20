@@ -63,6 +63,7 @@ export default function Contact() {
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(24px,4vw,44px)" }}>
                 <span
+                  data-anim="rise"
                   style={{
                     fontFamily: "var(--font-heading)",
                     fontWeight: 800,
@@ -74,15 +75,19 @@ export default function Contact() {
                 >
                   Contact
                 </span>
-                <span style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
+                <span data-anim="rule" style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
               </div>
               <h1 style={{ fontSize: "clamp(36px,5.6vw,72px)", lineHeight: 0.96, letterSpacing: "-0.03em", margin: 0 }}>
-                Let&rsquo;s talk.
+                <span style={{ display: "block", overflow: "hidden" }}>
+                  <span data-line="" style={{ display: "block" }}>
+                    Let&rsquo;s <span style={{ color: "var(--color-accent)" }}>talk.</span>
+                  </span>
+                </span>
               </h1>
-              <p style={{ fontSize: 18, lineHeight: "30px", maxWidth: "44ch", margin: "28px 0 0" }}>
+              <p data-anim="rise" style={{ fontSize: 18, lineHeight: "30px", maxWidth: "44ch", margin: "28px 0 0" }}>
                 The fastest way to reach us is the same channel we build on. Message us and see the agent answer.
               </p>
-              <div style={{ display: "flex", gap: 2, flexWrap: "wrap", marginTop: 28 }}>
+              <div data-anim="rise" style={{ display: "flex", gap: 2, flexWrap: "wrap", marginTop: 28 }}>
                 <a
                   className="btn btn-primary"
                   href={waLink()}
@@ -97,6 +102,7 @@ export default function Contact() {
                 {INFO_ROWS.map((row, i) => (
                   <div
                     key={row.label}
+                    data-anim="rise"
                     className="row-hover"
                     style={{
                       borderTop: "2px solid var(--color-divider)",
@@ -111,7 +117,9 @@ export default function Contact() {
               </div>
             </div>
 
-            <ContactForm />
+            <div data-anim="rise">
+              <ContactForm />
+            </div>
           </div>
         </section>
       </div>

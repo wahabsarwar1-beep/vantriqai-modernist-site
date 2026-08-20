@@ -102,17 +102,10 @@ figcaption {
 ::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
 .grayscale { filter: grayscale(1) contrast(1.08); }
 
-/* — scroll-reveal — */
-@keyframes reveal {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: none; }
-}
-[data-reveal] { opacity: 0; }
-[data-reveal].in { animation: reveal 0.58s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-@media (prefers-reduced-motion: reduce) {
-  [data-reveal] { opacity: 1; }
-  [data-reveal].in { animation: none; }
-}
+/* — motion layer keyframes (components/Motion.tsx, MotionBackground.tsx, RouteWipe.tsx) — */
+@keyframes marquee { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-50%, 0, 0); } }
+@keyframes wipeIn { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes wipeOut { from { transform: scaleY(1); } to { transform: scaleY(0); } }
 
 section div, .tag, .btn, a, summary, details, li, td, img {
   transition: background-color 0.22s ease, color 0.22s ease, border-color 0.22s ease, transform 0.22s ease;
@@ -234,6 +227,7 @@ textarea.input { min-height: 90px; resize: vertical; }
   border-bottom: 2px solid var(--color-divider);
   background: color-mix(in srgb, var(--color-bg) 92%, transparent);
   backdrop-filter: blur(12px);
+  transition: padding .28s ease, box-shadow .28s ease;
 }
 .nav-brand {
   display: inline-flex; align-items: center;
@@ -242,7 +236,7 @@ textarea.input { min-height: 90px; resize: vertical; }
   font-size: 18px;
 }
 .nav-brand:hover img { transform: translateY(-1px); }
-.nav-logo { height: 46px; width: auto; flex: none; display: block; }
+.nav-logo { height: 46px; width: auto; flex: none; display: block; transition: height .28s ease; }
 .nav-links {
   display: flex; flex-wrap: wrap; align-items: center;
   gap: 10px clamp(14px, 2vw, 28px);
@@ -331,9 +325,11 @@ textarea.input { min-height: 90px; resize: vertical; }
 }
 
 /* — cell/row hover tints used across the ruled grid sections — */
-.cell-hover:hover { background: var(--color-accent-100); }
+.cell-hover, .cell-hover-5, .why-block { transition: background-color .3s ease, transform .3s ease, border-color .3s ease; }
+.cell-hover:hover { background: var(--color-accent-100); transform: translateY(-4px); }
+.cell-hover-5:hover { background: var(--color-accent-100); transform: translateY(-5px); }
 .row-hover:hover { background: color-mix(in srgb, var(--color-accent) 7%, transparent); }
-.why-block:hover { border-top-color: var(--color-accent); }
+.why-block:hover { border-top-color: var(--color-accent); transform: translateY(-4px); }
 
 /* — FAQ accordion (Pricing page) — */
 summary { cursor: pointer; list-style: none; }

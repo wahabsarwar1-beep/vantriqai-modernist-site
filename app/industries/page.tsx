@@ -55,15 +55,45 @@ const SECTORS = [
   },
 ];
 
+function MarqueeTrack({ ariaHidden }: { ariaHidden?: boolean }) {
+  return (
+    <div aria-hidden={ariaHidden} style={{ display: "flex" }}>
+      {SECTORS.map((sector) => (
+        <span
+          key={sector.name}
+          style={{
+            fontFamily: "var(--font-heading)",
+            fontWeight: 800,
+            fontSize: "clamp(20px,2.4vw,34px)",
+            letterSpacing: "-0.02em",
+            padding: "0 22px",
+            whiteSpace: "nowrap",
+            color: "color-mix(in srgb, var(--color-text) 55%, transparent)",
+          }}
+        >
+          {sector.name}
+          <span style={{ color: "var(--color-accent)", paddingLeft: 22 }}>/</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function Industries() {
   return (
     <>
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" }}>
         <section style={{ padding: "clamp(48px,7vw,88px) 0 clamp(40px,6vw,72px)", position: "relative", overflow: "hidden" }}>
           <MotionBackground />
+          <span
+            data-par="-0.14"
+            aria-hidden="true"
+            style={{ position: "absolute", right: "10%", top: "30%", width: 64, height: 64, background: "var(--color-accent)", pointerEvents: "none" }}
+          />
           <div style={{ position: "relative", zIndex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(24px,4vw,44px)" }}>
               <span
+                data-anim="rise"
                 style={{
                   fontFamily: "var(--font-heading)",
                   fontWeight: 800,
@@ -75,12 +105,21 @@ export default function Industries() {
               >
                 Where it applies
               </span>
-              <span style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
+              <span data-anim="rule" style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
             </div>
             <h1 style={{ fontSize: "clamp(34px,5.4vw,68px)", lineHeight: 0.98, letterSpacing: "-0.03em", margin: 0, maxWidth: "16ch" }}>
-              <span style={{ color: "var(--color-accent)" }}>Every</span> sector, one platform
+              <span style={{ display: "block", overflow: "hidden" }}>
+                <span data-line="" style={{ display: "block" }}>
+                  <span style={{ color: "var(--color-accent)" }}>Every</span> sector,
+                </span>
+              </span>
+              <span style={{ display: "block", overflow: "hidden" }}>
+                <span data-line="" style={{ display: "block" }}>
+                  one platform
+                </span>
+              </span>
             </h1>
-            <p style={{ fontSize: 18, lineHeight: "30px", maxWidth: "52ch", margin: "32px 0 0" }}>
+            <p data-anim="rise" style={{ fontSize: 18, lineHeight: "30px", maxWidth: "52ch", margin: "32px 0 0" }}>
               The same core agent, tuned to the workflow of each sector — your catalogue, your booking rules, your tone.
             </p>
           </div>
@@ -102,7 +141,8 @@ export default function Industries() {
           {SECTORS.map((sector) => (
             <div
               key={sector.name}
-              className="cell-hover"
+              data-anim="rise"
+              className="cell-hover-5"
               style={{
                 background: "var(--color-bg)",
                 padding: "clamp(26px,3vw,40px) clamp(20px,2.5vw,36px)",
@@ -118,6 +158,13 @@ export default function Industries() {
               </p>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section style={{ borderBottom: "2px solid var(--color-divider)", padding: "clamp(24px,3vw,40px) 0", overflow: "hidden" }}>
+        <div style={{ display: "flex", width: "max-content", animation: "marquee 30s linear infinite" }}>
+          <MarqueeTrack />
+          <MarqueeTrack ariaHidden />
         </div>
       </section>
 

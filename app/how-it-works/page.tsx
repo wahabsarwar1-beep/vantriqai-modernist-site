@@ -72,9 +72,15 @@ export default function HowItWorks() {
       <div style={shell}>
         <section style={{ padding: "clamp(48px,7vw,88px) 0 clamp(40px,6vw,72px)", position: "relative", overflow: "hidden" }}>
           <MotionBackground />
+          <span
+            data-par="0.12"
+            aria-hidden="true"
+            style={{ position: "absolute", right: "8%", top: "20%", width: 90, height: 90, border: "2px solid var(--color-accent)", pointerEvents: "none" }}
+          />
           <div style={{ position: "relative", zIndex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(24px,4vw,44px)" }}>
               <span
+                data-anim="rise"
                 style={{
                   fontFamily: "var(--font-heading)",
                   fontWeight: 800,
@@ -86,25 +92,34 @@ export default function HowItWorks() {
               >
                 How it works
               </span>
-              <span style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
+              <span data-anim="rule" style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
             </div>
             <h1 style={{ fontSize: "clamp(32px,5vw,60px)", lineHeight: 1, letterSpacing: "-0.03em", margin: 0, maxWidth: "18ch" }}>
-              Three things your agent does, on repeat
+              <span style={{ display: "block", overflow: "hidden" }}>
+                <span data-line="" style={{ display: "block" }}>
+                  Three things your agent
+                </span>
+              </span>
+              <span style={{ display: "block", overflow: "hidden" }}>
+                <span data-line="" style={{ display: "block" }}>
+                  does, <span style={{ color: "var(--color-accent)" }}>on repeat</span>
+                </span>
+              </span>
             </h1>
-            <p style={{ fontSize: 18, lineHeight: "30px", maxWidth: "52ch", margin: "32px 0 0" }}>
+            <p data-anim="rise" style={{ fontSize: 18, lineHeight: "30px", maxWidth: "52ch", margin: "32px 0 0" }}>
               One AI agent, configured around how your business actually runs.
             </p>
           </div>
         </section>
 
         <section style={{ padding: "0 0 clamp(56px,8vw,96px)" }}>
-          {STEPS.map((step, i) => (
+          {STEPS.map((step) => (
             <div
               key={step.n}
+              data-anim="rise"
               className="row-hover step-row"
               style={{
                 borderTop: "2px solid var(--color-divider)",
-                borderBottom: i === STEPS.length - 1 ? "2px solid var(--color-divider)" : undefined,
                 padding: "clamp(28px,3.5vw,44px) 0",
               }}
             >
@@ -115,24 +130,25 @@ export default function HowItWorks() {
               <p style={{ fontSize: 16, lineHeight: "28px", margin: 0, maxWidth: "52ch", ...bodyMuted }}>{step.body}</p>
             </div>
           ))}
+          <div data-anim="rule" style={{ height: 2, background: "var(--color-divider)" }} />
         </section>
 
         <section style={{ padding: "0 0 clamp(56px,8vw,96px)" }}>
           <SplitHeader kicker="The difference">
-            <h2 style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px" }}>
+            <h2 data-anim="rise" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px" }}>
               Not a chatbot. Not another hire.
             </h2>
-            <p style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 36px", maxWidth: "52ch", ...bodyMuted }}>
+            <p data-anim="rise" style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 36px", maxWidth: "52ch", ...bodyMuted }}>
               Compared honestly against the two things you&rsquo;re probably weighing instead.
             </p>
-            <div style={{ overflowX: "auto" }}>
+            <div data-anim="rise" style={{ overflowX: "auto" }}>
               <table className="table" style={{ minWidth: 760, fontSize: 15 }}>
                 <thead>
                   <tr>
                     <th style={{ width: "22%", fontSize: 12, letterSpacing: "0.1em", padding: "12px 10px" }} />
                     <th style={{ fontSize: 12, letterSpacing: "0.1em", padding: "12px 10px" }}>Hiring staff</th>
                     <th style={{ fontSize: 12, letterSpacing: "0.1em", padding: "12px 10px" }}>A generic chatbot</th>
-                    <th style={{ fontSize: 12, letterSpacing: "0.1em", padding: "12px 10px", color: "var(--color-accent)" }}>
+                    <th style={{ fontSize: 12, letterSpacing: "0.1em", padding: "12px 10px", color: "var(--color-accent)", textTransform: "none" }}>
                       VantriqAI
                     </th>
                   </tr>
@@ -158,15 +174,12 @@ export default function HowItWorks() {
 
         <section style={{ padding: "0 0 clamp(56px,8vw,96px)" }}>
           <SplitHeader kicker="Under the hood">
-            <h2 style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px", maxWidth: "24ch" }}>
+            <h2 data-anim="rise" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 40px", maxWidth: "24ch" }}>
               Enterprise-grade, without the enterprise headache
             </h2>
-            <p style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 40px", maxWidth: "52ch", ...bodyMuted }}>
-              You never touch the infrastructure — we run, monitor, and tune all of it.
-            </p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 2, background: "var(--color-divider)", borderBlock: "2px solid var(--color-divider)" }}>
               {HOOD.map((item) => (
-                <div key={item.n} className="cell-hover" style={{ background: "var(--color-bg)", padding: "28px 26px 34px" }}>
+                <div key={item.n} data-anim="rise" className="cell-hover" style={{ background: "var(--color-bg)", padding: "28px 26px 34px" }}>
                   <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.1em", color: "var(--color-accent)", margin: "0 0 18px" }}>
                     {item.n}
                   </p>
@@ -183,13 +196,14 @@ export default function HowItWorks() {
 
         <section style={{ padding: "0 0 clamp(56px,8vw,104px)" }}>
           <SplitHeader kicker="Getting started">
-            <h2 style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 40px" }}>
+            <h2 data-anim="rise" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 40px" }}>
               How we get started
             </h2>
             <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "grid" }}>
               {ONBOARDING.map((step, i) => (
                 <li
                   key={step}
+                  data-anim="rise"
                   className="row-hover"
                   style={{
                     display: "grid",

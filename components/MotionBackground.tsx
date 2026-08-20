@@ -1,23 +1,28 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { MOTION_MULT, prefersReducedMotion } from "@/lib/motion";
 
-const INK = "32, 30, 29";
-const ACCENT = "236, 48, 19";
+const GAP = 46;
 
-type Node = {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  r: number;
-  accent: boolean;
+type Packet = {
+  axis: "v" | "h";
+  lane: number;
+  dir: 1 | -1;
+  pos: number;
+  speed: number;
+  len: number;
+  ink: boolean;
 };
 
-/** Full-bleed animated node network behind a hero section. Density scales
- *  with viewport area, pauses when off-screen or the tab is hidden, and
- *  renders one static frame under prefers-reduced-motion instead of
- *  animating. Purely decorative — pointer-events are disabled throughout. */
+type Pulse = { x: number; y: number; r: number; a: number };
+
+/** Hero background: a faint 46px signal grid with packets of light tracing
+ *  the lanes (mostly red, some ink) and pulse rings where they respawn.
+ *  Density scales with hero area and the motion-level multiplier, pauses
+ *  off-screen or when the tab is hidden, and draws exactly one frame under
+ *  prefers-reduced-motion instead of animating. Purely decorative —
+ *  pointer-events are disabled throughout. */
 export default function MotionBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -27,102 +32,123 @@ export default function MotionBackground() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduced = prefersReducedMotion();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    let width = 0;
-    let height = 0;
-    let nodes: Node[] = [];
+
+    let w = 0;
+    let h = 0;
+    let lanesX: number[] = [];
+    let lanesY: number[] = [];
+    let packets: Packet[] = [];
+    let pulses: Pulse[] = [];
     let raf = 0;
     let running = false;
 
-    const rand = (min: number, max: number) => min + Math.random() * (max - min);
-
-    function buildNodes() {
-      const area = width * height;
-      const count = Math.max(32, Math.min(130, Math.round(area / 13000)));
-      nodes = Array.from({ length: count }, () => ({
-        x: rand(0, width),
-        y: rand(0, height),
-        vx: rand(-0.16, 0.16),
-        vy: rand(-0.13, 0.13),
-        r: rand(1.4, 3.2),
-        accent: Math.random() < 0.16,
-      }));
+    function makePacket(width: number, height: number, lx: number[], ly: number[]): Packet {
+      const vert = Math.random() < 0.62;
+      const lanes = vert ? lx : ly;
+      const lane = lanes.length ? lanes[Math.floor(Math.random() * lanes.length)] : vert ? width / 2 : height / 2;
+      const dir: 1 | -1 = Math.random() < 0.5 ? 1 : -1;
+      const extent = vert ? height : width;
+      return {
+        axis: vert ? "v" : "h",
+        lane,
+        dir,
+        pos: dir === 1 ? -Math.random() * extent : extent + Math.random() * extent,
+        speed: (0.9 + Math.random() * 2.6) * MOTION_MULT,
+        len: 60 + Math.random() * 190,
+        ink: Math.random() < 0.35,
+      };
     }
 
-    function resize() {
+    function build() {
       const rect = canvas!.getBoundingClientRect();
-      width = rect.width;
-      height = rect.height;
-      canvas!.width = Math.round(width * dpr);
-      canvas!.height = Math.round(height * dpr);
+      w = rect.width;
+      h = rect.height;
+      canvas!.width = Math.round(w * dpr);
+      canvas!.height = Math.round(h * dpr);
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
-      buildNodes();
+      lanesX = [];
+      lanesY = [];
+      for (let x = GAP; x < w; x += GAP) lanesX.push(x);
+      for (let y = GAP; y < h; y += GAP) lanesY.push(y);
+      const n = Math.round(Math.max(6, Math.min(22, w / 70)) * MOTION_MULT);
+      packets = Array.from({ length: n }, () => makePacket(w, h, lanesX, lanesY));
+      pulses = [];
     }
 
-    function step() {
-      ctx!.clearRect(0, 0, width, height);
-      const linkDist = Math.min(190, Math.max(110, width / 6.5));
+    function draw() {
+      ctx!.clearRect(0, 0, w, h);
+      ctx!.lineWidth = 1;
+      ctx!.strokeStyle = "rgba(32,30,29,0.07)";
+      ctx!.beginPath();
+      lanesX.forEach((x) => {
+        ctx!.moveTo(x, 0);
+        ctx!.lineTo(x, h);
+      });
+      lanesY.forEach((y) => {
+        ctx!.moveTo(0, y);
+        ctx!.lineTo(w, y);
+      });
+      ctx!.stroke();
 
-      for (const n of nodes) {
-        n.x += n.vx;
-        n.y += n.vy;
-        if (n.x < -20) n.x = width + 20;
-        if (n.x > width + 20) n.x = -20;
-        if (n.y < -20) n.y = height + 20;
-        if (n.y > height + 20) n.y = -20;
-      }
+      packets.forEach((p, i) => {
+        const vert = p.axis === "v";
+        const hx = vert ? p.lane : p.pos;
+        const hy = vert ? p.pos : p.lane;
+        const tx = vert ? p.lane : p.pos - p.dir * p.len;
+        const ty = vert ? p.pos - p.dir * p.len : p.lane;
+        const grad = ctx!.createLinearGradient(tx, ty, hx, hy);
+        grad.addColorStop(0, "rgba(236,48,19,0)");
+        grad.addColorStop(1, p.ink ? "rgba(32,30,29,0.55)" : "rgba(236,48,19,0.85)");
+        ctx!.strokeStyle = grad;
+        ctx!.lineWidth = p.ink ? 1.5 : 2.5;
+        ctx!.beginPath();
+        ctx!.moveTo(tx, ty);
+        ctx!.lineTo(hx, hy);
+        ctx!.stroke();
+        ctx!.fillStyle = p.ink ? "rgba(32,30,29,0.75)" : "#ec3013";
+        ctx!.fillRect(hx - 2.5, hy - 2.5, 5, 5);
 
-      for (let i = 0; i < nodes.length; i++) {
-        for (let j = i + 1; j < nodes.length; j++) {
-          const a = nodes[i];
-          const b = nodes[j];
-          const dx = a.x - b.x;
-          const dy = a.y - b.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < linkDist) {
-            const near = a.accent || b.accent;
-            const alpha = (1 - dist / linkDist) * (near ? 0.4 : 0.28);
-            ctx!.strokeStyle = near ? `rgba(${ACCENT}, ${alpha})` : `rgba(${INK}, ${alpha})`;
-            ctx!.lineWidth = 1;
-            ctx!.beginPath();
-            ctx!.moveTo(a.x, a.y);
-            ctx!.lineTo(b.x, b.y);
-            ctx!.stroke();
+        if (!reduced) {
+          p.pos += p.dir * p.speed;
+          const extent = vert ? h : w;
+          if (p.pos < -p.len - 40 || p.pos > extent + p.len + 40) {
+            if (Math.random() < 0.5 && pulses.length < 8) pulses.push({ x: hx, y: hy, r: 0, a: 0.5 });
+            packets[i] = makePacket(w, h, lanesX, lanesY);
           }
         }
-      }
+      });
 
-      for (const n of nodes) {
-        ctx!.fillStyle = n.accent ? `rgba(${ACCENT}, 0.75)` : `rgba(${INK}, 0.5)`;
-        ctx!.beginPath();
-        ctx!.arc(n.x, n.y, n.r, 0, Math.PI * 2);
-        ctx!.fill();
-      }
+      pulses = pulses.filter((q) => q.a > 0.02);
+      pulses.forEach((q) => {
+        ctx!.strokeStyle = `rgba(236,48,19,${q.a.toFixed(3)})`;
+        ctx!.lineWidth = 2;
+        ctx!.strokeRect(q.x - q.r, q.y - q.r, q.r * 2, q.r * 2);
+        q.r += 1.4;
+        q.a *= 0.965;
+      });
 
-      if (running) raf = requestAnimationFrame(step);
+      if (running) raf = requestAnimationFrame(draw);
     }
 
     function start() {
-      if (running) return;
+      if (running || reduced) return;
       running = true;
-      raf = requestAnimationFrame(step);
+      raf = requestAnimationFrame(draw);
     }
     function stop() {
       running = false;
       cancelAnimationFrame(raf);
     }
 
-    resize();
-    if (reduced) {
-      step();
-    } else {
-      start();
-    }
+    build();
+    draw();
+    if (!reduced) start();
 
     const ro = new ResizeObserver(() => {
-      resize();
-      if (reduced) step();
+      build();
+      if (reduced) draw();
     });
     ro.observe(canvas);
 
@@ -158,12 +184,12 @@ export default function MotionBackground() {
       aria-hidden="true"
       style={{
         position: "absolute",
-        inset: 0,
+        inset: -1,
         width: "100%",
         height: "100%",
         pointerEvents: "none",
-        maskImage: "linear-gradient(to bottom, black 0%, black 65%, transparent 100%)",
-        WebkitMaskImage: "linear-gradient(to bottom, black 0%, black 65%, transparent 100%)",
+        maskImage: "linear-gradient(to bottom, black 0%, black 62%, transparent 100%)",
+        WebkitMaskImage: "linear-gradient(to bottom, black 0%, black 62%, transparent 100%)",
       }}
     />
   );

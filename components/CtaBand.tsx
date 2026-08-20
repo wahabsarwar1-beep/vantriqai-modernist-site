@@ -16,7 +16,7 @@ export default function CtaBand({
   secondaryHref,
 }: CtaBandProps) {
   return (
-    <section style={{ background: "var(--color-accent)", color: "var(--color-bg)" }}>
+    <section style={{ background: "var(--color-accent)", color: "var(--color-bg)", overflow: "hidden" }}>
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(56px,8vw,104px) clamp(20px,5vw,64px)" }}>
         <h2
           style={{
@@ -27,12 +27,16 @@ export default function CtaBand({
             color: "var(--color-bg)",
           }}
         >
-          {heading}
+          <span style={{ display: "block", overflow: "hidden" }}>
+            <span data-line="" style={{ display: "block" }}>
+              {heading}
+            </span>
+          </span>
         </h2>
-        <p style={{ fontSize: 17, lineHeight: "29px", margin: "0 0 34px", maxWidth: "50ch", color: "var(--color-bg)" }}>
+        <p data-anim="rise" style={{ fontSize: 17, lineHeight: "29px", margin: "0 0 34px", maxWidth: "50ch", color: "var(--color-bg)" }}>
           {body}
         </p>
-        <div style={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+        <div data-anim="rise" style={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
           <a
             className="btn cta-btn-ink"
             href={waLink()}

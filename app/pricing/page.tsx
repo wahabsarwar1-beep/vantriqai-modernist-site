@@ -90,6 +90,7 @@ export default function Pricing() {
           <div style={{ position: "relative", zIndex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(24px,4vw,44px)" }}>
               <span
+                data-anim="rise"
                 style={{
                   fontFamily: "var(--font-heading)",
                   fontWeight: 800,
@@ -101,10 +102,19 @@ export default function Pricing() {
               >
                 Packages
               </span>
-              <span style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
+              <span data-anim="rule" style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
             </div>
             <h1 style={{ fontSize: "clamp(32px,5vw,62px)", lineHeight: 1, letterSpacing: "-0.03em", margin: 0, maxWidth: "17ch" }}>
-              Six tiers. One clear path as you grow.
+              <span style={{ display: "block", overflow: "hidden" }}>
+                <span data-line="" style={{ display: "block" }}>
+                  <span data-count="6">6</span> tiers. One clear
+                </span>
+              </span>
+              <span style={{ display: "block", overflow: "hidden" }}>
+                <span data-line="" style={{ display: "block" }}>
+                  path as you <span style={{ color: "var(--color-accent)" }}>grow</span>.
+                </span>
+              </span>
             </h1>
             <div
               style={{
@@ -115,11 +125,11 @@ export default function Pricing() {
                 alignItems: "end",
               }}
             >
-              <p style={{ fontSize: 17, lineHeight: "29px", maxWidth: "52ch", margin: 0 }}>
+              <p data-anim="rise" style={{ fontSize: 17, lineHeight: "29px", maxWidth: "52ch", margin: 0 }}>
                 A one-time setup fee plus a simple monthly plan, quoted in PKR after we scope your workflow. No USD
                 surprises, and no charge for normal business volume.
               </p>
-              <div style={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+              <div data-anim="rise" style={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
                 <a
                   className="btn btn-primary"
                   href={waLink()}
@@ -143,12 +153,30 @@ export default function Pricing() {
       </div>
 
       <section style={{ borderTop: "2px solid var(--color-divider)", borderBottom: "2px solid var(--color-divider)", background: "var(--color-divider)" }}>
-        <div style={{ maxWidth: 1280, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 2 }}>
+        <div
+          style={{
+            maxWidth: 1280,
+            margin: "0 auto",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))",
+            gap: 2,
+            background: "var(--color-bg)",
+            overflow: "hidden",
+          }}
+        >
           {TIERS.map((tier) =>
             tier.featured ? (
               <div
                 key={tier.name}
-                style={{ background: "var(--color-text)", color: "var(--color-bg)", padding: "clamp(28px,3vw,40px) clamp(20px,2.5vw,36px)", display: "flex", flexDirection: "column" }}
+                data-anim="rise"
+                style={{
+                  background: "var(--color-text)",
+                  color: "var(--color-bg)",
+                  padding: "clamp(28px,3vw,40px) clamp(20px,2.5vw,36px)",
+                  display: "flex",
+                  flexDirection: "column",
+                  boxShadow: "2px 2px 0 0 var(--color-divider)",
+                }}
               >
                 <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent-400)", margin: "0 0 16px" }}>
                   {tier.tier}
@@ -171,8 +199,15 @@ export default function Pricing() {
             ) : (
               <div
                 key={tier.name}
-                className="cell-hover"
-                style={{ background: "var(--color-bg)", padding: "clamp(28px,3vw,40px) clamp(20px,2.5vw,36px)", display: "flex", flexDirection: "column" }}
+                data-anim="rise"
+                className="cell-hover-5"
+                style={{
+                  background: "var(--color-bg)",
+                  padding: "clamp(28px,3vw,40px) clamp(20px,2.5vw,36px)",
+                  display: "flex",
+                  flexDirection: "column",
+                  boxShadow: "2px 2px 0 0 var(--color-divider)",
+                }}
               >
                 <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)", margin: "0 0 16px" }}>
                   {tier.tier}
@@ -208,16 +243,16 @@ export default function Pricing() {
 
         <section style={{ padding: "0 0 clamp(56px,8vw,104px)" }}>
           <SplitHeader kicker="Questions">
-            <h2 style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 40px" }}>
+            <h2 data-anim="rise" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 40px" }}>
               Before you ask us
             </h2>
             <div style={{ display: "grid", maxWidth: 900 }}>
-              {FAQS.map((faq, i) => (
+              {FAQS.map((faq) => (
                 <details
                   key={faq.q}
+                  data-anim="rise"
                   style={{
                     borderTop: "2px solid var(--color-divider)",
-                    borderBottom: i === FAQS.length - 1 ? "2px solid var(--color-divider)" : undefined,
                     padding: "20px 0",
                   }}
                 >
@@ -232,6 +267,7 @@ export default function Pricing() {
                   </p>
                 </details>
               ))}
+              <div data-anim="rule" style={{ height: 2, background: "var(--color-divider)" }} />
             </div>
           </SplitHeader>
         </section>

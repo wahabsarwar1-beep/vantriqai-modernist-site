@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Archivo } from "next/font/google";
 import Nav from "@/components/Nav";
-import ScrollReveal from "@/components/ScrollReveal";
+import Motion from "@/components/Motion";
+import RouteWipe from "@/components/RouteWipe";
 import "./globals.css";
 
 const archivo = Archivo({
@@ -20,9 +21,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={archivo.variable}>
       <body>
+        <RouteWipe />
         <Nav />
         {children}
-        <ScrollReveal />
+        <Motion />
       </body>
     </html>
   );
