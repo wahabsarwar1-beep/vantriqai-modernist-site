@@ -66,7 +66,7 @@ export default function Contact() {
               </span>
               <span style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
             </div>
-            <h1 style={{ fontSize: "clamp(52px,7.6vw,104px)", lineHeight: 0.92, letterSpacing: "-0.04em", margin: 0 }}>
+            <h1 style={{ fontSize: "clamp(36px,5.6vw,72px)", lineHeight: 0.96, letterSpacing: "-0.03em", margin: 0 }}>
               Let&rsquo;s talk.
             </h1>
             <p style={{ fontSize: 18, lineHeight: "30px", maxWidth: "44ch", margin: "28px 0 0" }}>

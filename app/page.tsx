@@ -93,7 +93,7 @@ export default function Home() {
             </span>
             <span style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
           </div>
-          <h1 style={{ fontSize: "clamp(46px,8.4vw,118px)", lineHeight: 0.94, letterSpacing: "-0.035em", margin: 0, maxWidth: "16ch" }}>
+          <h1 style={{ fontSize: "clamp(38px,6vw,76px)", lineHeight: 0.98, letterSpacing: "-0.03em", margin: 0, maxWidth: "16ch" }}>
             <span style={{ display: "block" }}>Never miss another</span>
             <span style={{ display: "block", color: "var(--color-accent)" }}>customer message.</span>
           </h1>
@@ -140,7 +140,7 @@ export default function Home() {
                 style={{
                   fontFamily: "var(--font-heading)",
                   fontWeight: 800,
-                  fontSize: "clamp(44px,5vw,76px)",
+                  fontSize: "clamp(32px,3.6vw,52px)",
                   lineHeight: 1,
                   letterSpacing: "-0.04em",
                   margin: 0,
@@ -170,7 +170,7 @@ export default function Home() {
       <div style={shell}>
         <section style={{ padding: "clamp(56px,8vw,104px) 0 clamp(24px,3vw,40px)" }}>
           <SplitHeader kicker="Live — the agent answering">
-            <h2 style={{ fontSize: "clamp(30px,4.2vw,58px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px", maxWidth: "20ch" }}>
+            <h2 style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px", maxWidth: "20ch" }}>
               This is what your customer sees.
             </h2>
             <p style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 32px", maxWidth: "50ch", ...bodyMuted }}>
@@ -182,7 +182,7 @@ export default function Home() {
 
         <section style={{ padding: "clamp(56px,8vw,104px) 0 clamp(32px,4vw,48px)" }}>
           <SplitHeader kicker="01 — The problem">
-            <h2 style={{ fontSize: "clamp(30px,4.2vw,58px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: 0, maxWidth: "20ch" }}>
+            <h2 style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: 0, maxWidth: "20ch" }}>
               Your customers message at midnight. Does anyone reply?
             </h2>
             <p style={{ fontSize: 16, lineHeight: "28px", margin: "24px 0 0", maxWidth: "52ch", ...bodyMuted }}>
@@ -220,7 +220,7 @@ export default function Home() {
 
         <section style={{ padding: "0 0 clamp(56px,8vw,96px)" }}>
           <SplitHeader kicker="02 — Where it applies">
-            <h2 style={{ fontSize: "clamp(30px,4.2vw,58px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px" }}>
+            <h2 style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px" }}>
               Built for your industry
             </h2>
             <p style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 34px", maxWidth: "52ch", ...bodyMuted }}>
@@ -241,7 +241,7 @@ export default function Home() {
 
         <section style={{ padding: "0 0 clamp(56px,8vw,104px)" }}>
           <SplitHeader kicker={<>03 — Why <span style={{ color: "var(--color-text)" }}>Vantriq</span>AI</>}>
-            <h2 style={{ fontSize: "clamp(30px,4.2vw,58px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 44px", maxWidth: "22ch" }}>
+            <h2 style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 44px", maxWidth: "22ch" }}>
               A local partner, not a faceless subscription
             </h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: "36px clamp(24px,4vw,64px)" }}>

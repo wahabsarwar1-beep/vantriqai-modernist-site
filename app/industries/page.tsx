@@ -74,7 +74,7 @@ export default function Industries() {
             </span>
             <span style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
           </div>
-          <h1 style={{ fontSize: "clamp(44px,7.4vw,104px)", lineHeight: 0.94, letterSpacing: "-0.035em", margin: 0, maxWidth: "16ch" }}>
+          <h1 style={{ fontSize: "clamp(34px,5.4vw,68px)", lineHeight: 0.98, letterSpacing: "-0.03em", margin: 0, maxWidth: "16ch" }}>
             <span style={{ color: "var(--color-accent)" }}>Every</span> sector, one platform
           </h1>
           <p style={{ fontSize: 18, lineHeight: "30px", maxWidth: "52ch", margin: "32px 0 0" }}>

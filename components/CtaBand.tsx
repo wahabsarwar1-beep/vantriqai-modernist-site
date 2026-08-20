@@ -20,7 +20,7 @@ export default function CtaBand({
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(56px,8vw,104px) clamp(20px,5vw,64px)" }}>
         <h2
           style={{
-            fontSize: "clamp(44px,8vw,104px)",
+            fontSize: "clamp(32px,5.5vw,64px)",
             lineHeight: 0.94,
             letterSpacing: "-0.035em",
             margin: "0 0 28px",

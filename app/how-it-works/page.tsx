@@ -85,7 +85,7 @@ export default function HowItWorks() {
             </span>
             <span style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
           </div>
-          <h1 style={{ fontSize: "clamp(40px,6.6vw,92px)", lineHeight: 0.96, letterSpacing: "-0.035em", margin: 0, maxWidth: "18ch" }}>
+          <h1 style={{ fontSize: "clamp(32px,5vw,60px)", lineHeight: 1, letterSpacing: "-0.03em", margin: 0, maxWidth: "18ch" }}>
             Three things your agent does, on repeat
           </h1>
           <p style={{ fontSize: 18, lineHeight: "30px", maxWidth: "52ch", margin: "32px 0 0" }}>
@@ -107,7 +107,7 @@ export default function HowItWorks() {
               <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 14, letterSpacing: "0.1em", color: "var(--color-accent)", margin: 0, fontFeatureSettings: "'tnum' 1" }}>
                 {step.n}
               </p>
-              <h2 style={{ fontSize: "clamp(26px,3vw,38px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: 0 }}>{step.title}</h2>
+              <h2 style={{ fontSize: "clamp(22px,2.6vw,30px)", lineHeight: 1.05, letterSpacing: "-0.02em", margin: 0 }}>{step.title}</h2>
               <p style={{ fontSize: 16, lineHeight: "28px", margin: 0, maxWidth: "52ch", ...bodyMuted }}>{step.body}</p>
             </div>
           ))}
@@ -115,7 +115,7 @@ export default function HowItWorks() {
 
         <section style={{ padding: "0 0 clamp(56px,8vw,96px)" }}>
           <SplitHeader kicker="The difference">
-            <h2 style={{ fontSize: "clamp(30px,4.2vw,58px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px" }}>
+            <h2 style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px" }}>
               Not a chatbot. Not another hire.
             </h2>
             <p style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 36px", maxWidth: "52ch", ...bodyMuted }}>
@@ -154,7 +154,7 @@ export default function HowItWorks() {
 
         <section style={{ padding: "0 0 clamp(56px,8vw,96px)" }}>
           <SplitHeader kicker="Under the hood">
-            <h2 style={{ fontSize: "clamp(30px,4.2vw,58px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px", maxWidth: "24ch" }}>
+            <h2 style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px", maxWidth: "24ch" }}>
               Enterprise-grade, without the enterprise headache
             </h2>
             <p style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 40px", maxWidth: "52ch", ...bodyMuted }}>
@@ -179,7 +179,7 @@ export default function HowItWorks() {
 
         <section style={{ padding: "0 0 clamp(56px,8vw,104px)" }}>
           <SplitHeader kicker="Getting started">
-            <h2 style={{ fontSize: "clamp(30px,4.2vw,58px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 40px" }}>
+            <h2 style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 40px" }}>
               How we get started
             </h2>
             <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "grid" }}>

@@ -100,7 +100,7 @@ export default function Pricing() {
             </span>
             <span style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
           </div>
-          <h1 style={{ fontSize: "clamp(40px,6.6vw,94px)", lineHeight: 0.95, letterSpacing: "-0.035em", margin: 0, maxWidth: "17ch" }}>
+          <h1 style={{ fontSize: "clamp(32px,5vw,62px)", lineHeight: 1, letterSpacing: "-0.03em", margin: 0, maxWidth: "17ch" }}>
             Six tiers. One clear path as you grow.
           </h1>
           <div
@@ -204,7 +204,7 @@ export default function Pricing() {
 
         <section style={{ padding: "0 0 clamp(56px,8vw,104px)" }}>
           <SplitHeader kicker="Questions">
-            <h2 style={{ fontSize: "clamp(30px,4.2vw,58px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 40px" }}>
+            <h2 style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 40px" }}>
               Before you ask us
             </h2>
             <div style={{ display: "grid", maxWidth: 900 }}>
