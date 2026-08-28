@@ -1,0 +1,133 @@
+/* VantriqAI — @n8n/chat theme override
+ *
+ * Imported after '@n8n/chat/style.css' in components/ShopAIChat.tsx.
+ *
+ * Values are the Modernist tokens from app/globals.css, written as literals because the
+ * widget can mount outside the token scope in some builds — swap each literal for the
+ * matching var(--color-*) if they resolve in yours.
+ *
+ * Ground   #f3f2f2   Surface  #eae9e9   Ink      #201e1d
+ * Accent   #ec3013   Pressed  #c8250c   Tint     #fff2ef
+ */
+
+:root {
+  /* palette */
+  --chat--color-primary: #ec3013;
+  --chat--color-primary-shade-50: #d92b11;
+  --chat--color-primary-shade-100: #c8250c;
+  --chat--color-secondary: #201e1d;
+  --chat--color-secondary-shade-50: #2c2a29;
+  --chat--color-white: #f3f2f2;
+  --chat--color-light: #eae9e9;
+  --chat--color-light-shade-50: #dedddd;
+  --chat--color-light-shade-100: #cfcecd;
+  --chat--color-medium: #8a8785;
+  --chat--color-dark: #201e1d;
+  --chat--color-disabled: rgba(32, 30, 29, 0.45);
+  --chat--color-typing: #ec3013;
+
+  /* type & shape */
+  --chat--font-family: "Archivo", system-ui, sans-serif;
+  --chat--border-radius: 0;
+  --chat--spacing: 1rem;
+  --chat--transition-duration: 0.26s;
+
+  /* window */
+  --chat--window--width: 380px;
+  --chat--window--height: 560px;
+
+  /* header */
+  --chat--header--background: #201e1d;
+  --chat--header--color: #f3f2f2;
+  --chat--header--border-top: none;
+  --chat--header--border-bottom: none;
+  --chat--header--padding: 14px 16px;
+  --chat--heading--font-size: 14px;
+  --chat--subtitle--font-size: 11px;
+  --chat--subtitle--line-height: 1.5;
+
+  /* messages */
+  --chat--message--font-size: 14.5px;
+  --chat--message-line-height: 23px;
+  --chat--message--padding: 11px 14px;
+  --chat--message--border-radius: 0;
+  --chat--message--margin-bottom: 12px;
+  --chat--message--bot--background: #201e1d;
+  --chat--message--bot--color: #f3f2f2;
+  --chat--message--bot--border: none;
+  --chat--message--user--background: #f3f2f2;
+  --chat--message--user--color: #201e1d;
+  --chat--message--user--border: 2px solid #201e1d;
+  --chat--message--pre--background: rgba(32, 30, 29, 0.06);
+
+  /* input */
+  --chat--textarea--height: 44px;
+  --chat--input--font-size: 15px;
+  --chat--input--border: 2px solid rgba(32, 30, 29, 0.4);
+  --chat--input--background: #f3f2f2;
+  --chat--input--text-color: #201e1d;
+  --chat--input--placeholder--font-size: 15px;
+
+  /* launcher bubble */
+  --chat--toggle--size: 60px;
+  --chat--toggle--background: #ec3013;
+  --chat--toggle--hover--background: #c8250c;
+  --chat--toggle--active--background: #c8250c;
+  --chat--toggle--color: #f3f2f2;
+
+  /* send button */
+  --chat--button--background: #ec3013;
+  --chat--button--color: #f3f2f2;
+  --chat--button--hover--background: #c8250c;
+}
+
+/* Structural corrections the variables don't cover: flat panel, 2px frame,
+   flush-left labels, themed keyboard focus. */
+#n8n-chat .chat-window,
+#n8n-chat [class*="chat-window"] {
+  border: 2px solid #201e1d;
+  border-radius: 0;
+  box-shadow: 0 8px 24px rgba(32, 30, 29, 0.16);
+}
+
+#n8n-chat .chat-body,
+#n8n-chat [class*="chat-messages"] {
+  background:
+    repeating-linear-gradient(45deg, rgba(32, 30, 29, 0.04) 0 3px, transparent 3px 16px),
+    #eae9e9;
+}
+
+#n8n-chat button,
+#n8n-chat [class*="chat-input"] button {
+  border-radius: 0;
+  justify-content: flex-start;
+  font-family: "Archivo", system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 13px;
+}
+
+#n8n-chat :focus-visible {
+  outline: 2px solid #ec3013;
+  outline-offset: 2px;
+}
+
+/* Above the sticky nav (z-index 20), below the route-transition wipe (z-index 90). */
+#n8n-chat {
+  --chat--window--z-index: 70;
+  z-index: 70;
+  right: clamp(16px, 3vw, 28px);
+  bottom: clamp(16px, 3vw, 28px);
+}
+
+@media (max-width: 480px) {
+  :root {
+    --chat--window--width: calc(100vw - 32px);
+    --chat--window--height: calc(100vh - 132px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --chat--transition-duration: 0.001s; }
+}

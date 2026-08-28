@@ -182,6 +182,7 @@ export default function MotionBackground() {
     <canvas
       ref={canvasRef}
       aria-hidden="true"
+      className="hero-canvas"
       style={{
         position: "absolute",
         inset: -1,

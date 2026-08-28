@@ -144,13 +144,13 @@ export default function Home() {
               </span>
               <span data-anim="rule" style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
             </div>
-            <h1 style={{ fontSize: "clamp(38px,6vw,76px)", lineHeight: 0.98, letterSpacing: "-0.03em", margin: 0, maxWidth: "16ch" }}>
-              <span style={{ display: "block", overflow: "hidden" }}>
+            <h1 style={{ fontSize: "clamp(38px,6vw,76px)", lineHeight: 0.98, letterSpacing: "-0.03em", margin: 0, maxWidth: "16ch", overflowWrap: "break-word" }}>
+              <span style={{ display: "block", overflow: "hidden", paddingBottom: "0.16em", marginBottom: "-0.12em" }}>
                 <span data-line="" style={{ display: "block" }}>
                   Never miss another
                 </span>
               </span>
-              <span style={{ display: "block", overflow: "hidden" }}>
+              <span style={{ display: "block", overflow: "hidden", paddingBottom: "0.16em", marginBottom: "-0.12em" }}>
                 <span data-line="" style={{ display: "block", color: "var(--color-accent)" }}>
                   customer message.
                 </span>
@@ -159,7 +159,7 @@ export default function Home() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))",
+                gridTemplateColumns: "repeat(auto-fit,minmax(min(300px,100%),1fr))",
                 gap: "24px clamp(24px,5vw,80px)",
                 marginTop: "clamp(32px,4vw,56px)",
                 alignItems: "end",
@@ -198,7 +198,7 @@ export default function Home() {
             maxWidth: 1280,
             margin: "0 auto",
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))",
+            gridTemplateColumns: "repeat(auto-fit,minmax(min(260px,100%),1fr))",
             gap: 2,
             background: "var(--color-bg)",
             overflow: "hidden",
@@ -271,7 +271,7 @@ export default function Home() {
                   01 / 03
                 </span>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: "clamp(24px,5vw,72px)", alignItems: "center" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(300px,100%),1fr))", gap: "clamp(24px,5vw,72px)", alignItems: "center" }}>
                 <div style={{ position: "relative", minHeight: "min(46vh,340px)" }}>
                   {STEPS.map((step) => (
                     <div key={step.n} data-pin-panel="" style={{ position: "absolute", inset: 0 }}>
@@ -339,7 +339,7 @@ export default function Home() {
             <h2 data-anim="rise" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 44px", maxWidth: "22ch" }}>
               A local partner, not a faceless subscription
             </h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: "36px clamp(24px,4vw,64px)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(280px,100%),1fr))", gap: "36px clamp(24px,4vw,64px)" }}>
               {WHY.map((item) => (
                 <div key={item.title} data-anim="rise" className="why-block" style={{ borderTop: "2px solid var(--color-divider)", paddingTop: 18 }}>
                   <h3 style={{ fontSize: 21, lineHeight: 1.15, letterSpacing: "-0.02em", margin: "0 0 12px" }}>{item.title}</h3>

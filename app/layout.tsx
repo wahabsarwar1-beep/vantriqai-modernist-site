@@ -3,6 +3,7 @@ import { Archivo } from "next/font/google";
 import Nav from "@/components/Nav";
 import Motion from "@/components/Motion";
 import RouteWipe from "@/components/RouteWipe";
+import ShopAIChat from "@/components/ShopAIChat";
 import "./globals.css";
 
 const archivo = Archivo({
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <Nav />
         {children}
         <Motion />
+        <ShopAIChat />
       </body>
     </html>
   );

@@ -104,13 +104,13 @@ export default function Pricing() {
               </span>
               <span data-anim="rule" style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
             </div>
-            <h1 style={{ fontSize: "clamp(32px,5vw,62px)", lineHeight: 1, letterSpacing: "-0.03em", margin: 0, maxWidth: "17ch" }}>
-              <span style={{ display: "block", overflow: "hidden" }}>
+            <h1 style={{ fontSize: "clamp(32px,5vw,62px)", lineHeight: 1, letterSpacing: "-0.03em", margin: 0, maxWidth: "17ch", overflowWrap: "break-word" }}>
+              <span style={{ display: "block", overflow: "hidden", paddingBottom: "0.16em", marginBottom: "-0.12em" }}>
                 <span data-line="" style={{ display: "block" }}>
                   <span data-count="6">6</span> tiers. One clear
                 </span>
               </span>
-              <span style={{ display: "block", overflow: "hidden" }}>
+              <span style={{ display: "block", overflow: "hidden", paddingBottom: "0.16em", marginBottom: "-0.12em" }}>
                 <span data-line="" style={{ display: "block" }}>
                   path as you <span style={{ color: "var(--color-accent)" }}>grow</span>.
                 </span>
@@ -119,7 +119,7 @@ export default function Pricing() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))",
+                gridTemplateColumns: "repeat(auto-fit,minmax(min(300px,100%),1fr))",
                 gap: "24px clamp(24px,5vw,80px)",
                 marginTop: "clamp(28px,4vw,48px)",
                 alignItems: "end",
@@ -158,7 +158,7 @@ export default function Pricing() {
             maxWidth: 1280,
             margin: "0 auto",
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))",
+            gridTemplateColumns: "repeat(auto-fit,minmax(min(300px,100%),1fr))",
             gap: 2,
             background: "var(--color-bg)",
             overflow: "hidden",

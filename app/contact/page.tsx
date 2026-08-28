@@ -55,7 +55,7 @@ export default function Contact() {
               position: "relative",
               zIndex: 1,
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit,minmax(340px,1fr))",
+              gridTemplateColumns: "repeat(auto-fit,minmax(min(340px,100%),1fr))",
               gap: "clamp(40px,6vw,88px)",
               alignItems: "start",
             }}
@@ -77,8 +77,8 @@ export default function Contact() {
                 </span>
                 <span data-anim="rule" style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
               </div>
-              <h1 style={{ fontSize: "clamp(36px,5.6vw,72px)", lineHeight: 0.96, letterSpacing: "-0.03em", margin: 0 }}>
-                <span style={{ display: "block", overflow: "hidden" }}>
+              <h1 style={{ fontSize: "clamp(36px,5.6vw,72px)", lineHeight: 0.96, letterSpacing: "-0.03em", margin: 0, overflowWrap: "break-word" }}>
+                <span style={{ display: "block", overflow: "hidden", paddingBottom: "0.16em", marginBottom: "-0.12em" }}>
                   <span data-line="" style={{ display: "block" }}>
                     Let&rsquo;s <span style={{ color: "var(--color-accent)" }}>talk.</span>
                   </span>

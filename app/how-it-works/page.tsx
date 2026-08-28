@@ -94,13 +94,13 @@ export default function HowItWorks() {
               </span>
               <span data-anim="rule" style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
             </div>
-            <h1 style={{ fontSize: "clamp(32px,5vw,60px)", lineHeight: 1, letterSpacing: "-0.03em", margin: 0, maxWidth: "18ch" }}>
-              <span style={{ display: "block", overflow: "hidden" }}>
+            <h1 style={{ fontSize: "clamp(32px,5vw,60px)", lineHeight: 1, letterSpacing: "-0.03em", margin: 0, maxWidth: "18ch", overflowWrap: "break-word" }}>
+              <span style={{ display: "block", overflow: "hidden", paddingBottom: "0.16em", marginBottom: "-0.12em" }}>
                 <span data-line="" style={{ display: "block" }}>
                   Three things your agent
                 </span>
               </span>
-              <span style={{ display: "block", overflow: "hidden" }}>
+              <span style={{ display: "block", overflow: "hidden", paddingBottom: "0.16em", marginBottom: "-0.12em" }}>
                 <span data-line="" style={{ display: "block" }}>
                   does, <span style={{ color: "var(--color-accent)" }}>on repeat</span>
                 </span>
@@ -177,7 +177,7 @@ export default function HowItWorks() {
             <h2 data-anim="rise" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 40px", maxWidth: "24ch" }}>
               Enterprise-grade, without the enterprise headache
             </h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 2, background: "var(--color-divider)", borderBlock: "2px solid var(--color-divider)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(280px,100%),1fr))", gap: 2, background: "var(--color-divider)", borderBlock: "2px solid var(--color-divider)" }}>
               {HOOD.map((item) => (
                 <div key={item.n} data-anim="rise" className="cell-hover" style={{ background: "var(--color-bg)", padding: "28px 26px 34px" }}>
                   <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.1em", color: "var(--color-accent)", margin: "0 0 18px" }}>

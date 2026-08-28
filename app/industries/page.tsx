@@ -107,13 +107,13 @@ export default function Industries() {
               </span>
               <span data-anim="rule" style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
             </div>
-            <h1 style={{ fontSize: "clamp(34px,5.4vw,68px)", lineHeight: 0.98, letterSpacing: "-0.03em", margin: 0, maxWidth: "16ch" }}>
-              <span style={{ display: "block", overflow: "hidden" }}>
+            <h1 style={{ fontSize: "clamp(34px,5.4vw,68px)", lineHeight: 0.98, letterSpacing: "-0.03em", margin: 0, maxWidth: "16ch", overflowWrap: "break-word" }}>
+              <span style={{ display: "block", overflow: "hidden", paddingBottom: "0.16em", marginBottom: "-0.12em" }}>
                 <span data-line="" style={{ display: "block" }}>
                   <span style={{ color: "var(--color-accent)" }}>Every</span> sector,
                 </span>
               </span>
-              <span style={{ display: "block", overflow: "hidden" }}>
+              <span style={{ display: "block", overflow: "hidden", paddingBottom: "0.16em", marginBottom: "-0.12em" }}>
                 <span data-line="" style={{ display: "block" }}>
                   one platform
                 </span>
@@ -132,7 +132,7 @@ export default function Industries() {
             maxWidth: 1280,
             margin: "0 auto",
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))",
+            gridTemplateColumns: "repeat(auto-fit,minmax(min(300px,100%),1fr))",
             gap: 2,
             background: "var(--color-bg)",
             overflow: "hidden",

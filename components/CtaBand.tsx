@@ -25,9 +25,10 @@ export default function CtaBand({
             letterSpacing: "-0.035em",
             margin: "0 0 28px",
             color: "var(--color-bg)",
+            overflowWrap: "break-word",
           }}
         >
-          <span style={{ display: "block", overflow: "hidden" }}>
+          <span style={{ display: "block", overflow: "hidden", paddingBottom: "0.16em", marginBottom: "-0.12em" }}>
             <span data-line="" style={{ display: "block" }}>
               {heading}
             </span>

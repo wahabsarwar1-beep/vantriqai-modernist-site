@@ -248,26 +248,73 @@ textarea.input { min-height: 90px; resize: vertical; }
   white-space: nowrap;
 }
 .nav-links a:hover, .nav-links a[aria-current="page"] { color: var(--color-accent); }
-@media (max-width: 1024px) {
+@media (max-width: 1024px) and (min-width: 761px) {
   .nav-links { order: 3; width: 100%; gap: 12px 20px; padding-top: 12px; border-top: 2px solid var(--color-divider); }
 }
 @media (max-width: 860px) {
   .nav { gap: 10px 14px; padding-block: 12px; }
 }
-@media (max-width: 600px) {
-  /* Two lines total on phones: brand + CTA, then one scrollable link row —
-     never a third line of wrapped links. */
-  .nav-links {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-    gap: 18px;
-    mask-image: linear-gradient(to right, transparent, black 12px, black calc(100% - 24px), transparent);
+
+/* — mobile hamburger nav (≤760px) — */
+.nav-burger {
+  display: none;
+  position: relative;
+  width: 40px; height: 40px;
+  flex: none;
+  align-items: center; justify-content: center;
+  background: none; border: 2px solid var(--color-text);
+  padding: 0; cursor: pointer;
+}
+.nav-burger-line {
+  position: absolute; left: 9px; right: 9px; height: 2px;
+  background: var(--color-text);
+  transition: transform .25s cubic-bezier(.16,1,.3,1), opacity .2s ease, top .25s cubic-bezier(.16,1,.3,1);
+}
+.nav-burger-line:nth-child(1) { top: 13px; }
+.nav-burger-line:nth-child(2) { top: 19px; }
+.nav-burger-line:nth-child(3) { top: 25px; }
+.nav-burger[aria-expanded="true"] .nav-burger-line:nth-child(1) { top: 19px; transform: rotate(45deg); }
+.nav-burger[aria-expanded="true"] .nav-burger-line:nth-child(2) { opacity: 0; }
+.nav-burger[aria-expanded="true"] .nav-burger-line:nth-child(3) { top: 19px; transform: rotate(-45deg); }
+
+.nav-mobile-panel { display: none; }
+
+@media (max-width: 760px) {
+  .nav-links { display: none; }
+  .nav-burger { display: flex; }
+  .nav-mobile-panel {
+    display: block;
+    position: absolute;
+    top: 100%; left: 0; right: 0;
+    max-height: 0; overflow: hidden;
+    background: var(--color-bg);
+    border-bottom: 2px solid var(--color-divider);
+    box-shadow: 0 8px 16px rgba(32,30,29,0.08);
+    transition: max-height .32s cubic-bezier(.16,1,.3,1);
   }
-  .nav-links::-webkit-scrollbar { display: none; }
-  .nav-links a { font-size: 12px; }
+  .nav-mobile-panel.is-open { max-height: 520px; }
+  .nav-mobile-links { display: flex; flex-direction: column; }
+  .nav-mobile-links a {
+    padding: 16px clamp(20px,5vw,64px);
+    border-top: 2px solid var(--color-divider);
+    font-family: var(--font-heading); font-weight: 800;
+    font-size: 16px; letter-spacing: 0.02em; text-transform: uppercase;
+    color: var(--color-text);
+    transition: color .2s ease, background-color .2s ease;
+  }
+  .nav-mobile-links a:hover, .nav-mobile-links a[aria-current="page"] {
+    color: var(--color-accent); background: var(--color-accent-100);
+  }
+  .nav-mobile-cta {
+    margin: 18px clamp(20px,5vw,64px) 22px;
+    min-height: 48px !important;
+  }
+}
+@media (max-width: 600px) {
   .nav-logo { height: 34px; }
-  .nav-cta { min-height: 34px !important; padding-inline: 12px !important; font-size: 11.5px !important; }
+}
+@media (max-width: 560px) {
+  .nav-cta { display: none; }
 }
 
 /* — ruled step row (index / heading / body), How it works — */
@@ -342,3 +389,24 @@ span[data-chev] { display: inline-block; transition: transform 0.18s ease; }
 @keyframes blip { 0%, 60%, 100% { opacity: 0.22; } 30% { opacity: 1; } }
 @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
 @keyframes pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* — mobile (≤760px): quiet the decoration, unpin the three-step stage — */
+@media (max-width: 760px) {
+  [data-par] { display: none !important; }
+  .hero-canvas { opacity: 0.5; }
+
+  /* The pinned stage becomes a plain stacked list — inline styles (position,
+     height, opacity, transform) need !important to override the React
+     style prop, which otherwise always wins over an external stylesheet. */
+  [data-pin] { height: auto !important; }
+  [data-pin] > div { position: static !important; height: auto !important; }
+  [data-pin-panel] {
+    position: static !important;
+    opacity: 1 !important;
+    transform: none !important;
+    pointer-events: auto !important;
+    margin-bottom: clamp(32px, 7vw, 48px);
+  }
+  [data-pin-panel]:last-child { margin-bottom: 0; }
+  [data-pin-rail], [data-pin-count] { display: none !important; }
+}

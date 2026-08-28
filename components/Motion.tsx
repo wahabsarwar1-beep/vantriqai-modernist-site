@@ -80,6 +80,44 @@ export default function Motion() {
       timers.push(setTimeout(() => animEls.forEach((el) => show(el, 0)), 2400));
     }
 
+    // product logo marks: shapes assemble in sequence
+    const icons = Array.from(document.querySelectorAll<SVGElement>("[data-icon]"));
+    let iio: IntersectionObserver | null = null;
+    if (!reduced && icons.length) {
+      icons.forEach((svg) => {
+        svg.style.overflow = "visible";
+        svg.querySelectorAll<SVGElement>("path, rect, circle, polygon").forEach((p) => {
+          p.style.transformBox = "fill-box";
+          p.style.transformOrigin = "center";
+          p.style.opacity = "0";
+          p.style.transform = "scale(.72)";
+        });
+      });
+      const drawIcon = (svg: SVGElement, animate: boolean) => {
+        svg.querySelectorAll<SVGElement>("path, rect, circle, polygon").forEach((p, i) => {
+          if (p.style.opacity === "1") return;
+          const delay = 120 + i * 110;
+          p.style.transition = animate
+            ? `opacity .34s ease ${delay}ms, transform ${(0.6 / m).toFixed(2)}s cubic-bezier(.16,1,.3,1) ${delay}ms`
+            : "none";
+          p.style.opacity = "1";
+          p.style.transform = "none";
+        });
+      };
+      iio = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((e) => {
+            if (!e.isIntersecting) return;
+            drawIcon(e.target as unknown as SVGElement, true);
+            iio!.unobserve(e.target);
+          });
+        },
+        { rootMargin: "0px 0px -2% 0px", threshold: 0.01 }
+      );
+      icons.forEach((svg) => iio!.observe(svg));
+      timers.push(setTimeout(() => icons.forEach((svg) => drawIcon(svg, false)), 2400));
+    }
+
     // counters
     const counters = Array.from(document.querySelectorAll<HTMLElement>("[data-count]"));
     const countUp = (el: HTMLElement) => {
@@ -111,9 +149,18 @@ export default function Motion() {
         { threshold: 0.4 }
       );
       counters.forEach((el) => cio!.observe(el));
+      timers.push(
+        setTimeout(() => {
+          counters.forEach((el) => {
+            if (el.textContent === "0") el.textContent = el.getAttribute("data-count") || "0";
+          });
+        }, 2400)
+      );
     }
 
-    // parallax shapes + the scroll-pinned three-step stage
+    // parallax shapes + the scroll-pinned three-step stage — both are inert
+    // below 760px (shapes hidden, stage unpinned via CSS), so no scroll work there.
+    const isMobile = window.matchMedia("(max-width: 760px)").matches;
     const parEls = Array.from(document.querySelectorAll<HTMLElement>("[data-par]"));
     const pinWrap = document.querySelector<HTMLElement>("[data-pin]");
     const pinPanels = pinWrap ? Array.from(pinWrap.querySelectorAll<HTMLElement>("[data-pin-panel]")) : [];
@@ -162,7 +209,7 @@ export default function Motion() {
       parallax();
     };
 
-    const needsScrollWiring = parEls.length > 0 || pinWrap != null;
+    const needsScrollWiring = !isMobile && (parEls.length > 0 || pinWrap != null);
     if (needsScrollWiring) {
       window.addEventListener("scroll", onScroll, { passive: true });
       window.addEventListener("mousemove", onMove, { passive: true });
@@ -172,6 +219,7 @@ export default function Motion() {
     return () => {
       io?.disconnect();
       cio?.disconnect();
+      iio?.disconnect();
       timers.forEach(clearTimeout);
       if (needsScrollWiring) {
         window.removeEventListener("scroll", onScroll);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Logo from "@/components/Logo";
@@ -12,6 +12,7 @@ const HORIZONTAL_PADDING = "max(clamp(20px,5vw,64px), calc((100% - 1280px) / 2 +
 export default function Nav() {
   const pathname = usePathname();
   const navRef = useRef<HTMLElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const nav = navRef.current;
@@ -27,6 +28,15 @@ export default function Nav() {
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Close the mobile panel on resize past the breakpoint.
+  useEffect(() => {
+    const onResize = () => {
+      if (window.innerWidth > 760) setMenuOpen(false);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, []);
 
   return (
@@ -63,6 +73,43 @@ export default function Nav() {
       >
         WhatsApp us
       </a>
+
+      <button
+        type="button"
+        className="nav-burger"
+        aria-label={menuOpen ? "Close menu" : "Open menu"}
+        aria-expanded={menuOpen}
+        aria-controls="mobile-nav-panel"
+        onClick={() => setMenuOpen((v) => !v)}
+      >
+        <span className="nav-burger-line" />
+        <span className="nav-burger-line" />
+        <span className="nav-burger-line" />
+      </button>
+
+      <div id="mobile-nav-panel" className={menuOpen ? "nav-mobile-panel is-open" : "nav-mobile-panel"}>
+        <div className="nav-mobile-links">
+          {NAV_LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              aria-current={pathname === link.href ? "page" : undefined}
+              onClick={() => setMenuOpen(false)}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </div>
+        <a
+          className="btn btn-primary nav-mobile-cta"
+          href={waLink()}
+          target="_blank"
+          rel="noopener"
+          onClick={() => setMenuOpen(false)}
+        >
+          WhatsApp us
+        </a>
+      </div>
     </nav>
   );
 }
