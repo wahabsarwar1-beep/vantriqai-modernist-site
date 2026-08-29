@@ -103,6 +103,14 @@
   margin: 2px 0 0;
 }
 
+/* The "AI" in VantriqAI is always the accent color, mixed case, matching
+   the wordmark everywhere else on the site (nav, footer, hero) — applied
+   to the header title and the launcher label by ShopAIChat.tsx, since
+   neither is real markup we can style with a selector on its own. */
+#n8n-chat .chat-brand-ai {
+  color: #ec3013;
+}
+
 /* Structural corrections the variables don't cover: flat panel, 2px frame,
    flush-left labels, themed keyboard focus. */
 #n8n-chat .chat-window,
@@ -135,6 +143,106 @@
   outline-offset: 2px;
 }
 
+/* The widget does not inherit the site's Archivo — the base sheet resets
+   font-family on native controls, so force it explicitly. */
+#n8n-chat,
+#n8n-chat input,
+#n8n-chat textarea,
+#n8n-chat button {
+  font-family: "Archivo", system-ui, sans-serif;
+}
+
+/* Cleaner, branded panel — no third-party footer credit. */
+.n8n-chat-powered-by,
+#n8n-chat [class*="powered-by"] {
+  display: none !important;
+}
+
+/* Launcher: an ink "Ask VantriqAI" label tab butted flush against the accent
+   square, same butted-cell construction as the site's stat and product
+   grids. The label is a real element ShopAIChat.tsx inserts as the toggle's
+   first child (so .chat-brand-ai can color just the "AI") — CSS ::before
+   content can't hold styled sub-text. The square's own background comes
+   from --chat--toggle--background above; ::after only paints the icon. */
+#n8n-chat .chat-window-toggle {
+  display: flex;
+  align-items: stretch;
+  width: auto !important;
+  border-radius: 0 !important;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+#n8n-chat .chat-window-toggle:hover {
+  transform: translateY(-3px);
+}
+#n8n-chat .chat-window-toggle svg {
+  display: none;
+}
+#n8n-chat .chat-toggle-label {
+  display: flex;
+  align-items: center;
+  height: 60px;
+  padding: 0 16px;
+  background: #201e1d;
+  color: #f3f2f2;
+  font-family: "Archivo", system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+@media (max-width: 760px) {
+  #n8n-chat .chat-toggle-label {
+    display: none;
+  }
+}
+#n8n-chat .chat-window-toggle::after {
+  content: "";
+  display: flex;
+  width: 60px;
+  height: 60px;
+  flex: none;
+  background-color: #f3f2f2;
+  -webkit-mask-image: url("/chat-mark.svg");
+  mask-image: url("/chat-mark.svg");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: 26px;
+  mask-size: 26px;
+  animation: chatLauncherPing 5s ease-out infinite;
+}
+@keyframes chatLauncherPing {
+  0%, 68% { box-shadow: 0 0 0 0 rgba(236, 48, 19, 0.6); }
+  100% { box-shadow: 0 0 0 10px rgba(236, 48, 19, 0); }
+}
+
+/* Quick-reply chips, injected above the input by ShopAIChat.tsx — an
+   opening move instead of an empty field. */
+#n8n-chat .chat-quick-replies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 10px 10px 0;
+}
+#n8n-chat .chat-quick-reply-chip {
+  min-height: 34px;
+  padding: 0 12px;
+  background: transparent;
+  border: 2px solid rgba(32, 30, 29, 0.4);
+  color: #201e1d;
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+#n8n-chat .chat-quick-reply-chip:hover {
+  border-color: #ec3013;
+  background: #fff2ef;
+}
+
 /* Above the sticky nav (z-index 20), below the route-transition wipe (z-index 90). */
 #n8n-chat {
   --chat--window--z-index: 70;
@@ -145,11 +253,12 @@
 
 @media (max-width: 480px) {
   :root {
-    --chat--window--width: calc(100vw - 32px);
-    --chat--window--height: calc(100vh - 132px);
+    --chat--window--width: min(380px, calc(100vw - 32px));
+    --chat--window--height: min(560px, calc(100vh - 132px));
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   :root { --chat--transition-duration: 0.001s; }
+  #n8n-chat .chat-window-toggle::after { animation: none; }
 }
