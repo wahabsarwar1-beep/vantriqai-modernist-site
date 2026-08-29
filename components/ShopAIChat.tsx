@@ -134,7 +134,7 @@ export default function ShopAIChat() {
         webhookUrl: process.env.NEXT_PUBLIC_N8N_CHAT_WEBHOOK_URL!,
         mode: "window",
         showWelcomeScreen: false,
-        initialMessages: ["Hi! I'm Shop AI 👋 — ask me about products or add something to your cart."],
+                initialMessages: ["Hi! I'm the VantriqAI Assistant 👋 — ask me anything about our AI agents for WhatsApp, Instagram, or your website."],
         i18n: {
           en: {
             title: "VantriqAI Assistant",
