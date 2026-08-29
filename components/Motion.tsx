@@ -39,9 +39,26 @@ export default function Motion() {
 
     // reveal-on-scroll: rise (fade + rise) or rule (scaleX draw-in)
     const animEls = Array.from(document.querySelectorAll<HTMLElement>("[data-anim]"));
+    // Once the reveal has played, drop every inline override the effect added —
+    // otherwise the inline transform/transition it leaves behind permanently
+    // outranks any CSS :hover rule (cell-hover, why-block, etc.) on the same
+    // element, and cards can never lift or tint on hover again.
+    const clearInline = (el: HTMLElement) => {
+      el.style.transition = "";
+      el.style.opacity = "";
+      el.style.transform = "";
+      el.style.transformOrigin = "";
+      el.style.willChange = "";
+    };
     const show = (el: HTMLElement, i: number) => {
       const kind = el.getAttribute("data-anim");
       const delay = Math.min(i, 5) * 70;
+      const onDone = () => {
+        el.removeEventListener("transitionend", onDone);
+        clearInline(el);
+      };
+      el.addEventListener("transitionend", onDone);
+      timers.push(setTimeout(onDone, delay + 900));
       if (kind === "rule") {
         el.style.transition = `transform .85s cubic-bezier(.16,1,.3,1) ${delay}ms`;
         el.style.transform = "scaleX(1)";

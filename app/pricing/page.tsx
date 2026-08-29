@@ -202,7 +202,6 @@ export default function Pricing() {
                 data-anim="rise"
                 className="cell-hover-5"
                 style={{
-                  background: "var(--color-bg)",
                   padding: "clamp(28px,3vw,40px) clamp(20px,2.5vw,36px)",
                   display: "flex",
                   flexDirection: "column",

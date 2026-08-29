@@ -372,10 +372,16 @@ textarea.input { min-height: 90px; resize: vertical; }
 }
 
 /* — cell/row hover tints used across the ruled grid sections — */
-.cell-hover, .cell-hover-5, .why-block { transition: background-color .3s ease, transform .3s ease, border-color .3s ease; }
+/* Resting background lives here (not as an inline style) for the same reason
+   as .why-block's border: an inline background always outranks :hover. */
+.cell-hover, .cell-hover-5 { background: var(--color-bg); transition: background-color .3s ease, transform .3s ease, border-color .3s ease; }
+.why-block { transition: background-color .3s ease, transform .3s ease, border-color .3s ease; }
 .cell-hover:hover { background: var(--color-accent-100); transform: translateY(-4px); }
 .cell-hover-5:hover { background: var(--color-accent-100); transform: translateY(-5px); }
 .row-hover:hover { background: color-mix(in srgb, var(--color-accent) 7%, transparent); }
+/* border-top lives here (not as an inline style) so :hover can actually win —
+   an inline border-top-color always outranks an external stylesheet rule. */
+.why-block { border-top: 2px solid var(--color-divider); padding-top: 18px; }
 .why-block:hover { border-top-color: var(--color-accent); transform: translateY(-4px); }
 
 /* — FAQ accordion (Pricing page) — */

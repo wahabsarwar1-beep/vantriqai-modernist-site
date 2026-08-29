@@ -179,7 +179,7 @@ export default function HowItWorks() {
             </h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(280px,100%),1fr))", gap: 2, background: "var(--color-divider)", borderBlock: "2px solid var(--color-divider)" }}>
               {HOOD.map((item) => (
-                <div key={item.n} data-anim="rise" className="cell-hover" style={{ background: "var(--color-bg)", padding: "28px 26px 34px" }}>
+                <div key={item.n} data-anim="rise" className="cell-hover" style={{ padding: "28px 26px 34px" }}>
                   <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.1em", color: "var(--color-accent)", margin: "0 0 18px" }}>
                     {item.n}
                   </p>

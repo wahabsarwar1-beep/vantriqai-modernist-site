@@ -127,11 +127,6 @@ export default function Home() {
             style={{ position: "absolute", right: "13%", top: "30%", width: 56, height: 56, background: "var(--color-accent)", opacity: 0.9, pointerEvents: "none" }}
           />
           <span
-            data-par="0.22"
-            aria-hidden="true"
-            style={{ position: "absolute", right: "34%", top: "8%", width: 22, height: 22, background: "var(--color-text)", pointerEvents: "none" }}
-          />
-          <span
             data-par="-0.08"
             aria-hidden="true"
             style={{ position: "absolute", right: "2%", top: "70%", width: 180, height: 2, background: "var(--color-text)", opacity: 0.5, pointerEvents: "none" }}
@@ -209,7 +204,7 @@ export default function Home() {
               key={i}
               data-anim="rise"
               className="cell-hover"
-              style={{ background: "var(--color-bg)", padding: "clamp(28px,4vw,52px) clamp(20px,3vw,44px)", boxShadow: "2px 2px 0 0 var(--color-divider)" }}
+              style={{ padding: "clamp(28px,4vw,52px) clamp(20px,3vw,44px)", boxShadow: "2px 2px 0 0 var(--color-divider)" }}
             >
               <p
                 style={{
@@ -341,7 +336,7 @@ export default function Home() {
             </h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(280px,100%),1fr))", gap: "36px clamp(24px,4vw,64px)" }}>
               {WHY.map((item) => (
-                <div key={item.title} data-anim="rise" className="why-block" style={{ borderTop: "2px solid var(--color-divider)", paddingTop: 18 }}>
+                <div key={item.title} data-anim="rise" className="why-block">
                   <h3 style={{ fontSize: 21, lineHeight: 1.15, letterSpacing: "-0.02em", margin: "0 0 12px" }}>{item.title}</h3>
                   <p style={{ fontSize: 15.5, lineHeight: "27px", margin: 0, maxWidth: "44ch", ...bodyMuted }}>{item.body}</p>
                 </div>

@@ -81,6 +81,28 @@
   --chat--button--hover--background: #c8250c;
 }
 
+/* @n8n/chat's header is text-only by default (no logo slot) — inject the
+   reversed mark before the title so the header reads as the site's own
+   header bar, not the raw n8n default. */
+#n8n-chat .chat-header .chat-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+#n8n-chat .chat-header .chat-heading::before {
+  content: "";
+  display: block;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  background: url("/ventriqai-mark-reversed.svg") no-repeat center / contain;
+}
+#n8n-chat .chat-header p {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 2px 0 0;
+}
+
 /* Structural corrections the variables don't cover: flat panel, 2px frame,
    flush-left labels, themed keyboard focus. */
 #n8n-chat .chat-window,

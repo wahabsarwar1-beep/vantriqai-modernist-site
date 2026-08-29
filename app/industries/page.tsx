@@ -144,7 +144,6 @@ export default function Industries() {
               data-anim="rise"
               className="cell-hover-5"
               style={{
-                background: "var(--color-bg)",
                 padding: "clamp(26px,3vw,40px) clamp(20px,2.5vw,36px)",
                 boxShadow: "2px 2px 0 0 var(--color-divider)",
               }}

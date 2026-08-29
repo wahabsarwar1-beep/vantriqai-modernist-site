@@ -159,7 +159,6 @@ export default function Products() {
               data-anim="rise"
               className="cell-hover-5"
               style={{
-                background: "var(--color-bg)",
                 padding: "clamp(26px,3vw,40px) clamp(20px,2.5vw,36px)",
                 display: "flex",
                 flexDirection: "column",
@@ -203,7 +202,7 @@ export default function Products() {
             </h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(260px,100%),1fr))", gap: "36px clamp(24px,4vw,64px)" }}>
               {FOUNDATION.map((item) => (
-                <div key={item.title} data-anim="rise" className="why-block" style={{ borderTop: "2px solid var(--color-divider)", paddingTop: 18 }}>
+                <div key={item.title} data-anim="rise" className="why-block">
                   <h3 style={{ fontSize: 20, lineHeight: 1.15, letterSpacing: "-0.02em", margin: "0 0 10px" }}>{item.title}</h3>
                   <p style={{ fontSize: 15, lineHeight: "26px", margin: 0, maxWidth: "42ch", ...bodyMuted }}>{item.body}</p>
                 </div>
