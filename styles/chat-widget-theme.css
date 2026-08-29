@@ -113,8 +113,7 @@
 
 /* Structural corrections the variables don't cover: flat panel, 2px frame,
    flush-left labels, themed keyboard focus. */
-#n8n-chat .chat-window,
-#n8n-chat [class*="chat-window"] {
+#n8n-chat .chat-window {
   border: 2px solid #201e1d;
   border-radius: 0;
   box-shadow: 0 8px 24px rgba(32, 30, 29, 0.16);
