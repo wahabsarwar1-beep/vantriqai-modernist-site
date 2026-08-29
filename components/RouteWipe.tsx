@@ -38,6 +38,10 @@ export default function RouteWipe() {
       setPhase("in");
       timers.current.push(
         setTimeout(() => {
+          // Cancel any in-flight smooth-scroll glide first — otherwise its
+          // own scrollTo calls fight this one and the page bounces back
+          // toward the pre-navigation target instead of staying at the top.
+          window.__stopSmoothScroll?.();
           router.push(href);
           window.scrollTo(0, 0);
           setPhase("out");

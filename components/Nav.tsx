@@ -19,13 +19,29 @@ export default function Nav() {
     if (!nav) return;
     const logo = nav.querySelector<HTMLElement>(".nav-logo");
 
-    const onScroll = () => {
+    let lastSmall: boolean | null = null;
+    const apply = () => {
       const small = window.scrollY > 40;
+      if (small === lastSmall) return;
+      lastSmall = small;
       nav.style.padding = small ? `8px ${HORIZONTAL_PADDING}` : "";
       nav.style.boxShadow = small ? "0 2px 0 0 var(--color-divider)" : "";
       if (logo) logo.style.height = small ? "34px" : "";
     };
-    onScroll();
+    // RAF-coalesced: a burst of scroll events between frames still does at
+    // most one read-then-write pass, and re-applying the same padding value
+    // on every raw scroll tick was invalidating the nav's backdrop-filter
+    // and repainting the blur continuously.
+    let rafPending = false;
+    const onScroll = () => {
+      if (rafPending) return;
+      rafPending = true;
+      requestAnimationFrame(() => {
+        rafPending = false;
+        apply();
+      });
+    };
+    apply();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);

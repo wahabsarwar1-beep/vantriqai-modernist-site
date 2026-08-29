@@ -91,6 +91,35 @@ function injectLauncherLabel() {
   toggle.insertBefore(label, toggle.firstChild);
 }
 
+/** @n8n/chat toggles its panel via an inline `display:none`, which can't be
+ *  transitioned — it just snaps. CSS forces the panel to stay `display:block`
+ *  always and hides it with opacity/transform/visibility instead (see
+ *  chat-widget-theme.css); this keeps a `.chat-window-open` class on the
+ *  panel in sync with n8n's own inline style so that CSS can tell the two
+ *  states apart. */
+function syncChatWindowOpenClass() {
+  const win = document.querySelector<HTMLElement>("#n8n-chat .chat-window");
+  if (!win) return;
+  const isOpen = win.style.display !== "none";
+  if (!isOpen) {
+    win.classList.remove("chat-window-open");
+    return;
+  }
+  if (win.classList.contains("chat-window-open") || win.dataset.opening) return;
+  // Opening: n8n clears its inline display:none in the same tick this runs,
+  // so adding the class immediately would collapse "become visible" and
+  // "become open" into a single frame with nothing painted in between —
+  // the transition would have no "from" state to animate from. A double rAF
+  // guarantees the closed state (opacity 0) actually paints first.
+  win.dataset.opening = "1";
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      win.classList.add("chat-window-open");
+      delete win.dataset.opening;
+    });
+  });
+}
+
 /** The Shop AI assistant — @n8n/chat mounted in window mode, themed to the
  *  Modernist system via styles/chat-widget-theme.css. Backend is the client's
  *  own n8n workflow; this component only handles the embed. */
@@ -122,10 +151,11 @@ export default function ShopAIChat() {
         brandifyHeader();
         injectLauncherLabel();
         injectQuickReplies();
+        syncChatWindowOpenClass();
       };
       runInjections();
       observer = new MutationObserver(runInjections);
-      observer.observe(document.body, { childList: true, subtree: true });
+      observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["style"] });
     });
 
     return () => {

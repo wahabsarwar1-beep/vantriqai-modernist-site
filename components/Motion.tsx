@@ -58,7 +58,7 @@ export default function Motion() {
         clearInline(el);
       };
       el.addEventListener("transitionend", onDone);
-      timers.push(setTimeout(onDone, delay + 900));
+      timers.push(setTimeout(onDone, delay + 1100));
       if (kind === "rule") {
         el.style.transition = `transform .85s cubic-bezier(.16,1,.3,1) ${delay}ms`;
         el.style.transform = "scaleX(1)";
@@ -178,32 +178,91 @@ export default function Motion() {
     // parallax shapes + the scroll-pinned three-step stage — both are inert
     // below 760px (shapes hidden, stage unpinned via CSS), so no scroll work there.
     const isMobile = window.matchMedia("(max-width: 760px)").matches;
-    const parEls = Array.from(document.querySelectorAll<HTMLElement>("[data-par]"));
+
+    // Cache nodes (and, for parallax, the parsed factor) once per mount/route —
+    // no frame should ever run a querySelectorAll or re-parse an attribute.
+    const parEls = Array.from(document.querySelectorAll<HTMLElement>("[data-par]")).map((el) => ({
+      el,
+      k: (parseFloat(el.getAttribute("data-par") || "0") || 0) * m,
+    }));
     const pinWrap = document.querySelector<HTMLElement>("[data-pin]");
     const pinPanels = pinWrap ? Array.from(pinWrap.querySelectorAll<HTMLElement>("[data-pin-panel]")) : [];
     const pinRows = pinWrap ? Array.from(pinWrap.querySelectorAll<HTMLElement>("[data-pin-row]")) : [];
     const pinRail = pinWrap?.querySelector<HTMLElement>("[data-pin-rail]") ?? null;
     const pinLabel = pinWrap?.querySelector<HTMLElement>("[data-pin-count]") ?? null;
+    // Mutable, not reactive — read/written only inside the frame below.
+    const pinState = { idx: -1, prog: -1 };
+
+    let mio: IntersectionObserver | null = null;
+    if (isMobile && pinPanels.length) {
+      // Mobile doesn't scrub — each panel reveals independently on entry, and
+      // the row/rail/counter it drags along just track whichever panel most
+      // recently entered. Rail and counter stay visible (they used to be
+      // hidden here; the stage now animates instead of sitting static).
+      if (reduced) {
+        pinPanels.forEach((el) => {
+          el.style.opacity = "1";
+          el.style.transform = "none";
+        });
+      } else {
+        pinPanels.forEach((el) => {
+          el.style.transition = "opacity .6s ease, transform .7s cubic-bezier(.16,1,.3,1)";
+          el.style.opacity = "0";
+          el.style.transform = "translateY(26px)";
+        });
+        mio = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((e) => {
+              if (!e.isIntersecting) return;
+              const target = e.target as HTMLElement;
+              const i = pinPanels.indexOf(target);
+              target.style.opacity = "1";
+              target.style.transform = "none";
+              pinRows.forEach((row, j) => {
+                const on = j === i;
+                row.style.background = on ? "var(--color-accent)" : "var(--color-bg)";
+                row.style.color = on ? "var(--color-bg)" : "var(--color-text)";
+              });
+              if (pinRail) pinRail.style.transform = `scaleX(${((i + 1) / pinPanels.length).toFixed(3)})`;
+              if (pinLabel) pinLabel.textContent = `0${i + 1} / 0${pinPanels.length}`;
+              mio!.unobserve(target);
+            });
+          },
+          { rootMargin: "0px 0px -30% 0px", threshold: 0.25 }
+        );
+        pinPanels.forEach((el) => mio!.observe(el));
+      }
+    } else if (!isMobile && pinPanels.length) {
+      // Desktop: transition + will-change assigned once here, never per frame.
+      pinPanels.forEach((el) => {
+        el.style.transition = "opacity .45s ease, transform .55s cubic-bezier(.16,1,.3,1)";
+        el.style.willChange = "transform, opacity";
+      });
+    }
 
     const parallax = () => {
-      if (reduced) return;
+      if (reduced || isMobile) return;
       const mo = mouseRef.current;
       const y = window.scrollY;
-      parEls.forEach((el) => {
-        const k = parseFloat(el.getAttribute("data-par") || "0") * m;
+      for (const { el, k } of parEls) {
         el.style.transform = `translate3d(${(mo.x * 60 * k).toFixed(1)}px,${(y * k + mo.y * 50 * k).toFixed(1)}px,0) rotate(${(mo.x * 6 * k).toFixed(2)}deg)`;
-      });
+      }
     };
 
     const pin = () => {
-      if (!pinWrap) return;
+      if (!pinWrap || isMobile) return;
       const rect = pinWrap.getBoundingClientRect();
       const span = pinWrap.offsetHeight - window.innerHeight;
       const p = Math.max(0, Math.min(0.999, -rect.top / (span || 1)));
+      if (pinRail && Math.abs(p - pinState.prog) > 0.002) {
+        pinRail.style.transform = `scaleX(${Math.max(0.04, p).toFixed(3)})`;
+        pinState.prog = p;
+      }
       const idx = Math.min(pinPanels.length - 1, Math.floor(p * pinPanels.length));
+      if (idx === pinState.idx) return;
+      pinState.idx = idx;
       pinPanels.forEach((el, i) => {
         const on = i === idx;
-        el.style.transition = "opacity .45s ease, transform .55s cubic-bezier(.16,1,.3,1)";
         el.style.opacity = on ? "1" : "0";
         el.style.transform = on ? "none" : `translateY(${i < idx ? -34 : 34}px)`;
         el.style.pointerEvents = on ? "auto" : "none";
@@ -213,30 +272,41 @@ export default function Motion() {
         el.style.background = on ? "var(--color-accent)" : "var(--color-bg)";
         el.style.color = on ? "var(--color-bg)" : "var(--color-text)";
       });
-      if (pinRail) pinRail.style.transform = `scaleX(${Math.max(0.04, p).toFixed(3)})`;
       if (pinLabel) pinLabel.textContent = `0${idx + 1} / 0${pinPanels.length}`;
     };
 
-    const onScroll = () => {
-      parallax();
-      pin();
+    // One requestAnimationFrame coalescer for both scroll and mousemove: the
+    // event handlers only store input and request a frame, never write style
+    // directly, so a burst of events between frames does at most one
+    // read-then-write pass instead of one per event.
+    let rafPending = false;
+    const scheduleFrame = () => {
+      if (rafPending) return;
+      rafPending = true;
+      requestAnimationFrame(() => {
+        rafPending = false;
+        parallax();
+        pin();
+      });
     };
+    const onScroll = () => scheduleFrame();
     const onMove = (e: MouseEvent) => {
       mouseRef.current = { x: e.clientX / window.innerWidth - 0.5, y: e.clientY / window.innerHeight - 0.5 };
-      parallax();
+      scheduleFrame();
     };
 
     const needsScrollWiring = !isMobile && (parEls.length > 0 || pinWrap != null);
     if (needsScrollWiring) {
       window.addEventListener("scroll", onScroll, { passive: true });
       window.addEventListener("mousemove", onMove, { passive: true });
-      onScroll();
+      scheduleFrame();
     }
 
     return () => {
       io?.disconnect();
       cio?.disconnect();
       iio?.disconnect();
+      mio?.disconnect();
       timers.forEach(clearTimeout);
       if (needsScrollWiring) {
         window.removeEventListener("scroll", onScroll);

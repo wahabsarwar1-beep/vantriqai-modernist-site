@@ -402,17 +402,17 @@ span[data-chev] { display: inline-block; transition: transform 0.18s ease; }
   .hero-canvas { opacity: 0.5; }
 
   /* The pinned stage becomes a plain stacked list — inline styles (position,
-     height, opacity, transform) need !important to override the React
-     style prop, which otherwise always wins over an external stylesheet. */
+     height) need !important to override the React style prop, which
+     otherwise always wins over an external stylesheet. Opacity/transform are
+     NOT forced here: Motion.tsx drives each panel's own reveal-on-scroll
+     inline (opacity 0->1, translateY(26px)->0), and rail/counter now stay
+     visible, tracking whichever panel most recently entered. */
   [data-pin] { height: auto !important; }
   [data-pin] > div { position: static !important; height: auto !important; }
   [data-pin-panel] {
     position: static !important;
-    opacity: 1 !important;
-    transform: none !important;
     pointer-events: auto !important;
     margin-bottom: clamp(32px, 7vw, 48px);
   }
   [data-pin-panel]:last-child { margin-bottom: 0; }
-  [data-pin-rail], [data-pin-count] { display: none !important; }
 }

@@ -33,7 +33,7 @@ export default function MotionBackground() {
     if (!ctx) return;
 
     const reduced = prefersReducedMotion();
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
 
     let w = 0;
     let h = 0;
@@ -42,7 +42,8 @@ export default function MotionBackground() {
     let packets: Packet[] = [];
     let pulses: Pulse[] = [];
     let raf = 0;
-    let running = false;
+    let dead = false;
+    let visible = true;
 
     function makePacket(width: number, height: number, lx: number[], ly: number[]): Packet {
       const vert = Math.random() < 0.62;
@@ -128,23 +129,25 @@ export default function MotionBackground() {
         q.r += 1.4;
         q.a *= 0.965;
       });
-
-      if (running) raf = requestAnimationFrame(draw);
     }
 
-    function start() {
-      if (running || reduced) return;
-      running = true;
-      raf = requestAnimationFrame(draw);
-    }
-    function stop() {
-      running = false;
-      cancelAnimationFrame(raf);
+    // The tick keeps running every frame regardless of visibility — it's
+    // just an if-check and a requestAnimationFrame call. Only the actual
+    // draw() (clearRect, gradients, per-packet strokes) is skipped while
+    // off-screen or the tab is hidden, checked fresh each tick rather than
+    // fully starting/stopping the loop from a separate visibility listener.
+    function loop() {
+      if (dead) return;
+      if (visible && !document.hidden) draw();
+      raf = requestAnimationFrame(loop);
     }
 
     build();
-    draw();
-    if (!reduced) start();
+    if (reduced) {
+      draw();
+    } else {
+      raf = requestAnimationFrame(loop);
+    }
 
     const ro = new ResizeObserver(() => {
       build();
@@ -152,29 +155,19 @@ export default function MotionBackground() {
     });
     ro.observe(canvas);
 
-    const onVisibility = () => {
-      if (reduced) return;
-      if (document.hidden) stop();
-      else start();
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-
     const io = new IntersectionObserver(
       (entries) => {
-        if (reduced) return;
-        const visible = entries[0]?.isIntersecting;
-        if (visible && !document.hidden) start();
-        else stop();
+        visible = entries[0]?.isIntersecting ?? true;
       },
       { threshold: 0.01 }
     );
     io.observe(canvas);
 
     return () => {
-      stop();
+      dead = true;
+      cancelAnimationFrame(raf);
       ro.disconnect();
       io.disconnect();
-      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
 

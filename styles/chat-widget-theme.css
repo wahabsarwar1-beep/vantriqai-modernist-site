@@ -120,6 +120,50 @@
   box-shadow: 0 8px 24px rgba(32, 30, 29, 0.16);
 }
 
+/* Open/close: the panel stays mounted and *always* display:block — n8n's own
+   inline display:none toggle can't be transitioned, which is what made the
+   panel snap open/closed instead of animating. ShopAIChat.tsx watches that
+   inline style and mirrors it onto .chat-window-open, so the actual show/hide
+   here runs on opacity/transform/visibility instead, which can animate.
+   visibility only flips to hidden 520ms into a close (transition-delay),
+   giving the closing animation time to actually play; it flips to visible
+   immediately on open. */
+/* n8n wraps the panel in its own Vue <Transition> (chat-window-transition-*
+   classes) with an un-styled ~500ms leave phase that runs BEFORE it hands
+   off to display:none — stacking a dead pause in front of the animation
+   below instead of replacing it. Neutralizing the duration makes Vue
+   resolve that phase immediately, so our own transition is the only one
+   that actually plays. */
+#n8n-chat [class*="chat-window-transition-"] {
+  transition: none !important;
+  animation: none !important;
+}
+
+#n8n-chat .chat-window {
+  display: flex !important;
+  transform-origin: bottom right;
+  opacity: 0;
+  transform: translateY(20px) scale(0.96);
+  visibility: hidden;
+  pointer-events: none;
+  will-change: transform, opacity;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.52s cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0s linear 0.52s;
+}
+#n8n-chat .chat-window.chat-window-open {
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.52s cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0s linear 0s;
+}
+@media (prefers-reduced-motion: reduce) {
+  #n8n-chat .chat-window {
+    transition: none;
+  }
+}
+
 #n8n-chat .chat-body,
 #n8n-chat [class*="chat-messages"] {
   background:

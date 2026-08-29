@@ -4,6 +4,7 @@ import Nav from "@/components/Nav";
 import Motion from "@/components/Motion";
 import RouteWipe from "@/components/RouteWipe";
 import ShopAIChat from "@/components/ShopAIChat";
+import SmoothScroll from "@/components/SmoothScroll";
 import "./globals.css";
 
 const archivo = Archivo({
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={archivo.variable}>
       <body>
+        <SmoothScroll />
         <RouteWipe />
         <Nav />
         {children}
