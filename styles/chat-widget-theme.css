@@ -138,6 +138,21 @@
   animation: none !important;
 }
 
+/* Because the panel below is always display:flex (so it can animate), n8n's
+   own wrapper no longer collapses when the chat is closed — it stays a
+   fixed, full-size box at z-index 70 and swallows every tap underneath it.
+   On mobile that covered ~80% of the screen and made the nav menu and any
+   low-on-page button unclickable. The wrapper must therefore be transparent
+   to pointer events, with only the genuinely interactive parts opting back in. */
+#n8n-chat .chat-window-wrapper {
+  pointer-events: none;
+}
+#n8n-chat .chat-window.chat-window-open,
+#n8n-chat .chat-window-toggle,
+#n8n-chat .chat-toggle-label {
+  pointer-events: auto;
+}
+
 #n8n-chat .chat-window {
   display: flex !important;
   transform-origin: bottom right;

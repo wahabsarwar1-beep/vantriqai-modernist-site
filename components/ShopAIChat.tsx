@@ -18,7 +18,16 @@ function sendQuickReply(text: string) {
   setter?.call(textarea, text);
   textarea.dispatchEvent(new Event("input", { bubbles: true }));
 
-  const sendButton = root?.querySelector<HTMLButtonElement>('[class*="chat-input"] button');
+  // The chips are <button>s sitting right beside the input row, so a plain
+  // '[class*="chat-input"] button' lookup matched the FIRST CHIP instead of
+  // n8n's send control — every chip then re-fired chip #1 and the input
+  // always ended up reading "Book a demo". Scope to the input row and
+  // exclude our own chips explicitly.
+  const inputRow = textarea.closest<HTMLElement>('[class*="chat-input"]');
+  const sendButton =
+    inputRow?.querySelector<HTMLButtonElement>("button:not(.chat-quick-reply-chip)") ??
+    root?.querySelector<HTMLButtonElement>('[class*="chat-input"] button:not(.chat-quick-reply-chip)');
+
   if (sendButton) {
     sendButton.click();
   } else {
@@ -120,9 +129,10 @@ function syncChatWindowOpenClass() {
   });
 }
 
-/** The Shop AI assistant — @n8n/chat mounted in window mode, themed to the
- *  Modernist system via styles/chat-widget-theme.css. Backend is the client's
- *  own n8n workflow; this component only handles the embed. */
+/** The VantriqAI assistant — @n8n/chat mounted in window mode, themed to the
+ *  Modernist system via styles/chat-widget-theme.css. Backend is VantriqAI's
+ *  own n8n workflow (persona/knowledge live there, not in this component);
+ *  this component only handles the embed. */
 export default function ShopAIChat() {
   useEffect(() => {
     let mounted = true;
@@ -134,7 +144,9 @@ export default function ShopAIChat() {
         webhookUrl: process.env.NEXT_PUBLIC_N8N_CHAT_WEBHOOK_URL!,
         mode: "window",
         showWelcomeScreen: false,
-                initialMessages: ["Hi! I'm the VantriqAI Assistant 👋 — ask me anything about our AI agents for WhatsApp, Instagram, or your website."],
+        initialMessages: [
+          "Hi! I'm the VantriqAI assistant 👋 — ask me about our AI agents, packages, or how it works, or I can book you a quick discovery call.",
+        ],
         i18n: {
           en: {
             title: "VantriqAI Assistant",
