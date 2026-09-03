@@ -34,9 +34,13 @@ export default function Footer({ showLocation = true }: FooterProps) {
           <BrandName inkColor="inherit" /> · Intelligent automation for business
           {showLocation ? " · Islamabad, Pakistan" : ""}
         </span>
-        <span style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+        {/* These are the only navigation on a phone once the reader is past
+            the nav, so they carry the 44px touch target the rest of the site
+            does. The negative margin keeps the padded rows from adding a
+            visible gap to the footer's own 36px padding. */}
+        <span style={{ display: "flex", gap: "0 24px", flexWrap: "wrap", margin: "-11px 0" }}>
           {NAV_LINKS.filter((link) => link.href !== pathname).map((link) => (
-            <Link key={link.href} href={link.href}>
+            <Link key={link.href} href={link.href} style={{ display: "inline-flex", alignItems: "center", minHeight: 44 }}>
               {link.label}
             </Link>
           ))}

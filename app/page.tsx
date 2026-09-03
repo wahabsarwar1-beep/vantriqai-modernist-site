@@ -1,39 +1,16 @@
+import AdvantageBand from "@/components/AdvantageBand";
 import BrandName from "@/components/BrandName";
-import ChatDemo from "@/components/ChatDemo";
 import CtaBand from "@/components/CtaBand";
 import Footer from "@/components/Footer";
 import MotionBackground from "@/components/MotionBackground";
+import ResponseGap from "@/components/ResponseGap";
 import SplitHeader from "@/components/SplitHeader";
+import StepRail from "@/components/StepRail";
+import WorkspaceCards from "@/components/WorkspaceCards";
+import { AGENTS, BENCH, INTEGRATIONS } from "@/lib/home-data";
 import { waLink } from "@/lib/whatsapp";
 
 const bodyMuted = { color: "color-mix(in srgb, var(--color-text) 78%, transparent)" };
-
-const STATS = [
-  {
-    value: (
-      <>
-        ~<span data-count="400">400</span>%
-      </>
-    ),
-    label: "More leads convert when you reply within two minutes instead of hours",
-  },
-  {
-    value: (
-      <>
-        <span data-count="20">20</span>–<span data-count="30">30</span>%
-      </>
-    ),
-    label: "Revenue typically lost to after-hours and peak-rush messages that go unanswered",
-  },
-  {
-    value: (
-      <>
-        <span data-count="24">24</span>/<span data-count="7">7</span>
-      </>
-    ),
-    label: "The coverage your AI-equipped competitors already have — and you may not",
-  },
-];
 
 const STEPS = [
   {
@@ -198,55 +175,85 @@ export default function Home() {
             padding: "clamp(22px,3vw,40px) clamp(20px,5vw,64px)",
           }}
         >
-          {STATS.map((stat, i) => (
+          {BENCH.map((b) => (
             <div
-              key={i}
+              key={b.fig}
               data-anim="rise"
               className="cell-hover"
-              style={{ padding: "clamp(24px,3vw,32px) clamp(20px,2.4vw,28px)" }}
+              style={{ padding: "clamp(26px,3.4vw,46px) clamp(18px,2.4vw,34px)", display: "flex", flexDirection: "column" }}
             >
               <p
                 style={{
                   fontFamily: "var(--font-heading)",
                   fontWeight: 800,
-                  fontSize: "clamp(32px,3.6vw,52px)",
+                  fontSize: "clamp(34px,3.8vw,54px)",
                   lineHeight: 1,
                   letterSpacing: "-0.04em",
                   margin: 0,
                   fontFeatureSettings: "'tnum' 1",
                 }}
               >
-                {stat.value}
+                {b.fig}
+              </p>
+              <p style={{ fontSize: 14.5, lineHeight: "23px", margin: "16px 0 22px", flex: 1, maxWidth: "30ch", ...bodyMuted }}>
+                {b.claim}
               </p>
               <p
                 style={{
-                  fontSize: 13,
-                  lineHeight: "20px",
-                  letterSpacing: "0.06em",
+                  fontFamily: "var(--font-heading)",
+                  fontWeight: 800,
+                  fontSize: 10,
+                  lineHeight: "16px",
+                  letterSpacing: "0.1em",
                   textTransform: "uppercase",
-                  color: "color-mix(in srgb, var(--color-text) 64%, transparent)",
-                  margin: "18px 0 0",
-                  maxWidth: "26ch",
+                  margin: 0,
+                  paddingTop: 12,
+                  borderTop: "1px solid var(--color-divider)",
+                  color: "color-mix(in srgb, var(--color-text) 50%, transparent)",
                 }}
               >
-                {stat.label}
+                {b.src}
               </p>
             </div>
           ))}
         </div>
       </section>
 
+      {/* 01 — the response gap, then the same enquiry answered twice */}
+      <div style={{ ...shell, paddingTop: "clamp(34px,4.4vw,58px)" }}>
+        <ResponseGap />
+      </div>
+
+      {/* { Vantriq's advantage } — the phone in front of the tile band */}
       <div style={shell}>
-        <section style={{ padding: "clamp(56px,8vw,104px) 0 clamp(24px,3vw,40px)" }}>
-          <SplitHeader kicker="Live — the agent answering">
+        <section style={{ padding: "clamp(38px,4.8vw,64px) 0 clamp(16px,2.2vw,28px)" }}>
+          <SplitHeader kicker={<>{"{ Vantriq\u2019s advantage }"}</>}>
             <h2 data-anim="rise" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px", maxWidth: "20ch" }}>
-              This is what your customer sees.
+              The growth engine for local business.
             </h2>
             <p data-anim="rise" style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 32px", maxWidth: "50ch", ...bodyMuted }}>
-              An exchange replayed at the speed the agent actually answers — no queue, no office hours.
+              One agent, plugged into your channels and your calendar, answering every hour you are closed. Below: a
+              real exchange replayed at the speed it actually runs.
             </p>
-            <div data-anim="rise">
-              <ChatDemo />
+            <AdvantageBand />
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit,minmax(min(272px,100%),1fr))",
+                gap: "28px clamp(24px,4vw,64px)",
+                marginTop: "clamp(32px,4vw,56px)",
+              }}
+            >
+              {[
+                { title: "Trained on real conversations", body: "Configured against your own message history, not a generic script with your logo on it." },
+                { title: "Modules in sync", body: "Booking, catalogue and qualification share one memory of the customer, so nothing is asked twice." },
+                { title: "Connected to your whole stack", body: "It acts inside your calendar, CRM and inventory rather than keeping a second copy of the truth." },
+              ].map((item) => (
+                <div key={item.title} data-anim="rise" className="why-block">
+                  <h3 style={{ fontSize: 21, lineHeight: 1.15, letterSpacing: "-0.02em", margin: "0 0 12px" }}>{item.title}</h3>
+                  <p style={{ fontSize: 15.5, lineHeight: "27px", margin: 0, maxWidth: "44ch", ...bodyMuted }}>{item.body}</p>
+                </div>
+              ))}
             </div>
           </SplitHeader>
         </section>
@@ -258,7 +265,7 @@ export default function Home() {
             <div style={{ maxWidth: 1280, width: "100%", margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(24px,4vw,44px)" }}>
                 <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)" }}>
-                  01 — What it does
+                  02 — What it does
                 </span>
                 <span style={{ flex: 1, height: 1, background: "var(--color-divider)" }} />
                 <span data-pin-count="" style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.14em" }}>
@@ -297,6 +304,119 @@ export default function Home() {
           </div>
         </div>
 
+        {/* 03 — the ten agent modules */}
+        <div style={{ ...shell, padding: "clamp(34px,4.4vw,58px) clamp(20px,5vw,64px) clamp(18px,2.4vw,30px)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(20px,3vw,32px)" }}>
+            <span data-anim="rise" className="kicker-pill">03 — The agents</span>
+            <span data-anim="rule" style={{ flex: 1, height: 1, background: "var(--color-divider)" }} />
+          </div>
+          <h2 data-anim="rise" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: 0, maxWidth: "24ch" }}>
+            One brain, ten jobs. Switch on the ones your day actually needs — the rest stay quiet until you want them.
+          </h2>
+        </div>
+
+        <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)" }}>
+          <div
+            style={{
+              maxWidth: 1280,
+              margin: "0 auto",
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit,minmax(min(272px,100%),1fr))",
+              gap: 18,
+              padding: "clamp(22px,3vw,40px) clamp(20px,5vw,64px)",
+            }}
+          >
+            {AGENTS.map((a) => (
+              <div
+                key={a.n}
+                data-anim="rise"
+                className="cell-hover-5"
+                style={{ padding: "clamp(24px,3vw,38px) clamp(20px,2.5vw,34px)", display: "flex", flexDirection: "column" }}
+              >
+                <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", color: "var(--color-accent)", margin: "0 0 18px" }}>
+                  {a.n}
+                </p>
+                <h3 style={{ fontSize: 23, lineHeight: 1.05, letterSpacing: "-0.025em", margin: "0 0 12px" }}>{a.name} Agent</h3>
+                <p style={{ fontSize: 14.5, lineHeight: "25px", margin: "0 0 22px", flex: 1, ...bodyMuted }}>{a.body}</p>
+                <p
+                  style={{
+                    fontFamily: "var(--font-heading)",
+                    fontWeight: 800,
+                    fontSize: 11,
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                    margin: 0,
+                    paddingTop: 14,
+                    borderTop: "1px solid var(--color-divider)",
+                    color: "var(--color-accent)",
+                  }}
+                >
+                  {a.metric}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* { The workspace } */}
+        <div style={shell}>
+          <section style={{ padding: "clamp(38px,5vw,72px) 0 clamp(20px,3vw,36px)" }}>
+            <SplitHeader kicker={<>{"{ The workspace }"}</>}>
+              <h2 data-anim="rise" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 32px", maxWidth: "20ch" }}>
+                For work that is bigger than one inbox.
+              </h2>
+              <WorkspaceCards />
+            </SplitHeader>
+          </section>
+        </div>
+
+        {/* 04 — the horizontally pinned five-step rail */}
+        <StepRail />
+
+        {/* 05 — what it plugs into */}
+        <div style={{ ...shell, padding: "clamp(34px,4.4vw,60px) clamp(20px,5vw,64px) clamp(18px,2.4vw,30px)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(20px,3vw,32px)" }}>
+            <span data-anim="rise" className="kicker-pill">05 — What it plugs into</span>
+            <span data-anim="rule" style={{ flex: 1, height: 1, background: "var(--color-divider)" }} />
+          </div>
+          <h2 data-anim="rise" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: 0, maxWidth: "24ch" }}>
+            It acts inside the tools you already pay for.
+          </h2>
+        </div>
+
+        <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)" }}>
+          <div
+            style={{
+              maxWidth: 1280,
+              margin: "0 auto",
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit,minmax(min(272px,100%),1fr))",
+              gap: 18,
+              padding: "clamp(22px,3vw,40px) clamp(20px,5vw,64px)",
+            }}
+          >
+            {INTEGRATIONS.map((g) => (
+              <div
+                key={g.group}
+                data-anim="rise"
+                className="cell-hover"
+                style={{ padding: "clamp(24px,3vw,36px) clamp(20px,2.5vw,32px)" }}
+              >
+                <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)", margin: "0 0 18px" }}>
+                  {g.group}
+                </p>
+                <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10 }}>
+                  {g.items.map((it) => (
+                    <li key={it} style={{ fontSize: 15, lineHeight: "24px", borderTop: "1px solid var(--color-divider)", paddingTop: 10 }}>
+                      {it}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* industries marquee */}
         <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)", padding: "clamp(28px,4vw,48px) 0", overflow: "hidden" }}>
           <p
@@ -313,9 +433,9 @@ export default function Home() {
               color: "var(--color-accent)",
             }}
           >
-            02 — Where it applies
+            06 — Where it applies
           </p>
-          <div style={{ display: "flex", width: "max-content", animation: "marquee 34s linear infinite" }}>
+          <div style={{ display: "flex", width: "max-content", animation: "marquee 40s linear infinite" }}>
             <MarqueeTrack />
             <MarqueeTrack ariaHidden />
           </div>
@@ -326,7 +446,7 @@ export default function Home() {
           <SplitHeader
             kicker={
               <>
-                03 — Why <BrandName inkColor="var(--color-text)" />
+                07 — Why <BrandName inkColor="var(--color-text)" />
               </>
             }
           >

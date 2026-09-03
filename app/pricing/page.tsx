@@ -344,7 +344,7 @@ export default function Pricing() {
                     padding: "20px 0",
                   }}
                 >
-                  <summary style={{ display: "flex", gap: 20, alignItems: "baseline", fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 19, lineHeight: 1.35, letterSpacing: "-0.02em" }}>
+                  <summary style={{ display: "flex", gap: 20, alignItems: "baseline", minHeight: 44, paddingBlock: 9, fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 19, lineHeight: 1.35, letterSpacing: "-0.02em" }}>
                     <span data-chev="" style={{ color: "var(--color-accent)", fontSize: 16 }}>
                       +
                     </span>

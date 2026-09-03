@@ -64,6 +64,34 @@ const ONBOARDING = [
   "Ongoing management — monthly tuning, reporting, and support included in your plan",
 ];
 
+/** The response window — published lead-response benchmarks, each with its
+ *  own bar. Percentages are relative bar lengths, not the figure itself. */
+const WINDOW = [
+  { band: "Inside 1 minute", src: "Velocify", pct: 96, fig: "+391%", count: 391, prefix: "+", suffix: "%", note: "conversion lift on first contact" },
+  { band: "Inside 5 minutes", src: "MIT / InsideSales.com", pct: 74, fig: "21×", count: 21, prefix: "", suffix: "×", note: "more likely to qualify than at 30 minutes" },
+  { band: "Inside 1 hour", src: "Harvard Business Review", pct: 52, fig: "60×", count: 60, prefix: "", suffix: "×", note: "more likely to qualify than after 24 hours" },
+  { band: "After 24 hours", src: "Harvard Business Review", pct: 14, fig: "23%", count: 23, prefix: "", suffix: "%", note: "of firms never reply at all" },
+];
+
+/** Every benchmark quoted anywhere on the site, with its source. */
+const BMK = [
+  { claim: "Qualification odds, replying at 5 minutes instead of 30", fig: "21× higher", src: "MIT / InsideSales.com, Lead Response Management Study, 2007" },
+  { claim: "Odds of making contact at all, 5 minutes versus 30", fig: "100× higher", src: "MIT / InsideSales.com, 2007" },
+  { claim: "Customers who buy from the business that replies first", fig: "78%", src: "MIT / InsideSales.com, 2007" },
+  { claim: "Average first response to a web enquiry (2,241 firms audited)", fig: "42 hours", src: "Harvard Business Review, 2011" },
+  { claim: "Firms that never responded to the enquiry at all", fig: "23%", src: "Harvard Business Review, 2011" },
+  { claim: "Qualification odds, replying within an hour versus 24 hours+", fig: "60× higher", src: "Harvard Business Review, 2011" },
+  { claim: "Conversion lift when the first contact lands inside 60 seconds", fig: "+391%", src: "Velocify research" },
+  { claim: "Average first reply to a customer service email (1,000 companies)", fig: "12h 10m", src: "SuperOffice, Customer Service Benchmark Report" },
+  { claim: "Customers who expect to engage immediately on contact", fig: "83%", src: "Salesforce" },
+  { claim: "Who define \u201cimmediately\u201d as ten minutes or less", fig: "60%", src: "HubSpot" },
+  { claim: "Customers who expect support to be available 24/7", fig: "74%", src: "Salesmate" },
+  { claim: "Customers who leave after a single poor experience", fig: "62%", src: "Salesforce" },
+  { claim: "WhatsApp monthly active users worldwide", fig: "3 bn+", src: "Meta, confirmed 2025" },
+  { claim: "Businesses on WhatsApp Business products", fig: "200 m+", src: "Meta, 2023" },
+  { claim: "Open rate on a WhatsApp business message, versus 20\u201325% for email", fig: "95\u201398%", src: "Mobilesquared / Infobip \u00b7 industry estimate" },
+];
+
 const shell = { maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" };
 
 export default function HowItWorks() {
@@ -130,7 +158,94 @@ export default function HowItWorks() {
               <p style={{ fontSize: 16, lineHeight: "28px", margin: 0, maxWidth: "52ch", ...bodyMuted }}>{step.body}</p>
             </div>
           ))}
-          <div data-anim="rule" style={{ height: 2, background: "var(--color-divider)" }} />
+          <div data-anim="rule" style={{ height: 1, background: "var(--color-divider)" }} />
+        </section>
+
+        {/* The response window — bars grow from 0 via [data-bar] */}
+        <section style={{ padding: "0 0 clamp(48px,7vw,88px)" }}>
+          <SplitHeader kicker="The response window">
+            <h2 data-anim="rise" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px" }}>
+              Every minute you wait costs you the odds
+            </h2>
+            <p data-anim="rise" style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 32px", maxWidth: "54ch", ...bodyMuted }}>
+              The agent replies inside the top band, every time, at any hour. Where your business lands today decides
+              the rest.
+            </p>
+            <div className="spotlight-grid" style={{ display: "grid", gap: 14 }}>
+              {WINDOW.map((w) => (
+                <div
+                  key={w.band}
+                  data-anim="rise"
+                  className="cell-hover"
+                  style={{
+                    padding: "22px clamp(20px,2.4vw,30px)",
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit,minmax(min(220px,100%),1fr))",
+                    gap: "18px clamp(20px,3vw,44px)",
+                    alignItems: "center",
+                  }}
+                >
+                  <div>
+                    <p style={{ fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 17, letterSpacing: "-0.01em", margin: 0 }}>
+                      {w.band}
+                    </p>
+                    <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 10, lineHeight: "16px", letterSpacing: "0.1em", textTransform: "uppercase", margin: "6px 0 0", ...mutedLabel }}>
+                      {w.src}
+                    </p>
+                  </div>
+                  <div>
+                    <div style={{ height: 10, borderRadius: 999, background: "var(--color-neutral-200)", overflow: "hidden" }}>
+                      <span
+                        data-bar=""
+                        style={{ display: "block", width: `${w.pct}%`, height: "100%", borderRadius: 999, background: "var(--color-accent)", "--bar": `${w.pct}%` } as React.CSSProperties}
+                      />
+                    </div>
+                    <p style={{ fontSize: 14, lineHeight: "22px", margin: "12px 0 0", ...bodyMuted }}>{w.note}</p>
+                  </div>
+                  <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(26px,3vw,40px)", lineHeight: 1, letterSpacing: "-0.03em", margin: 0, color: "var(--color-accent-700)", justifySelf: "start" }}>
+                    {w.prefix}
+                    <span data-count={String(w.count)}>{w.count}</span>
+                    {w.suffix}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </SplitHeader>
+        </section>
+
+        {/* Every figure on the site, with its source */}
+        <section style={{ padding: "0 0 clamp(56px,8vw,96px)" }}>
+          <SplitHeader kicker="The evidence">
+            <h2 data-anim="rise" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px" }}>
+              Why speed is the whole argument
+            </h2>
+            <p data-anim="rise" style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 36px", maxWidth: "54ch", ...bodyMuted }}>
+              Published benchmarks for lead response and business messaging, with the source against each line. These
+              are category figures, not VantriqAI client results.
+            </p>
+            <div data-anim="rise" style={{ overflowX: "auto" }}>
+              <table className="table" style={{ minWidth: 560 }}>
+                <thead>
+                  <tr>
+                    <th>What it measures</th>
+                    <th>Figure</th>
+                    <th>Source</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {BMK.map((row) => (
+                    <tr key={row.claim}>
+                      <td>{row.claim}</td>
+                      <td className="num" style={{ fontFamily: "var(--font-heading)", fontWeight: 700, color: "var(--color-accent-700)", whiteSpace: "nowrap" }}>
+                        {row.fig}
+                      </td>
+                      <td style={{ fontSize: 13, ...mutedLabel }}>{row.src}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </SplitHeader>
         </section>
 
         <section style={{ padding: "0 0 clamp(56px,8vw,96px)" }}>

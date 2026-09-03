@@ -68,6 +68,14 @@
   --shadow-lg: 0 6px 14px rgba(22, 21, 26, .07), 0 36px 72px -26px rgba(22, 21, 26, .26);
 }
 
+/* The full-bleed pieces — the tile band and the five-step rail cards — are
+   sized in 100vw, which counts the scrollbar and so overhangs the content box
+   by its width. This clips that overhang.
+   It must be `clip`, not `hidden`: `hidden` turns <html> into a scroll
+   container, which breaks every `position: sticky` on the site (both pinned
+   stages and the nav). */
+html, body { overflow-x: clip; }
+
 body {
   margin: 0;
   font-size: 15px;
@@ -102,6 +110,16 @@ p { margin: 0 0 var(--space-3); }
    darker accent-700 and only brighten to full accent on hover. */
 a { color: var(--color-accent-700); text-decoration: none; text-underline-offset: 3px; }
 a:hover { color: var(--color-accent); }
+
+/* A link inside a sentence can't be given a 44px box without wrecking the line
+   it sits in. Vertical padding on an inline element grows the hit area but
+   does NOT affect the line box, so the prose is unchanged and the target
+   clears the touch minimum. Underlined so it reads as a link at all. */
+p > a, li > a, td > a {
+  padding-block: 0.8em;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+}
 img { display: block; max-width: 100%; }
 figure { margin: 0; }
 figcaption {
@@ -121,6 +139,9 @@ figcaption {
 
 /* — motion layer keyframes (components/Motion.tsx, MotionBackground.tsx, RouteWipe.tsx) — */
 @keyframes marquee { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-50%, 0, 0); } }
+/* The tile band's back row travels the other way, so the two rows read as
+   depth rather than one thick belt moving in a single direction. */
+@keyframes marquee-rev { from { transform: translate3d(-50%, 0, 0); } to { transform: translate3d(0, 0, 0); } }
 @keyframes wipeIn { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 @keyframes wipeOut { from { transform: scaleY(1); } to { transform: scaleY(0); } }
 
@@ -458,6 +479,49 @@ textarea.input { min-height: 110px; resize: vertical; }
    an inline border-top-color always outranks an external stylesheet rule. */
 .why-block { border-top: 1px solid var(--color-divider); padding-top: 18px; }
 .why-block:hover { border-top-color: var(--color-accent); transform: translateY(-4px); }
+
+/* — section kicker, a pill rather than bare text in this theme — */
+.kicker-pill {
+  display: inline-block;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent-700);
+  background: var(--color-accent-100);
+  border-radius: var(--radius-pill);
+  padding: 7px 14px;
+  white-space: nowrap;
+}
+
+/* — the horizontally pinned five-step rail — */
+[data-hpin-card] { transition: opacity .4s ease; }
+
+@media (max-width: 900px) {
+  /* Unpin into five stacked blocks. The inline styles React writes (height,
+     position, width, transform) need !important to lose to this sheet. */
+  [data-hpin] { height: auto !important; }
+  [data-hpin] > div { position: static !important; height: auto !important; }
+  [data-hpin-track] {
+    display: grid !important;
+    width: 100% !important;
+    transform: none !important;
+    gap: clamp(32px, 7vw, 52px);
+  }
+  [data-hpin-card] { width: 100% !important; opacity: 1 !important; padding: 0 !important; }
+  [data-hpin-dots] { display: none !important; }
+}
+
+/* — the tile band that passes behind the phone mockup — */
+@media (max-width: 760px) {
+  /* Two scrolling rows behind a phone is a lot of motion on a small screen,
+     and the band is decorative, so the phone stands alone there. */
+  [data-tileband] { display: none !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-tileband] { display: none !important; }
+}
 
 /* — FAQ accordion (Pricing page) — */
 summary { cursor: pointer; list-style: none; }

@@ -140,6 +140,11 @@ export default function Motion() {
     const countUp = (el: HTMLElement) => {
       const target = parseFloat(el.getAttribute("data-count") || "0") || 0;
       const dur = 1100 / m;
+      // Zero it here, at the moment the run starts, rather than up front at
+      // mount: the real number is authored as the element's own text, so a
+      // counter whose observer never fires still reads correctly instead of
+      // sitting at 0 waiting for the backstop.
+      el.textContent = "0";
       const t0 = performance.now();
       const tick = (t: number) => {
         const p = Math.min(1, (t - t0) / dur);
@@ -152,9 +157,6 @@ export default function Motion() {
     };
     let cio: IntersectionObserver | null = null;
     if (!reduced && counters.length) {
-      counters.forEach((el) => {
-        el.textContent = "0";
-      });
       cio = new IntersectionObserver(
         (entries) => {
           entries.forEach((e) => {
@@ -165,7 +167,14 @@ export default function Motion() {
         },
         { threshold: 0.4 }
       );
-      counters.forEach((el) => cio!.observe(el));
+      counters.forEach((el) => {
+        // A counter already on screen at mount (every hero figure) runs now.
+        // Waiting for the observer would leave the headline number visibly
+        // static for a frame or two before it jumped.
+        const r = el.getBoundingClientRect();
+        if (r.top < window.innerHeight && r.bottom > 0) countUp(el);
+        else cio!.observe(el);
+      });
       timers.push(
         setTimeout(() => {
           counters.forEach((el) => {
@@ -175,9 +184,41 @@ export default function Motion() {
       );
     }
 
+    // bars: width 0 -> the element's own --bar value, on entry
+    const bars = Array.from(document.querySelectorAll<HTMLElement>("[data-bar]"));
+    let bio: IntersectionObserver | null = null;
+    if (bars.length) {
+      const grow = (el: HTMLElement) => {
+        el.style.width = getComputedStyle(el).getPropertyValue("--bar").trim() || "0%";
+      };
+      if (reduced) {
+        bars.forEach(grow);
+      } else {
+        bars.forEach((el) => {
+          el.style.width = "0%";
+          el.style.transition = `width ${1150 / m}ms cubic-bezier(.16,1,.3,1)`;
+        });
+        bio = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((e) => {
+              if (!e.isIntersecting) return;
+              grow(e.target as HTMLElement);
+              bio!.unobserve(e.target);
+            });
+          },
+          { threshold: 0.35 }
+        );
+        bars.forEach((el) => bio!.observe(el));
+        timers.push(setTimeout(() => bars.forEach(grow), 2400));
+      }
+    }
+
     // parallax shapes + the scroll-pinned three-step stage — both are inert
     // below 760px (shapes hidden, stage unpinned via CSS), so no scroll work there.
     const isMobile = window.matchMedia("(max-width: 760px)").matches;
+    // The rail unpins at 900px, one step wider than everything else, so it
+    // needs its own breakpoint rather than reusing isMobile.
+    const isNarrowRail = window.matchMedia("(max-width: 900px)").matches;
 
     // Cache nodes (and, for parallax, the parsed factor) once per mount/route —
     // no frame should ever run a querySelectorAll or re-parse an attribute.
@@ -275,6 +316,41 @@ export default function Motion() {
       if (pinLabel) pinLabel.textContent = `0${idx + 1} / 0${pinPanels.length}`;
     };
 
+    // The five-step rail: same sticky trick as the stage above, but scroll
+    // progress drives the track sideways instead of cross-fading panels.
+    // Unpinned below 900px by CSS, so this never runs there.
+    const hWrap = document.querySelector<HTMLElement>("[data-hpin]");
+    const hTrack = hWrap?.querySelector<HTMLElement>("[data-hpin-track]") ?? null;
+    const hCards = hWrap ? Array.from(hWrap.querySelectorAll<HTMLElement>("[data-hpin-card]")) : [];
+    const hDots = hWrap ? Array.from(hWrap.querySelectorAll<HTMLElement>("[data-hpin-dot]")) : [];
+    const hLabel = hWrap?.querySelector<HTMLElement>("[data-hpin-count]") ?? null;
+    const hState = { idx: -1, x: -1 };
+
+    const hpin = () => {
+      if (!hWrap || !hTrack || hCards.length < 2) return;
+      const rect = hWrap.getBoundingClientRect();
+      const span = hWrap.offsetHeight - window.innerHeight;
+      const p = Math.max(0, Math.min(1, -rect.top / (span || 1)));
+      const cardW = hCards[0].offsetWidth;
+      const x = -p * (hCards.length - 1) * cardW;
+      if (Math.abs(x - hState.x) > 0.5) {
+        hTrack.style.transform = `translate3d(${x.toFixed(1)}px,0,0)`;
+        hState.x = x;
+      }
+      const idx = Math.round(p * (hCards.length - 1));
+      if (idx === hState.idx) return;
+      hState.idx = idx;
+      hCards.forEach((el, i) => {
+        el.style.opacity = i === idx ? "1" : "0.25";
+      });
+      hDots.forEach((el, i) => {
+        const on = i === idx;
+        el.style.background = on ? "var(--color-accent)" : "var(--color-neutral-200)";
+        el.style.color = on ? "var(--color-bg)" : "var(--color-text)";
+      });
+      if (hLabel) hLabel.textContent = `0${idx + 1}`;
+    };
+
     // One requestAnimationFrame coalescer for both scroll and mousemove: the
     // event handlers only store input and request a frame, never write style
     // directly, so a burst of events between frames does at most one
@@ -287,6 +363,7 @@ export default function Motion() {
         rafPending = false;
         parallax();
         pin();
+        if (!isNarrowRail) hpin();
       });
     };
     const onScroll = () => scheduleFrame();
@@ -295,7 +372,8 @@ export default function Motion() {
       scheduleFrame();
     };
 
-    const needsScrollWiring = !isMobile && (parEls.length > 0 || pinWrap != null);
+    const needsScrollWiring =
+      (!isMobile && (parEls.length > 0 || pinWrap != null)) || (!isNarrowRail && hWrap != null);
     if (needsScrollWiring) {
       window.addEventListener("scroll", onScroll, { passive: true });
       window.addEventListener("mousemove", onMove, { passive: true });
