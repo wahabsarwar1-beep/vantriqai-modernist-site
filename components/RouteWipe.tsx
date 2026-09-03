@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { prefersReducedMotion } from "@/lib/motion";
 
-/** Intercepts internal link clicks and covers the viewport with a red panel
+/** Intercepts internal link clicks and covers the viewport with a cobalt panel
  *  before navigating, mirroring the prototype's goTo(): wipe in (420ms),
  *  swap the route, wipe out (480ms more — 900ms total), then unmount.
  *  Reduced motion lets the click through untouched (default Link/browser

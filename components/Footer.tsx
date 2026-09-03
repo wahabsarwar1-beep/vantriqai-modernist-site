@@ -14,7 +14,7 @@ export default function Footer({ showLocation = true }: FooterProps) {
   const pathname = usePathname();
 
   return (
-    <footer style={{ borderTop: "2px solid var(--color-divider)" }}>
+    <footer style={{ borderTop: "1px solid var(--color-divider)" }}>
       <div
         style={{
           maxWidth: 1280,

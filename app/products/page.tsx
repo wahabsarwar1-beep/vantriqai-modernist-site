@@ -58,11 +58,47 @@ const PRODUCTS: { id: MarkId; category: string; name: string; body: string; avai
     availability: "In every plan",
   },
   {
+    id: "followup",
+    category: "Capability",
+    name: "Follow-up Agent",
+    body: "Abandoned carts, unanswered quotes and half-finished bookings, reopened once and politely at the hour people actually reply.",
+    availability: "Add-on module",
+  },
+  {
+    id: "outreach",
+    category: "Capability",
+    name: "Outreach Agent",
+    body: "Reactivation lists, seasonal offers and WhatsApp broadcasts drafted for the segment worth the message. Nothing sends until you approve it.",
+    availability: "From Growth",
+  },
+  {
+    id: "payments",
+    category: "Capability",
+    name: "Payments Agent",
+    body: "Sends the payment link inside the conversation, confirms receipt, and chases the unpaid invoice on the schedule you set.",
+    availability: "Add-on module",
+  },
+  {
+    id: "insights",
+    category: "Capability",
+    name: "Insights Digest",
+    body: "What customers asked, what they abandoned and which hours cost you money — one Monday digest in plain language, not a wall of charts.",
+    availability: "In every plan",
+  },
+  {
     id: "deployment",
     category: "Deployment",
     name: "Private Deployment",
     body: "The whole stack self-hosted on your infrastructure, for strict data-residency requirements. Same agents, nothing leaving your network.",
     availability: "From Enterprise",
+  },
+  {
+    id: "custom",
+    category: "Deployment",
+    // The only card without a ® — it is the module that does not exist yet.
+    name: "Custom Module",
+    body: "The one thing only your business does, built during onboarding: your name for it, your tone, your rules, your sign-off before it acts.",
+    availability: "From Scale",
   },
 ];
 
@@ -97,12 +133,12 @@ export default function Products() {
           <span
             data-par="0.12"
             aria-hidden="true"
-            style={{ position: "absolute", right: "7%", top: "16%", width: 104, height: 104, border: "2px solid var(--color-accent)", pointerEvents: "none" }}
+            style={{ position: "absolute", right: "7%", top: "16%", width: 104, height: 104, border: "1px solid var(--color-accent)", borderRadius: "var(--radius-lg)", pointerEvents: "none" }}
           />
           <span
             data-par="-0.09"
             aria-hidden="true"
-            style={{ position: "absolute", right: "22%", top: "44%", width: 44, height: 44, background: "var(--color-accent)", pointerEvents: "none" }}
+            style={{ position: "absolute", right: "22%", top: "44%", width: 44, height: 44, background: "var(--color-accent)", borderRadius: "var(--radius-sm)", pointerEvents: "none" }}
           />
           <div style={{ position: "relative", zIndex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(24px,4vw,44px)" }}>
@@ -119,12 +155,12 @@ export default function Products() {
               >
                 Products
               </span>
-              <span data-anim="rule" style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
+              <span data-anim="rule" style={{ flex: 1, height: 1, background: "var(--color-divider)" }} />
             </div>
             <h1 style={{ fontSize: "clamp(34px,5.4vw,66px)", lineHeight: 0.98, letterSpacing: "-0.03em", margin: 0, maxWidth: "17ch", overflowWrap: "break-word" }}>
               <span style={lineMask}>
                 <span data-line="" style={{ display: "block" }}>
-                  <span data-count="8">8</span> agents. Assemble
+                  <span data-count="13">13</span> agents. Assemble
                 </span>
               </span>
               <span style={lineMask}>
@@ -134,23 +170,22 @@ export default function Products() {
               </span>
             </h1>
             <p data-anim="rise" style={{ fontSize: 18, lineHeight: "30px", maxWidth: "52ch", margin: "32px 0 0" }}>
-              Each product is a module on the same platform. Start with one channel, add capability as volume grows —
-              nothing is rebuilt when you do.
+              Each product is a module on the same platform: three channels, eight capabilities, two ways to deploy.
+              Start with one, add as volume grows — nothing is rebuilt when you do.
             </p>
           </div>
         </section>
       </div>
 
-      <section style={{ borderTop: "2px solid var(--color-divider)", borderBottom: "2px solid var(--color-divider)", background: "var(--color-divider)" }}>
+      <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)" }}>
         <div
           style={{
             maxWidth: 1280,
             margin: "0 auto",
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit,minmax(min(300px,100%),1fr))",
-            gap: 2,
-            background: "var(--color-bg)",
-            overflow: "hidden",
+            gap: 18,
+            padding: "clamp(22px,3vw,40px) clamp(20px,5vw,64px)",
           }}
         >
           {PRODUCTS.map((product) => (
@@ -162,7 +197,8 @@ export default function Products() {
                 padding: "clamp(26px,3vw,40px) clamp(20px,2.5vw,36px)",
                 display: "flex",
                 flexDirection: "column",
-                boxShadow: "2px 2px 0 0 var(--color-divider)",
+                // The anchor product is tinted so the grid has an entry point.
+                ...(product.id === "whatsapp" ? { background: "var(--color-accent-100)" } : null),
               }}
             >
               <ProductMark id={product.id} />
@@ -171,19 +207,21 @@ export default function Products() {
               </p>
               <h2 style={{ fontSize: 24, lineHeight: 1.05, letterSpacing: "-0.025em", margin: "0 0 12px" }}>
                 {product.name}
-                <sup
-                  style={{
-                    fontFamily: "var(--font-body)",
-                    fontWeight: 400,
-                    fontSize: "0.42em",
-                    lineHeight: 1,
-                    verticalAlign: "super",
-                    marginLeft: 3,
-                    color: "color-mix(in srgb, var(--color-text) 55%, transparent)",
-                  }}
-                >
-                  &reg;
-                </sup>
+                {product.id !== "custom" && (
+                  <sup
+                    style={{
+                      fontFamily: "var(--font-body)",
+                      fontWeight: 400,
+                      fontSize: "0.42em",
+                      lineHeight: 1,
+                      verticalAlign: "super",
+                      marginLeft: 3,
+                      color: "color-mix(in srgb, var(--color-text) 55%, transparent)",
+                    }}
+                  >
+                    &reg;
+                  </sup>
+                )}
               </h2>
               <p style={{ fontSize: 15, lineHeight: "26px", margin: "0 0 22px", flex: 1, ...bodyMuted }}>{product.body}</p>
               <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--color-accent)" }}>

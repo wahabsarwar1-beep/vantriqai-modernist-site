@@ -1,48 +1,54 @@
-/* Modernist design-system tokens and component classes, ported from
-   project/_ds/modernist-675b0ed4-1763-4fc6-96bb-2c7a8dbdc185/styles.css.
-   Font is loaded via next/font in layout.tsx instead of the @import there. */
+/* VantriqAI — soft warm theme, ported from the handoff's symphony-theme.css.
+   Warm cream ground, ink text, one cobalt accent, large radii, pill actions.
+   This replaces the Modernist token sheet the site previously ran on.
+   Fonts are loaded via next/font in layout.tsx instead of the @import there. */
 
 :root {
-  --color-bg: #f3f2f2;
-  --color-surface: #eae9e9;
-  --color-text: #201e1d;
-  --color-accent: #ec3013;
-  --color-accent-2: #e15b47;
-  --color-divider: color-mix(in srgb, #201e1d 40%, transparent);
+  --color-bg: #fbf9f6;
+  --color-surface: #ffffff;
+  --color-text: #16151a;
+  --color-divider: #e7e2da;
 
-  --color-neutral-100: #f8f4f4;
-  --color-neutral-200: #eae7e7;
-  --color-neutral-300: #d7d3d3;
-  --color-neutral-400: #bab6b6;
-  --color-neutral-500: #9b9797;
-  --color-neutral-600: #7d7979;
-  --color-neutral-700: #605d5d;
-  --color-neutral-800: #444141;
-  --color-neutral-900: #2d2b2b;
+  --color-accent: #2f56d9;
+  --color-accent-100: #e8ecfd;
+  --color-accent-200: #cfd9fb;
+  --color-accent-300: #a9bbf7;
+  --color-accent-400: #7f9bf2;
+  --color-accent-500: #2f56d9;
+  --color-accent-600: #2848b8;
+  --color-accent-700: #1f3a95;
+  --color-accent-800: #182c70;
+  --color-accent-900: #111f4f;
 
-  --color-accent-100: #fff2ef;
-  --color-accent-200: #ffe0d9;
-  --color-accent-300: #ffc4b8;
-  --color-accent-400: #ff9783;
-  --color-accent-500: #ff563c;
-  --color-accent-600: #dd2b0f;
-  --color-accent-700: #ae1800;
-  --color-accent-800: #7c1405;
-  --color-accent-900: #4d170e;
+  /* secondary — decorative only, never carries an action */
+  --color-accent-2: #e0854f;
+  --color-accent-2-100: #fbeee4;
+  --color-accent-2-200: #f6dac6;
+  --color-accent-2-300: #eeba95;
+  --color-accent-2-400: #e79f6f;
+  --color-accent-2-500: #e0854f;
+  --color-accent-2-600: #c06b3a;
+  --color-accent-2-700: #94512b;
+  --color-accent-2-800: #6d3c20;
+  --color-accent-2-900: #4a2916;
 
-  --color-accent-2-100: #fff2ef;
-  --color-accent-2-200: #ffe0da;
-  --color-accent-2-300: #ffc4b9;
-  --color-accent-2-400: #ff9784;
-  --color-accent-2-500: #ef6853;
-  --color-accent-2-600: #c94b39;
-  --color-accent-2-700: #9e3526;
-  --color-accent-2-800: #71261b;
-  --color-accent-2-900: #471d16;
+  --color-neutral-100: #faf7f2;
+  --color-neutral-200: #efeae1;
+  --color-neutral-300: #ded7ca;
+  --color-neutral-400: #bdb4a5;
+  --color-neutral-500: #8d857a;
+  --color-neutral-600: #6b645b;
+  --color-neutral-700: #4a453f;
+  --color-neutral-800: #2c2a26;
+  --color-neutral-900: #16151a;
 
-  --font-heading: var(--font-archivo), system-ui, sans-serif;
-  --font-heading-weight: 800;
-  --font-body: var(--font-archivo), system-ui, sans-serif;
+  --blob-peach: #f2cba9;
+  --blob-mint: #c3ddca;
+  --blob-lilac: #d2cbf3;
+
+  --font-heading: var(--font-sora), ui-sans-serif, system-ui, sans-serif;
+  --font-heading-weight: 700;
+  --font-body: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -51,13 +57,15 @@
   --space-6: 24px;
   --space-8: 32px;
 
-  --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
+  --radius-sm: 12px;
+  --radius-md: 20px;
+  --radius-lg: 28px;
+  --radius-xl: 40px;
+  --radius-pill: 999px;
 
-  --shadow-sm: 0 1px 2px color-mix(in srgb, #2d2b2b 14%, transparent);
-  --shadow-md: 0 3px 10px color-mix(in srgb, #2d2b2b 16%, transparent);
-  --shadow-lg: 0 12px 32px color-mix(in srgb, #2d2b2b 22%, transparent);
+  --shadow-sm: 0 1px 2px rgba(22, 21, 26, .04), 0 10px 26px -14px rgba(22, 21, 26, .12);
+  --shadow-md: 0 2px 4px rgba(22, 21, 26, .05), 0 18px 44px -18px rgba(22, 21, 26, .18);
+  --shadow-lg: 0 6px 14px rgba(22, 21, 26, .07), 0 36px 72px -26px rgba(22, 21, 26, .26);
 }
 
 body {
@@ -69,17 +77,20 @@ body {
   font-family: var(--font-body);
   text-wrap: pretty;
   background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
-  font-weight: var(--font-heading-weight);
+  font-weight: 600;
   line-height: 1.12;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.02em;
   margin: 0 0 var(--space-2);
 }
+h1, h2 { font-weight: var(--font-heading-weight); }
 h1 { font-size: 42px; }
 h2 { font-size: 32px; }
 h3 { font-size: 25px; }
@@ -87,8 +98,10 @@ h4 { font-size: 20px; }
 h5 { font-size: 16px; }
 h6 { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; }
 p { margin: 0 0 var(--space-3); }
-a { color: var(--color-accent); text-decoration: none; text-underline-offset: 3px; }
-a:hover { color: var(--color-accent-600); }
+/* Cobalt on cream is not contrast-safe for body-size text, so links carry the
+   darker accent-700 and only brighten to full accent on hover. */
+a { color: var(--color-accent-700); text-decoration: none; text-underline-offset: 3px; }
+a:hover { color: var(--color-accent); }
 img { display: block; max-width: 100%; }
 figure { margin: 0; }
 figcaption {
@@ -98,8 +111,12 @@ figcaption {
 }
 .text-muted { color: color-mix(in srgb, var(--color-text) 55%, transparent); }
 :focus { outline: none; }
-:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
-::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+::selection { background: var(--color-accent-200); color: var(--color-text); }
 .grayscale { filter: grayscale(1) contrast(1.08); }
 
 /* — motion layer keyframes (components/Motion.tsx, MotionBackground.tsx, RouteWipe.tsx) — */
@@ -111,56 +128,65 @@ section div, .tag, .btn, a, summary, details, li, td, img {
   transition: background-color 0.22s ease, color 0.22s ease, border-color 0.22s ease, transform 0.22s ease;
 }
 
-/* — rules — */
+/* — rules (1px in this theme, not the 2px Modernist system) — */
 .hr {
-  height: 2px; border: 0; margin: var(--space-4) 0;
+  height: 1px; border: 0; margin: var(--space-4) 0;
   background: var(--color-divider);
 }
 
-/* — buttons — */
+/* — buttons: pills, 44px minimum touch target — */
 .btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   cursor: pointer; text-decoration: none;
-  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
-  font-size: 14px; line-height: 1.2; color: var(--color-text);
+  font-family: var(--font-heading); font-weight: 600;
+  font-size: 15px; line-height: 1; color: var(--color-text);
   background: transparent; border: 1px solid transparent;
-  padding: var(--space-2) calc(var(--space-3) * 1.2);
-  border-radius: var(--radius-md);
+  padding: 14px 24px;
+  border-radius: var(--radius-pill);
+  transition: background-color .22s ease, color .22s ease, border-color .22s ease,
+    transform .22s ease, box-shadow .22s ease;
 }
 .btn svg { display: block; }
-.btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.btn-primary { background: var(--color-accent); color: var(--color-bg); }
-.btn-primary:hover { background: var(--color-accent-600); }
+.btn:hover { transform: translateY(-2px); }
+.btn:active { transform: translateY(0); }
+.btn:disabled, .btn[disabled] { opacity: 0.45; pointer-events: none; cursor: not-allowed; }
+.btn-primary { background: var(--color-accent); color: #fff; box-shadow: var(--shadow-sm); }
+.btn-primary:hover { background: var(--color-accent-600); box-shadow: var(--shadow-md); }
 .btn-primary:active { background: var(--color-accent-700); }
-.btn-secondary { border-color: var(--color-divider); }
-.btn-secondary:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
-.btn-secondary:active { background: color-mix(in srgb, var(--color-text) 14%, transparent); }
-.btn-ghost { color: var(--color-accent); padding-inline: var(--space-1); }
-.btn-ghost:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
-.btn-ghost:active { background: color-mix(in srgb, var(--color-accent) 18%, transparent); }
-.btn-icon { width: 36px; height: 36px; padding: 0; }
-.btn-block { width: 100%; margin-top: var(--space-2); justify-content: flex-start; text-align: left; }
+.btn-secondary { background: var(--color-surface); border-color: var(--color-divider); color: var(--color-text); }
+.btn-secondary:hover { border-color: var(--color-accent-300); background: var(--color-accent-100); color: var(--color-accent-700); }
+.btn-ghost { color: var(--color-accent-700); }
+.btn-ghost:hover { background: var(--color-accent-100); }
+.btn-icon { padding: 12px; border-radius: var(--radius-pill); }
+.btn-block { width: 100%; margin-top: var(--space-2); }
 
-/* — poster CTA band buttons (ink fill / ground outline on a red field) — */
-.cta-btn-ink { background: var(--color-text); color: var(--color-bg); }
-.cta-btn-ink:hover { background: var(--color-neutral-900); }
-.cta-btn-outline { border: 2px solid var(--color-bg); color: var(--color-bg); }
-.cta-btn-outline:hover { background: color-mix(in srgb, var(--color-bg) 16%, transparent); }
+/* — poster CTA band buttons (cream fill / cream outline on the cobalt field) — */
+.cta-btn-ink { background: var(--color-bg); color: var(--color-accent-700); }
+.cta-btn-ink:hover { background: #fff; color: var(--color-accent-800); }
+.cta-btn-outline { border: 1px solid color-mix(in srgb, var(--color-bg) 55%, transparent); color: var(--color-bg); }
+.cta-btn-outline:hover { background: color-mix(in srgb, var(--color-bg) 16%, transparent); color: var(--color-bg); }
 
 /* — forms — */
+.field { display: grid; gap: 8px; }
 .field > label {
-  display: block; font-size: 12px; margin-bottom: 5px;
-  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+  display: block;
+  font-family: var(--font-heading); font-weight: 600;
+  font-size: 13px; margin-bottom: 0;
+  color: color-mix(in srgb, var(--color-text) 62%, transparent);
 }
 .input {
-  width: 100%; min-height: 36px; padding: 6px 10px; font: inherit;
-  font-size: 14px; color: var(--color-text); caret-color: var(--color-accent);
+  width: 100%; min-height: 44px; padding: 13px 16px;
+  font-family: var(--font-body); font-size: 15px;
+  color: var(--color-text); caret-color: var(--color-accent);
   background: var(--color-surface);
   border: 1px solid var(--color-divider); border-radius: var(--radius-md);
+  transition: border-color .2s ease, box-shadow .2s ease;
 }
-.input:hover { border-color: color-mix(in srgb, var(--color-text) 45%, transparent); }
-.input:focus-visible { border-color: var(--color-accent); outline-offset: 0; }
-textarea.input { min-height: 90px; resize: vertical; }
+.input::placeholder { color: color-mix(in srgb, var(--color-text) 38%, transparent); }
+.input:hover { border-color: var(--color-neutral-400); }
+.input:focus { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 4px var(--color-accent-100); }
+.input:focus-visible { outline: none; border-color: var(--color-accent); }
+textarea.input { min-height: 110px; resize: vertical; }
 .radio { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; }
 .radio input, .seg-opt input {
   position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none;
@@ -191,11 +217,13 @@ textarea.input { min-height: 90px; resize: vertical; }
 /* — cards — */
 .card {
   display: flex; flex-direction: column; gap: var(--space-2);
-  padding: var(--space-3); border-radius: var(--radius-md); background: var(--color-surface);
+  padding: 28px; border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
 }
-.card-kicker { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-accent); }
+.card-kicker { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-accent-700); }
 .card-title {
-  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-family: var(--font-heading); font-weight: 600;
   font-size: 17px; line-height: 1.2;
 }
 .card-body { margin: 0; font-size: 13px; opacity: 0.8; flex: 1; }
@@ -209,23 +237,25 @@ textarea.input { min-height: 90px; resize: vertical; }
 
 /* — tags — */
 .tag {
-  display: inline-flex; align-items: center; font-size: 11px;
-  letter-spacing: 0.02em; padding: 3px 10px;
-  border-radius: calc(var(--radius-md) * 0.75);
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-heading); font-weight: 600;
+  font-size: 12px; letter-spacing: 0.02em; padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--color-neutral-200); color: var(--color-neutral-700);
 }
-.tag-accent { background: var(--color-accent-100); color: var(--color-accent-800); }
-.tag-accent-2 { background: var(--color-accent-2-100); color: var(--color-accent-2-800); }
-.tag-neutral { background: var(--color-neutral-100); color: var(--color-neutral-800); }
-.tag-outline { border: 1px solid var(--color-accent); color: var(--color-accent); }
-.tag-outline:hover { background: var(--color-accent); color: var(--color-bg); }
+.tag-accent { background: var(--color-accent-100); color: var(--color-accent-700); }
+.tag-accent-2 { background: var(--color-accent-2-100); color: var(--color-accent-2-700); }
+.tag-neutral { background: var(--color-neutral-200); color: var(--color-neutral-700); }
+.tag-outline { background: transparent; border: 1px solid var(--color-divider); color: var(--color-text); }
+.tag-outline:hover { border-color: var(--color-accent-300); background: var(--color-accent-100); color: var(--color-accent-700); }
 
 /* — navigation — */
 .nav {
   display: flex; align-items: center; flex-wrap: wrap;
   gap: clamp(14px, 2vw, 30px);
-  padding: 14px max(clamp(20px, 5vw, 64px), calc((100% - 1280px) / 2 + clamp(20px, 5vw, 64px)));
-  border-bottom: 2px solid var(--color-divider);
-  background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+  padding: 16px max(clamp(20px, 5vw, 64px), calc((100% - 1280px) / 2 + clamp(20px, 5vw, 64px)));
+  border-bottom: 1px solid var(--color-divider);
+  background: color-mix(in srgb, var(--color-bg) 90%, transparent);
   backdrop-filter: blur(12px);
   transition: padding .28s ease, box-shadow .28s ease;
 }
@@ -242,45 +272,54 @@ textarea.input { min-height: 90px; resize: vertical; }
   gap: 10px clamp(14px, 2vw, 28px);
 }
 .nav-links a {
+  position: relative;
   color: var(--color-text);
   font-family: var(--font-heading); font-weight: 800;
   font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase;
   white-space: nowrap;
 }
-.nav-links a:hover, .nav-links a[aria-current="page"] { color: var(--color-accent); }
-@media (max-width: 1024px) and (min-width: 761px) {
-  .nav-links { order: 3; width: 100%; gap: 12px 20px; padding-top: 12px; border-top: 2px solid var(--color-divider); }
-}
-@media (max-width: 860px) {
-  .nav { gap: 10px 14px; padding-block: 12px; }
+.nav-links a:hover { color: var(--color-accent); }
+/* The active page is marked by an accent underline, not just accent text —
+   colour alone would leave it indistinguishable from a hovered sibling. */
+.nav-links a[aria-current="page"] { color: var(--color-accent); }
+.nav-links a[aria-current="page"]::after {
+  content: "";
+  position: absolute; left: 0; right: 0; bottom: -6px;
+  height: 2px; background: var(--color-accent);
 }
 
-/* — mobile hamburger nav (≤760px) — */
+/* — mobile hamburger nav (≤1000px) — */
 .nav-burger {
   display: none;
   position: relative;
-  width: 40px; height: 40px;
+  width: 46px; height: 46px;
   flex: none;
   align-items: center; justify-content: center;
-  background: none; border: 2px solid var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-radius: 14px;
   padding: 0; cursor: pointer;
 }
 .nav-burger-line {
-  position: absolute; left: 9px; right: 9px; height: 2px;
+  position: absolute; left: 13px; right: 13px; height: 2px;
   background: var(--color-text);
-  transition: transform .25s cubic-bezier(.16,1,.3,1), opacity .2s ease, top .25s cubic-bezier(.16,1,.3,1);
+  transition: transform .26s cubic-bezier(.16,1,.3,1), opacity .2s ease;
 }
-.nav-burger-line:nth-child(1) { top: 13px; }
-.nav-burger-line:nth-child(2) { top: 19px; }
-.nav-burger-line:nth-child(3) { top: 25px; }
-.nav-burger[aria-expanded="true"] .nav-burger-line:nth-child(1) { top: 19px; transform: rotate(45deg); }
+/* All three bars sit on the centre line and are pushed apart by transform, so
+   the open state only has to cancel that offset — animating `top` as well
+   would fight the rotation and bow the X. */
+.nav-burger-line:nth-child(1) { top: 22px; transform: translateY(-7px); }
+.nav-burger-line:nth-child(2) { top: 22px; }
+.nav-burger-line:nth-child(3) { top: 22px; transform: translateY(7px); }
+.nav-burger[aria-expanded="true"] .nav-burger-line:nth-child(1) { transform: rotate(45deg); }
 .nav-burger[aria-expanded="true"] .nav-burger-line:nth-child(2) { opacity: 0; }
-.nav-burger[aria-expanded="true"] .nav-burger-line:nth-child(3) { top: 19px; transform: rotate(-45deg); }
+.nav-burger[aria-expanded="true"] .nav-burger-line:nth-child(3) { transform: rotate(-45deg); }
 
 .nav-mobile-panel { display: none; }
 
-@media (max-width: 760px) {
+@media (max-width: 1000px) {
   .nav-links { display: none; }
+  .nav-cta { display: none; }
   .nav-burger { display: flex; }
   .nav-mobile-panel {
     display: block;
@@ -288,33 +327,39 @@ textarea.input { min-height: 90px; resize: vertical; }
     top: 100%; left: 0; right: 0;
     max-height: 0; overflow: hidden;
     background: var(--color-bg);
-    border-bottom: 2px solid var(--color-divider);
-    box-shadow: 0 8px 16px rgba(32,30,29,0.08);
+    border-bottom: 1px solid var(--color-divider);
+    box-shadow: var(--shadow-md);
     transition: max-height .32s cubic-bezier(.16,1,.3,1);
   }
-  .nav-mobile-panel.is-open { max-height: 520px; }
-  .nav-mobile-links { display: flex; flex-direction: column; }
+  /* Capped to the space actually below the nav, and scrollable, so the last
+     rows stay reachable on short and landscape viewports. The nav is ~78px
+     tall, 62px once it shrinks on scroll. */
+  .nav-mobile-panel.is-open {
+    max-height: calc(100vh - 78px);
+    overflow-y: auto;
+  }
+  .nav-mobile-inner { padding: 4px clamp(20px,5vw,64px) 14px; }
+  .nav-mobile-links { display: flex; flex-direction: column; flex-wrap: nowrap; }
   .nav-mobile-links a {
-    padding: 16px clamp(20px,5vw,64px);
-    border-top: 2px solid var(--color-divider);
-    font-family: var(--font-heading); font-weight: 800;
-    font-size: 16px; letter-spacing: 0.02em; text-transform: uppercase;
+    display: flex; align-items: center;
+    min-height: 48px;
+    border-bottom: 1px solid var(--color-divider);
+    font-family: var(--font-heading); font-weight: 600;
+    font-size: 15px; letter-spacing: 0.01em;
     color: var(--color-text);
-    transition: color .2s ease, background-color .2s ease;
+    transition: color .2s ease;
   }
   .nav-mobile-links a:hover, .nav-mobile-links a[aria-current="page"] {
-    color: var(--color-accent); background: var(--color-accent-100);
+    color: var(--color-accent);
   }
   .nav-mobile-cta {
-    margin: 18px clamp(20px,5vw,64px) 22px;
+    width: 100%;
+    margin: 16px 0 4px;
     min-height: 48px !important;
   }
 }
 @media (max-width: 600px) {
-  .nav-logo { height: 34px; }
-}
-@media (max-width: 560px) {
-  .nav-cta { display: none; }
+  .nav-logo { height: 38px; }
 }
 
 /* — ruled step row (index / heading / body), How it works — */
@@ -329,17 +374,25 @@ textarea.input { min-height: 90px; resize: vertical; }
 }
 
 /* — tables — */
-.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table {
+  width: 100%; border-collapse: separate; border-spacing: 0;
+  font-family: var(--font-body); font-size: 14px;
+}
 .table th {
-  text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
-  color: color-mix(in srgb, var(--color-text) 60%, transparent);
-  padding: var(--space-2); border-bottom: 2px solid var(--color-divider);
+  text-align: left;
+  font-family: var(--font-heading); font-weight: 600;
+  font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 52%, transparent);
+  padding: 12px var(--space-2); border-bottom: 1px solid var(--color-divider);
 }
 .table td {
-  padding: var(--space-2);
+  padding: 14px var(--space-2); vertical-align: top;
   border-bottom: 1px solid var(--color-divider);
 }
-.table tbody tr:hover { background: color-mix(in srgb, var(--color-text) 4%, transparent); }
+.table tbody tr { transition: background-color .2s ease; }
+.table tbody tr:hover { background: var(--color-surface); }
+/* Figures in the plan table are compared column-wise, so they line up. */
+.table .num { font-variant-numeric: tabular-nums; }
 
 /* — dialog — */
 .dialog-backdrop {
@@ -364,24 +417,46 @@ textarea.input { min-height: 90px; resize: vertical; }
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 9fr);
   gap: 20px clamp(24px, 5vw, 72px);
-  border-top: 2px solid var(--color-divider);
+  border-top: 1px solid var(--color-divider);
   padding-top: 22px;
 }
 @media (max-width: 860px) {
   .split-header { grid-template-columns: minmax(0, 1fr); gap: 12px; }
 }
 
-/* — cell/row hover tints used across the ruled grid sections — */
-/* Resting background lives here (not as an inline style) for the same reason
-   as .why-block's border: an inline background always outranks :hover. */
-.cell-hover, .cell-hover-5 { background: var(--color-bg); transition: background-color .3s ease, transform .3s ease, border-color .3s ease; }
+/* — cell/row hover treatment used across the ruled grid sections — */
+/* These cells are the theme's cards: white surface, hairline border, 28px
+   radius. The resting values live here rather than as inline styles because
+   an inline background or border-color always outranks a :hover rule from an
+   external sheet, which is what silently killed these hovers once before. */
+.cell-hover, .cell-hover-5 {
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-lg);
+  transition: background-color .3s ease, transform .3s ease, border-color .3s ease, box-shadow .3s ease;
+}
 .why-block { transition: background-color .3s ease, transform .3s ease, border-color .3s ease; }
-.cell-hover:hover { background: var(--color-accent-100); transform: translateY(-4px); }
-.cell-hover-5:hover { background: var(--color-accent-100); transform: translateY(-5px); }
-.row-hover:hover { background: color-mix(in srgb, var(--color-accent) 7%, transparent); }
+.cell-hover:hover, .cell-hover-5:hover {
+  background: var(--color-accent-100);
+  border-color: var(--color-accent-300);
+  box-shadow: var(--shadow-md);
+}
+.cell-hover:hover { transform: translateY(-4px); }
+/* The industries/products grids use the deeper -7px lift the handoff calls
+   the "spotlight", and dim their siblings — see .spotlight-grid below. */
+.cell-hover-5:hover { transform: translateY(-7px); }
+.row-hover:hover { background: color-mix(in srgb, var(--color-accent) 6%, transparent); }
+
+/* Spotlight: hovering one card in the grid dims the others, so the hovered
+   card reads as picked out rather than merely tinted. */
+.spotlight-grid:hover > *:not(:hover) { opacity: .52; }
+.spotlight-grid > * { transition: opacity .3s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .spotlight-grid:hover > *:not(:hover) { opacity: 1; }
+}
 /* border-top lives here (not as an inline style) so :hover can actually win —
    an inline border-top-color always outranks an external stylesheet rule. */
-.why-block { border-top: 2px solid var(--color-divider); padding-top: 18px; }
+.why-block { border-top: 1px solid var(--color-divider); padding-top: 18px; }
 .why-block:hover { border-top-color: var(--color-accent); transform: translateY(-4px); }
 
 /* — FAQ accordion (Pricing page) — */

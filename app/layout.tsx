@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Archivo } from "next/font/google";
+import { Manrope, Sora } from "next/font/google";
 import Nav from "@/components/Nav";
 import Motion from "@/components/Motion";
 import RouteWipe from "@/components/RouteWipe";
@@ -7,10 +7,16 @@ import ShopAIChat from "@/components/ShopAIChat";
 import SmoothScroll from "@/components/SmoothScroll";
 import "./globals.css";
 
-const archivo = Archivo({
-  variable: "--font-archivo",
+const sora = Sora({
+  variable: "--font-sora",
   subsets: ["latin"],
-  weight: ["400", "600", "800"],
+  weight: ["400", "500", "600", "700", "800"],
+});
+
+const manrope = Manrope({
+  variable: "--font-manrope",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
@@ -21,7 +27,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={archivo.variable}>
+    <html lang="en" className={`${sora.variable} ${manrope.variable}`}>
       <body>
         <SmoothScroll />
         <RouteWipe />

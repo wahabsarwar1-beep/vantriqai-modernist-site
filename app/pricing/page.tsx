@@ -77,7 +77,47 @@ const FAQS = [
     q: "Can we move up a tier later?",
     a: "Yes. Tiers are a path, not a lock-in — most clients start on the channel that matters most and add CRM, website, or extra channels as volume grows.",
   },
+  {
+    q: "Where do the figures on this site come from?",
+    a: "Every benchmark is published third-party research — MIT/InsideSales.com, Harvard Business Review, SuperOffice, Salesforce, HubSpot, Meta and Mobilesquared — cited on the line where it appears. They describe the category, not our client results.",
+  },
 ];
+
+/** Capacity per tier — the figures a quote is built from. Prices are
+ *  deliberately not published; the site promises a quote after a call. */
+const USAGE = [
+  { plan: "Starter", typical: "300–600 / mo", sessions: "1,500", perday: "50", head: "5.0×", over: "PKR 2 / session" },
+  { plan: "Growth", typical: "800–1,500 / mo", sessions: "4,000", perday: "133", head: "5.0×", over: "PKR 2 / session" },
+  { plan: "Scale", typical: "2,000–4,000 / mo", sessions: "9,000", perday: "300", head: "4.5×", over: "PKR 3 / session" },
+  { plan: "Pro", typical: "4,000–8,000 / mo", sessions: "15,000", perday: "500", head: "3.8×", over: "PKR 4 / session" },
+  { plan: "Enterprise", typical: "8,000–15,000 / mo", sessions: "25,000", perday: "833", head: "3.1×", over: "PKR 4 / session" },
+  { plan: "Enterprise+", typical: "15,000+ / mo", sessions: "40,000", perday: "1,333", head: "2.7×", over: "PKR 5 / session" },
+];
+
+/** Legal text. Client-approved and shipped verbatim — do not paraphrase. */
+const TERMS = [
+  "Usage and credits. Every action performed by an agent or tool consumes AI credits. The amount is determined by VantriqAI after the action completes, based on its complexity and the tool used, and is not quoted in advance. Credits are allocated monthly, expire at the end of each billing period, do not roll over, and are neither refundable nor exchangeable for cash or service. Sessions, session counts and headroom figures describe expected capacity, not a guaranteed entitlement; usage beyond the included allowance is billed at the stated overage rate.",
+  "Pricing and taxes. All figures are indicative and provided for reference only. Prices and currency vary by location, and any PKR or USD amount shown is illustrative and not an offer. Quoted amounts exclude taxes, duties and payment-processing charges, which are applied according to your billing address. The binding price is the one shown on the purchase page before payment is completed. VantriqAI may revise tier pricing, allowances, overage rates and package contents at any time, at its sole discretion and without notice or obligation to give reasons; changes take effect from your next billing period.",
+  "Performance and third parties. Response times, volumes, conversion figures and any other metrics on this site are illustrative examples drawn from past deployments. They are not warranties, forecasts or guarantees of results for your business. Service delivery depends on third parties outside our control, including messaging platforms, business solution providers, calendar and CRM vendors and AI model providers; their pricing, policies, availability or model behaviour may change, and such changes pass through to you. Unless a separate written agreement states otherwise, the service is provided without service-level guarantees and our aggregate liability is limited to fees you paid in the three months preceding a claim.",
+  "General. Nothing on this page constitutes a contract, an offer capable of acceptance, professional advice, or a commitment to supply. Scope, fees, term and support are governed solely by the written agreement signed with VantriqAI, which prevails over anything stated here. Trademarks, product names and materials on this site remain the property of VantriqAI or their respective owners. VantriqAI reserves all rights not expressly granted.",
+];
+
+const termsLabel = {
+  fontFamily: "var(--font-heading)",
+  fontWeight: 800,
+  fontSize: 11,
+  letterSpacing: "0.14em",
+  textTransform: "uppercase" as const,
+  color: "color-mix(in srgb, var(--color-text) 62%, transparent)",
+};
+const termsBody = {
+  fontSize: 11,
+  lineHeight: "19px",
+  margin: 0,
+  maxWidth: "104ch",
+  color: "color-mix(in srgb, var(--color-text) 62%, transparent)",
+};
+const figureAccent = { color: "var(--color-accent-700)", fontWeight: 600 };
 
 const shell = { maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" };
 
@@ -129,20 +169,20 @@ export default function Pricing() {
                 A one-time setup fee plus a simple monthly plan, quoted in PKR after we scope your workflow. No USD
                 surprises, and no charge for normal business volume.
               </p>
-              <div data-anim="rise" style={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+              <div data-anim="rise" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                 <a
                   className="btn btn-primary"
                   href={waLink()}
                   target="_blank"
                   rel="noopener"
-                  style={{ minHeight: 52, paddingInline: 22, fontSize: 15, justifyContent: "flex-start" }}
+                  style={{ minHeight: 52, paddingInline: 22, fontSize: 15 }}
                 >
                   Request a quote on WhatsApp
                 </a>
                 <a
                   className="btn btn-secondary"
                   href="/contact"
-                  style={{ minHeight: 52, paddingInline: 22, fontSize: 15, justifyContent: "flex-start", borderWidth: 2 }}
+                  style={{ minHeight: 52, paddingInline: 22, fontSize: 15, borderWidth: 2 }}
                 >
                   Send a brief
                 </a>
@@ -152,16 +192,15 @@ export default function Pricing() {
         </section>
       </div>
 
-      <section style={{ borderTop: "2px solid var(--color-divider)", borderBottom: "2px solid var(--color-divider)", background: "var(--color-divider)" }}>
+      <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)" }}>
         <div
           style={{
             maxWidth: 1280,
             margin: "0 auto",
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit,minmax(min(300px,100%),1fr))",
-            gap: 2,
-            background: "var(--color-bg)",
-            overflow: "hidden",
+            gap: 18,
+            padding: "clamp(22px,3vw,40px) clamp(20px,5vw,64px)",
           }}
         >
           {TIERS.map((tier) =>
@@ -172,10 +211,11 @@ export default function Pricing() {
                 style={{
                   background: "var(--color-text)",
                   color: "var(--color-bg)",
+                  border: "1px solid var(--color-text)",
+                  borderRadius: "var(--radius-lg)",
                   padding: "clamp(28px,3vw,40px) clamp(20px,2.5vw,36px)",
                   display: "flex",
                   flexDirection: "column",
-                  boxShadow: "2px 2px 0 0 var(--color-divider)",
                 }}
               >
                 <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent-400)", margin: "0 0 16px" }}>
@@ -205,7 +245,6 @@ export default function Pricing() {
                   padding: "clamp(28px,3vw,40px) clamp(20px,2.5vw,36px)",
                   display: "flex",
                   flexDirection: "column",
-                  boxShadow: "2px 2px 0 0 var(--color-divider)",
                 }}
               >
                 <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)", margin: "0 0 16px" }}>
@@ -240,6 +279,56 @@ export default function Pricing() {
           </p>
         </section>
 
+        {/* Legal block — client-approved copy, shipped verbatim. */}
+        <section data-anim="rise" style={{ padding: "0 0 clamp(44px,6vw,72px)", display: "grid", gap: 12 }}>
+          <p style={{ ...termsLabel, margin: "0 0 6px" }}>Terms &amp; conditions</p>
+          {TERMS.map((para) => (
+            <p key={para.slice(0, 24)} style={termsBody}>
+              {para}
+            </p>
+          ))}
+        </section>
+
+        <section style={{ padding: "0 0 clamp(56px,8vw,96px)" }}>
+          <SplitHeader kicker="What each tier carries">
+            <h2 data-anim="rise" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px" }}>
+              The same table your quote is built from
+            </h2>
+            <p data-anim="rise" style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 32px", maxWidth: "60ch", ...bodyMuted }}>
+              Every plan carries several times the sessions a business its size normally uses, so ordinary months never
+              touch the overage rate. Your quote confirms the tier against your real message history.
+            </p>
+            {/* Six columns do not fit a phone; the table scrolls inside its own
+                box rather than forcing the page to scroll sideways. */}
+            <div data-anim="rise" style={{ overflowX: "auto" }}>
+              <table className="table" style={{ minWidth: 720 }}>
+                <thead>
+                  <tr>
+                    <th>Plan</th>
+                    <th>Typical use</th>
+                    <th>Sessions included</th>
+                    <th>Sessions / day</th>
+                    <th>Headroom</th>
+                    <th>Overage</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {USAGE.map((row) => (
+                    <tr key={row.plan}>
+                      <td style={{ fontFamily: "var(--font-heading)", fontWeight: 600 }}>{row.plan}</td>
+                      <td className="num" style={bodyMuted}>{row.typical}</td>
+                      <td className="num" style={figureAccent}>{row.sessions}</td>
+                      <td className="num" style={bodyMuted}>{row.perday}</td>
+                      <td className="num" style={figureAccent}>{row.head}</td>
+                      <td className="num" style={bodyMuted}>{row.over}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </SplitHeader>
+        </section>
+
         <section style={{ padding: "0 0 clamp(56px,8vw,104px)" }}>
           <SplitHeader kicker="Questions">
             <h2 data-anim="rise" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 40px" }}>
@@ -251,7 +340,7 @@ export default function Pricing() {
                   key={faq.q}
                   data-anim="rise"
                   style={{
-                    borderTop: "2px solid var(--color-divider)",
+                    borderTop: "1px solid var(--color-divider)",
                     padding: "20px 0",
                   }}
                 >
@@ -266,7 +355,7 @@ export default function Pricing() {
                   </p>
                 </details>
               ))}
-              <div data-anim="rule" style={{ height: 2, background: "var(--color-divider)" }} />
+              <div data-anim="rule" style={{ height: 1, background: "var(--color-divider)" }} />
             </div>
           </SplitHeader>
         </section>

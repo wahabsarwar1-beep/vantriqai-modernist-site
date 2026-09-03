@@ -119,17 +119,17 @@ export default function Home() {
           <span
             data-par="0.10"
             aria-hidden="true"
-            style={{ position: "absolute", right: "6%", top: "12%", width: 120, height: 120, border: "2px solid var(--color-accent)", pointerEvents: "none" }}
+            style={{ position: "absolute", right: "6%", top: "12%", width: 120, height: 120, border: "1px solid var(--color-accent)", borderRadius: "var(--radius-lg)", pointerEvents: "none" }}
           />
           <span
             data-par="-0.10"
             aria-hidden="true"
-            style={{ position: "absolute", right: "13%", top: "30%", width: 56, height: 56, background: "var(--color-accent)", opacity: 0.9, pointerEvents: "none" }}
+            style={{ position: "absolute", right: "13%", top: "30%", width: 56, height: 56, background: "var(--color-accent)", borderRadius: "var(--radius-md)", opacity: 0.9, pointerEvents: "none" }}
           />
           <span
             data-par="-0.08"
             aria-hidden="true"
-            style={{ position: "absolute", right: "2%", top: "70%", width: 180, height: 2, background: "var(--color-text)", opacity: 0.5, pointerEvents: "none" }}
+            style={{ position: "absolute", right: "2%", top: "70%", width: 180, height: 1, background: "var(--color-text)", opacity: 0.5, pointerEvents: "none" }}
           />
 
           <div style={{ position: "relative", zIndex: 1 }}>
@@ -137,7 +137,7 @@ export default function Home() {
               <span data-anim="rise" style={{ fontSize: 13, letterSpacing: "0.08em" }}>
                 <BrandName inkColor="var(--color-text)" />
               </span>
-              <span data-anim="rule" style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
+              <span data-anim="rule" style={{ flex: 1, height: 1, background: "var(--color-divider)" }} />
             </div>
             <h1 style={{ fontSize: "clamp(38px,6vw,76px)", lineHeight: 0.98, letterSpacing: "-0.03em", margin: 0, maxWidth: "16ch", overflowWrap: "break-word" }}>
               <span style={{ display: "block", overflow: "hidden", paddingBottom: "0.16em", marginBottom: "-0.12em" }}>
@@ -164,20 +164,20 @@ export default function Home() {
                 AI agents that reply, qualify, and book — 24 hours a day. On WhatsApp, Instagram, and your website, in
                 seconds, at any volume.
               </p>
-              <div data-anim="rise" style={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+              <div data-anim="rise" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                 <a
                   className="btn btn-primary"
                   href={waLink()}
                   target="_blank"
                   rel="noopener"
-                  style={{ minHeight: 52, paddingInline: 22, justifyContent: "flex-start", fontSize: 15, letterSpacing: "0.02em" }}
+                  style={{ minHeight: 52, paddingInline: 24, fontSize: 15, letterSpacing: "0.02em" }}
                 >
                   Message us on WhatsApp
                 </a>
                 <a
                   className="btn btn-secondary"
                   href="/how-it-works"
-                  style={{ minHeight: 52, paddingInline: 22, justifyContent: "flex-start", fontSize: 15, letterSpacing: "0.02em", borderWidth: 2 }}
+                  style={{ minHeight: 52, paddingInline: 24, fontSize: 15, letterSpacing: "0.02em" }}
                 >
                   See how it works
                 </a>
@@ -187,16 +187,15 @@ export default function Home() {
         </section>
       </div>
 
-      <section style={{ borderTop: "2px solid var(--color-divider)", borderBottom: "2px solid var(--color-divider)", background: "var(--color-divider)" }}>
+      <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)" }}>
         <div
           style={{
             maxWidth: 1280,
             margin: "0 auto",
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(min(260px,100%),1fr))",
-            gap: 2,
-            background: "var(--color-bg)",
-            overflow: "hidden",
+            gridTemplateColumns: "repeat(auto-fit,minmax(min(240px,100%),1fr))",
+            gap: 18,
+            padding: "clamp(22px,3vw,40px) clamp(20px,5vw,64px)",
           }}
         >
           {STATS.map((stat, i) => (
@@ -204,7 +203,7 @@ export default function Home() {
               key={i}
               data-anim="rise"
               className="cell-hover"
-              style={{ padding: "clamp(28px,4vw,52px) clamp(20px,3vw,44px)", boxShadow: "2px 2px 0 0 var(--color-divider)" }}
+              style={{ padding: "clamp(24px,3vw,32px) clamp(20px,2.4vw,28px)" }}
             >
               <p
                 style={{
@@ -254,14 +253,14 @@ export default function Home() {
       </div>
 
       {/* scroll-pinned three-step stage */}
-        <div data-pin="" style={{ position: "relative", height: "320vh", borderTop: "2px solid var(--color-divider)", background: "var(--color-bg)" }}>
+        <div data-pin="" style={{ position: "relative", height: "320vh", borderTop: "1px solid var(--color-divider)", background: "var(--color-bg)" }}>
           <div style={{ position: "sticky", top: 0, height: "100vh", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "center" }}>
             <div style={{ maxWidth: 1280, width: "100%", margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(24px,4vw,44px)" }}>
                 <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)" }}>
                   01 — What it does
                 </span>
-                <span style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
+                <span style={{ flex: 1, height: 1, background: "var(--color-divider)" }} />
                 <span data-pin-count="" style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.14em" }}>
                   01 / 03
                 </span>
@@ -278,18 +277,18 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
-                <div style={{ display: "grid", gap: 2, background: "var(--color-divider)", border: "2px solid var(--color-divider)" }}>
+                <div style={{ display: "grid", background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
                   {STEPS.map((step) => (
                     <div
                       key={step.n}
                       data-pin-row=""
-                      style={{ background: "var(--color-bg)", padding: "22px 24px", display: "flex", alignItems: "baseline", gap: 18, transition: "background-color .35s ease, color .35s ease" }}
+                      style={{ padding: "22px 24px", display: "flex", alignItems: "baseline", gap: 18, borderBottom: "1px solid var(--color-divider)", transition: "background-color .35s ease, color .35s ease" }}
                     >
                       <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.12em" }}>{step.n}</span>
                       <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(20px,2.4vw,30px)", letterSpacing: "-0.02em" }}>{step.title}</span>
                     </div>
                   ))}
-                  <div style={{ background: "var(--color-bg)", padding: "18px 24px" }}>
+                  <div style={{ padding: "18px 24px" }}>
                     <span data-pin-rail="" style={{ display: "block", height: 4, background: "var(--color-accent)", transformOrigin: "left", transform: "scaleX(0.04)" }} />
                   </div>
                 </div>
@@ -299,7 +298,7 @@ export default function Home() {
         </div>
 
         {/* industries marquee */}
-        <section style={{ borderTop: "2px solid var(--color-divider)", borderBottom: "2px solid var(--color-divider)", padding: "clamp(28px,4vw,48px) 0", overflow: "hidden" }}>
+        <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)", padding: "clamp(28px,4vw,48px) 0", overflow: "hidden" }}>
           <p
             data-anim="rise"
             style={{

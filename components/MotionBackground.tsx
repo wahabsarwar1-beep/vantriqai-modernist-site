@@ -81,7 +81,7 @@ export default function MotionBackground() {
     function draw() {
       ctx!.clearRect(0, 0, w, h);
       ctx!.lineWidth = 1;
-      ctx!.strokeStyle = "rgba(32,30,29,0.07)";
+      ctx!.strokeStyle = "rgba(22,21,26,0.07)";
       ctx!.beginPath();
       lanesX.forEach((x) => {
         ctx!.moveTo(x, 0);
@@ -100,15 +100,15 @@ export default function MotionBackground() {
         const tx = vert ? p.lane : p.pos - p.dir * p.len;
         const ty = vert ? p.pos - p.dir * p.len : p.lane;
         const grad = ctx!.createLinearGradient(tx, ty, hx, hy);
-        grad.addColorStop(0, "rgba(236,48,19,0)");
-        grad.addColorStop(1, p.ink ? "rgba(32,30,29,0.55)" : "rgba(236,48,19,0.85)");
+        grad.addColorStop(0, "rgba(47,86,217,0)");
+        grad.addColorStop(1, p.ink ? "rgba(22,21,26,0.55)" : "rgba(47,86,217,0.85)");
         ctx!.strokeStyle = grad;
         ctx!.lineWidth = p.ink ? 1.5 : 2.5;
         ctx!.beginPath();
         ctx!.moveTo(tx, ty);
         ctx!.lineTo(hx, hy);
         ctx!.stroke();
-        ctx!.fillStyle = p.ink ? "rgba(32,30,29,0.75)" : "#ec3013";
+        ctx!.fillStyle = p.ink ? "rgba(22,21,26,0.75)" : "#2f56d9";
         ctx!.fillRect(hx - 2.5, hy - 2.5, 5, 5);
 
         if (!reduced) {
@@ -123,7 +123,7 @@ export default function MotionBackground() {
 
       pulses = pulses.filter((q) => q.a > 0.02);
       pulses.forEach((q) => {
-        ctx!.strokeStyle = `rgba(236,48,19,${q.a.toFixed(3)})`;
+        ctx!.strokeStyle = `rgba(47,86,217,${q.a.toFixed(3)})`;
         ctx!.lineWidth = 2;
         ctx!.strokeRect(q.x - q.r, q.y - q.r, q.r * 2, q.r * 2);
         q.r += 1.4;

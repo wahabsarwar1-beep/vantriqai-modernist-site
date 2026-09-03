@@ -87,13 +87,13 @@ export default function Contact() {
               <p data-anim="rise" style={{ fontSize: 18, lineHeight: "30px", maxWidth: "44ch", margin: "28px 0 0" }}>
                 The fastest way to reach us is the same channel we build on. Message us and see the agent answer.
               </p>
-              <div data-anim="rise" style={{ display: "flex", gap: 2, flexWrap: "wrap", marginTop: 28 }}>
+              <div data-anim="rise" style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 28 }}>
                 <a
                   className="btn btn-primary"
                   href={waLink()}
                   target="_blank"
                   rel="noopener"
-                  style={{ minHeight: 52, paddingInline: 22, fontSize: 15, justifyContent: "flex-start" }}
+                  style={{ minHeight: 52, paddingInline: 22, fontSize: 15 }}
                 >
                   Message us on WhatsApp
                 </a>
@@ -105,8 +105,8 @@ export default function Contact() {
                     data-anim="rise"
                     className="row-hover"
                     style={{
-                      borderTop: "2px solid var(--color-divider)",
-                      borderBottom: i === INFO_ROWS.length - 1 ? "2px solid var(--color-divider)" : undefined,
+                      borderTop: "1px solid var(--color-divider)",
+                      borderBottom: i === INFO_ROWS.length - 1 ? "1px solid var(--color-divider)" : undefined,
                       padding: "18px 0",
                     }}
                   >

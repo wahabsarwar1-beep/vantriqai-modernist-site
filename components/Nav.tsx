@@ -46,17 +46,18 @@ export default function Nav() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Close the mobile panel on resize past the breakpoint.
+  // Close the mobile panel on resize past the breakpoint. Must match the
+  // 1000px media query in globals.css that swaps the links for the burger.
   useEffect(() => {
     const onResize = () => {
-      if (window.innerWidth > 760) setMenuOpen(false);
+      if (window.innerWidth > 1000) setMenuOpen(false);
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
   return (
-    <nav ref={navRef} className="nav" style={{ position: "sticky", top: 0, zIndex: 20 }}>
+    <nav ref={navRef} className="nav" style={{ position: "sticky", top: 0, zIndex: 40 }}>
       <Link href="/" className="nav-brand">
         <Logo className="nav-logo" />
       </Link>
@@ -79,11 +80,14 @@ export default function Nav() {
         target="_blank"
         rel="noopener"
         style={{
+          minHeight: 38,
+          padding: "0 16px",
+          fontSize: 11.5,
           letterSpacing: "0.04em",
           textTransform: "uppercase",
+          justifyContent: "center",
           whiteSpace: "nowrap",
-          minHeight: 40,
-          paddingInline: 16,
+          flex: "none",
           color: "var(--color-bg)",
         }}
       >
@@ -104,27 +108,32 @@ export default function Nav() {
       </button>
 
       <div id="mobile-nav-panel" className={menuOpen ? "nav-mobile-panel is-open" : "nav-mobile-panel"}>
-        <div className="nav-mobile-links">
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              aria-current={pathname === link.href ? "page" : undefined}
-              onClick={() => setMenuOpen(false)}
-            >
-              {link.label}
-            </Link>
-          ))}
+        {/* The gutter lives on this inner wrapper, not the panel: padding on a
+            max-height:0 element still paints, so the closed panel would show
+            as a stripe under the nav. */}
+        <div className="nav-mobile-inner">
+          <div className="nav-mobile-links">
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                aria-current={pathname === link.href ? "page" : undefined}
+                onClick={() => setMenuOpen(false)}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+          <a
+            className="btn btn-primary nav-mobile-cta"
+            href={waLink()}
+            target="_blank"
+            rel="noopener"
+            onClick={() => setMenuOpen(false)}
+          >
+            WhatsApp us
+          </a>
         </div>
-        <a
-          className="btn btn-primary nav-mobile-cta"
-          href={waLink()}
-          target="_blank"
-          rel="noopener"
-          onClick={() => setMenuOpen(false)}
-        >
-          WhatsApp us
-        </a>
       </div>
     </nav>
   );

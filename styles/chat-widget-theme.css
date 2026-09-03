@@ -2,33 +2,34 @@
  *
  * Imported after '@n8n/chat/style.css' in components/ShopAIChat.tsx.
  *
- * Values are the Modernist tokens from app/globals.css, written as literals because the
- * widget can mount outside the token scope in some builds — swap each literal for the
- * matching var(--color-*) if they resolve in yours.
+ * Values are the soft-warm tokens from app/globals.css, written as literals
+ * because the widget can mount outside the token scope in some builds — swap
+ * each literal for the matching var(--color-*) if they resolve in yours.
  *
- * Ground   #f3f2f2   Surface  #eae9e9   Ink      #201e1d
- * Accent   #ec3013   Pressed  #c8250c   Tint     #fff2ef
+ * Ground   #fbf9f6   Surface  #ffffff   Ink      #16151a
+ * Accent   #2f56d9   Pressed  #1f3a95   Tint     #e8ecfd
+ * Divider  #e7e2da   Accent-400 #7f9bf2 (the "AI" on dark grounds)
  */
 
 :root {
   /* palette */
-  --chat--color-primary: #ec3013;
-  --chat--color-primary-shade-50: #d92b11;
-  --chat--color-primary-shade-100: #c8250c;
-  --chat--color-secondary: #201e1d;
-  --chat--color-secondary-shade-50: #2c2a29;
-  --chat--color-white: #f3f2f2;
-  --chat--color-light: #eae9e9;
-  --chat--color-light-shade-50: #dedddd;
-  --chat--color-light-shade-100: #cfcecd;
-  --chat--color-medium: #8a8785;
-  --chat--color-dark: #201e1d;
-  --chat--color-disabled: rgba(32, 30, 29, 0.45);
-  --chat--color-typing: #ec3013;
+  --chat--color-primary: #2f56d9;
+  --chat--color-primary-shade-50: #2848b8;
+  --chat--color-primary-shade-100: #1f3a95;
+  --chat--color-secondary: #16151a;
+  --chat--color-secondary-shade-50: #2c2a26;
+  --chat--color-white: #ffffff;
+  --chat--color-light: #fbf9f6;
+  --chat--color-light-shade-50: #faf7f2;
+  --chat--color-light-shade-100: #efeae1;
+  --chat--color-medium: #8d857a;
+  --chat--color-dark: #16151a;
+  --chat--color-disabled: rgba(22, 21, 26, 0.45);
+  --chat--color-typing: #2f56d9;
 
   /* type & shape */
-  --chat--font-family: "Archivo", system-ui, sans-serif;
-  --chat--border-radius: 0;
+  --chat--font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --chat--border-radius: 12px;
   --chat--spacing: 1rem;
   --chat--transition-duration: 0.26s;
 
@@ -37,57 +38,61 @@
   --chat--window--height: min(560px, calc(100vh - 132px));
 
   /* header */
-  --chat--header--background: #201e1d;
-  --chat--header--color: #f3f2f2;
+  --chat--header--background: #16151a;
+  --chat--header--color: #fbf9f6;
   --chat--header--border-top: none;
   --chat--header--border-bottom: none;
   --chat--header--padding: 14px 16px;
   --chat--heading--font-size: 14px;
-  --chat--subtitle--font-size: 11px;
+  --chat--subtitle--font-size: 10.5px;
   --chat--subtitle--line-height: 1.5;
 
   /* messages */
   --chat--message--font-size: 14.5px;
   --chat--message-line-height: 23px;
   --chat--message--padding: 11px 14px;
-  --chat--message--border-radius: 0;
+  --chat--message--border-radius: 16px;
   --chat--message--margin-bottom: 12px;
-  --chat--message--bot--background: #201e1d;
-  --chat--message--bot--color: #f3f2f2;
-  --chat--message--bot--border: none;
-  --chat--message--user--background: #f3f2f2;
-  --chat--message--user--color: #201e1d;
-  --chat--message--user--border: 2px solid #201e1d;
-  --chat--message--pre--background: rgba(32, 30, 29, 0.06);
+  --chat--message--bot--background: #ffffff;
+  --chat--message--bot--color: #16151a;
+  --chat--message--bot--border: 1px solid #e7e2da;
+  --chat--message--user--background: #2f56d9;
+  --chat--message--user--color: #ffffff;
+  --chat--message--user--border: none;
+  --chat--message--pre--background: rgba(22, 21, 26, 0.06);
 
   /* input */
   --chat--textarea--height: 44px;
   --chat--input--font-size: 15px;
-  --chat--input--border: 2px solid rgba(32, 30, 29, 0.4);
-  --chat--input--background: #f3f2f2;
-  --chat--input--text-color: #201e1d;
+  --chat--input--border: 1px solid #e7e2da;
+  --chat--input--background: #ffffff;
+  --chat--input--text-color: #16151a;
   --chat--input--placeholder--font-size: 15px;
 
   /* launcher bubble */
   --chat--toggle--size: 60px;
-  --chat--toggle--background: #ec3013;
-  --chat--toggle--hover--background: #c8250c;
-  --chat--toggle--active--background: #c8250c;
-  --chat--toggle--color: #f3f2f2;
+  --chat--toggle--background: #2f56d9;
+  --chat--toggle--hover--background: #2848b8;
+  --chat--toggle--active--background: #1f3a95;
+  --chat--toggle--color: #fbf9f6;
 
   /* send button */
-  --chat--button--background: #ec3013;
-  --chat--button--color: #f3f2f2;
-  --chat--button--hover--background: #c8250c;
+  --chat--button--background: #2f56d9;
+  --chat--button--color: #ffffff;
+  --chat--button--hover--background: #2848b8;
 }
 
 /* @n8n/chat's header is text-only by default (no logo slot) — inject the
-   reversed mark before the title so the header reads as the site's own
+   reversed cobalt mark before the title so the header reads as the site's own
    header bar, not the raw n8n default. */
 #n8n-chat .chat-header .chat-heading {
   display: flex;
   align-items: center;
   gap: 10px;
+  /* n8n's own rule is space-between, which takes the injected mark below as
+     the first flex child and throws the title to the far right of the header.
+     The lockup has to read as one unit, so pack them together. */
+  justify-content: flex-start;
 }
 #n8n-chat .chat-header .chat-heading::before {
   content: "";
@@ -95,31 +100,31 @@
   width: 22px;
   height: 22px;
   flex: none;
-  background: url("/ventriqai-mark-reversed.svg") no-repeat center / contain;
+  background: url("/ventriqai-mark-reversed-cobalt.svg") no-repeat center / contain;
 }
 #n8n-chat .chat-header p {
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   margin: 2px 0 0;
 }
 
-/* The "AI" in VantriqAI is always the accent color, mixed case, matching
-   the wordmark everywhere else on the site (nav, footer, hero) — applied
-   to the header title and the launcher label by ShopAIChat.tsx, since
-   neither is real markup we can style with a selector on its own. */
+/* The "AI" in VantriqAI is always accent, mixed case, matching the wordmark
+   everywhere else on the site. On the ink header and ink launcher tab the
+   full-strength cobalt is too dark to read, so both use the -400 step. */
 #n8n-chat .chat-brand-ai {
-  color: #ec3013;
+  color: #7f9bf2;
 }
 
-/* Structural corrections the variables don't cover: flat panel, 2px frame,
-   flush-left labels, themed keyboard focus. */
+/* Structural corrections the variables don't cover: rounded panel, hairline
+   ink frame, themed keyboard focus. */
 #n8n-chat .chat-window {
-  border: 2px solid #201e1d;
-  border-radius: 0;
-  box-shadow: 0 8px 24px rgba(32, 30, 29, 0.16);
+  border: 1px solid #16151a;
+  border-radius: 28px;
+  overflow: hidden;
+  box-shadow: 0 6px 14px rgba(22, 21, 26, 0.07), 0 36px 72px -26px rgba(22, 21, 26, 0.26);
 }
 
-/* Open/close: the panel stays mounted and *always* display:block — n8n's own
+/* Open/close: the panel stays mounted and *always* display:flex — n8n's own
    inline display:none toggle can't be transitioned, which is what made the
    panel snap open/closed instead of animating. ShopAIChat.tsx watches that
    inline style and mirrors it onto .chat-window-open, so the actual show/hide
@@ -181,16 +186,15 @@
 #n8n-chat .chat-body,
 #n8n-chat [class*="chat-messages"] {
   background:
-    repeating-linear-gradient(45deg, rgba(32, 30, 29, 0.04) 0 3px, transparent 3px 16px),
-    #eae9e9;
+    repeating-linear-gradient(45deg, rgba(22, 21, 26, 0.04) 0 3px, transparent 3px 16px),
+    #ffffff;
 }
 
 /* Messages need their own inset from the panel edges and a width cap, or a
-   long bot reply reads as one edge-to-edge black slab that merges straight
-   into the header above it instead of a distinct bubble on the hatched
-   surface. */
+   long bot reply reads as one edge-to-edge slab that merges straight into the
+   header above it instead of a distinct bubble on the hatched surface. */
 #n8n-chat .chat-messages-list {
-  padding: 16px;
+  padding: 18px 16px;
   gap: 12px;
 }
 #n8n-chat .chat-message {
@@ -200,13 +204,14 @@
 /* Flat scrollbar instead of the browser default, to match the system. */
 #n8n-chat .chat-messages-list {
   scrollbar-width: thin;
-  scrollbar-color: rgba(32, 30, 29, 0.35) transparent;
+  scrollbar-color: rgba(22, 21, 26, 0.28) transparent;
 }
 #n8n-chat .chat-messages-list::-webkit-scrollbar {
   width: 8px;
 }
 #n8n-chat .chat-messages-list::-webkit-scrollbar-thumb {
-  background: rgba(32, 30, 29, 0.35);
+  background: rgba(22, 21, 26, 0.28);
+  border-radius: 999px;
 }
 #n8n-chat .chat-messages-list::-webkit-scrollbar-track {
   background: transparent;
@@ -214,27 +219,31 @@
 
 #n8n-chat button,
 #n8n-chat [class*="chat-input"] button {
-  border-radius: 0;
-  justify-content: flex-start;
-  font-family: "Archivo", system-ui, sans-serif;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  border-radius: 999px;
+  justify-content: center;
+  font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
   font-size: 13px;
 }
 
 #n8n-chat :focus-visible {
-  outline: 2px solid #ec3013;
-  outline-offset: 2px;
+  outline: 2px solid #2f56d9;
+  outline-offset: 3px;
 }
 
-/* The widget does not inherit the site's Archivo — the base sheet resets
-   font-family on native controls, so force it explicitly. */
+/* The widget does not inherit the site's fonts — the base sheet resets
+   font-family on native controls, so force it explicitly. Headings and
+   controls take Sora, running prose takes Manrope. */
 #n8n-chat,
 #n8n-chat input,
-#n8n-chat textarea,
+#n8n-chat textarea {
+  font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+}
+#n8n-chat .chat-header,
 #n8n-chat button {
-  font-family: "Archivo", system-ui, sans-serif;
+  font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Cleaner, branded panel — no third-party footer credit. */
@@ -244,16 +253,18 @@
 }
 
 /* Launcher: an ink "Ask VantriqAI" label tab butted flush against the accent
-   square, same butted-cell construction as the site's stat and product
-   grids. The label is a real element ShopAIChat.tsx inserts as the toggle's
-   first child (so .chat-brand-ai can color just the "AI") — CSS ::before
-   content can't hold styled sub-text. The square's own background comes
-   from --chat--toggle--background above; ::after only paints the icon. */
+   square, the pair clipped to a single pill. The label is a real element
+   ShopAIChat.tsx inserts as the toggle's first child (so .chat-brand-ai can
+   colour just the "AI") — CSS ::before content can't hold styled sub-text.
+   The square's own background comes from --chat--toggle--background above;
+   ::after only paints the icon. */
 #n8n-chat .chat-window-toggle {
   display: flex;
   align-items: stretch;
   width: auto !important;
-  border-radius: 0 !important;
+  border-radius: 999px !important;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(22, 21, 26, 0.05), 0 18px 44px -18px rgba(22, 21, 26, 0.18);
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 #n8n-chat .chat-window-toggle:hover {
@@ -267,12 +278,13 @@
   align-items: center;
   height: 60px;
   padding: 0 16px;
-  background: #201e1d;
-  color: #f3f2f2;
-  font-family: "Archivo", system-ui, sans-serif;
+  background: #16151a;
+  color: #fbf9f6;
+  font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
   font-weight: 800;
   font-size: 12px;
   letter-spacing: 0.1em;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 @media (max-width: 760px) {
@@ -286,20 +298,20 @@
   width: 60px;
   height: 60px;
   flex: none;
-  background-color: #f3f2f2;
+  background-color: #fbf9f6;
   -webkit-mask-image: url("/chat-mark.svg");
   mask-image: url("/chat-mark.svg");
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
   mask-position: center;
-  -webkit-mask-size: 26px;
-  mask-size: 26px;
+  -webkit-mask-size: 30px;
+  mask-size: 30px;
   animation: chatLauncherPing 5s ease-out infinite;
 }
 @keyframes chatLauncherPing {
-  0%, 68% { box-shadow: 0 0 0 0 rgba(236, 48, 19, 0.6); }
-  100% { box-shadow: 0 0 0 10px rgba(236, 48, 19, 0); }
+  0%, 68% { box-shadow: 0 0 0 0 rgba(47, 86, 217, 0.6); }
+  100% { box-shadow: 0 0 0 10px rgba(47, 86, 217, 0); }
 }
 
 /* Quick-reply chips, injected above the input by ShopAIChat.tsx — an
@@ -307,28 +319,31 @@
 #n8n-chat .chat-quick-replies {
   display: flex;
   flex-wrap: wrap;
-  gap: 2px;
+  gap: 6px;
   padding: 10px 10px 0;
 }
 #n8n-chat .chat-quick-reply-chip {
   min-height: 34px;
-  padding: 0 12px;
+  padding: 0 14px;
   background: transparent;
-  border: 2px solid rgba(32, 30, 29, 0.4);
-  color: #201e1d;
-  font-weight: 800;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  border: 1px solid #e7e2da;
+  border-radius: 999px;
+  color: #16151a;
+  font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: none;
   cursor: pointer;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
 }
 #n8n-chat .chat-quick-reply-chip:hover {
-  border-color: #ec3013;
-  background: #fff2ef;
+  border-color: #a9bbf7;
+  background: #e8ecfd;
+  color: #1f3a95;
 }
 
-/* Above the sticky nav (z-index 20), below the route-transition wipe (z-index 90). */
+/* Above the sticky nav (z-index 40), below the route-transition wipe (z-index 90). */
 #n8n-chat {
   --chat--window--z-index: 70;
   z-index: 70;

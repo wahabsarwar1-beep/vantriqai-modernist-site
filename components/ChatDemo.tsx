@@ -130,7 +130,7 @@ export default function ChatDemo() {
           width: "100%",
           maxWidth: 360,
           background: "var(--color-text)",
-          border: "2px solid var(--color-neutral-800)",
+          border: "1px solid var(--color-neutral-800)",
           padding: "12px 12px 14px",
           borderRadius: 46,
           boxShadow: "var(--shadow-lg)",
@@ -247,7 +247,7 @@ export default function ChatDemo() {
                 style={{
                   justifySelf: "start",
                   maxWidth: "84%",
-                  border: "2px solid var(--color-text)",
+                  border: "1px solid var(--color-text)",
                   background: "var(--color-bg)",
                   padding: "12px 14px",
                   boxShadow: "var(--shadow-sm)",
@@ -287,7 +287,7 @@ export default function ChatDemo() {
                 style={{
                   justifySelf: "start",
                   maxWidth: "84%",
-                  border: "2px solid var(--color-text)",
+                  border: "1px solid var(--color-text)",
                   background: "var(--color-bg)",
                   padding: "12px 14px",
                   boxShadow: "var(--shadow-sm)",
@@ -334,8 +334,8 @@ export default function ChatDemo() {
           <div
             key={note.label}
             style={{
-              borderTop: "2px solid var(--color-divider)",
-              borderBottom: i === NOTES.length - 1 ? "2px solid var(--color-divider)" : undefined,
+              borderTop: "1px solid var(--color-divider)",
+              borderBottom: i === NOTES.length - 1 ? "1px solid var(--color-divider)" : undefined,
               padding: "16px 0",
             }}
           >

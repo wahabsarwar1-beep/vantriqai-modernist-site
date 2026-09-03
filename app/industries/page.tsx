@@ -105,7 +105,7 @@ export default function Industries() {
               >
                 Where it applies
               </span>
-              <span data-anim="rule" style={{ flex: 1, height: 2, background: "var(--color-divider)" }} />
+              <span data-anim="rule" style={{ flex: 1, height: 1, background: "var(--color-divider)" }} />
             </div>
             <h1 style={{ fontSize: "clamp(34px,5.4vw,68px)", lineHeight: 0.98, letterSpacing: "-0.03em", margin: 0, maxWidth: "16ch", overflowWrap: "break-word" }}>
               <span style={{ display: "block", overflow: "hidden", paddingBottom: "0.16em", marginBottom: "-0.12em" }}>
@@ -126,17 +126,17 @@ export default function Industries() {
         </section>
       </div>
 
-      <section style={{ borderTop: "2px solid var(--color-divider)", borderBottom: "2px solid var(--color-divider)", background: "var(--color-divider)" }}>
+      <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)" }}>
         <div
           style={{
             maxWidth: 1280,
             margin: "0 auto",
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit,minmax(min(300px,100%),1fr))",
-            gap: 2,
-            background: "var(--color-bg)",
-            overflow: "hidden",
+            gap: 18,
+            padding: "clamp(22px,3vw,40px) clamp(20px,5vw,64px)",
           }}
+          className="spotlight-grid"
         >
           {SECTORS.map((sector) => (
             <div
@@ -145,7 +145,6 @@ export default function Industries() {
               className="cell-hover-5"
               style={{
                 padding: "clamp(26px,3vw,40px) clamp(20px,2.5vw,36px)",
-                boxShadow: "2px 2px 0 0 var(--color-divider)",
               }}
             >
               <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)", margin: "0 0 18px" }}>
@@ -160,7 +159,7 @@ export default function Industries() {
         </div>
       </section>
 
-      <section style={{ borderBottom: "2px solid var(--color-divider)", padding: "clamp(24px,3vw,40px) 0", overflow: "hidden" }}>
+      <section style={{ borderBottom: "1px solid var(--color-divider)", padding: "clamp(24px,3vw,40px) 0", overflow: "hidden" }}>
         <div style={{ display: "flex", width: "max-content", animation: "marquee 30s linear infinite" }}>
           <MarqueeTrack />
           <MarqueeTrack ariaHidden />

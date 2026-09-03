@@ -6,9 +6,14 @@ export type MarkId =
   | "catalogue"
   | "lead"
   | "escalation"
-  | "deployment";
+  | "followup"
+  | "outreach"
+  | "payments"
+  | "insights"
+  | "deployment"
+  | "custom";
 
-/** Channels (1–3) sit on an accent field; capabilities + deployment (4–8) sit on ink. */
+/** Channels sit on an accent field; capabilities and deployment sit on ink. */
 const FIELD_BG: Record<MarkId, string> = {
   whatsapp: "var(--color-accent)",
   social: "var(--color-accent)",
@@ -17,7 +22,12 @@ const FIELD_BG: Record<MarkId, string> = {
   catalogue: "var(--color-text)",
   lead: "var(--color-text)",
   escalation: "var(--color-text)",
+  followup: "var(--color-text)",
+  outreach: "var(--color-text)",
+  payments: "var(--color-text)",
+  insights: "var(--color-text)",
   deployment: "var(--color-text)",
+  custom: "var(--color-text)",
 };
 
 function MarkGlyph({ id }: { id: MarkId }) {
@@ -77,6 +87,43 @@ function MarkGlyph({ id }: { id: MarkId }) {
           <path d="M28 4h16v16h-7V15l-9 9-5-5 9-9h-4z" fill="var(--color-accent)" />
         </>
       );
+    case "followup":
+      // A thread reopened: two settled bars, then an accent one returning.
+      return (
+        <>
+          <rect x="4" y="8" width="30" height="9" fill="var(--color-bg)" />
+          <rect x="14" y="21" width="30" height="9" fill="var(--color-bg)" />
+          <path d="M4 34h22v10H4zm26 5l10-6v12z" fill="var(--color-accent)" />
+        </>
+      );
+    case "outreach":
+      // One message fanning out to a segment.
+      return (
+        <>
+          <rect x="4" y="18" width="14" height="12" fill="var(--color-bg)" />
+          <rect x="26" y="4" width="18" height="9" fill="var(--color-accent)" />
+          <rect x="26" y="19" width="18" height="9" fill="var(--color-bg)" />
+          <rect x="26" y="34" width="18" height="9" fill="var(--color-bg)" />
+        </>
+      );
+    case "payments":
+      // A card with the paid stripe called out in accent.
+      return (
+        <>
+          <rect x="4" y="9" width="40" height="30" fill="var(--color-bg)" />
+          <rect x="4" y="16" width="40" height="7" fill="var(--color-text)" />
+          <rect x="9" y="28" width="16" height="6" fill="var(--color-accent)" />
+        </>
+      );
+    case "insights":
+      // The Monday digest: three bars, the last one the week's peak.
+      return (
+        <>
+          <rect x="6" y="28" width="9" height="16" fill="var(--color-bg)" />
+          <rect x="20" y="18" width="9" height="26" fill="var(--color-bg)" />
+          <rect x="34" y="6" width="9" height="38" fill="var(--color-accent)" />
+        </>
+      );
     case "deployment":
       return (
         <>
@@ -84,10 +131,18 @@ function MarkGlyph({ id }: { id: MarkId }) {
           <rect x="19" y="19" width="10" height="10" fill="var(--color-accent)" />
         </>
       );
+    case "custom":
+      // The blank module: a frame with the corner still to be filled in.
+      return (
+        <>
+          <path fillRule="evenodd" d="M4 4h26v10H14v16H4zm14 30h16V18h10v26H18z" fill="var(--color-bg)" />
+          <rect x="19" y="19" width="10" height="10" fill="var(--color-accent)" />
+        </>
+      );
   }
 }
 
-/** One of the eight product logo marks: a 76x76 flat field with a 44px filled-SVG glyph. */
+/** One of the thirteen product marks: a 76x76 rounded field with a 44px filled-SVG glyph. */
 export default function ProductMark({ id }: { id: MarkId }) {
   return (
     <span
@@ -98,6 +153,7 @@ export default function ProductMark({ id }: { id: MarkId }) {
         height: 76,
         flex: "none",
         background: FIELD_BG[id],
+        borderRadius: 24,
         marginBottom: 24,
       }}
     >

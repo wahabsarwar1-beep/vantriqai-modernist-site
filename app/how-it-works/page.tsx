@@ -75,7 +75,7 @@ export default function HowItWorks() {
           <span
             data-par="0.12"
             aria-hidden="true"
-            style={{ position: "absolute", right: "8%", top: "20%", width: 90, height: 90, border: "2px solid var(--color-accent)", pointerEvents: "none" }}
+            style={{ position: "absolute", right: "8%", top: "20%", width: 90, height: 90, border: "1px solid var(--color-accent)", borderRadius: "var(--radius-lg)", pointerEvents: "none" }}
           />
           <div style={{ position: "relative", zIndex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(24px,4vw,44px)" }}>
@@ -119,7 +119,7 @@ export default function HowItWorks() {
               data-anim="rise"
               className="row-hover step-row"
               style={{
-                borderTop: "2px solid var(--color-divider)",
+                borderTop: "1px solid var(--color-divider)",
                 padding: "clamp(28px,3.5vw,44px) 0",
               }}
             >
@@ -177,7 +177,7 @@ export default function HowItWorks() {
             <h2 data-anim="rise" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 40px", maxWidth: "24ch" }}>
               Enterprise-grade, without the enterprise headache
             </h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(280px,100%),1fr))", gap: 2, background: "var(--color-divider)", borderBlock: "2px solid var(--color-divider)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(272px,100%),1fr))", gap: 18, padding: "clamp(22px,3vw,40px) 0" }}>
               {HOOD.map((item) => (
                 <div key={item.n} data-anim="rise" className="cell-hover" style={{ padding: "28px 26px 34px" }}>
                   <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.1em", color: "var(--color-accent)", margin: "0 0 18px" }}>
@@ -210,8 +210,8 @@ export default function HowItWorks() {
                     gridTemplateColumns: "56px minmax(0,1fr)",
                     gap: 24,
                     padding: "20px 0",
-                    borderTop: "2px solid var(--color-divider)",
-                    borderBottom: i === ONBOARDING.length - 1 ? "2px solid var(--color-divider)" : undefined,
+                    borderTop: "1px solid var(--color-divider)",
+                    borderBottom: i === ONBOARDING.length - 1 ? "1px solid var(--color-divider)" : undefined,
                   }}
                 >
                   <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 14, color: "var(--color-accent)", fontFeatureSettings: "'tnum' 1" }}>
