@@ -19,6 +19,14 @@ export default function Motion() {
     const m = MOTION_MULT;
     const timers: ReturnType<typeof setTimeout>[] = [];
 
+    /** The timed backstop below every observer exists so nothing is ever left
+     *  invisible if an observer misses. It must only cover what the reader can
+     *  already see: applied blindly it fires 2.4s after load and finishes every
+     *  animation on the page — including sections metres below the fold — so by
+     *  the time the reader scrolls there, everything has already played and the
+     *  page looks static. Anything further down stays with its observer. */
+    const withinReach = (el: Element) => el.getBoundingClientRect().top < window.innerHeight + 200;
+
     // headline lines — animate in immediately on mount/route change
     const lines = Array.from(document.querySelectorAll<HTMLElement>("[data-line]"));
     lines.forEach((el, i) => {
@@ -94,7 +102,7 @@ export default function Motion() {
         { rootMargin: "0px 0px -6% 0px", threshold: 0.05 }
       );
       animEls.forEach((el) => io!.observe(el));
-      timers.push(setTimeout(() => animEls.forEach((el) => show(el, 0)), 2400));
+      timers.push(setTimeout(() => animEls.filter(withinReach).forEach((el) => show(el, 0)), 2400));
     }
 
     // product logo marks: shapes assemble in sequence
@@ -132,7 +140,7 @@ export default function Motion() {
         { rootMargin: "0px 0px -2% 0px", threshold: 0.01 }
       );
       icons.forEach((svg) => iio!.observe(svg));
-      timers.push(setTimeout(() => icons.forEach((svg) => drawIcon(svg, false)), 2400));
+      timers.push(setTimeout(() => icons.filter(withinReach).forEach((svg) => drawIcon(svg, false)), 2400));
     }
 
     // counters
@@ -177,39 +185,55 @@ export default function Motion() {
       });
       timers.push(
         setTimeout(() => {
-          counters.forEach((el) => {
+          counters.filter(withinReach).forEach((el) => {
             if (el.textContent === "0") el.textContent = el.getAttribute("data-count") || "0";
           });
         }, 2400)
       );
     }
 
-    // bars: width 0 -> the element's own --bar value, on entry
+    // bars: 0 -> the element's own --bar value, on entry. Horizontal by
+    // default; data-bar="y" grows upward instead, for the sparkline columns
+    // in the workspace mockup.
     const bars = Array.from(document.querySelectorAll<HTMLElement>("[data-bar]"));
     let bio: IntersectionObserver | null = null;
     if (bars.length) {
+      const axis = (el: HTMLElement) => (el.getAttribute("data-bar") === "y" ? "height" : "width");
       const grow = (el: HTMLElement) => {
-        el.style.width = getComputedStyle(el).getPropertyValue("--bar").trim() || "0%";
+        el.style[axis(el)] = getComputedStyle(el).getPropertyValue("--bar").trim() || "0%";
       };
       if (reduced) {
         bars.forEach(grow);
       } else {
+        bars.forEach((el, i) => {
+          el.style[axis(el)] = "0%";
+          // Columns read as a chart drawing itself when they stagger; a single
+          // horizontal bar has nothing to stagger against, so it starts at once.
+          const delay = axis(el) === "height" ? Math.min(i, 9) * 55 : 0;
+          el.style.transition = `${axis(el)} ${1150 / m}ms cubic-bezier(.16,1,.3,1) ${delay}ms`;
+        });
+        // A collapsed bar has zero area, and a zero-area target can never
+        // satisfy a non-zero threshold, so observing the bar itself would
+        // never fire — the timed backstop was silently doing all the work.
+        // Observe the track instead, which keeps its size, and grow the bars
+        // inside it.
+        const tracks = new Map<Element, HTMLElement[]>();
         bars.forEach((el) => {
-          el.style.width = "0%";
-          el.style.transition = `width ${1150 / m}ms cubic-bezier(.16,1,.3,1)`;
+          const track = el.parentElement ?? el;
+          tracks.set(track, [...(tracks.get(track) ?? []), el]);
         });
         bio = new IntersectionObserver(
           (entries) => {
             entries.forEach((e) => {
               if (!e.isIntersecting) return;
-              grow(e.target as HTMLElement);
+              tracks.get(e.target)?.forEach(grow);
               bio!.unobserve(e.target);
             });
           },
           { threshold: 0.35 }
         );
-        bars.forEach((el) => bio!.observe(el));
-        timers.push(setTimeout(() => bars.forEach(grow), 2400));
+        tracks.forEach((_, track) => bio!.observe(track));
+        timers.push(setTimeout(() => bars.filter(withinReach).forEach(grow), 2400));
       }
     }
 

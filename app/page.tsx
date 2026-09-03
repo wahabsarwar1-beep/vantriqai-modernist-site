@@ -358,17 +358,34 @@ export default function Home() {
           </div>
         </section>
 
-        {/* { The workspace } */}
-        <div style={shell}>
-          <section style={{ padding: "clamp(38px,5vw,72px) 0 clamp(20px,3vw,36px)" }}>
-            <SplitHeader kicker={<>{"{ The workspace }"}</>}>
-              <h2 data-anim="rise" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 32px", maxWidth: "20ch" }}>
+        {/* { The workspace } — a full-width ruled band, so all three cards sit
+            on one row. Inside a split header the content column is only 9/12
+            of the page and the third card wrapped underneath. */}
+        <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)" }}>
+          <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(36px,4.6vw,62px) clamp(20px,5vw,64px)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(20px,3vw,32px)" }}>
+              <span data-anim="rise" className="kicker-pill">{"{ The workspace }"}</span>
+              <span data-anim="rule" style={{ flex: 1, height: 1, background: "var(--color-divider)" }} />
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit,minmax(min(320px,100%),1fr))",
+                gap: "20px clamp(24px,4vw,56px)",
+                marginBottom: "clamp(26px,3.4vw,44px)",
+              }}
+            >
+              <h2 data-anim="rise" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: 0, maxWidth: "22ch" }}>
                 For work that is bigger than one inbox.
               </h2>
-              <WorkspaceCards />
-            </SplitHeader>
-          </section>
-        </div>
+              <p data-anim="rise" style={{ fontSize: 16, lineHeight: "28px", margin: 0, maxWidth: "46ch", ...bodyMuted }}>
+                Switch on the modules you need, watch one thread carry a customer to a booking, and read the week in a
+                minute.
+              </p>
+            </div>
+            <WorkspaceCards />
+          </div>
+        </section>
 
         {/* 04 — the horizontally pinned five-step rail */}
         <StepRail />
