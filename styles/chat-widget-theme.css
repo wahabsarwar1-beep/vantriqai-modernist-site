@@ -282,9 +282,11 @@
   color: #fbf9f6;
   font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
   font-weight: 800;
-  font-size: 12px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-size: 13px;
+  /* Mixed case, not uppercase: the wordmark is "VantriqAI" — capital V,
+     lowercase antriq, capital AI — and setting it in caps destroys that.
+     Tracking drops accordingly, since 0.1em is an all-caps value. */
+  letter-spacing: 0.01em;
   white-space: nowrap;
 }
 @media (max-width: 760px) {
