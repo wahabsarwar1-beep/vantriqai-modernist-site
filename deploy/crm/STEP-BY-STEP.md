@@ -94,38 +94,42 @@ echo "Dockerfile written"
 
 **You should see:** `Dockerfile written`
 
-## Step 6 — Work out your settings automatically
+## Step 6 & 7 — Settings and database, in one go
 
-Rather than hunting for your database password and network name, this finds
-them for you and invents a fresh password for the CRM:
+This discovers your Postgres superuser name and network, generates a password,
+and creates the CRM's own database. Run it as one block:
 
 ```bash
 cd /root/crm-stack
+unset CRM_DB_PASSWORD DOCKER_NET
+PGSUPER=$(docker exec postgres_db printenv POSTGRES_USER 2>/dev/null); [ -z "$PGSUPER" ] && PGSUPER=postgres
 NET=$(docker inspect postgres_db --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}')
 PASS=$(openssl rand -hex 24)
 printf 'DOCKER_NET=%s\nCRM_DB_PASSWORD=%s\n' "$NET" "$PASS" > .env
-cat .env
+echo "superuser: $PGSUPER"
+echo "network:   $NET"
+docker exec postgres_db psql -U "$PGSUPER" -c "CREATE USER vantriq WITH PASSWORD '$PASS';"
+docker exec postgres_db psql -U "$PGSUPER" -c "CREATE DATABASE vantriq OWNER vantriq;"
+unset PASS NET PGSUPER
 ```
 
-**You should see:** two lines, e.g. `DOCKER_NET=app-stack_default` and
-`CRM_DB_PASSWORD=` followed by a long string of letters and numbers.
+**You should see:** the superuser name, the network name, then `CREATE ROLE` and
+`CREATE DATABASE`.
 
-If `DOCKER_NET=` is empty, stop here and tell me — the rest won't work.
+Two things this gets right that a naive version does not:
 
-## Step 7 — Give the CRM its own database
+- **The superuser is probably not `postgres`.** On this stack it is `n8n`,
+  because n8n created the container. Hardcoding `-U postgres` fails with
+  `role "postgres" does not exist`, so the name is read from the container.
+- **Never `source` the .env file into your shell.** Docker Compose gives a
+  variable already set in your shell precedence over the `.env` file. Sourcing
+  `.env` and then regenerating the password leaves the shell holding the old
+  value, and Compose hands the container a password the database no longer
+  accepts — a `password authentication failed for user "vantriq"` that looks
+  inexplicable because the file on disk is correct. The `unset` lines above
+  prevent it.
 
-Your Postgres already holds n8n's data. We add a separate database for the CRM
-so the two can never interfere:
-
-```bash
-cd /root/crm-stack && set -a && . ./.env && set +a
-docker exec postgres_db psql -U postgres -c "CREATE USER vantriq WITH PASSWORD '$CRM_DB_PASSWORD';"
-docker exec postgres_db psql -U postgres -c "CREATE DATABASE vantriq OWNER vantriq;"
-```
-
-**You should see:** `CREATE ROLE` then `CREATE DATABASE`.
-
-If it says *"role already exists"*, that's fine — it means you ran this twice.
+If `DOCKER_NET` prints blank, stop — the rest will not work.
 
 ## Step 8 — Write the startup file
 
@@ -265,7 +269,7 @@ Run `docker logs crm_app` first — the answer is nearly always in there.
 | `/run/postgresql/.s.PGSQL.5432` | It can't find the database and gave up | Step 8's `DATABASE_URL` didn't apply — re-run Steps 8 and 9 |
 | `no encryption` / SSL error | Encryption mismatch | `DATABASE_SSL` isn't `"false"` — check Step 8 |
 | `ENOTFOUND postgres_db` | Can't see the database container | `DOCKER_NET` in Step 6 was wrong or blank |
-| `password authentication failed` | Password mismatch | Step 7 ran before Step 6, so they disagree. Run: `docker exec postgres_db psql -U postgres -c "DROP DATABASE vantriq;" && docker exec postgres_db psql -U postgres -c "DROP USER vantriq;"` then redo Steps 6–10 |
+| `password authentication failed` | The container and database disagree on the password, usually because a stale `CRM_DB_PASSWORD` in your shell overrode `.env` | Re-run the Step 6 & 7 block, but with `ALTER USER` instead of `CREATE USER`, then `docker compose up -d --force-recreate`. |
 | `database "vantriq" does not exist` | Step 7 was skipped | Run Step 7 |
 | Still 502 in the browser | Traffic director is misconfigured | Step 12 — Forward Port must be `8080`, hostname must be `crm_app` |
 
