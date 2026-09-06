@@ -1,0 +1,28 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# env files — ignore every variant, then re-allow the committed template.
+# The old rule only covered ".env*.local", so a plain .env or .env.production
+# holding the Sheet endpoint would have been committed.
+.env*
+!.env.example
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
