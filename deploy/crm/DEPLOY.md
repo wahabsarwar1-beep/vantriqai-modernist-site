@@ -150,8 +150,12 @@ container going green tells you the image and the proxy are right, nothing more.
 The database is only proven by a query succeeding:
 
 ```bash
-curl -sS -H "Authorization: Bearer vq_YOUR_ADMIN_KEY" https://crm.vantriqai.com/api/products
+curl -sS -H "x-api-key: vq_YOUR_ADMIN_KEY" https://crm.vantriqai.com/api/products
 ```
+
+The header is `x-api-key`, not `Authorization: Bearer` — see
+`src/middleware/auth.js`. A Bearer token returns
+`{"error":"Missing x-api-key header"}` with a 401.
 
 That should return the six seeded packages. A 500 here with a green container
 means the app is up but `DATABASE_URL` / `DATABASE_SSL` are wrong — check
