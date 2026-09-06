@@ -1,8 +1,58 @@
 "use client";
 
 import { useEffect } from "react";
-import "@n8n/chat/style.css";
+import "@/styles/n8n-chat.css";
 import "@/styles/chat-widget-theme.css";
+
+/** The widget's own prebuilt browser bundle, vendored into public/ rather than
+ *  installed from npm.
+ *
+ *  Installing @n8n/chat drags in n8n's *server* workflow engine as npm
+ *  metadata — n8n-workflow -> @n8n/expression-runtime -> isolated-vm, plus
+ *  ssh2 — both native C++ addons. isolated-vm requires Node >=24 and ships
+ *  prebuilds only for abi137/abi147, so on a Node 22 host it falls back to
+ *  compiling with node-gyp, which needs Python and a toolchain shared hosting
+ *  does not have. That is what broke the deploy.
+ *
+ *  None of it is reachable from the browser: this bundle contains zero
+ *  references to isolated-vm, ssh2, n8n-workflow or expression-runtime. So we
+ *  ship the bundle the widget actually runs and skip the dependency tree.
+ *
+ *  Loaded as a classic script so no bundler ever tries to resolve it. It is
+ *  UMD and self-contained (Vue included), exposing window.N8nChat. */
+const CHAT_BUNDLE = "/vendor/n8n-chat/chat.bundle.umd.js";
+
+type CreateChat = (options: Record<string, unknown>) => void;
+
+declare global {
+  interface Window {
+    N8nChat?: { createChat: CreateChat };
+    __n8nChatLoader?: Promise<{ createChat: CreateChat }>;
+  }
+}
+
+/** Injects the bundle once per page, however many times this mounts. */
+function loadChatBundle(): Promise<{ createChat: CreateChat }> {
+  if (window.N8nChat) return Promise.resolve(window.N8nChat);
+  if (window.__n8nChatLoader) return window.__n8nChatLoader;
+
+  window.__n8nChatLoader = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = CHAT_BUNDLE;
+    script.async = true;
+    script.onload = () =>
+      window.N8nChat
+        ? resolve(window.N8nChat)
+        : reject(new Error("chat bundle loaded but did not expose window.N8nChat"));
+    script.onerror = () => {
+      // Let a later mount retry rather than caching the failure forever.
+      delete window.__n8nChatLoader;
+      reject(new Error(`could not load ${CHAT_BUNDLE}`));
+    };
+    document.head.appendChild(script);
+  });
+  return window.__n8nChatLoader;
+}
 
 const QUICK_REPLIES = ["Book a demo", "What does it cost?", "Which module?"];
 
@@ -138,7 +188,7 @@ export default function ShopAIChat() {
     let mounted = true;
     let observer: MutationObserver | null = null;
 
-    import("@n8n/chat").then(({ createChat }) => {
+    loadChatBundle().then(({ createChat }) => {
       if (!mounted) return;
       createChat({
         webhookUrl: process.env.NEXT_PUBLIC_N8N_CHAT_WEBHOOK_URL!,
@@ -168,6 +218,10 @@ export default function ShopAIChat() {
       runInjections();
       observer = new MutationObserver(runInjections);
       observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["style"] });
+    }).catch((err) => {
+      // The site must not break because the assistant could not load — the
+      // WhatsApp route is on every page and is the primary contact channel.
+      console.error("[chat] widget unavailable:", err);
     });
 
     return () => {
