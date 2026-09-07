@@ -443,3 +443,88 @@ alter table clients add column if not exists portal_password_set_by text;
 
 -- The same, for internal staff.
 alter table internal_users add column if not exists password_set_by text;
+
+-- =====================================================================
+-- v5 — realign the ladder to the Business Model (August 2026)
+--
+-- seed.sql only inserts packages that do not exist yet, so a database
+-- that has been running since v1 still carries the old figures. This
+-- block updates them in place, ONCE.
+--
+-- It is guarded rather than idempotent on purpose. Enterprise+ is an
+-- admin-editable tier and the standard tiers can be re-priced by an
+-- admin later; re-running this on every migrate would silently undo
+-- those edits and put the old numbers back.
+-- =====================================================================
+
+create table if not exists applied_migrations (
+  name text primary key,
+  applied_at timestamptz not null default now(),
+  note text default ''
+);
+
+do $$
+begin
+  if exists (select 1 from applied_migrations where name = 'v5_model_realignment') then
+    return;
+  end if;
+
+  -- The ladder, as the model sets it. Setup and monthly are PKR; quota is
+  -- included sessions per month; overage is PKR per session past it.
+  update products set setup_fee=25000,  retainer=20000,  msgs_per_session=12, quota=1500,  overage_rate=2, delivery_cost_full=672,
+    target_tier='Typically 300–600 sessions/mo'     where name='Starter';
+  update products set setup_fee=55000,  retainer=35000,  msgs_per_session=14, quota=4000,  overage_rate=2, delivery_cost_full=3120,
+    target_tier='Typically 800–1,500 sessions/mo'   where name='Growth';
+  update products set setup_fee=70000,  retainer=53000,  msgs_per_session=14, quota=9000,  overage_rate=3, delivery_cost_full=8072,
+    target_tier='Typically 2,000–4,000 sessions/mo' where name='Scale';
+  update products set setup_fee=100000, retainer=90000,  msgs_per_session=16, quota=15000, overage_rate=4, delivery_cost_full=18077,
+    target_tier='Typically 4,000–8,000 sessions/mo' where name='Pro';
+  update products set setup_fee=135000, retainer=137000, msgs_per_session=16, quota=25000, overage_rate=4, delivery_cost_full=33674,
+    target_tier='Typically 8,000–15,000 sessions/mo' where name='Enterprise';
+  update products set setup_fee=190000, retainer=257000, msgs_per_session=18, quota=40000, overage_rate=5, delivery_cost_full=69391,
+    target_tier='Typically 15,000+ sessions/mo'      where name='Enterprise+';
+
+  -- The stack behind every tier. There is no Airtable and no Google Sheets any
+  -- more: this CRM's own Postgres is the data layer, on the same self-hosted
+  -- box as n8n.
+  update products set
+    automation = 'n8n Community, self-hosted',
+    data_layer = 'Vantriq CRM (Postgres)'
+   where name in ('Starter','Growth','Scale','Pro','Enterprise','Enterprise+');
+
+  update products set ai_model = 'Gemini 3 Flash; 12% escalated to GPT-4o-mini / Sonnet' where name='Starter';
+  update products set ai_model = 'Gemini 3 Flash; 15% escalated to GPT-4o-mini / Sonnet' where name='Growth';
+  update products set ai_model = 'Gemini 3 Flash; 16% escalated to GPT-4o-mini / Sonnet' where name='Scale';
+  update products set ai_model = 'Gemini 3 Flash; 18% escalated to GPT-4o-mini / Sonnet' where name='Pro';
+  update products set ai_model = 'Gemini 3 Flash; 20% escalated to GPT-4o-mini / Sonnet' where name='Enterprise';
+  update products set ai_model = 'Gemini 3 Flash; 22% escalated to GPT-4o-mini / Sonnet' where name='Enterprise+';
+
+  -- Web chat and voice are priced add-ons, so they are not part of a tier.
+  update products set channels = 'WhatsApp + Instagram'
+   where name in ('Starter','Growth','Scale','Pro');
+  update products set channels = 'WhatsApp + Instagram; on-premise option' where name='Enterprise';
+  update products set channels = 'WhatsApp + Instagram; custom SLA'        where name='Enterprise+';
+
+  -- The cost base changed with the architecture. The paid data layer and the
+  -- metered automation platform are gone; what is left is one virtual server.
+  update vendors set status = 'Retired — replaced by the CRM''s own Postgres'
+   where name in ('Airtable', 'Supabase (Postgres)', 'Pinecone') and status = 'Active';
+  update vendors set status = 'Retired — replaced by self-hosted n8n Community'
+   where name in ('n8n Cloud', 'n8n Server (self-hosted)') and status = 'Active';
+  update vendors set cost_min = 0, cost_max = 0
+   where status like 'Retired%';
+
+  -- Quota flags raised against the old allowances are meaningless now that the
+  -- allowances are several times larger — a client "over quota" at 220 sessions
+  -- is comfortably inside 1,500. Close them rather than leave an admin deciding
+  -- on a threshold that no longer exists. Nothing is billed by a waive.
+  update quota_events set
+      decision = 'waive',
+      decided_at = now(),
+      decided_by = 'system (model realignment)',
+      note = 'Voided automatically: raised against the previous allowance, which the August 2026 model replaced with a much larger one.'
+   where decision is null;
+
+  insert into applied_migrations (name, note)
+  values ('v5_model_realignment', 'Ladder, stack and cost base set from the VantriqAI Business Model, August 2026.');
+end $$;

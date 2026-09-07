@@ -278,30 +278,38 @@ router.get('/activity', async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const offset = (page - 1) * perPage;
 
+  // The client's allowance for the month, so each session can be shown as
+  // included or billable rather than as a bare number the customer has to
+  // reconcile against their invoice themselves.
+  let quota = null, overageRate = null, packageName = null;
+  if (client.product_id) {
+    const { rows } = await db.query(`select * from products where id = $1`, [client.product_id]);
+    const eff = effectivePackage(client, rows[0]);
+    if (eff) { quota = eff.quota; overageRate = eff.overage_rate; packageName = eff.name; }
+  }
+
+  // One row per session for the month, numbered in the order they happened.
+  // seq is computed over the whole month, not the page, so session 1,501 is
+  // still 1,501 on page 61.
+  const SESSIONS_CTE = `
+    with s as (
+      select session_id,
+             min(occurred_at) as started_at,
+             max(occurred_at) as ended_at,
+             sum(messages_count)::int as messages,
+             mode() within group (order by channel) as channel
+        from usage_events
+       where client_id = $1
+         and occurred_at >= $2::date
+         and occurred_at <  ($2::date + interval '1 month')
+       group by session_id
+    )
+    select s.*, row_number() over (order by started_at asc)::int as seq from s`;
+
   const [countRes, rowsRes, monthsRes] = await Promise.all([
+    db.query(`select count(*)::int as n from (${SESSIONS_CTE}) t`, [client.id, month]),
     db.query(
-      `select count(*)::int as n from (
-         select session_id from usage_events
-          where client_id = $1
-            and occurred_at >= $2::date
-            and occurred_at <  ($2::date + interval '1 month')
-          group by session_id
-       ) s`,
-      [client.id, month]
-    ),
-    db.query(
-      `select session_id,
-              min(occurred_at) as started_at,
-              max(occurred_at) as ended_at,
-              sum(messages_count)::int as messages,
-              mode() within group (order by channel) as channel
-         from usage_events
-        where client_id = $1
-          and occurred_at >= $2::date
-          and occurred_at <  ($2::date + interval '1 month')
-        group by session_id
-        order by min(occurred_at) desc
-        limit $3 offset $4`,
+      `select * from (${SESSIONS_CTE}) t order by started_at desc limit $3 offset $4`,
       [client.id, month, perPage, offset]
     ),
     db.query(
@@ -313,10 +321,21 @@ router.get('/activity', async (req, res) => {
   ]);
 
   const total = countRes.rows[0].n;
+  const included = quota != null ? Math.min(total, quota) : total;
+  const billable = quota != null ? Math.max(0, total - quota) : 0;
+
   res.json({
     period_month: month,
     months: monthsRes.rows.map((r) => r.m),
     total_sessions: total,
+    // What the customer is actually being charged for this month, in the same
+    // unit the invoice uses.
+    package_name: packageName,
+    quota,
+    overage_rate: overageRate,
+    included_sessions: included,
+    billable_sessions: billable,
+    estimated_overage_cost: overageRate != null ? Math.round(billable * overageRate * 100) / 100 : null,
     page,
     per_page: perPage,
     total_pages: Math.max(1, Math.ceil(total / perPage)),
@@ -324,6 +343,11 @@ router.get('/activity', async (req, res) => {
       const started = new Date(r.started_at);
       const ended = new Date(r.ended_at);
       return {
+        // Where this session falls in the month, which is what decides whether
+        // it is inside the allowance. The raw session_id is deliberately never
+        // returned: it is built from the end consumer's phone number, and that
+        // is a third party's data, not this client's.
+        seq: r.seq,
         started_at: r.started_at,
         ended_at: r.ended_at,
         // A single-turn session has no span; report 0 rather than null so the
@@ -331,6 +355,8 @@ router.get('/activity', async (req, res) => {
         duration_seconds: Math.max(0, Math.round((ended - started) / 1000)),
         channel: r.channel || 'whatsapp',
         messages: r.messages || 0,
+        billable: quota != null ? r.seq > quota : false,
+        charge: quota != null && r.seq > quota ? overageRate : 0,
       };
     }),
   });

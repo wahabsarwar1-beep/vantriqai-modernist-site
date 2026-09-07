@@ -171,16 +171,16 @@ finding out at month end:
 {
   "event_id": "…",
   "client_id": "…",
-  "month_to_date": { "sessions": 224, "messages": 448 },
+  "month_to_date": { "sessions": 1504, "messages": 18048 },
   "quota": {
     "period_month": "2026-09-01",
-    "quota": 220,
-    "sessions_used": 224,
+    "quota": 1500,
+    "sessions_used": 1504,
     "sessions_remaining": 0,
-    "percent_used": 102,
+    "percent_used": 100,
     "over_quota_sessions": 4,
-    "overage_rate": 110,
-    "estimated_overage_cost": 440,
+    "overage_rate": 2,
+    "estimated_overage_cost": 8,
     "state": "exceeded",
     "flagged": "exceeded"
   }

@@ -36,19 +36,19 @@ ls -lh /root/vantriq-backup-*.sql
 In **WinSCP**: left panel = your PC, right panel = the server.
 
 - Right panel path box: `/root/crm-stack`
-- Drag **`vantriq-backend-v4.zip`** from left to right
+- Drag **`vantriq-backend-v5.zip`** from left to right
 
 Then confirm it arrived:
 
 ```bash
-ls -lh /root/crm-stack/vantriq-backend-v4.zip
+ls -lh /root/crm-stack/vantriq-backend-v5.zip
 ```
 
 ## 3. Unpack it
 
 ```bash
 cd /root/crm-stack
-unzip -o vantriq-backend-v4.zip
+unzip -o vantriq-backend-v5.zip
 ls -1 vantriq-backend/src/routes/quota.js vantriq-backend/public/reset.html vantriq-backend/Dockerfile
 ```
 
@@ -115,6 +115,34 @@ docker exec postgres_db psql -U n8n -d vantriq -c \
 
 **Expect:** three column names, and both table names printed (not blank).
 If anything is missing, the container is running old code — go back to step 3.
+
+## 6b. Check the new package figures
+
+The migration also realigns the six tiers to the August 2026 business model —
+new setup fees, monthly plans, allowances and overage rates, and the stack
+description (there is no Airtable or Google Sheets any more; this CRM's own
+Postgres is the data layer). It runs **once** and records itself, so re-pricing
+a package afterwards is safe: a later migrate will not put the old numbers back.
+
+```bash
+docker exec postgres_db psql -U n8n -d vantriq -c \
+  "select name, setup_fee, retainer, quota, overage_rate from products order by sort_order;"
+```
+
+**Expect** Starter 25000 / 20000 / 1500 / 2, through to Enterprise+ 190000 /
+257000 / 40000 / 5.
+
+Two consequences worth knowing before you look at the CRM:
+
+- **Allowances are several times larger** (Starter goes from 220 to 1,500
+  sessions), so clients who looked close to their limit will now look
+  comfortably inside it. That is the point — the model sets allowances at 2.7 to
+  5 times typical use so nobody rations conversations.
+- **Overage is far cheaper** (Starter goes from PKR 110 to PKR 2 a session), so
+  a busy month is a conversation about upgrading rather than a disputed invoice.
+- Any quota flag still awaiting your decision was raised against the *old*
+  allowance and is closed automatically as waived, with a note saying why.
+  Nothing is billed by that.
 
 ## 7. Fill in your tax details
 

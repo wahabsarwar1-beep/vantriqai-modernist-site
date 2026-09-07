@@ -1974,7 +1974,7 @@ function productModalHTML(id){
       </div>
       <div class="field-row">
         <div class="field"><label>Automation layer</label><input id="p_automation" value="${p?esc(p.automation):'n8n Cloud'}"></div>
-        <div class="field"><label>Data layer</label><input id="p_data" value="${p?esc(p.dataLayer):'Airtable'}"></div>
+        <div class="field"><label>Data layer</label><input id="p_data" value="${p?esc(p.dataLayer):'Vantriq CRM (Postgres)'}"></div>
       </div>
       <div class="field-row">
         <div class="field"><label>AI model</label><input id="p_ai" value="${p?esc(p.aiModel):''}"></div>
@@ -2071,7 +2071,7 @@ function poModalHTML(){
       <div class="field"><label>Vendor</label>
         <select id="po_vendor">${state.vendors.map(v=>`<option value="${v.id}">${esc(v.name)}</option>`).join('')}</select>
       </div>
-      <div class="field"><label>Item / description</label><input id="po_item" placeholder="e.g. Airtable — Business tier upgrade"></div>
+      <div class="field"><label>Item / description</label><input id="po_item" placeholder="e.g. VPS — annual renewal"></div>
       <div class="field-row">
         <div class="field"><label>Amount (PKR)</label><input id="po_amount" type="number"></div>
         <div class="field"><label>Date</label><input id="po_date" type="date" value="${todayISO()}"></div>

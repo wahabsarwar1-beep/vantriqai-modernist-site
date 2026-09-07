@@ -405,9 +405,22 @@ function renderActivity(){
         </select>
       </div>
     </div>
+    ${a.quota != null ? `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">
+      <div style="flex:1;min-width:120px;background:var(--teal-light);border-radius:10px;padding:10px 12px;">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--teal-dark);font-weight:700;">Included</div>
+        <div style="font-size:17px;font-weight:600;margin-top:2px;">${fmtNum(a.included_sessions)} <span style="font-size:12px;color:var(--muted);font-weight:400;">of ${fmtNum(a.quota)}</span></div>
+      </div>
+      <div style="flex:1;min-width:120px;background:${a.billable_sessions?'var(--amber-light)':'#EEF1F4'};border-radius:10px;padding:10px 12px;">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:${a.billable_sessions?'#7A5410':'var(--muted)'};font-weight:700;">Beyond allowance</div>
+        <div style="font-size:17px;font-weight:600;margin-top:2px;">${fmtNum(a.billable_sessions)}${a.estimated_overage_cost?` <span style="font-size:12px;color:var(--muted);font-weight:400;">· ${fmtMoney(a.estimated_overage_cost)}</span>`:''}</div>
+      </div>
+    </div>` : ''}
     <p style="font-size:12px;color:var(--muted);margin:12px 0 0;">
       Each row is one conversation session — the unit your package is counted in.
-      A session covers a single 24-hour conversation window with one person.
+      A session is a single 24-hour conversation window with one person, and
+      <strong>every message inside it is included</strong>: three messages or thirty, it counts once.
+      ${a.quota != null ? `Your package includes ${fmtNum(a.quota)} sessions a month${a.overage_rate?`; anything past that is ${fmtMoney(a.overage_rate)} a session`:''}.` : ''}
     </p>
   </div>
 
@@ -418,19 +431,25 @@ function renderActivity(){
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
         <thead>
           <tr style="text-align:left;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px;">
-            <th style="padding:8px 10px 8px 0;">Started</th>
+            <th style="padding:8px 10px 8px 0;">#</th>
+            <th style="padding:8px 10px;">Started</th>
             <th style="padding:8px 10px;">Channel</th>
             <th style="padding:8px 10px;">Messages</th>
-            <th style="padding:8px 0 8px 10px;">Length</th>
+            <th style="padding:8px 10px;">Length</th>
+            <th style="padding:8px 0 8px 10px;">Charge</th>
           </tr>
         </thead>
         <tbody>
           ${a.sessions.map(sn=>`
-            <tr style="border-top:1px solid var(--border);">
-              <td style="padding:10px 10px 10px 0;">${esc(fmtDateTime(sn.started_at))}</td>
+            <tr style="border-top:1px solid var(--border);${sn.billable?'background:#FEFAF2;':''}">
+              <td style="padding:10px 10px 10px 0;color:var(--muted);font-variant-numeric:tabular-nums;">${fmtNum(sn.seq)}</td>
+              <td style="padding:10px;">${esc(fmtDateTime(sn.started_at))}</td>
               <td style="padding:10px;"><span class="tag">${esc(channelLabel(sn.channel))}</span></td>
               <td style="padding:10px;">${fmtNum(sn.messages)}</td>
-              <td style="padding:10px 0 10px 10px;color:var(--muted);">${esc(fmtDuration(sn.duration_seconds))}</td>
+              <td style="padding:10px;color:var(--muted);">${esc(fmtDuration(sn.duration_seconds))}</td>
+              <td style="padding:10px 0 10px 10px;white-space:nowrap;">${sn.billable
+                ? `<span class="pill pill-overdue"><span class="pill-dot"></span>${fmtMoney(sn.charge)}</span>`
+                : `<span style="color:var(--muted);font-size:12px;">Included</span>`}</td>
             </tr>`).join('')}
         </tbody>
       </table>
