@@ -166,6 +166,85 @@ router.get('/ledger', async (req, res) => {
   });
 });
 
+/* ---------------------------- Activity: the sessions behind the bill ---------------------------- */
+/**
+ * One row per conversation session — the unit the client is actually billed
+ * on — reconstructed from usage_events by grouping on session_id.
+ *
+ * The raw session_id is deliberately not returned. It is built from the end
+ * consumer's phone number, and that is a third party's data, not the client's
+ * own; the start time identifies a session well enough for a billing query.
+ */
+router.get('/activity', async (req, res) => {
+  const client = req.portalClient;
+
+  const monthParam = String(req.query.month || '').slice(0, 7);
+  const month = /^\d{4}-\d{2}$/.test(monthParam)
+    ? `${monthParam}-01`
+    : new Date().toISOString().slice(0, 7) + '-01';
+
+  const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page, 10) || 25));
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const offset = (page - 1) * perPage;
+
+  const [countRes, rowsRes, monthsRes] = await Promise.all([
+    db.query(
+      `select count(*)::int as n from (
+         select session_id from usage_events
+          where client_id = $1
+            and occurred_at >= $2::date
+            and occurred_at <  ($2::date + interval '1 month')
+          group by session_id
+       ) s`,
+      [client.id, month]
+    ),
+    db.query(
+      `select session_id,
+              min(occurred_at) as started_at,
+              max(occurred_at) as ended_at,
+              sum(messages_count)::int as messages,
+              mode() within group (order by channel) as channel
+         from usage_events
+        where client_id = $1
+          and occurred_at >= $2::date
+          and occurred_at <  ($2::date + interval '1 month')
+        group by session_id
+        order by min(occurred_at) desc
+        limit $3 offset $4`,
+      [client.id, month, perPage, offset]
+    ),
+    db.query(
+      `select distinct date_trunc('month', occurred_at)::date as m
+         from usage_events where client_id = $1
+        order by m desc limit 24`,
+      [client.id]
+    ),
+  ]);
+
+  const total = countRes.rows[0].n;
+  res.json({
+    period_month: month,
+    months: monthsRes.rows.map((r) => r.m),
+    total_sessions: total,
+    page,
+    per_page: perPage,
+    total_pages: Math.max(1, Math.ceil(total / perPage)),
+    sessions: rowsRes.rows.map((r) => {
+      const started = new Date(r.started_at);
+      const ended = new Date(r.ended_at);
+      return {
+        started_at: r.started_at,
+        ended_at: r.ended_at,
+        // A single-turn session has no span; report 0 rather than null so the
+        // client never has to special-case it.
+        duration_seconds: Math.max(0, Math.round((ended - started) / 1000)),
+        channel: r.channel || 'whatsapp',
+        messages: r.messages || 0,
+      };
+    }),
+  });
+});
+
 /* ---------------------------- Standard packages + subscribe ---------------------------- */
 // The standard ladder, for a customer choosing an upgrade. Only standard
 // tiers are offered — Enterprise+ is scoped and priced by conversation, and

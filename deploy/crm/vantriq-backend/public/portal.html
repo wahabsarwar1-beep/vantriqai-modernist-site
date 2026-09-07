@@ -112,7 +112,10 @@ const SESSION_KEY = 'vantriq_portal_session';
 let SESSION = '';
 try { SESSION = localStorage.getItem(SESSION_KEY) || ''; } catch(e) { SESSION = ''; }
 
-let data = { account:null, usage:null, invoices:[], ledger:null, packages:null };
+let data = { account:null, usage:null, invoices:[], ledger:null, packages:null, activity:null };
+let activityMonth = '';   // '' = current month
+let activityPage = 1;
+let activityBusy = false;
 let currentTab = 'overview';
 let error = null;
 let openInvoiceId = null;
@@ -151,7 +154,7 @@ async function boot(){
     const [account, usage, invoices, ledger, packages] = await Promise.all([
       api('/account'), api('/usage'), api('/invoices'), api('/ledger'), api('/packages'),
     ]);
-    data = { account, usage, invoices, ledger, packages };
+    data = { account, usage, invoices, ledger, packages, activity: null };
     render();
   }catch(e){
     if(e.expired){ renderLogin('Your session has ended. Please sign in again.'); return; }
@@ -250,6 +253,7 @@ function render(){
       <div class="tabs">
         <div class="tab ${currentTab==='overview'?'active':''}" onclick="setTab('overview')">Overview</div>
         <div class="tab ${currentTab==='usage'?'active':''}" onclick="setTab('usage')">Usage</div>
+        <div class="tab ${currentTab==='activity'?'active':''}" onclick="setTab('activity')">Activity</div>
         <div class="tab ${currentTab==='invoices'?'active':''}" onclick="setTab('invoices')">Invoices</div>
         <div class="tab ${currentTab==='ledger'?'active':''}" onclick="setTab('ledger')">Statement</div>
         <div class="tab ${currentTab==='packages'?'active':''}" onclick="setTab('packages')">Packages</div>
@@ -273,6 +277,7 @@ function renderTab(){
   if(currentTab==='usage') return renderUsage();
   if(currentTab==='invoices') return renderInvoices();
   if(currentTab==='ledger') return renderLedger();
+  if(currentTab==='activity') return renderActivity();
   if(currentTab==='packages') return renderPackages();
   return '';
 }
@@ -314,6 +319,102 @@ function renderOverview(){
     <div class="kv"><span class="k">Client since</span><span class="v">${fmtDate(account.join_date)}</span></div>
   </div>
   `;
+}
+
+/* ---- Activity: the individual conversations behind the monthly number ---- */
+function fmtDuration(sec){
+  if(!sec) return 'under a minute';
+  if(sec < 60) return sec + ' sec';
+  const m = Math.round(sec/60);
+  if(m < 60) return m + ' min';
+  const h = Math.floor(m/60), r = m%60;
+  return r ? `${h}h ${r}m` : `${h}h`;
+}
+function fmtDateTime(d){
+  if(!d) return '—';
+  return new Date(d).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+}
+function channelLabel(c){
+  return {whatsapp:'WhatsApp', web:'Web chat', voice:'Voice', instagram:'Instagram'}[c] || c;
+}
+
+async function loadActivity(){
+  if(activityBusy) return;
+  activityBusy = true;
+  try{
+    const qs = `?page=${activityPage}` + (activityMonth ? `&month=${encodeURIComponent(activityMonth)}` : '');
+    data.activity = await api('/activity'+qs);
+    activityBusy = false;
+    render();
+  }catch(e){
+    activityBusy = false;
+    if(e.expired){ renderLogin('Your session has ended. Please sign in again.'); return; }
+    data.activity = { error: e.message||'Could not load your activity.' };
+    render();
+  }
+}
+function setActivityMonth(m){ activityMonth = m; activityPage = 1; data.activity = null; loadActivity(); }
+function setActivityPage(p){ activityPage = p; data.activity = null; loadActivity(); }
+
+function renderActivity(){
+  const a = data.activity;
+  if(!a){ requestAnimationFrame(loadActivity); return `<div class="card"><div class="empty"><span class="loading-dot"></span> Loading your activity…</div></div>`; }
+  if(a.error) return `<div class="card"><div class="empty">${esc(a.error)}</div></div>`;
+
+  const monthOpts = (a.months && a.months.length ? a.months : [a.period_month]);
+  return `
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;">Conversations this period</div>
+        <div style="font-family:'Space Grotesk';font-size:22px;font-weight:600;margin-top:2px;">${fmtNum(a.total_sessions)}</div>
+      </div>
+      <div>
+        <label style="font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px;">Period</label>
+        <select onchange="setActivityMonth(this.value)"
+                style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:#fff;">
+          ${monthOpts.map(m=>`<option value="${String(m).slice(0,7)}" ${String(m).slice(0,7)===String(a.period_month).slice(0,7)?'selected':''}>${fmtMonth(m)}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin:12px 0 0;">
+      Each row is one conversation session — the unit your package is counted in.
+      A session covers a single 24-hour conversation window with one person.
+    </p>
+  </div>
+
+  <div class="card">
+    <h3>Sessions</h3>
+    ${a.sessions.length ? `
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="text-align:left;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px;">
+            <th style="padding:8px 10px 8px 0;">Started</th>
+            <th style="padding:8px 10px;">Channel</th>
+            <th style="padding:8px 10px;">Messages</th>
+            <th style="padding:8px 0 8px 10px;">Length</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${a.sessions.map(sn=>`
+            <tr style="border-top:1px solid var(--border);">
+              <td style="padding:10px 10px 10px 0;">${esc(fmtDateTime(sn.started_at))}</td>
+              <td style="padding:10px;"><span class="tag">${esc(channelLabel(sn.channel))}</span></td>
+              <td style="padding:10px;">${fmtNum(sn.messages)}</td>
+              <td style="padding:10px 0 10px 10px;color:var(--muted);">${esc(fmtDuration(sn.duration_seconds))}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    ${a.total_pages > 1 ? `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:12.5px;">
+      <button class="btn btn-ghost btn-sm" ${a.page<=1?'disabled style="opacity:.4;"':''} onclick="setActivityPage(${a.page-1})">Previous</button>
+      <span style="color:var(--muted);">Page ${a.page} of ${a.total_pages}</span>
+      <button class="btn btn-ghost btn-sm" ${a.page>=a.total_pages?'disabled style="opacity:.4;"':''} onclick="setActivityPage(${a.page+1})">Next</button>
+    </div>` : ''}
+    ` : `<div class="empty">No conversations recorded in this period yet.</div>`}
+  </div>`;
 }
 
 function renderPackages(){
