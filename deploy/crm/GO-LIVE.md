@@ -102,6 +102,19 @@ unzip -o vantriq-backend-v3.zip
 docker compose up -d --build
 ```
 
+The zip contains a top-level `vantriq-backend/` folder, so this lands the code
+in `/root/crm-stack/vantriq-backend/` — which is the build context named in
+docker-compose.yml. If you ever see `unzip` listing files as `src/...` rather
+than `vantriq-backend/src/...`, stop: the code is going to the wrong place and
+the build will silently reuse the old version. Extract with
+`-d vantriq-backend/` instead.
+
+Confirm the new code really is in the build context before rebuilding:
+
+```bash
+grep -c "is_standard" /root/crm-stack/vantriq-backend/db/schema.sql   # expect > 0
+```
+
 Takes a minute or two. **Expect** it to end with `Container crm_app Started`.
 
 Then check it came up:
