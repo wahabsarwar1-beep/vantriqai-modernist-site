@@ -49,12 +49,20 @@ ls -lh /root/crm-stack/vantriq-backend-v4.zip
 ```bash
 cd /root/crm-stack
 unzip -o vantriq-backend-v4.zip
-ls -1 vantriq-backend/src/routes/quota.js vantriq-backend/public/reset.html
+ls -1 vantriq-backend/src/routes/quota.js vantriq-backend/public/reset.html vantriq-backend/Dockerfile
 ```
 
-**Expect:** both file names printed back. If instead you get "No such file",
-the zip unpacked into the wrong place — check that `vantriq-backend/` exists
-and holds `package.json`, and re-unzip.
+**Expect:** all three file names printed back. If you get "No such file" for
+the first two, the zip unpacked into the wrong place — check that
+`vantriq-backend/` exists and holds `package.json`, and re-unzip.
+
+If only `Dockerfile` is missing, the zip does not carry one (it never has);
+copy the one already on the server back into place:
+
+```bash
+cp /root/app-stack/vantriq-backend/Dockerfile /root/crm-stack/vantriq-backend/ 2>/dev/null \
+  || echo "Get Dockerfile from deploy/crm/Dockerfile and upload it with WinSCP."
+```
 
 > The folder matters: `docker-compose.yml` builds from `./vantriq-backend`.
 > Files spilled loose into `/root/crm-stack/` are not what gets built.

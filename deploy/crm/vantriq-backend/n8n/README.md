@@ -259,6 +259,27 @@ Billing the same client for the same period twice answers `409` with
 double-bill anyone. Treat `409` as success-already-done, not as an error to
 retry.
 
-`vantriq-monthly-billing.json` in this folder is that workflow, ready to
-import. Set the two credentials placeholders (`VANTRIQ_BASE_URL`,
-`VANTRIQ_AUTOMATION_KEY`) before you activate it.
+That workflow already exists in your n8n as a **draft**, called
+**Vantriq — monthly billing run**. It is not active and will not fire until you
+publish it. `vantriq-monthly-billing.json` in this folder is the same workflow,
+for import elsewhere or as a backup.
+
+Before publishing it:
+
+1. Check both URLs point at your CRM (they default to
+   `https://crm.vantriqai.com`).
+2. Create the credential it asks for — a **Custom Auth (templated)** credential
+   with the template
+
+   ```json
+   { "headers": { "x-api-key": "{{api_key}}" } }
+   ```
+
+   and `api_key` set to the automation key from `create-key`. Putting the key in
+   a credential rather than in the node keeps it out of the workflow JSON and
+   out of exports.
+3. Run it once by hand and read the **Summarise the run** output. Each client
+   comes back as `invoiced`, `already invoiced`, or `FAILED` with the reason.
+
+Only then publish it. It fires on the 1st at 03:00 and bills the month that
+just ended.
