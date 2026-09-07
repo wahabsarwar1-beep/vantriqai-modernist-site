@@ -23,6 +23,14 @@
       DATABASE_SSL: "false"
       PORT: "8080"
       CORS_ORIGIN: https://crm.vantriqai.com,https://portal.vantriqai.com
+      # Internal sign-in emails the one-time code through Hostinger's mail API.
+      # Without a token nobody can finish signing in.
+      HOSTINGER_MAIL_TOKEN: PASTE_MAIL_TOKEN
+      HOSTINGER_MAILBOX_ID: AC639077da6944831097970eb520d3
+      MAIL_FROM: support@vantriqai.com
+      COMPANY_EMAIL_DOMAIN: vantriqai.com
+      # Break-glass admin API key. Set to "false" once everyone has an account.
+      ALLOW_API_KEY_LOGIN: "true"
     depends_on:
       - postgres_db
     # No `ports:` on purpose — Nginx Proxy Manager reaches it over the internal

@@ -24,7 +24,7 @@ const j=async r=>{ try{return await r.json()}catch{return null} };
   const m=await j(r);
   ok(r.status===400 && /Required/.test(m.error||''),'partial client rejected (400)','got '+r.status+' '+JSON.stringify(m));
   const full={name:'Wahab Sarwar',company:'Acme Ltd',email:'a@acme.test',phone:'92300111',
-    external_ref:'923006789807',product_id:starter.id,stage:'lead',est_value:50000,source:'Referral'};
+    external_ref:'92300'+Date.now().toString().slice(-7),product_id:starter.id,stage:'lead',est_value:50000,source:'Referral'};
   r=await A('/api/clients',{method:'POST',body:JSON.stringify(full)});
   const client=await j(r);
   ok(r.status===201,'complete client created (201)','got '+r.status+' '+JSON.stringify(client));
@@ -49,11 +49,11 @@ const j=async r=>{ try{return await r.json()}catch{return null} };
   ok(hist[0].comment==='Ended contract','latest history comment recorded','got '+JSON.stringify(hist[0]));
 
   console.log('\n== lost from a pre-active stage ==');
-  const c2=await j(await A('/api/clients',{method:'POST',body:JSON.stringify({...full,external_ref:'923006789808',company:'Beta Ltd'})}));
+  const c2=await j(await A('/api/clients',{method:'POST',body:JSON.stringify({...full,external_ref:'92301'+Date.now().toString().slice(-7),company:'Beta Ltd'})}));
   r=await mv(c2.id,'lost','Went with a competitor'); ok(r.status===200,'lead -> lost allowed (200)','got '+r.status);
 
   console.log('\n== custom terms: Ent+ only ==');
-  const c3=await j(await A('/api/clients',{method:'POST',body:JSON.stringify({...full,external_ref:'923006789809',company:'Gamma Ltd'})}));
+  const c3=await j(await A('/api/clients',{method:'POST',body:JSON.stringify({...full,external_ref:'92302'+Date.now().toString().slice(-7),company:'Gamma Ltd'})}));
   r=await A(`/api/clients/${c3.id}`,{method:'PUT',body:JSON.stringify({custom_retainer:999})});
   ok(r.status===400,'custom terms on standard package blocked (400)','got '+r.status);
   r=await A(`/api/clients/${c3.id}`,{method:'PUT',body:JSON.stringify({product_id:ep.id,custom_retainer:999000,custom_quota:5000})});

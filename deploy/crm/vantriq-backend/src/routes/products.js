@@ -18,6 +18,13 @@ const LOCKED_MESSAGE =
   'Standard packages are fixed by the business model and cannot be edited. ' +
   'Custom pricing and resources are only available on Enterprise+, set per client.';
 
+/** Reading the catalogue is open to staff; changing it is not. */
+function adminOnly(req, res, next) {
+  if (req.authKind === 'apikey' && req.apiKeyScope === 'admin') return next();
+  if (req.user && req.user.role === 'admin') return next();
+  return res.status(403).json({ error: 'Only an admin can change package pricing.' });
+}
+
 async function loadProduct(id) {
   const { rows } = await db.query(`select * from products where id = $1`, [id]);
   return rows[0] || null;
@@ -27,6 +34,11 @@ router.get('/', async (req, res) => {
   const { rows } = await db.query(
     `select * from products where archived = false order by sort_order asc, created_at asc`
   );
+  // delivery_cost_full is what a package costs us to run — Financials data, so
+  // it is withheld from staff sessions along with the dashboard cost figures.
+  if (req.user && req.user.role === 'staff') {
+    return res.json(rows.map(({ delivery_cost_full, ...rest }) => rest));
+  }
   res.json(rows);
 });
 
@@ -37,7 +49,7 @@ router.post('/', async (req, res) => {
   });
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', adminOnly, async (req, res) => {
   const existing = await loadProduct(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Product not found' });
   if (existing.is_standard !== false) return res.status(403).json({ error: LOCKED_MESSAGE });
@@ -55,7 +67,7 @@ router.put('/:id', async (req, res) => {
   res.json(rows[0]);
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', adminOnly, async (req, res) => {
   const existing = await loadProduct(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Product not found' });
   if (existing.is_standard !== false) return res.status(403).json({ error: LOCKED_MESSAGE });
@@ -70,7 +82,7 @@ router.delete('/:id', async (req, res) => {
   res.status(204).end();
 });
 
-router.post('/:id/archive', async (req, res) => {
+router.post('/:id/archive', adminOnly, async (req, res) => {
   const existing = await loadProduct(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Product not found' });
   if (existing.is_standard !== false) return res.status(403).json({ error: LOCKED_MESSAGE });

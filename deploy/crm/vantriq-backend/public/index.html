@@ -284,23 +284,35 @@ const LS_BASE = 'vantriq_api_base';
 const LS_KEY = 'vantriq_api_key';
 
 /* ---------------------------- API client ---------------------------- */
+const LS_SESS = 'vantriq_staff_session';
 const API = {
   base: localStorage.getItem(LS_BASE) || window.location.origin,
   key: localStorage.getItem(LS_KEY) || '',
-  configured(){ return !!(this.base && this.key); },
+  session: localStorage.getItem(LS_SESS) || '',
+  // Signed in either as an employee (session) or, for emergencies only, with
+  // an admin API key.
+  configured(){ return !!(this.base && (this.session || this.key)); },
+  setSession(base, token){
+    this.base = (base||this.base||window.location.origin).replace(/\/$/,'');
+    this.session = token;
+    localStorage.setItem(LS_BASE, this.base); localStorage.setItem(LS_SESS, token);
+  },
   setConfig(base, key){
     this.base = base.replace(/\/$/,''); this.key = key;
     localStorage.setItem(LS_BASE, this.base); localStorage.setItem(LS_KEY, this.key);
   },
   clearConfig(){
-    localStorage.removeItem(LS_BASE); localStorage.removeItem(LS_KEY);
-    this.base=''; this.key='';
+    localStorage.removeItem(LS_BASE); localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_SESS);
+    this.base=''; this.key=''; this.session='';
   },
   async req(method, path, body){
     let res;
+    const headers = {'Content-Type':'application/json'};
+    if(this.session) headers['Authorization'] = 'Bearer ' + this.session;
+    else if(this.key) headers['x-api-key'] = this.key;
     try{
       res = await fetch(this.base+path, {
-        method, headers: {'Content-Type':'application/json','x-api-key':this.key},
+        method, headers,
         body: body!==undefined ? JSON.stringify(body) : undefined,
       });
     }catch(e){ throw new ApiError('Could not reach the API — check the API URL in Settings.', 0); }
@@ -396,17 +408,24 @@ let state = null;
 let apiConnected = false;
 let connectError = '';
 
+/* Staff logins cannot see procurement, expenses, settings or reps — asking for
+   them would 403 and take the whole load down with it, so they resolve to an
+   empty default instead. */
+function adminOnly(path, fallback){
+  return isAdmin() ? API.get(path) : Promise.resolve(fallback);
+}
+
 async function loadState(){
   const [products, clients, invoices, vendors, pos, expenses, settings, dash, reps, packageRequests] = await Promise.all([
     API.get('/api/products'),
     API.get('/api/clients'),
     API.get('/api/invoices'),
-    API.get('/api/vendors'),
-    API.get('/api/purchase-orders'),
-    API.get('/api/expenses'),
-    API.get('/api/settings'),
+    adminOnly('/api/vendors', []),
+    adminOnly('/api/purchase-orders', []),
+    adminOnly('/api/expenses', []),
+    adminOnly('/api/settings', { company_name:'Vantriq AI', city:'', founder:'', currency:'PKR', utilization:0.7 }),
     API.get('/api/dashboard'),
-    API.get('/api/reps'),
+    adminOnly('/api/reps', []),
     API.get('/api/package-requests?status=pending'),
   ]);
 
@@ -467,6 +486,8 @@ function showToast(msg, kind){
 
 /* ---------------------------- Router / view state ---------------------------- */
 let currentView = 'dashboard';
+let authUser = null;   // {id,email,name,role} when signed in as an employee
+function isAdmin(){ return !authUser || authUser.role === 'admin'; }  // an API-key session is admin
 let sidebarOpen = false;
 let openPanel = null; // {type:'client'|'invoiceDetail', id}
 let openModal = null; // {type, id}
@@ -485,13 +506,21 @@ const NAV = [
   ]},
   {group:'Operations', items:[
     {id:'products', label:'Products & Pricing', icon:iconBox},
-    {id:'procurement', label:'Procurement', icon:iconTruck},
-    {id:'financials', label:'Financials', icon:iconChart},
+    {id:'procurement', label:'Procurement', icon:iconTruck, adminOnly:true},
+    {id:'financials', label:'Financials', icon:iconChart, adminOnly:true},
   ]},
   {group:'', items:[
-    {id:'settings', label:'Settings', icon:iconGear},
+    {id:'team', label:'Team', icon:iconUsers, adminOnly:true},
+    {id:'settings', label:'Settings', icon:iconGear, adminOnly:true},
   ]},
 ];
+
+/* Nav filtered to what this account may actually open. */
+function visibleNav(){
+  return NAV
+    .map(g=>({ ...g, items: g.items.filter(it=> !it.adminOnly || isAdmin()) }))
+    .filter(g=>g.items.length);
+}
 
 function navigate(view){ currentView=view; sidebarOpen=false; openPanel=null; render(); window.scrollTo(0,0); }
 
@@ -572,7 +601,7 @@ function renderSidebar(){
       </div>
     </div>
     <div class="nav">
-      ${NAV.map(g=>`
+      ${visibleNav().map(g=>`
         ${g.group?`<div class="nav-group-label">${g.group}</div>`:''}
         ${g.items.map(it=>`
           <div class="nav-item ${currentView===it.id?'active':''}" onclick="navigate('${it.id}')">
@@ -583,7 +612,17 @@ function renderSidebar(){
         `).join('')}
       `).join('')}
     </div>
-    <div class="sidebar-foot">${esc(state.company.name)} · ${esc(state.company.city)}</div>
+    <div class="sidebar-foot">
+      ${authUser ? `
+        <div style="color:#B9C6CE;font-weight:600;font-size:11.5px;">${esc(authUser.name)}</div>
+        <div style="margin-bottom:6px;">${esc(authUser.email)} · ${authUser.role==='admin'?'Admin':'Staff'}</div>
+        <a href="#" onclick="event.preventDefault();signOut()" style="color:#8FD9CC;">Sign out</a>
+      ` : `
+        <div style="margin-bottom:6px;color:#C7A76B;">Signed in with an API key (emergency access)</div>
+        <a href="#" onclick="event.preventDefault();signOut()" style="color:#8FD9CC;">Sign out</a>
+      `}
+      <div style="margin-top:8px;">${esc(state.company.name)} · ${esc(state.company.city)}</div>
+    </div>
   </div>`;
 }
 function sidebarPulseSVG(){
@@ -598,6 +637,7 @@ const VIEW_TITLES = {
   clients:['Clients','Every active and past account'],
   billing:['Billing & Invoices','Setup fees, retainers, and overage'],
   reps:['Sales Reps','Manage rep logins and see every rep\'s pipeline'],
+  team:['Team','Internal logins for Vantriq AI employees'],
   products:['Products & Pricing','Standard tiers are fixed by the model; only Enterprise+ is customisable'],
   requests:['Package Requests','Changes customers have asked for from their portal'],
   procurement:['Procurement','Vendors, tools, and purchase orders behind delivery'],
@@ -636,6 +676,7 @@ function renderView(){
     case 'clients': return renderClients();
     case 'billing': return renderBilling();
     case 'reps': return renderReps();
+    case 'team': return renderTeam();
     case 'requests': return renderRequests();
     case 'products': return renderProducts();
     case 'procurement': return renderProcurement();
@@ -675,11 +716,11 @@ function renderDashboard(){
       <div class="value mono">${fmtMoney(pipeVal)}</div>
       <div class="delta">${pipelineClients().length} open deals</div>
     </div>
-    <div class="card kpi">
+    ${isAdmin() ? `<div class="card kpi">
       <div class="label">Est. net monthly result</div>
       <div class="value mono" style="color:${netMonthly>=0?'var(--teal-dark)':'var(--red)'}">${fmtMoney(netMonthly)}</div>
       <div class="delta ${marginPct>=35?'up':'down'}">${marginPct.toFixed(0)}% contribution margin</div>
-    </div>
+    </div>` : ''}
   </div>
 
   <div class="section-title"><h2>Revenue by package</h2><div class="hint">Active clients, monthly retainer</div></div>
@@ -711,13 +752,14 @@ function renderDashboard(){
     </table>
   </div>
 
+  ${isAdmin() ? `
   <div class="section-title"><h2>Platform cost footprint</h2><div class="hint">Procurement + delivery, this month</div></div>
   <div class="grid kpi-row">
     <div class="card kpi"><div class="label">Vendor / tooling cost</div><div class="value mono" style="font-size:19px;">${fmtMoney(totalPlatformCostMonthly())}</div></div>
     <div class="card kpi"><div class="label">Contract labour</div><div class="value mono" style="font-size:19px;">${fmtMoney(totalContractLabourMonthly())}</div></div>
     <div class="card kpi"><div class="label">Est. AI + messaging delivery cost</div><div class="value mono" style="font-size:19px;">${fmtMoney(totalDelivery)}</div></div>
     <div class="card kpi"><div class="label">Assumed avg. quota utilization</div><div class="value" style="font-size:19px;">${Math.round(state.utilization*100)}%</div></div>
-  </div>
+  </div>` : ''}
   `;
 }
 
@@ -961,6 +1003,102 @@ function renderBilling(){
     </table>
   </div>
   `;
+}
+
+/* ============================== TEAM ============================== */
+let teamUsers = null;
+
+async function loadTeam(){
+  try{ teamUsers = await API.get('/api/team'); render(); }
+  catch(e){ showToast(e.message||'Could not load the team','warn'); }
+}
+
+function renderTeam(){
+  if(teamUsers === null){ requestAnimationFrame(loadTeam); return `<div class="card"><div class="empty"><span class="loading-dot"></span> Loading the team…</div></div>`; }
+  return `
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div style="font-size:12.5px;color:var(--muted);max-width:520px;">
+        Internal logins for @vantriqai.com addresses. Everyone signs in with a password
+        <strong>and</strong> a one-time code emailed to them. Admins see everything; staff get the
+        pipeline, clients, billing and package requests, but not financials, procurement,
+        settings or this screen.
+      </div>
+      <button class="btn btn-primary" onclick="openModal={type:'teamUser'};render()">${iconPlus(15)} Add employee</button>
+    </div>
+  </div>
+  <div id="new-user-creds"></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last signed in</th><th></th></tr></thead>
+      <tbody>
+      ${teamUsers.map(u=>`
+        <tr style="${u.active?'':'opacity:.55;'}">
+          <td><strong>${esc(u.name)}</strong>${u.must_change_password?' <span class="pill pill-pending" style="margin-left:6px;">must change password</span>':''}</td>
+          <td class="mono" style="font-size:12px;">${esc(u.email)}</td>
+          <td><span class="tag">${u.role==='admin'?'Admin':'Staff'}</span></td>
+          <td>${u.active?'<span class="pill pill-active"><span class="pill-dot"></span>Active</span>':'<span class="pill pill-pending"><span class="pill-dot"></span>Deactivated</span>'}</td>
+          <td>${u.last_login_at?fmtDate(u.last_login_at):'—'}</td>
+          <td style="white-space:nowrap;">
+            <button class="btn btn-ghost btn-sm" onclick="resetUserPassword('${u.id}')">Reset password</button>
+            <button class="btn btn-ghost btn-sm" onclick="setUserRole('${u.id}','${u.role==='admin'?'staff':'admin'}')">Make ${u.role==='admin'?'staff':'admin'}</button>
+            ${u.active
+              ? `<button class="btn btn-danger-ghost btn-sm" onclick="setUserActive('${u.id}',false)">Deactivate</button>`
+              : `<button class="btn btn-ghost btn-sm" onclick="setUserActive('${u.id}',true)">Reactivate</button>`}
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function showCreds(title, email, password){
+  const box = document.getElementById('new-user-creds');
+  if(!box) return;
+  box.innerHTML = `
+    <div class="card" style="background:var(--teal-light);border-color:#BFE3D8;">
+      <div style="font-weight:600;color:var(--teal-dark);margin-bottom:8px;">${esc(title)}</div>
+      <div style="font-size:13px;margin-bottom:4px;">Email: <strong class="mono">${esc(email)}</strong></div>
+      <div style="font-size:13px;margin-bottom:10px;">Password: <strong class="mono" style="font-size:15px;">${esc(password)}</strong></div>
+      <button class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText('${esc(email)}  ${esc(password)}').then(()=>showToast('Copied'))">Copy</button>
+      <div style="margin-top:10px;background:var(--amber-light);color:#8A5F17;padding:8px 10px;border-radius:8px;font-size:11.5px;">
+        Shown once. Send it over a channel you trust — not the same inbox the sign-in code goes to.
+        They will still need the emailed code to get in.
+      </div>
+    </div>`;
+}
+
+async function saveTeamUser(){
+  const email=(document.getElementById('tu_email')||{}).value||'';
+  const name=(document.getElementById('tu_name')||{}).value||'';
+  const role=(document.getElementById('tu_role')||{}).value||'staff';
+  if(!email.trim()||!name.trim()){ showToast('Name and email are required','warn'); return; }
+  try{
+    const r = await API.post('/api/team', { email:email.trim(), name:name.trim(), role });
+    closeModal(); teamUsers=null; render();
+    setTimeout(()=>showCreds('Login created for '+r.user.name, r.user.email, r.password), 400);
+    showToast('Employee added');
+  }catch(e){ showToast(e.message||'Could not add the employee','warn'); }
+}
+
+async function resetUserPassword(id){
+  if(!confirm('Reset this password?\n\nTheir current one stops working and any session they have open is closed.')) return;
+  try{
+    const r = await API.post(`/api/team/${id}/reset-password`, {});
+    teamUsers=null; render();
+    setTimeout(()=>showCreds('New password for '+r.user.name, r.user.email, r.password), 400);
+  }catch(e){ showToast(e.message||'Could not reset the password','warn'); }
+}
+
+async function setUserRole(id, role){
+  try{ await API.post(`/api/team/${id}/role`, { role }); teamUsers=null; render(); showToast('Role updated'); }
+  catch(e){ showToast(e.message||'Could not change the role','warn'); }
+}
+
+async function setUserActive(id, active){
+  if(!active && !confirm('Deactivate this employee?\n\nThey are signed out immediately and cannot sign back in.')) return;
+  try{ await API.post(`/api/team/${id}/${active?'activate':'deactivate'}`, {}); teamUsers=null; render(); showToast(active?'Reactivated':'Deactivated'); }
+  catch(e){ showToast(e.message||'Could not update the account','warn'); }
 }
 
 /* ====================== PACKAGE REQUESTS (from the portal) ====================== */
@@ -1312,6 +1450,7 @@ function renderModal(){
   if(!openModal){ root.innerHTML=''; return; }
   let html='';
   if(openModal.type==='client') html = clientModalHTML(openModal.id);
+  else if(openModal.type==='teamUser') html = teamUserModalHTML();
   else if(openModal.type==='product') html = productModalHTML(openModal.id);
   else if(openModal.type==='vendor') html = vendorModalHTML(openModal.id);
   else if(openModal.type==='po') html = poModalHTML();
@@ -1336,6 +1475,30 @@ function toggleStageComment(originalStage){
   const wrap = document.getElementById('stage-comment-wrap');
   if(!sel || !wrap) return;
   wrap.style.display = (sel.value !== originalStage) ? 'block' : 'none';
+}
+
+function teamUserModalHTML(){
+  return `
+  <div class="modal">
+    <div class="modal-head"><h3>Add an employee</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Full name <span style="color:var(--red);">*</span></label><input id="tu_name"></div>
+      <div class="field"><label>Work email <span style="color:var(--red);">*</span></label>
+        <input id="tu_email" placeholder="someone@vantriqai.com">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">Must be an @vantriqai.com address — the sign-in code is emailed there.</div>
+      </div>
+      <div class="field"><label>Role</label>
+        <select id="tu_role">
+          <option value="staff">Staff — pipeline, clients, billing, package requests</option>
+          <option value="admin">Admin — everything, including team and financials</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTeamUser()">${iconCheck(14)} Create login</button>
+    </div>
+  </div>`;
 }
 
 function clientModalHTML(id){
@@ -2007,23 +2170,114 @@ function attachPostRenderHooks(){
   }
 }
 
-/* ============================== Connect screen ============================== */
-function renderConnectScreen(){
-  document.getElementById('app').innerHTML = `
+/* ============================== Sign in ============================== */
+/* Employees sign in with their company email and password, then a one-time
+   code emailed to that address. The API-key route still exists but is a
+   deliberate break-glass path, not the everyday way in. */
+let loginStep = 'password';      // 'password' | 'otp' | 'apikey'
+let loginChallenge = null;
+let loginBusy = false;
+
+function shell(inner){
+  return `
   <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;">
-    <div class="card" style="max-width:440px;width:100%;padding:30px 28px;">
+    <div class="card" style="max-width:400px;width:100%;padding:30px 28px;">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;">
         <div class="brand-mark" style="background:linear-gradient(135deg,#12897A,#0A4E45);">${sidebarPulseSVG()}</div>
-        <div><div style="font-family:'Space Grotesk';font-weight:600;font-size:16px;">Vantriq Ops</div><div style="font-size:11.5px;color:var(--muted);">Connect to your API</div></div>
+        <div><div style="font-family:'Space Grotesk';font-weight:600;font-size:16px;">Vantriq Ops</div><div style="font-size:11.5px;color:var(--muted);">Internal sign-in</div></div>
       </div>
       ${connectError?`<div style="background:var(--red-light);color:#8F3527;padding:10px 12px;border-radius:8px;font-size:12.5px;margin-bottom:14px;">${esc(connectError)}</div>`:''}
-      <div class="field"><label>API base URL</label><input id="conn_base" value="${esc(API.base||window.location.origin)}" placeholder="https://your-api.example.com"></div>
-      <div class="field"><label>Admin API key</label><input id="conn_key" type="password" value="${esc(API.key)}" placeholder="vq_..."></div>
-      <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:6px;" onclick="attemptConnect()">Connect</button>
-      <p class="footnote">Generate an admin key on the server with <code>npm run create-key -- "name" admin</code>, then paste it above. This key is stored only in this browser.</p>
+      ${inner}
     </div>
   </div>`;
 }
+
+function renderConnectScreen(){
+  const app = document.getElementById('app');
+  if(loginStep === 'apikey'){
+    app.innerHTML = shell(`
+      <div style="background:var(--amber-light);color:#63430B;padding:9px 11px;border-radius:8px;font-size:11.5px;margin-bottom:14px;">
+        Emergency access. Use your Vantriq Ops account unless sign-in by email is unavailable.
+      </div>
+      <div class="field"><label>API base URL</label><input id="conn_base" value="${esc(API.base||window.location.origin)}"></div>
+      <div class="field"><label>Admin API key</label><input id="conn_key" type="password" placeholder="vq_..."></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:6px;" onclick="attemptConnect()">Connect with key</button>
+      <p class="footnote" style="text-align:center;"><a href="#" onclick="event.preventDefault();loginStep='password';connectError='';renderConnectScreen()">Back to normal sign-in</a></p>`);
+    return;
+  }
+  if(loginStep === 'otp'){
+    app.innerHTML = shell(`
+      <h3 style="margin:0 0 4px;font-size:15px;">Check your email</h3>
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">${esc((loginChallenge&&loginChallenge.message)||'We sent you a 6-digit code.')}</p>
+      <div class="field"><label>6-digit code</label>
+        <input id="otp_code" inputmode="numeric" autocomplete="one-time-code" maxlength="6"
+               style="letter-spacing:6px;font-size:19px;font-family:'JetBrains Mono',monospace;text-align:center;"
+               onkeydown="if(event.key==='Enter')submitOtp()"></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitOtp()">Verify and sign in</button>
+      <p class="footnote" style="text-align:center;"><a href="#" onclick="event.preventDefault();loginStep='password';loginChallenge=null;connectError='';renderConnectScreen()">Start again</a></p>`);
+    const el = document.getElementById('otp_code'); if(el) el.focus();
+    return;
+  }
+  app.innerHTML = shell(`
+    <div class="field"><label>Work email</label><input id="lg_email" autocomplete="username" placeholder="you@vantriqai.com" onkeydown="if(event.key==='Enter')document.getElementById('lg_pw').focus()"></div>
+    <div class="field"><label>Password</label><input id="lg_pw" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitPassword()"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:6px;" onclick="submitPassword()">Continue</button>
+    <p class="footnote">You'll get a one-time code by email to finish signing in. Accounts are created by an administrator in the CRM.</p>
+    <p class="footnote" style="text-align:center;margin-top:10px;"><a href="#" onclick="event.preventDefault();loginStep='apikey';connectError='';renderConnectScreen()" style="color:var(--muted);">Emergency access with an API key</a></p>`);
+  const el = document.getElementById('lg_email'); if(el) el.focus();
+}
+
+async function submitPassword(){
+  if(loginBusy) return;
+  const email = (document.getElementById('lg_email')||{}).value || '';
+  const password = (document.getElementById('lg_pw')||{}).value || '';
+  if(!email.trim() || !password){ connectError='Enter your email and password.'; renderConnectScreen(); return; }
+  loginBusy = true;
+  try{
+    const res = await fetch((API.base||window.location.origin)+'/api/auth/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email: email.trim(), password }),
+    });
+    const json = await res.json().catch(()=>({}));
+    loginBusy = false;
+    if(!res.ok){ connectError = json.error || 'Could not sign you in.'; renderConnectScreen(); return; }
+    loginChallenge = json; loginStep = 'otp'; connectError = '';
+    renderConnectScreen();
+  }catch(e){
+    loginBusy = false; connectError = 'Could not reach the server.'; renderConnectScreen();
+  }
+}
+
+async function submitOtp(){
+  if(loginBusy) return;
+  const code = (document.getElementById('otp_code')||{}).value || '';
+  if(!code.trim()){ connectError='Enter the code from your email.'; renderConnectScreen(); return; }
+  loginBusy = true;
+  try{
+    const res = await fetch((API.base||window.location.origin)+'/api/auth/verify', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ challenge_id: loginChallenge.challenge_id, code: code.trim() }),
+    });
+    const json = await res.json().catch(()=>({}));
+    loginBusy = false;
+    if(!res.ok){ connectError = json.error || 'That code was not accepted.'; renderConnectScreen(); return; }
+    API.setSession(API.base || window.location.origin, json.session);
+    authUser = json.user;
+    loginStep='password'; loginChallenge=null; connectError='';
+    await boot();
+  }catch(e){
+    loginBusy = false; connectError = 'Could not reach the server.'; renderConnectScreen();
+  }
+}
+
+async function signOut(){
+  try{ if(API.session) await fetch(API.base+'/api/auth/logout',{method:'POST',headers:{'Authorization':'Bearer '+API.session}}); }catch(e){}
+  API.clearConfig(); authUser=null; apiConnected=false;
+  API.base = window.location.origin;
+  loginStep='password'; connectError='';
+  renderConnectScreen();
+}
+
 async function attemptConnect(){
   const base = document.getElementById('conn_base').value.trim();
   const key = document.getElementById('conn_key').value.trim();
@@ -2037,6 +2291,11 @@ async function boot(){
   if(!API.configured()){ renderConnectScreen(); return; }
   document.getElementById('app').innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;gap:10px;color:#6C7885;font-family:Inter;"><span class="loading-dot"></span> Connecting to Vantriq API…</div>`;
   try{
+    if(API.session){
+      const me = await fetch(API.base+'/api/auth/me',{headers:{'Authorization':'Bearer '+API.session}});
+      if(!me.ok){ API.clearConfig(); API.base = window.location.origin; renderConnectScreen(); return; }
+      authUser = await me.json();
+    } else { authUser = null; }
     await loadState();
     apiConnected = true; connectError='';
     render();

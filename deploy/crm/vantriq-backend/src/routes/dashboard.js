@@ -53,8 +53,12 @@ router.get('/', async (req, res) => {
     .sort((a, b) => new Date(a.issued_date) - new Date(b.issued_date))
     .slice(0, 8);
 
-  res.json({
-    kpis: {
+  // Staff run the pipeline; delivery cost, platform cost and margin are
+  // Financials data their role deliberately excludes, so they never leave
+  // the server for a staff session.
+  const staffOnly = req.user && req.user.role === 'staff';
+
+  const kpis = {
       active_clients: active.length,
       pipeline_deals: pipeline.length,
       mrr,
@@ -66,7 +70,15 @@ router.get('/', async (req, res) => {
       total_contract_labour: totalContractLabour,
       total_delivery_cost: totalDeliveryCost,
       utilization,
-    },
+  };
+  if (staffOnly) {
+    for (const k of ['net_monthly_result','margin_pct','total_platform_cost','total_contract_labour','total_delivery_cost','utilization']) {
+      delete kpis[k];
+    }
+  }
+
+  res.json({
+    kpis,
     revenue_by_tier: revenueByTier,
     pipeline_by_stage: pipelineByStage,
     needs_attention: attention,

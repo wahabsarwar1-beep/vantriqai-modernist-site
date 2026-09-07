@@ -18,6 +18,8 @@ const portalRoutes = require('./routes/portal');
 const repsRoutes = require('./routes/reps');
 const repPortalRoutes = require('./routes/repPortal');
 const packageRequestsRoutes = require('./routes/packageRequests');
+const { router: authRoutes } = require('./routes/auth');
+const teamRoutes = require('./routes/team');
 
 const app = express();
 
@@ -29,6 +31,11 @@ app.use(express.json({ limit: '1mb' }));
 
 // Health check — no auth, used by hosting platforms and n8n connection tests
 app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
+
+// Internal employee sign-in: company email + password, then a one-time code
+// emailed to that address. Public by necessity — it is how people get a
+// session in the first place. Mounted before the admin-scoped mounts below.
+app.use('/api/auth', authRoutes);
 
 // Customer portal: username + password login issuing a session token — see
 // src/routes/portal.js and src/middleware/portalAuth.js. Mounted BEFORE the
@@ -46,16 +53,22 @@ app.use('/api/rep', requireRep, repPortalRoutes);
 // holds credentials that can read/edit clients, invoices, or pricing.
 app.use('/api/webhooks', requireScope('webhook'), usageRoutes);
 
-app.use('/api/products', requireScope('admin'), productsRoutes);
-app.use('/api/clients', requireScope('admin'), clientsRoutes);
-app.use('/api/invoices', requireScope('admin'), invoicesRoutes);
+app.use('/api/products', requireScope('staff'), productsRoutes);
+app.use('/api/clients', requireScope('staff'), clientsRoutes);
+app.use('/api/invoices', requireScope('staff'), invoicesRoutes);
 app.use('/api/reps', requireScope('admin'), repsRoutes);
-app.use('/api/package-requests', requireScope('admin'), packageRequestsRoutes);
-app.use('/api', requireScope('admin'), procurementRoutes); // /api/vendors, /api/purchase-orders
+app.use('/api/package-requests', requireScope('staff'), packageRequestsRoutes);
 app.use('/api/expenses', requireScope('admin'), expensesRoutes);
-app.use('/api/dashboard', requireScope('admin'), dashboardRoutes);
+app.use('/api/dashboard', requireScope('staff'), dashboardRoutes);
 app.use('/api/financials', requireScope('admin'), financialsRoutes);
 app.use('/api/settings', requireScope('admin'), settingsRoutes);
+app.use('/api/team', requireScope('admin'), teamRoutes);
+
+// Procurement is mounted on the bare '/api' prefix (it declares /vendors and
+// /purchase-orders internally), so it MUST come last: mounted earlier its
+// admin guard runs for every /api path declared below it, which silently made
+// staff-scoped routes admin-only.
+app.use('/api', requireScope('admin'), procurementRoutes); // /api/vendors, /api/purchase-orders
 
 // Serve the frontend (public/index.html) as a static site from the same server,
 // so the whole thing — API + UI — is one deployment.

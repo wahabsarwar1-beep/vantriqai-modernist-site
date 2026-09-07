@@ -299,3 +299,48 @@ create table if not exists package_requests (
   created_at timestamptz not null default now()
 );
 create index if not exists idx_package_requests_status on package_requests(status, created_at desc);
+
+-- =====================================================================
+-- v3 — internal employee logins: password + emailed OTP, no API key
+-- =====================================================================
+
+-- Internal staff. Email must be on the company domain (enforced in the API
+-- and by the constraint below). Roles: admin sees and manages everything;
+-- staff get the day-to-day CRM but not financials, procurement, settings,
+-- vendors or team management.
+create table if not exists internal_users (
+  id uuid primary key default gen_random_uuid(),
+  email text not null unique,
+  name text not null,
+  password_hash text not null,
+  role text not null default 'staff' check (role in ('admin','staff')),
+  active boolean not null default true,
+  must_change_password boolean not null default true,
+  created_at timestamptz not null default now(),
+  last_login_at timestamptz,
+  constraint company_domain check (email like '%@vantriqai.com')
+);
+create index if not exists idx_internal_users_email on internal_users(email);
+
+-- A signed-in employee's session.
+create table if not exists staff_sessions (
+  token text primary key,
+  user_id uuid not null references internal_users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null,
+  last_seen_at timestamptz not null default now()
+);
+create index if not exists idx_staff_sessions_user on staff_sessions(user_id);
+
+-- Second factor. A correct password creates a challenge; the emailed code
+-- redeems it for a session. Codes are hashed, expire, and are attempt-limited.
+create table if not exists login_challenges (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references internal_users(id) on delete cascade,
+  code_hash text not null,
+  expires_at timestamptz not null,
+  attempts int not null default 0,
+  consumed boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_login_challenges_user on login_challenges(user_id, created_at desc);
