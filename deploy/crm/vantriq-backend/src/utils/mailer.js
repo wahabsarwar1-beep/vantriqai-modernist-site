@@ -59,8 +59,32 @@ function otpEmail(code, name) {
   return { subject, text, html };
 }
 
+function resetEmail(url, name, minutes) {
+  const subject = 'Reset your Vantriq password';
+  const text = [
+    `Hi ${name || 'there'},`,
+    ``,
+    `Use this link to choose a new password:`,
+    url,
+    ``,
+    `The link works once and expires in ${minutes} minutes.`,
+    `If you did not ask to reset your password, ignore this email — nothing has changed.`,
+  ].join('\n');
+  const html = `
+    <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:460px;">
+      <p>Hi ${escapeHtml(name || 'there')},</p>
+      <p>Use this link to choose a new password:</p>
+      <p style="margin:18px 0;">
+        <a href="${escapeHtml(url)}" style="background:#8F3527;color:#fff;padding:11px 18px;border-radius:6px;text-decoration:none;font-weight:600;">Choose a new password</a>
+      </p>
+      <p style="color:#555;font-size:13px;">The link works once and expires in ${escapeHtml(String(minutes))} minutes.</p>
+      <p style="color:#555;font-size:13px;">If you did not ask to reset your password, ignore this email — nothing has changed.</p>
+    </div>`;
+  return { subject, text, html };
+}
+
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
 
-module.exports = { sendMail, otpEmail, mailConfigured };
+module.exports = { sendMail, otpEmail, resetEmail, mailConfigured };

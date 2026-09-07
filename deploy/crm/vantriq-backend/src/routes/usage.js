@@ -1,5 +1,6 @@
 const express = require('express');
 const db = require('../db');
+const { recordQuotaCrossing } = require('../utils/quota');
 const router = express.Router();
 
 /**
@@ -53,18 +54,32 @@ router.post('/usage', async (req, res) => {
     ]
   );
 
-  // Return the client's live month-to-date usage so n8n / a bot flow can
-  // react immediately (e.g. flag when a client is approaching quota).
+  // Return the client's live month-to-date usage and their position against
+  // quota, so an n8n flow can react on the spot rather than at month end.
   const month = new Date().toISOString().slice(0, 7) + '-01';
   const { rows: usageRows } = await db.query(
     `select * from v_monthly_usage where client_id = $1 and period_month = $2::date`,
     [resolvedClientId, month]
   );
 
+  // Crossing the 80% line or the quota itself is recorded once per client per
+  // month, for an admin to decide on. Service is never cut off here — running
+  // over quota is a billing question, not a reason to stop answering the
+  // customer's customers.
+  let quota = null;
+  try {
+    quota = await recordQuotaCrossing(resolvedClientId, month);
+  } catch (err) {
+    // Usage must be recorded even if the quota check trips over something;
+    // the event is the billable fact, the flag is a convenience.
+    console.error('Quota check failed', err);
+  }
+
   res.status(201).json({
     event_id: inserted[0].id,
     client_id: resolvedClientId,
     month_to_date: usageRows[0] || { sessions: 0, messages: 0, input_tokens: 0, output_tokens: 0 },
+    quota,
   });
 });
 

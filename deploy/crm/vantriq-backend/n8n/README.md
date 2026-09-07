@@ -130,3 +130,135 @@ the bot proactively mention it to the client. The quota number itself
 lives on the package (`GET /api/products` -> `quota` field), so fetch
 that once and cache it in an n8n variable if you want to avoid an extra
 API call per message.
+
+---
+
+# v4 — the automation key, quota signals and monthly billing
+
+Three things changed for n8n in v4. The usage webhook above is untouched: keep
+it exactly as it is, on the same webhook key.
+
+## The automation key
+
+Onboarding a client or raising an invoice is more than the webhook scope can
+do, and no reason to hand n8n the admin key. There is now a scope in between:
+
+```
+npm run create-key -- "n8n automation" automation
+```
+
+An automation key can:
+
+- read the package catalogue (`GET /api/products`) — but never
+  `delivery_cost_full`, which is what a package costs us to run
+- create and update clients (`POST`/`PUT /api/clients`)
+- create invoices (`POST /api/invoices`)
+
+It cannot read financials, procurement, settings, the team or the dashboard,
+cannot delete anything, and cannot mint customer portal credentials. Those all
+answer `403`.
+
+Use it in the same `x-api-key` header the usage node uses. Keep it on the
+billing and onboarding workflows only.
+
+## Quota comes back on every usage post
+
+`POST /api/webhooks/usage` now answers with the client's position against
+their quota, so a flow can react the moment a client tips over instead of
+finding out at month end:
+
+```json
+{
+  "event_id": "…",
+  "client_id": "…",
+  "month_to_date": { "sessions": 224, "messages": 448 },
+  "quota": {
+    "period_month": "2026-09-01",
+    "quota": 220,
+    "sessions_used": 224,
+    "sessions_remaining": 0,
+    "percent_used": 102,
+    "over_quota_sessions": 4,
+    "overage_rate": 110,
+    "estimated_overage_cost": 440,
+    "state": "exceeded",
+    "flagged": "exceeded"
+  }
+}
+```
+
+- `state` is `ok`, `warning` (80% used), `exceeded`, or `no_quota`.
+- `flagged` is set **only on the post that crossed the line** — the first time
+  this client hits that threshold this month. Every later post repeats `state`
+  with `flagged: null`.
+
+That makes `flagged` the thing to branch on. An IF node on
+`{{ $json.quota.flagged === "exceeded" }}` fires exactly once per client per
+month, which is what you want for a "your quota is used up" WhatsApp message
+or an internal alert. Branching on `state` instead would fire on every
+message for the rest of the month.
+
+**Nothing here stops service.** A client past their quota keeps being answered;
+the month is flagged in the CRM's **Quota & Overage** screen for an admin to
+decide on. Do not add a node that refuses to reply when `state` is `exceeded`.
+
+## Onboarding a client from n8n
+
+```
+POST /api/clients
+x-api-key: vq_… (automation)
+
+{
+  "name": "Ali Khan",
+  "company": "Khan Traders",
+  "email": "ali@khantraders.pk",
+  "phone": "03001234567",
+  "external_ref": "923001112222",
+  "product_id": "…",
+  "stage": "active",
+  "est_value": 50000,
+  "source": "Website form",
+  "ntn": "7654321-0",
+  "billing_address": "12 Mall Road, Lahore",
+  "parent_client_id": null
+}
+```
+
+`external_ref` is what the usage webhook matches on later — it must be the
+client's WhatsApp number, and it must be unique.
+
+Creating a client straight into `"stage": "active"` raises the setup fee and
+the first retainer for you; they come back in `invoices_created`. That is
+deliberate: the same thing happens whether a client is activated here or
+dragged across the board in the CRM.
+
+A client cannot be activated without `ntn` and `billing_address` — the
+activation is what issues the first invoice, and an invoice without them is
+not compliant. Leave `stage` as `"lead"` if you do not have those yet.
+
+`parent_client_id` makes this a sub-account of another client, for grouping
+only: it still gets its own package, its own quota and its own invoices.
+
+## The monthly billing run
+
+Once a month, raise each active client's retainer priced off their real usage:
+
+```
+POST /api/invoices
+x-api-key: vq_… (automation)
+
+{ "client_id": "…", "type": "retainer", "auto_from_usage": true, "month": "2026-09-01" }
+```
+
+The server works out `retainer + (sessions over quota × overage rate)` from
+that month's usage, applies the client's sales tax rate, allocates the next
+invoice number, and stamps the due date. You do not compute anything.
+
+Billing the same client for the same period twice answers `409` with
+`existing_invoice_id`, so a workflow that runs twice by accident cannot
+double-bill anyone. Treat `409` as success-already-done, not as an error to
+retry.
+
+`vantriq-monthly-billing.json` in this folder is that workflow, ready to
+import. Set the two credentials placeholders (`VANTRIQ_BASE_URL`,
+`VANTRIQ_AUTOMATION_KEY`) before you activate it.

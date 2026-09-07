@@ -20,6 +20,7 @@ const repPortalRoutes = require('./routes/repPortal');
 const packageRequestsRoutes = require('./routes/packageRequests');
 const { router: authRoutes } = require('./routes/auth');
 const teamRoutes = require('./routes/team');
+const quotaRoutes = require('./routes/quota');
 
 const app = express();
 
@@ -53,13 +54,18 @@ app.use('/api/rep', requireRep, repPortalRoutes);
 // holds credentials that can read/edit clients, invoices, or pricing.
 app.use('/api/webhooks', requireScope('webhook'), usageRoutes);
 
-app.use('/api/products', requireScope('staff'), productsRoutes);
-app.use('/api/clients', requireScope('staff'), clientsRoutes);
-app.use('/api/invoices', requireScope('staff'), invoicesRoutes);
+// Records an automation may touch. 'automation' is the lowest scope accepted
+// here, so staff sessions and the admin key still pass; a webhook key does
+// not. n8n uses this to onboard a client and raise the monthly invoice
+// without ever holding a credential that can read our financials.
+app.use('/api/products', requireScope('automation'), productsRoutes);
+app.use('/api/clients', requireScope('automation'), clientsRoutes);
+app.use('/api/invoices', requireScope('automation'), invoicesRoutes);
 app.use('/api/reps', requireScope('admin'), repsRoutes);
 app.use('/api/package-requests', requireScope('staff'), packageRequestsRoutes);
 app.use('/api/expenses', requireScope('admin'), expensesRoutes);
 app.use('/api/dashboard', requireScope('staff'), dashboardRoutes);
+app.use('/api/quota', requireScope('staff'), quotaRoutes);
 app.use('/api/financials', requireScope('admin'), financialsRoutes);
 app.use('/api/settings', requireScope('admin'), settingsRoutes);
 app.use('/api/team', requireScope('admin'), teamRoutes);

@@ -2,11 +2,16 @@ const express = require('express');
 const crypto = require('crypto');
 const db = require('../db');
 const { hashPassword, generatePassword } = require('../utils/password');
+const { billOnActivation } = require('../utils/billing');
+const { quotaStatus } = require('../utils/quota');
+const { blockAutomation } = require('../middleware/auth');
 const router = express.Router();
 
 const FIELDS = [
   'name','company','email','phone','external_ref','product_id','stage',
-  'est_value','source','notes','join_date'
+  'est_value','source','notes','join_date',
+  // v4 — group structure and the tax details an FBR invoice has to carry.
+  'parent_client_id','ntn','strn','tax_rate','billing_address'
 ];
 
 // Per-client package overrides. Only accepted when the client's package is
@@ -28,6 +33,33 @@ const REQUIRED_FIELDS = [
 
 // The client lifecycle, in order. A deal may only ever advance one step.
 const FORWARD = ['lead', 'contacted', 'proposal', 'negotiation', 'active'];
+
+// Billing details only become mandatory when a client actually starts being
+// billed. Chasing an NTN off a cold lead would be pointless; issuing a tax
+// invoice without one is not allowed.
+const BILLING_REQUIRED = [['ntn', 'NTN (or CNIC for an unregistered buyer)'], ['billing_address', 'Billing address']];
+
+function missingBilling(row) {
+  return BILLING_REQUIRED.filter(([f]) => String(row[f] || '').trim() === '').map(([, label]) => label);
+}
+
+/**
+ * A sub-client is a client in its own right — its own package, its own quota,
+ * its own invoices. The parent link groups them for reporting only, so it is
+ * kept one level deep: no chains, no cycles.
+ */
+async function validateParent(parentId, selfId) {
+  if (parentId === undefined || parentId === null || parentId === '') return null;
+  if (selfId && parentId === selfId) return 'A client cannot be its own parent.';
+  const { rows } = await db.query(`select id, parent_client_id from clients where id = $1`, [parentId]);
+  if (!rows[0]) return 'That parent account does not exist.';
+  if (rows[0].parent_client_id) return 'Sub-accounts are one level deep — pick the top-level account as the parent.';
+  if (selfId) {
+    const { rows: kids } = await db.query(`select 1 from clients where parent_client_id = $1 limit 1`, [selfId]);
+    if (kids[0]) return 'This account already has sub-accounts of its own, so it cannot become a sub-account.';
+  }
+  return null;
+}
 
 function missingRequired(body) {
   return REQUIRED_FIELDS
@@ -104,6 +136,15 @@ router.post('/', async (req, res) => {
   const customErr = await assertCustomAllowed(body, body.product_id);
   if (customErr) return res.status(400).json({ error: customErr });
 
+  if (body.parent_client_id) {
+    const parentErr = await validateParent(body.parent_client_id, null);
+    if (parentErr) return res.status(400).json({ error: parentErr });
+  }
+  if (body.stage === 'active') {
+    const need = missingBilling(body);
+    if (need.length) return res.status(400).json({ error: `A client cannot go live without: ${need.join(', ')}.` });
+  }
+
   const cols = [...FIELDS, ...CUSTOM_FIELDS].filter((f) => body[f] !== undefined);
   const values = cols.map((c) => body[c]);
   const placeholders = cols.map((_, i) => `$${i + 1}`);
@@ -116,7 +157,11 @@ router.post('/', async (req, res) => {
       `insert into client_stage_history (client_id, from_stage, to_stage, comment) values ($1,null,$2,$3)`,
       [rows[0].id, rows[0].stage, String(body.stage_comment || 'Client created').slice(0, 1000)]
     );
-    res.status(201).json(strip(rows[0]));
+    // A client created straight into 'active' — which is how n8n onboards one
+    // — is billed here, exactly as one dragged across the CRM board is.
+    let billed = null;
+    if (rows[0].stage === 'active') billed = await billOnActivation(rows[0]);
+    res.status(201).json({ ...strip(rows[0]), invoices_created: billed ? billed.invoices : [] });
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'external_ref already in use by another client' });
     throw err;
@@ -155,6 +200,18 @@ router.put('/:id', async (req, res) => {
   const customErr = await assertCustomAllowed(body, targetProduct);
   if (customErr) return res.status(400).json({ error: customErr });
 
+  if (body.parent_client_id !== undefined && body.parent_client_id !== existing.parent_client_id) {
+    const parentErr = await validateParent(body.parent_client_id, req.params.id);
+    if (parentErr) return res.status(400).json({ error: parentErr });
+  }
+
+  // Going live is the moment billing starts, so the tax details have to be
+  // there — the first invoice is raised in this same request.
+  if (body.stage === 'active' && existing.stage !== 'active') {
+    const need = missingBilling(merged);
+    if (need.length) return res.status(400).json({ error: `A client cannot go live without: ${need.join(', ')}.` });
+  }
+
   const cols = [...FIELDS, ...CUSTOM_FIELDS].filter((f) => body[f] !== undefined);
   if (cols.length === 0) return res.status(400).json({ error: 'No fields to update' });
 
@@ -177,14 +234,18 @@ router.put('/:id', async (req, res) => {
         [req.params.id, existing.stage, body.stage, String(body.stage_comment).trim().slice(0, 1000)]
       );
     }
-    res.json(strip(rows[0]));
+    // Setup fee + first retainer are raised here rather than by the browser,
+    // so the same thing happens however the client was activated. Idempotent.
+    let billed = null;
+    if (body.stage === 'active' && existing.stage !== 'active') billed = await billOnActivation(rows[0]);
+    res.json({ ...strip(rows[0]), invoices_created: billed ? billed.invoices : [] });
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'external_ref already in use by another client' });
     throw err;
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', blockAutomation, async (req, res) => {
   await db.query(`delete from clients where id = $1`, [req.params.id]);
   res.status(204).end();
 });
@@ -209,10 +270,52 @@ router.get('/:id/usage', async (req, res) => {
   res.json(rows[0] || { client_id: req.params.id, period_month: month, sessions: 0, messages: 0, input_tokens: 0, output_tokens: 0 });
 });
 
+/* ---------------------------- Sub-accounts ---------------------------- */
+/**
+ * The accounts grouped under this one. Each bills and consumes its own quota;
+ * this is a reporting view of the group, not a shared pool.
+ */
+router.get('/:id/sub-clients', async (req, res) => {
+  const month = req.query.month || new Date().toISOString().slice(0, 7) + '-01';
+  const { rows } = await db.query(
+    `select c.*, p.name as package_name, p.quota as package_quota,
+            coalesce(u.sessions, 0)::int as sessions_this_month
+       from clients c
+       left join products p on p.id = c.product_id
+       left join v_monthly_usage u on u.client_id = c.id and u.period_month = $2::date
+      where c.parent_client_id = $1
+      order by c.company asc`,
+    [req.params.id, month]
+  );
+  const subs = rows.map(strip);
+  res.json({
+    period_month: month,
+    count: subs.length,
+    // Quotas are per sub-account and deliberately not pooled; the totals are
+    // for the group's own reporting only.
+    group_totals: {
+      sessions: subs.reduce((s, c) => s + Number(c.sessions_this_month || 0), 0),
+      quota: subs.reduce((s, c) => s + Number(c.custom_quota || c.package_quota || 0), 0),
+    },
+    sub_clients: subs,
+  });
+});
+
+/* ---------------------------- Quota position ---------------------------- */
+router.get('/:id/quota', async (req, res) => {
+  const status = await quotaStatus(req.params.id, req.query.month);
+  if (!status) return res.status(404).json({ error: 'Client not found' });
+  res.json(status);
+});
+
 /* ---------------------------- Portal credentials ---------------------------- */
-// Creates or resets the customer's portal login. The password is generated
-// here, hashed immediately, and returned exactly once — it cannot be read back.
-router.post('/:id/portal-credentials', async (req, res) => {
+// Creates or resets the customer's portal login. An admin may type the
+// password (send `password`), or leave it out and have one generated. Either
+// way it is hashed on arrival and returned exactly once — nothing can read it
+// back afterwards, including this API.
+const MIN_PORTAL_PASSWORD = 10;
+
+router.post('/:id/portal-credentials', blockAutomation, async (req, res) => {
   const { rows: found } = await db.query(`select * from clients where id = $1`, [req.params.id]);
   const client = found[0];
   if (!client) return res.status(404).json({ error: 'Client not found' });
@@ -228,10 +331,16 @@ router.post('/:id/portal-credentials', async (req, res) => {
     return res.status(400).json({ error: 'Username must be 3–64 characters: lowercase letters, digits, dot, underscore or hyphen.' });
   }
 
-  const password = generatePassword();
+  const typed = String((req.body || {}).password || '');
+  if (typed && typed.length < MIN_PORTAL_PASSWORD) {
+    return res.status(400).json({ error: `Choose a password of at least ${MIN_PORTAL_PASSWORD} characters.` });
+  }
+  const password = typed || generatePassword();
   try {
     await db.query(
-      `update clients set portal_username = $2, portal_password_hash = $3, portal_password_set_at = now() where id = $1`,
+      `update clients set portal_username = $2, portal_password_hash = $3,
+              portal_password_set_at = now(), portal_password_set_by = 'admin'
+        where id = $1`,
       [req.params.id, username, hashPassword(password)]
     );
   } catch (err) {
@@ -242,16 +351,24 @@ router.post('/:id/portal-credentials', async (req, res) => {
   await db.query(`delete from portal_sessions where client_id = $1`, [req.params.id]);
 
   res.json({
-    username, password,
+    username,
+    // Echoing back a password the admin just typed tells them nothing they
+    // don't already have, so it is only returned when we generated it.
+    password: typed ? null : password,
+    was_typed: !!typed,
     login_url: '/portal.html',
-    notice: 'Copy this password now — it is hashed immediately and cannot be shown again.',
+    notice: typed
+      ? 'Saved. Give it to the customer over a channel you trust — it is hashed here and cannot be read back.'
+      : 'Copy this password now — it is hashed immediately and cannot be shown again.',
   });
 });
 
 // Revoke portal access entirely.
-router.delete('/:id/portal-credentials', async (req, res) => {
+router.delete('/:id/portal-credentials', blockAutomation, async (req, res) => {
   await db.query(
-    `update clients set portal_username = null, portal_password_hash = null, portal_password_set_at = null where id = $1`,
+    `update clients set portal_username = null, portal_password_hash = null,
+            portal_password_set_at = null, portal_password_set_by = null
+      where id = $1`,
     [req.params.id]
   );
   await db.query(`delete from portal_sessions where client_id = $1`, [req.params.id]);

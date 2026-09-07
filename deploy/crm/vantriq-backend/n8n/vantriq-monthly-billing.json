@@ -1,0 +1,205 @@
+{
+  "name": "Vantriq \u2014 monthly billing run",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 3 1 * *"
+            }
+          ]
+        }
+      },
+      "id": "trigger",
+      "name": "1st of the month, 03:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -380,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// The month being billed is the one that just ended, not the one that\n// started an hour ago.\nconst now = new Date();\nconst prev = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));\nconst month = prev.toISOString().slice(0, 10);\nconst period = prev.toLocaleString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });\nreturn [{ json: { month, period } }];"
+      },
+      "id": "period",
+      "name": "Work out the period",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.VANTRIQ_BASE_URL }}/api/clients?stage=active",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.VANTRIQ_AUTOMATION_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch",
+      "name": "Get active clients",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        60,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.product_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "hasPackage",
+      "name": "Has a package?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        280,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.VANTRIQ_BASE_URL }}/api/invoices",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.VANTRIQ_AUTOMATION_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ client_id: $json.id, type: 'retainer', auto_from_usage: true, month: $('Work out the period').first().json.month, period: $('Work out the period').first().json.period }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "invoice",
+      "name": "Raise the retainer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 409 means this client's invoice for this period already exists \u2014 a second\n// run of the same month is a no-op, not a failure. Anything else that is not\n// a 201 is a real problem and worth seeing.\nconst out = [];\nfor (const item of $input.all()) {\n  const status = item.json.statusCode;\n  const body = item.json.body || {};\n  if (status === 201) {\n    out.push({ json: { result: 'invoiced', invoice_number: body.invoice_number, amount: body.amount, tax: body.tax_amount, total: body.total_amount, client_id: body.client_id } });\n  } else if (status === 409) {\n    out.push({ json: { result: 'already invoiced', detail: body.error, invoice_id: body.existing_invoice_id } });\n  } else {\n    out.push({ json: { result: 'FAILED', status, detail: body.error || body } });\n  }\n}\nreturn out;"
+      },
+      "id": "summarise",
+      "name": "Summarise the run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        -100
+      ]
+    }
+  ],
+  "connections": {
+    "1st of the month, 03:00": {
+      "main": [
+        [
+          {
+            "node": "Work out the period",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Work out the period": {
+      "main": [
+        [
+          {
+            "node": "Get active clients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get active clients": {
+      "main": [
+        [
+          {
+            "node": "Has a package?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has a package?": {
+      "main": [
+        [
+          {
+            "node": "Raise the retainer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Raise the retainer": {
+      "main": [
+        [
+          {
+            "node": "Summarise the run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

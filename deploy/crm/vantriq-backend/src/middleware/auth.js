@@ -21,9 +21,15 @@ function hashKey(plaintextKey) {
  *     last admin loses their second factor. Set ALLOW_API_KEY_LOGIN=false to
  *     switch that off.
  *
- * Scopes, least to most: webhook < staff < admin.
+ *  3. An 'automation' scoped API key. n8n needs to onboard a client and raise
+ *     an invoice, which the webhook scope cannot do and which is no reason to
+ *     hand out the admin key. It sits between the two: clients, invoices and
+ *     the package catalogue, never financials, procurement, settings, the
+ *     team or the API keys themselves.
+ *
+ * Scopes, least to most: webhook < automation < staff < admin.
  */
-const ROLE_RANK = { webhook: 0, staff: 1, admin: 2 };
+const ROLE_RANK = { webhook: 0, automation: 1, staff: 2, admin: 3 };
 
 function requireScope(minScope) {
   return async function (req, res, next) {
@@ -89,4 +95,26 @@ function requireScope(minScope) {
   };
 }
 
-module.exports = { requireScope, hashKey };
+/**
+ * True only for a real administrator — an admin's own session, or the
+ * break-glass admin key. Used to gate cost and margin figures, which staff,
+ * automation keys and webhooks must never receive.
+ */
+function isAdminRequest(req) {
+  if (req.authKind === 'apikey' && req.apiKeyScope === 'admin') return true;
+  return !!(req.user && req.user.role === 'admin');
+}
+
+/**
+ * Route guard for the things an automation key must not do even on routes it
+ * is otherwise allowed to reach: deleting records, and handing out portal
+ * credentials. n8n creates and updates; a person deletes.
+ */
+function blockAutomation(req, res, next) {
+  if (req.authKind === 'apikey' && req.apiKeyScope === 'automation') {
+    return res.status(403).json({ error: 'An automation key cannot do this. Sign in to the CRM.' });
+  }
+  next();
+}
+
+module.exports = { requireScope, hashKey, isAdminRequest, blockAutomation };

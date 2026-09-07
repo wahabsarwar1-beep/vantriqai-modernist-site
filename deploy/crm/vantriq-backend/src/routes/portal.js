@@ -2,6 +2,10 @@ const express = require('express');
 const crypto = require('crypto');
 const db = require('../db');
 const { verifyPassword } = require('../utils/password');
+const { sendMail, resetEmail, mailConfigured } = require('../utils/mailer');
+const { issueReset, redeemReset, RESET_MINUTES } = require('../utils/resets');
+const { quotaStatus } = require('../utils/quota');
+const { buildTaxInvoice, getSettings } = require('../utils/billing');
 const { requirePortalSession } = require('../middleware/portalAuth');
 const { effectivePackage } = require('../utils/pkg');
 
@@ -51,6 +55,50 @@ router.post('/logout', async (req, res) => {
   res.status(204).end();
 });
 
+/* ---------------------------- Forgot password (public) ---------------------------- */
+/**
+ * A customer can reset their own password. The link goes to the address on
+ * their client record — an admin has to change that, so a stolen username
+ * alone cannot redirect the reset. The new password is written straight into
+ * the CRM's own record for them, so what they set is what the CRM holds.
+ *
+ * The reply never varies, so the form cannot be used to test usernames.
+ */
+router.post('/forgot-password', async (req, res) => {
+  const id = String((req.body || {}).username || (req.body || {}).email || '').trim().toLowerCase();
+  const same = () => res.json({
+    ok: true,
+    message: `If that account exists, a reset link is on its way to the email address we hold for it. It expires in ${RESET_MINUTES} minutes.`,
+  });
+  if (!id) return same();
+
+  const { rows } = await db.query(
+    `select id, company, name, email, portal_username from clients
+      where portal_username = $1 or lower(email) = $1
+      limit 1`,
+    [id]
+  );
+  const client = rows[0];
+  if (!client || !client.portal_username || !client.email || !mailConfigured()) return same();
+
+  try {
+    const { url } = await issueReset('portal', client.id);
+    const { subject, text, html } = resetEmail(url, client.name || client.company, RESET_MINUTES);
+    await sendMail({ to: client.email, subject, text, html });
+  } catch (err) {
+    console.error('Portal reset send failed', err);
+  }
+  same();
+});
+
+router.post('/reset-password', async (req, res) => {
+  const token = String((req.body || {}).token || '');
+  const password = String((req.body || {}).password || '');
+  const result = await redeemReset('portal', token, password);
+  if (!result.ok) return res.status(result.status).json({ error: result.error });
+  res.json({ ok: true, message: 'Your password has been changed. Sign in with it now.' });
+});
+
 /* -------- Everything below requires a signed-in customer session -------- */
 router.use(requirePortalSession);
 
@@ -71,6 +119,9 @@ router.get('/account', async (req, res) => {
     stage: client.stage,
     join_date: client.join_date,
     provider: settingsRes.rows[0],
+    // Their own billing details, so a wrong NTN is visible to them before it
+    // ends up on an invoice.
+    billing: { ntn: client.ntn || '', strn: client.strn || '', address: client.billing_address || '' },
     // ai_model is intentionally omitted — internal delivery detail.
     package: eff ? {
       name: eff.name, retainer: eff.retainer, setup_fee: eff.setup_fee,
@@ -101,15 +152,33 @@ router.get('/usage', async (req, res) => {
     if (eff) { quota = eff.quota; overageRate = eff.overage_rate; }
   }
   const current = currentRes.rows[0] || { sessions: 0, messages: 0, input_tokens: 0, output_tokens: 0 };
-  const overSessions = quota != null ? Math.max(0, current.sessions - quota) : 0;
+  const sessionsUsed = +current.sessions || 0;
+  const overSessions = quota != null ? Math.max(0, sessionsUsed - quota) : 0;
+
+  // Service does not stop at the quota line, so say plainly what is happening
+  // instead of showing a bare number the customer has to interpret.
+  const state = quota == null ? 'no_quota'
+    : sessionsUsed >= quota ? 'exceeded'
+    : sessionsUsed >= quota * 0.8 ? 'warning'
+    : 'ok';
+  const NOTICE = {
+    exceeded: 'You have used all the conversations included in your package this month. Your service is still running — the extra conversations are billed at your overage rate, or you can move up a package.',
+    warning: 'You have used most of the conversations included in your package this month.',
+    ok: null, no_quota: null,
+  };
 
   res.json({
     period_month: month,
     quota,
-    sessions_used: +current.sessions || 0,
+    sessions_used: sessionsUsed,
+    sessions_remaining: quota != null ? Math.max(0, quota - sessionsUsed) : null,
+    percent_used: quota ? Math.round((sessionsUsed / quota) * 100) : null,
     messages: +current.messages || 0,
     over_quota_sessions: overSessions,
+    overage_rate: overageRate,
     estimated_overage_cost: overageRate != null ? overSessions * overageRate : null,
+    state,
+    notice: NOTICE[state],
     history: historyRes.rows.map((r) => ({
       period_month: r.period_month, sessions: +r.sessions || 0, messages: +r.messages || 0,
     })),
@@ -134,11 +203,31 @@ router.get('/invoices/:invoiceId', async (req, res) => {
   res.json(formatInvoice(rows[0]));
 });
 
+/** The same printable tax invoice the CRM produces, for the customer's own records. */
+router.get('/invoices/:invoiceId/tax-invoice', async (req, res) => {
+  const [{ rows }, settings] = await Promise.all([
+    db.query(`select * from invoices where id = $1 and client_id = $2`, [req.params.invoiceId, req.portalClient.id]),
+    getSettings(),
+  ]);
+  if (!rows[0]) return res.status(404).json({ error: 'Invoice not found' });
+  res.json(buildTaxInvoice(rows[0], req.portalClient, settings));
+});
+
 function formatInvoice(inv) {
+  const total = inv.total_amount != null ? +inv.total_amount : +inv.amount;
   return {
     id: inv.id, type: inv.type, type_label: INVOICE_TYPE_LABEL[inv.type] || inv.type,
-    amount: +inv.amount, period: inv.period, status: inv.status,
-    issued_date: inv.issued_date, overage_sessions: inv.overage_sessions,
+    invoice_number: inv.invoice_number,
+    // amount stays the value excluding tax, as it always was; the tax and the
+    // total payable are alongside it so the customer sees the same breakdown
+    // the printed invoice carries.
+    amount: +inv.amount,
+    tax_rate: +inv.tax_rate || 0,
+    tax_amount: +inv.tax_amount || 0,
+    total_amount: total,
+    period: inv.period, status: inv.status,
+    issued_date: inv.issued_date, due_date: inv.due_date,
+    overage_sessions: inv.overage_sessions,
   };
 }
 
@@ -150,7 +239,8 @@ router.get('/ledger', async (req, res) => {
   );
   let balance = 0;
   const entries = rows.map((inv) => {
-    const amount = +inv.amount;
+    // What the customer actually owes is the tax-inclusive total.
+    const amount = inv.total_amount != null ? +inv.total_amount : +inv.amount;
     if (inv.status !== 'paid') balance += amount;
     return {
       date: inv.issued_date,
@@ -162,7 +252,8 @@ router.get('/ledger', async (req, res) => {
   res.json({
     entries,
     total_outstanding: balance,
-    total_paid: rows.filter((i) => i.status === 'paid').reduce((s, i) => s + Number(i.amount), 0),
+    total_paid: rows.filter((i) => i.status === 'paid')
+      .reduce((s, i) => s + Number(i.total_amount != null ? i.total_amount : i.amount), 0),
   });
 });
 

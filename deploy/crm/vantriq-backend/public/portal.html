@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="/invoice-print.js"></script>
 <style>
 :root{
   --ink:#0F1A22; --teal:#12897A; --teal-dark:#0B6357; --teal-light:#E3F1EE;
@@ -179,8 +180,11 @@ function renderLogin(msg){
       <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;">Password</label>
       <input id="lg_pass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()" style="width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;margin-bottom:14px;box-sizing:border-box;">
       <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="doLogin()">Sign in</button>
-      <p style="font-size:11.5px;color:var(--muted);margin:14px 0 0;text-align:center;">
-        Lost your details? <a class="wa-link" href="https://wa.me/923006789807" target="_blank" rel="noopener">Message us on WhatsApp</a>
+      <p style="font-size:12px;margin:14px 0 0;text-align:center;">
+        <a href="#" onclick="event.preventDefault();doForgotPassword()" style="color:var(--teal-dark);font-weight:600;">Forgot your password?</a>
+      </p>
+      <p style="font-size:11.5px;color:var(--muted);margin:8px 0 0;text-align:center;">
+        Lost your username too? <a class="wa-link" href="https://wa.me/923006789807" target="_blank" rel="noopener">Message us on WhatsApp</a>
       </p>
     </div>
   </div>`;
@@ -209,6 +213,30 @@ async function doLogin(){
     show('Could not reach the server. Check your connection and try again.');
     loginBusy = false;
   }
+}
+
+/**
+ * Sends a reset link to the email address Vantriq holds for this account. The
+ * answer is the same whether or not the account exists, so nothing here can be
+ * used to test whether a username is real.
+ */
+async function doForgotPassword(){
+  const box = document.getElementById('login-msg');
+  const username = ((document.getElementById('lg_user')||{}).value || '').trim();
+  const show = (m, ok)=>{ if(!box) return;
+    box.style.display='block'; box.style.padding='9px 11px'; box.style.borderRadius='8px';
+    box.style.fontSize='12.5px'; box.style.marginBottom='12px';
+    box.style.background = ok ? 'var(--teal-light)' : 'var(--red-light)';
+    box.style.color = ok ? 'var(--teal-dark)' : '#8F3527';
+    box.textContent = m; };
+  if(!username){ show('Type your username (or the email address on your account) first, then choose "Forgot your password?".'); return; }
+  try{
+    const res = await fetch('/api/portal/forgot-password', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username }),
+    });
+    const json = await res.json().catch(()=>({}));
+    show(json.message || 'If that account exists, a reset link is on its way.', true);
+  }catch(e){ show('Could not reach the server. Check your connection and try again.'); }
 }
 
 async function doLogout(){
@@ -490,10 +518,16 @@ function renderUsage(){
       <span style="font-size:13px;color:var(--muted);">of ${u.quota?fmtNum(u.quota):'—'} sessions included</span>
     </div>
     <div class="progress-track"><div class="progress-fill ${barClass}" style="width:${pct}%"></div></div>
-    ${u.over_quota_sessions > 0 ? `
-      <div style="margin-top:14px;padding:10px 12px;background:var(--amber-light);border-radius:10px;font-size:12.5px;color:#7A5410;">
-        ${fmtNum(u.over_quota_sessions)} sessions over quota this month — estimated overage ${fmtMoney(u.estimated_overage_cost)}, billed on your next retainer invoice.
+    ${u.notice ? `
+      <div style="margin-top:14px;padding:10px 12px;background:${u.state==='exceeded'?'var(--amber-light)':'#EEF1F4'};border-radius:10px;font-size:12.5px;color:${u.state==='exceeded'?'#7A5410':'#5A6672'};">
+        ${esc(u.notice)}
       </div>` : `<div style="margin-top:14px;font-size:12.5px;color:var(--muted);">You're within your monthly quota.</div>`}
+    ${u.over_quota_sessions > 0 ? `
+      <div style="margin-top:10px;padding:10px 12px;background:var(--amber-light);border-radius:10px;font-size:12.5px;color:#7A5410;">
+        ${fmtNum(u.over_quota_sessions)} conversation${u.over_quota_sessions===1?'':'s'} beyond your included quota — estimated ${fmtMoney(u.estimated_overage_cost)}.
+        We'll confirm before anything is billed.
+      </div>
+      <button class="btn btn-primary btn-block" style="margin-top:12px;" onclick="currentTab='packages';render()">See packages with a larger quota</button>` : ''}
   </div>
 
   <div class="stat-grid">
@@ -510,6 +544,18 @@ function renderUsage(){
 function drawUsageChart(){
   const el = document.getElementById('usageChart');
   if(!el) return;
+  // Chart.js comes from a CDN; without it, show the months as text rather
+  // than letting the whole page fall over.
+  if(typeof Chart === 'undefined'){
+    const hist = (data.usage.history || []);
+    const note = document.createElement('div');
+    note.style.cssText = 'font-size:12.5px;color:var(--muted);';
+    note.textContent = hist.length
+      ? hist.map(h=>`${fmtMonth(h.period_month)}: ${fmtNum(h.sessions)} sessions`).join('  ·  ')
+      : 'No usage recorded yet.';
+    el.replaceWith(note);
+    return;
+  }
   if(usageChart) usageChart.destroy();
   const hist = data.usage.history || [];
   usageChart = new Chart(el, {
@@ -525,12 +571,12 @@ function renderInvoices(){
   return `
   <div class="card" style="padding:8px 4px;">
     <table>
-      <thead><tr><th style="padding-left:16px;">Invoice</th><th>Amount</th><th style="padding-right:16px;">Status</th></tr></thead>
+      <thead><tr><th style="padding-left:16px;">Invoice</th><th>Total</th><th style="padding-right:16px;">Status</th></tr></thead>
       <tbody>
         ${invs.map(inv=>`
         <tr class="row-click" onclick="openInvoiceId='${inv.id}';renderInvoiceModal()">
-          <td style="padding-left:16px;"><div style="font-weight:600;">${esc(inv.type_label)}</div><div style="font-size:11.5px;color:var(--muted);">${esc(inv.period||fmtDate(inv.issued_date))}</div></td>
-          <td class="mono">${fmtMoney(inv.amount)}</td>
+          <td style="padding-left:16px;"><div style="font-weight:600;">${esc(inv.type_label)}</div><div style="font-size:11.5px;color:var(--muted);">${esc(inv.invoice_number||inv.period||fmtDate(inv.issued_date))}</div></td>
+          <td class="mono">${fmtMoney(inv.total_amount!=null?inv.total_amount:inv.amount)}</td>
           <td style="padding-right:16px;"><span class="pill ${invoiceStatusClass(inv.status)}"><span class="pill-dot"></span>${inv.status}</span></td>
         </tr>`).join('')}
       </tbody>
@@ -577,16 +623,29 @@ function renderInvoiceModal(){
         <h3 style="margin:0;">${esc(inv.type_label)}</h3>
         <button class="close-x" onclick="openInvoiceId=null;renderInvoiceModal()">✕</button>
       </div>
-      <div class="kv" style="font-size:22px;padding:6px 0 16px;border:none;"><strong>${fmtMoney(inv.amount)}</strong>
+      <div class="kv" style="font-size:22px;padding:6px 0 16px;border:none;"><strong>${fmtMoney(inv.total_amount!=null?inv.total_amount:inv.amount)}</strong>
         <span class="pill ${invoiceStatusClass(inv.status)}"><span class="pill-dot"></span>${inv.status}</span>
       </div>
+      ${inv.invoice_number ? `<div class="kv"><span class="k">Invoice number</span><span class="v mono">${esc(inv.invoice_number)}</span></div>` : ''}
+      <div class="kv"><span class="k">Amount excluding tax</span><span class="v mono">${fmtMoney(inv.amount)}</span></div>
+      <div class="kv"><span class="k">Sales tax${inv.tax_rate?` @ ${inv.tax_rate}%`:''}</span><span class="v mono">${fmtMoney(inv.tax_amount||0)}</span></div>
       <div class="kv"><span class="k">Period</span><span class="v">${esc(inv.period||'—')}</span></div>
       <div class="kv"><span class="k">Issued</span><span class="v">${fmtDate(inv.issued_date)}</span></div>
-      ${inv.overage_sessions ? `<div class="kv"><span class="k">Overage sessions</span><span class="v">${fmtNum(inv.overage_sessions)}</span></div>` : ''}
-      <button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="downloadInvoice()">Download</button>
+      ${inv.due_date ? `<div class="kv"><span class="k">Due</span><span class="v">${fmtDate(inv.due_date)}</span></div>` : ''}
+      ${inv.overage_sessions ? `<div class="kv"><span class="k">Conversations over quota</span><span class="v">${fmtNum(inv.overage_sessions)}</span></div>` : ''}
+      <button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="printTaxInvoice()">Print tax invoice</button>
+      <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="downloadInvoice()">Download as text</button>
     </div>
   </div>`;
 }
+/** The same printable tax invoice the CRM produces, for the customer's records. */
+async function printTaxInvoice(){
+  if(!openInvoiceId) return;
+  const id = openInvoiceId;
+  const r = await openTaxInvoice(()=>api(`/invoices/${id}/tax-invoice`));
+  if(!r.ok) alert(r.error);
+}
+
 function downloadInvoice(){
   const inv = data.invoices.find(i=>i.id===openInvoiceId);
   if(!inv) return;

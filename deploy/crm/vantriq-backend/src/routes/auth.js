@@ -2,7 +2,8 @@ const express = require('express');
 const crypto = require('crypto');
 const db = require('../db');
 const { hashPassword, verifyPassword } = require('../utils/password');
-const { sendMail, otpEmail, mailConfigured } = require('../utils/mailer');
+const { sendMail, otpEmail, resetEmail, mailConfigured } = require('../utils/mailer');
+const { issueReset, redeemReset, RESET_MINUTES } = require('../utils/resets');
 
 const router = express.Router();
 
@@ -166,6 +167,44 @@ router.post('/change-password', async (req, res) => {
   );
   await db.query(`delete from staff_sessions where user_id = $1 and token <> $2`, [user.id, token]);
   res.json({ ok: true });
+});
+
+/* ---------------------------- Forgot password ---------------------------- */
+/**
+ * Emails a one-time link to choose a new password. The reply is the same
+ * whether or not the address belongs to anyone — this form must not become a
+ * way to find out who works here.
+ */
+router.post('/forgot-password', async (req, res) => {
+  const email = String((req.body || {}).email || '').trim().toLowerCase();
+  const same = () => res.json({
+    ok: true,
+    message: `If that address belongs to a Vantriq account, a reset link is on its way. It expires in ${RESET_MINUTES} minutes.`,
+  });
+  if (!email) return same();
+
+  const { rows } = await db.query(`select id, email, name, active from internal_users where email = $1`, [email]);
+  const user = rows[0];
+  if (!user || !user.active || !mailConfigured()) return same();
+
+  try {
+    const { url } = await issueReset('staff', user.id);
+    const { subject, text, html } = resetEmail(url, user.name, RESET_MINUTES);
+    await sendMail({ to: user.email, subject, text, html });
+  } catch (err) {
+    // Logged, not surfaced: telling the caller the send failed would confirm
+    // the address exists.
+    console.error('Staff reset send failed', err);
+  }
+  same();
+});
+
+router.post('/reset-password', async (req, res) => {
+  const token = String((req.body || {}).token || '');
+  const password = String((req.body || {}).password || '');
+  const result = await redeemReset('staff', token, password);
+  if (!result.ok) return res.status(result.status).json({ error: result.error });
+  res.json({ ok: true, message: 'Your password has been changed. Sign in with it — you will still be sent a code by email.' });
 });
 
 module.exports = { router, COMPANY_DOMAIN };

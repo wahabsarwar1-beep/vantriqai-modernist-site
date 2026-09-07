@@ -1,5 +1,6 @@
 const express = require('express');
 const db = require('../db');
+const { isAdminRequest } = require('../middleware/auth');
 const router = express.Router();
 
 const FIELDS = [
@@ -20,8 +21,7 @@ const LOCKED_MESSAGE =
 
 /** Reading the catalogue is open to staff; changing it is not. */
 function adminOnly(req, res, next) {
-  if (req.authKind === 'apikey' && req.apiKeyScope === 'admin') return next();
-  if (req.user && req.user.role === 'admin') return next();
+  if (isAdminRequest(req)) return next();
   return res.status(403).json({ error: 'Only an admin can change package pricing.' });
 }
 
@@ -34,9 +34,10 @@ router.get('/', async (req, res) => {
   const { rows } = await db.query(
     `select * from products where archived = false order by sort_order asc, created_at asc`
   );
-  // delivery_cost_full is what a package costs us to run — Financials data, so
-  // it is withheld from staff sessions along with the dashboard cost figures.
-  if (req.user && req.user.role === 'staff') {
+  // delivery_cost_full is what a package costs us to run — Financials data. It
+  // is withheld from everyone but an admin, which covers staff sessions and
+  // the automation key alike; neither has any use for our margin.
+  if (!isAdminRequest(req)) {
     return res.json(rows.map(({ delivery_cost_full, ...rest }) => rest));
   }
   res.json(rows);

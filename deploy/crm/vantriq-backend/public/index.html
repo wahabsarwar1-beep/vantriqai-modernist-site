@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="/invoice-print.js"></script>
 <style>
 :root{
   --ink:#0F1A22;
@@ -339,13 +340,22 @@ function productToApi(p){ return { name:p.name, target_tier:p.targetTier, setup_
 
 function clientFromApi(c){ return { id:c.id, name:c.name, company:c.company, email:c.email, phone:c.phone, externalRef:c.external_ref||'', productId:c.product_id, stage:c.stage, estValue:+c.est_value||0, source:c.source, notes:c.notes, joinDate:c.join_date, sessionsUsedThisMonth:0, ownerRepId:c.owner_rep_id||null, salesStage:c.sales_stage||null, closeOutcome:c.close_outcome||null,
   portalEnabled:!!c.portal_enabled, portalUsername:c.portal_username||'',
+  portalPasswordSetBy:c.portal_password_set_by||'', portalPasswordSetAt:c.portal_password_set_at||null,
+  parentClientId:c.parent_client_id||null,
+  ntn:c.ntn||'', strn:c.strn||'', taxRate:(c.tax_rate===null||c.tax_rate===undefined)?null:+c.tax_rate,
+  billingAddress:c.billing_address||'',
   customSetupFee:c.custom_setup_fee, customRetainer:c.custom_retainer, customQuota:c.custom_quota,
   customOverageRate:c.custom_overage_rate, customMsgsPerSession:c.custom_msgs_per_session,
   customAutomation:c.custom_automation||'', customDataLayer:c.custom_data_layer||'',
   customAiModel:c.custom_ai_model||'', customChannels:c.custom_channels||'' }; }
 function clientToApi(c){
   const out = { name:c.name, company:c.company, email:c.email, phone:c.phone, external_ref:c.externalRef||null,
-    product_id:c.productId||null, stage:c.stage, est_value:c.estValue, source:c.source, notes:c.notes };
+    product_id:c.productId||null, stage:c.stage, est_value:c.estValue, source:c.source, notes:c.notes,
+    // Billing identity. The API needs NTN and a billing address before a client
+    // can go active — that is what its invoices are issued against.
+    parent_client_id:c.parentClientId||null, ntn:c.ntn||'', strn:c.strn||'',
+    tax_rate:(c.taxRate===null||c.taxRate===undefined||c.taxRate==='')?null:c.taxRate,
+    billing_address:c.billingAddress||'' };
   if(c.stageComment) out.stage_comment = c.stageComment;
   // Custom package terms are only accepted by the API on the Enterprise+ tier.
   if(c.custom){
@@ -377,7 +387,12 @@ function isCustomTier(productId){
   return !!p && p.isStandard === false;
 }
 
-function invoiceFromApi(i){ return { id:i.id, clientId:i.client_id, type:INVOICE_TYPE_FROM_API[i.type]||i.type, amount:+i.amount, period:i.period, status:i.status, date:i.issued_date, overageSessions:i.overage_sessions||0 }; }
+// amount stays the value excluding tax, as the API stores it; tax and total
+// come alongside so the CRM shows the same breakdown the invoice prints.
+function invoiceFromApi(i){ return { id:i.id, clientId:i.client_id, type:INVOICE_TYPE_FROM_API[i.type]||i.type,
+  amount:+i.amount, period:i.period, status:i.status, date:i.issued_date, overageSessions:i.overage_sessions||0,
+  number:i.invoice_number||'', taxRate:+i.tax_rate||0, taxAmount:+i.tax_amount||0,
+  total:(i.total_amount===null||i.total_amount===undefined)?+i.amount:+i.total_amount, dueDate:i.due_date||null }; }
 
 function vendorFromApi(v){ return { id:v.id, name:v.name, category:v.category, tiers:v.tiers, costMin:+v.cost_min, costMax:+v.cost_max, status:v.status }; }
 function vendorToApi(v){ return { name:v.name, category:v.category, tiers:v.tiers, cost_min:v.costMin, cost_max:v.costMax, status:v.status }; }
@@ -423,7 +438,8 @@ async function loadState(){
     adminOnly('/api/vendors', []),
     adminOnly('/api/purchase-orders', []),
     adminOnly('/api/expenses', []),
-    adminOnly('/api/settings', { company_name:'Vantriq AI', city:'', founder:'', currency:'PKR', utilization:0.7 }),
+    adminOnly('/api/settings', { company_name:'Vantriq AI', city:'', founder:'', currency:'PKR', utilization:0.7,
+      ntn:'', strn:'', address:'', default_tax_rate:0, invoice_prefix:'VAI', payment_terms_days:7 }),
     API.get('/api/dashboard'),
     adminOnly('/api/reps', []),
     API.get('/api/package-requests?status=pending'),
@@ -437,7 +453,14 @@ async function loadState(){
   });
 
   state = {
-    company:{ name:settings.company_name, city:settings.city, founder:settings.founder },
+    company:{ name:settings.company_name, city:settings.city, founder:settings.founder,
+      // Tax and invoicing details. Staff sessions cannot read /api/settings, so
+      // these fall back to the defaults rather than breaking the whole load.
+      ntn:settings.ntn||'', strn:settings.strn||'', address:settings.address||'',
+      defaultTaxRate:settings.default_tax_rate!=null?+settings.default_tax_rate:0,
+      invoicePrefix:settings.invoice_prefix||'VAI',
+      paymentTermsDays:settings.payment_terms_days!=null?+settings.payment_terms_days:7,
+      currency:settings.currency||'PKR' },
     packageRequests: packageRequests || [],
     products: products.map(productFromApi),
     clients: camelClients,
@@ -501,6 +524,7 @@ const NAV = [
     {id:'pipeline', label:'Pipeline', icon:iconFunnel},
     {id:'clients', label:'Clients', icon:iconUsers},
     {id:'billing', label:'Billing & Invoices', icon:iconReceipt},
+    {id:'quota', label:'Quota & Overage', icon:iconChart},
     {id:'requests', label:'Package Requests', icon:iconBox},
     {id:'reps', label:'Sales Reps', icon:iconUsers},
   ]},
@@ -675,6 +699,7 @@ function renderView(){
     case 'pipeline': return renderPipeline();
     case 'clients': return renderClients();
     case 'billing': return renderBilling();
+    case 'quota': return renderQuota();
     case 'reps': return renderReps();
     case 'team': return renderTeam();
     case 'requests': return renderRequests();
@@ -764,6 +789,17 @@ function renderDashboard(){
 }
 
 function drawDashboardCharts(){
+  // The chart library is loaded from a CDN. If it can't be reached, draw
+  // nothing rather than throwing — the numbers matter more than the graphs.
+  if(typeof Chart === 'undefined'){
+    document.querySelectorAll('canvas').forEach(el=>{
+      const note = document.createElement('div');
+      note.style.cssText = 'font-size:12px;color:var(--muted);padding:18px 0;text-align:center;';
+      note.textContent = 'Charts need an internet connection — the figures above are live either way.';
+      el.replaceWith(note);
+    });
+    return;
+  }
   dashboardCharts.forEach(c=>c.destroy());
   dashboardCharts=[];
   const revEl = document.getElementById('chartRevByTier');
@@ -851,13 +887,14 @@ async function handleDrop(ev, newStage){
     const updated = await API.put(`/api/clients/${client.id}`, { stage: newStage, stage_comment: comment.trim() });
     Object.assign(client, { stage: updated.stage, joinDate: updated.join_date });
     if(newStage==='active' && !wasActive){
-      const p = productOf(client);
-      if(p){
-        const setupInv = await API.post('/api/invoices', { client_id:client.id, type:'setup_fee', amount:p.setupFee, status:'pending' });
-        const retInv = await API.post('/api/invoices', { client_id:client.id, type:'retainer', amount:p.retainer, status:'pending', period:monthLabel(todayISO()) });
-        state.invoices.push(invoiceFromApi(setupInv), invoiceFromApi(retInv));
-      }
-      showToast(`${client.company} moved to Active — setup + first retainer invoice created`);
+      // The server raises the setup fee and first retainer as part of the
+      // activation, so a client onboarded by n8n is billed the same way. It
+      // hands them back here rather than the browser creating them.
+      const raised = (updated.invoices_created||[]).map(invoiceFromApi);
+      state.invoices.push(...raised);
+      showToast(raised.length
+        ? `${client.company} moved to Active — ${raised.length} invoice${raised.length===1?'':'s'} raised`
+        : `${client.company} moved to Active`);
     }
     render();
   }catch(e){
@@ -899,6 +936,9 @@ function renderClients(){
 
 /* ============================== SALES REPS ============================== */
 const SALES_STAGE_LABEL = {qualification:'Qualification', needs_assessment:'Needs Assessment', proposal_submission:'Proposal Submission', negotiation:'Negotiation', closure:'Closure'};
+function parentOf(client){ return client.parentClientId ? state.clients.find(x=>x.id===client.parentClientId) : null; }
+function subAccountsOf(id){ return state.clients.filter(x=>x.parentClientId===id).sort((a,b)=>a.company.localeCompare(b.company)); }
+
 function repNameOf(client){ const r = state.reps.find(r=>r.id===client.ownerRepId); return r?r.name:null; }
 
 function renderReps(){
@@ -970,14 +1010,18 @@ let billingFilter = 'all';
 function renderBilling(){
   const invoices = state.invoices.slice().sort((a,b)=> new Date(b.date)-new Date(a.date));
   const filtered = billingFilter==='all'?invoices:invoices.filter(i=>i.status===billingFilter);
-  const totalPaid = invoices.filter(i=>i.status==='paid').reduce((s,i)=>s+i.amount,0);
-  const totalPending = invoices.filter(i=>i.status==='pending').reduce((s,i)=>s+i.amount,0);
-  const totalOverdue = invoices.filter(i=>i.status==='overdue').reduce((s,i)=>s+i.amount,0);
+  // Totals are what the customer actually owes, i.e. including sales tax.
+  const payable = (i)=> i.total!=null ? i.total : i.amount;
+  const totalPaid = invoices.filter(i=>i.status==='paid').reduce((s,i)=>s+payable(i),0);
+  const totalPending = invoices.filter(i=>i.status==='pending').reduce((s,i)=>s+payable(i),0);
+  const totalOverdue = invoices.filter(i=>i.status==='overdue').reduce((s,i)=>s+payable(i),0);
+  const totalTax = invoices.reduce((s,i)=>s+(i.taxAmount||0),0);
   return `
   <div class="grid kpi-row" style="margin-bottom:22px;">
     <div class="card kpi"><div class="label">Collected</div><div class="value mono" style="font-size:19px;color:var(--teal-dark)">${fmtMoney(totalPaid)}</div></div>
     <div class="card kpi"><div class="label">Pending</div><div class="value mono" style="font-size:19px;">${fmtMoney(totalPending)}</div></div>
     <div class="card kpi"><div class="label">Overdue</div><div class="value mono" style="font-size:19px;color:var(--red)">${fmtMoney(totalOverdue)}</div></div>
+    <div class="card kpi"><div class="label">Sales tax billed</div><div class="value mono" style="font-size:19px;">${fmtMoney(totalTax)}</div></div>
     <div class="card kpi"><div class="label">Total invoices</div><div class="value" style="font-size:19px;">${invoices.length}</div></div>
   </div>
   <div class="tabs">
@@ -985,24 +1029,109 @@ function renderBilling(){
   </div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Client</th><th>Type</th><th>Period</th><th>Amount</th><th>Date</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th>Invoice #</th><th>Client</th><th>Type</th><th>Period</th><th>Excl. tax</th><th>Tax</th><th>Total</th><th>Date</th><th>Status</th><th></th></tr></thead>
       <tbody>
       ${filtered.map(inv=>{
         const c = state.clients.find(cl=>cl.id===inv.clientId);
         return `<tr class="row-click" onclick="openPanel={type:'invoice',id:'${inv.id}'};render()">
+          <td class="mono" style="font-size:11.5px;">${esc(inv.number||'—')}</td>
           <td><strong>${esc(c?c.company:'—')}</strong></td>
           <td>${esc(inv.type)}${inv.overageSessions?` <span class="tag">+${inv.overageSessions} overage</span>`:''}</td>
           <td>${esc(inv.period||'—')}</td>
           <td class="mono">${fmtMoney(inv.amount)}</td>
+          <td class="mono" style="color:var(--muted);">${inv.taxAmount?fmtMoney(inv.taxAmount):'—'}</td>
+          <td class="mono"><strong>${fmtMoney(payable(inv))}</strong></td>
           <td>${fmtDate(inv.date)}</td>
           <td><span class="pill ${invoiceStatusPillClass(inv.status)}"><span class="pill-dot"></span>${inv.status}</span></td>
           <td>${iconArrowRight(14)}</td>
         </tr>`;
-      }).join('') || `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted);">No invoices in this filter.</td></tr>`}
+      }).join('') || `<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--muted);">No invoices in this filter.</td></tr>`}
       </tbody>
     </table>
   </div>
   `;
+}
+
+/* ============================== QUOTA & OVERAGE ============================== */
+/**
+ * Clients who have used up — or nearly used up — the conversations their
+ * package includes. Service is never cut off at the quota line; each month is
+ * flagged here and waits for a decision: bill the overage, move them up a
+ * tier, or waive it this once.
+ */
+let quotaFlags = null;
+let quotaFilter = 'open';
+
+async function loadQuota(){
+  try{ quotaFlags = await API.get('/api/quota?status='+quotaFilter); render(); }
+  catch(e){ quotaFlags = { error: e.message || 'Could not load quota flags' }; render(); }
+}
+
+function setQuotaFilter(f){ quotaFilter = f; quotaFlags = null; render(); }
+
+function renderQuota(){
+  if(quotaFlags === null){ requestAnimationFrame(loadQuota); return `<div class="card"><div class="empty"><span class="loading-dot"></span> Loading quota flags…</div></div>`; }
+  if(quotaFlags.error) return `<div class="card" style="color:var(--red);">${esc(quotaFlags.error)}</div>`;
+
+  const rows = quotaFlags;
+  const open = rows.filter(r=>!r.decision);
+  return `
+  <div class="grid kpi-row" style="margin-bottom:22px;">
+    <div class="card kpi"><div class="label">Awaiting a decision</div><div class="value" style="font-size:19px;${open.length?'color:var(--red);':''}">${open.length}</div></div>
+    <div class="card kpi"><div class="label">Over quota now</div><div class="value" style="font-size:19px;">${rows.filter(r=>r.threshold==='exceeded'&&!r.decision).length}</div></div>
+    <div class="card kpi"><div class="label">Billable overage</div><div class="value mono" style="font-size:19px;">${fmtMoney(open.reduce((s,r)=>s+(+r.estimated_overage_cost||0),0))}</div></div>
+  </div>
+  <div style="background:var(--teal-light);border:1px solid #BFE3D8;border-radius:10px;padding:11px 13px;font-size:12px;color:var(--teal-dark);margin-bottom:18px;">
+    Running past the quota never stops a client's service. Their conversations keep being answered —
+    what happens is that the month lands here for you to decide on.
+  </div>
+  <div class="tabs">
+    ${[['open','Awaiting decision'],['all','All flags']].map(([f,l])=>`<div class="tab ${quotaFilter===f?'active':''}" onclick="setQuotaFilter('${f}')">${l}</div>`).join('')}
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Client</th><th>Month</th><th>Flag</th><th>Used / included</th><th>Over</th><th>Overage value</th><th>Decision</th></tr></thead>
+      <tbody>
+      ${rows.map(r=>{
+        const over = +r.over_quota_sessions||0;
+        return `<tr>
+          <td><strong>${esc(r.company)}</strong>${r.parent_client_id?`<div style="font-size:11px;color:var(--muted);">sub-account</div>`:''}</td>
+          <td>${fmtDate(r.period_month)}</td>
+          <td><span class="pill ${r.threshold==='exceeded'?'pill-overdue':'pill-pending'}"><span class="pill-dot"></span>${r.threshold==='exceeded'?'Over quota':'80% used'}</span></td>
+          <td class="mono">${fmtNum(r.sessions_now)} / ${fmtNum(r.quota_at_event)}</td>
+          <td class="mono">${over?fmtNum(over):'—'}</td>
+          <td class="mono">${r.estimated_overage_cost?fmtMoney(r.estimated_overage_cost):'—'}</td>
+          <td>${r.decision
+            ? `<span class="tag">${esc(QUOTA_DECISION_LABEL[r.decision]||r.decision)}</span><div style="font-size:11px;color:var(--muted);margin-top:2px;">${esc(r.decided_by||'')}</div>`
+            : `<div style="display:flex;gap:5px;flex-wrap:wrap;">
+                 <button class="btn btn-primary btn-sm" ${over?'':'disabled title="Nothing over quota to bill"'} onclick="decideQuota('${r.id}','bill_overage')">Bill overage</button>
+                 <button class="btn btn-ghost btn-sm" onclick="decideQuota('${r.id}','upgrade')">Upgrade</button>
+                 <button class="btn btn-ghost btn-sm" onclick="decideQuota('${r.id}','waive')">Waive</button>
+               </div>`}</td>
+        </tr>`;
+      }).join('') || `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted);">No clients are near their quota.</td></tr>`}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+const QUOTA_DECISION_LABEL = { bill_overage:'Billed as overage', upgrade:'Moving up a tier', waive:'Waived' };
+
+async function decideQuota(id, decision){
+  const prompts = {
+    bill_overage: 'Bill this month\'s overage?\n\nAn overage invoice is raised immediately, priced off their live usage.',
+    upgrade: 'Record that this client is moving up a tier?\n\nNothing is billed. Change their package on the client record.',
+    waive: 'Waive this month\'s overage?\n\nNothing is billed and the month is closed.',
+  };
+  if(!confirm(prompts[decision])) return;
+  const note = prompt('Add a note (optional) — recorded against the decision:') || '';
+  try{
+    const r = await API.post(`/api/quota/${id}/decision`, { decision, note });
+    if(r.invoice) state.invoices.push(invoiceFromApi(r.invoice));
+    quotaFlags = null;
+    render();
+    showToast(r.invoice ? `Overage invoice ${r.invoice.invoice_number} raised` : 'Decision recorded');
+  }catch(e){ showToast(e.message||'Could not record the decision','warn'); }
 }
 
 /* ============================== TEAM ============================== */
@@ -1054,7 +1183,7 @@ function renderTeam(){
 
 function showCreds(title, email, password){
   const box = document.getElementById('new-user-creds');
-  if(!box) return;
+  if(!box || !password) return;   // a password the admin typed is never echoed back
   box.innerHTML = `
     <div class="card" style="background:var(--teal-light);border-color:#BFE3D8;">
       <div style="font-weight:600;color:var(--teal-dark);margin-bottom:8px;">${esc(title)}</div>
@@ -1072,9 +1201,11 @@ async function saveTeamUser(){
   const email=(document.getElementById('tu_email')||{}).value||'';
   const name=(document.getElementById('tu_name')||{}).value||'';
   const role=(document.getElementById('tu_role')||{}).value||'staff';
+  const password=((document.getElementById('tu_password')||{}).value||'').trim();
   if(!email.trim()||!name.trim()){ showToast('Name and email are required','warn'); return; }
+  if(password && password.length < 10){ showToast('Choose a password of at least 10 characters','warn'); return; }
   try{
-    const r = await API.post('/api/team', { email:email.trim(), name:name.trim(), role });
+    const r = await API.post('/api/team', { email:email.trim(), name:name.trim(), role, ...(password?{password}:{}) });
     closeModal(); teamUsers=null; render();
     setTimeout(()=>showCreds('Login created for '+r.user.name, r.user.email, r.password), 400);
     showToast('Employee added');
@@ -1082,12 +1213,16 @@ async function saveTeamUser(){
 }
 
 async function resetUserPassword(id){
-  if(!confirm('Reset this password?\n\nTheir current one stops working and any session they have open is closed.')) return;
+  if(!confirm('Set a new password for this employee?\n\nTheir current one stops working and any session they have open is closed.')) return;
+  // Leaving the box empty generates one; typing a password sets exactly that.
+  const typed = (prompt('Type the new password, or leave this blank to have one generated:') || '').trim();
+  if(typed && typed.length < 10){ showToast('Choose a password of at least 10 characters','warn'); return; }
   try{
-    const r = await API.post(`/api/team/${id}/reset-password`, {});
+    const r = await API.post(`/api/team/${id}/reset-password`, typed ? { password: typed } : {});
     teamUsers=null; render();
-    setTimeout(()=>showCreds('New password for '+r.user.name, r.user.email, r.password), 400);
-  }catch(e){ showToast(e.message||'Could not reset the password','warn'); }
+    if(r.password) setTimeout(()=>showCreds('New password for '+r.user.name, r.user.email, r.password), 400);
+    else showToast('Password set. Any session they had open is now closed.');
+  }catch(e){ showToast(e.message||'Could not set the password','warn'); }
 }
 
 async function setUserRole(id, role){
@@ -1401,6 +1536,27 @@ function renderSettings(){
     <button class="btn btn-primary" onclick="saveSettings()">Save changes</button>
   </div>
   <div class="card" style="max-width:520px;margin-top:16px;">
+    <h3 style="margin-top:0;font-size:14.5px;">Tax &amp; invoicing</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:0;">
+      Printed on every invoice you issue. Changing these affects invoices raised from now on —
+      invoices already issued keep the details they were issued with.
+    </p>
+    <div class="field-row">
+      <div class="field"><label>Your NTN</label><input id="setNtn" value="${esc(state.company.ntn||'')}" placeholder="1234567-8"></div>
+      <div class="field"><label>Your STRN</label><input id="setStrn" value="${esc(state.company.strn||'')}" placeholder="32-77-8899-001-46"></div>
+    </div>
+    <div class="field"><label>Registered address</label><input id="setAddress" value="${esc(state.company.address||'')}" placeholder="Printed on the invoice as the seller's address"></div>
+    <div class="field-row">
+      <div class="field"><label>Default sales tax rate %</label><input id="setTaxRate" type="number" step="0.01" value="${state.company.defaultTaxRate!=null?state.company.defaultTaxRate:0}">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">Applied to any client without a rate of their own.</div></div>
+      <div class="field"><label>Payment terms (days)</label><input id="setTerms" type="number" value="${state.company.paymentTermsDays!=null?state.company.paymentTermsDays:7}">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">Sets the due date stamped on each invoice.</div></div>
+    </div>
+    <div class="field"><label>Invoice number prefix</label><input id="setPrefix" value="${esc(state.company.invoicePrefix||'VAI')}">
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">Numbers run in sequence, e.g. ${esc(state.company.invoicePrefix||'VAI')}-${new Date().getFullYear()}-000123.</div></div>
+    <button class="btn btn-primary" onclick="saveTaxSettings()">Save tax details</button>
+  </div>
+  <div class="card" style="max-width:520px;margin-top:16px;">
     <h3 style="margin-top:0;font-size:14.5px;">API connection</h3>
     <p style="font-size:12.5px;color:var(--muted);margin-top:0;">
       Connected to <strong class="mono" style="font-size:12px;">${esc(API.base)}</strong>.
@@ -1426,9 +1582,34 @@ async function saveSettings(){
   };
   try{
     const updated = await API.put('/api/settings', payload);
-    state.company = { name:updated.company_name, city:updated.city, founder:updated.founder };
+    applySettings(updated);
     render(); showToast('Settings saved');
   }catch(e){ showToast(e.message||'Could not save settings','warn'); }
+}
+
+function applySettings(updated){
+  state.company = { name:updated.company_name, city:updated.city, founder:updated.founder,
+    ntn:updated.ntn||'', strn:updated.strn||'', address:updated.address||'',
+    defaultTaxRate:updated.default_tax_rate!=null?+updated.default_tax_rate:0,
+    invoicePrefix:updated.invoice_prefix||'VAI',
+    paymentTermsDays:updated.payment_terms_days!=null?+updated.payment_terms_days:7,
+    currency:updated.currency||'PKR' };
+}
+
+async function saveTaxSettings(){
+  const v = (id)=> (document.getElementById(id)||{value:''}).value.trim();
+  const rate = parseFloat(v('setTaxRate'));
+  if(isNaN(rate) || rate < 0 || rate > 100){ showToast('Tax rate must be a percentage between 0 and 100','warn'); return; }
+  try{
+    const updated = await API.put('/api/settings', {
+      ntn: v('setNtn'), strn: v('setStrn'), address: v('setAddress'),
+      default_tax_rate: rate,
+      payment_terms_days: parseInt(v('setTerms'),10) || 0,
+      invoice_prefix: v('setPrefix') || 'VAI',
+    });
+    applySettings(updated);
+    render(); showToast('Tax details saved');
+  }catch(e){ showToast(e.message||'Could not save tax details','warn'); }
 }
 function exportAllData(){
   const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
@@ -1493,6 +1674,10 @@ function teamUserModalHTML(){
           <option value="admin">Admin — everything, including team and financials</option>
         </select>
       </div>
+      <div class="field"><label>Password <span style="font-size:11px;color:var(--muted);font-weight:400;">— type one, or leave blank to generate</span></label>
+        <input id="tu_password" type="text" autocomplete="new-password" placeholder="At least 10 characters">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">A generated password is shown once and must be changed at first sign-in. One you type is theirs to keep.</div>
+      </div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
@@ -1510,6 +1695,10 @@ function clientModalHTML(id){
   const stageOptions = c ? [c.stage, ...allowedNext]
                          : ['lead','contacted','proposal','negotiation','active','lost','churned'];
   const showCustom = c ? isCustomTier(c.productId) : false;
+  // Only top-level accounts may be a parent, and never this client itself.
+  const parentOptions = state.clients
+    .filter(x=>(!c||x.id!==c.id) && !x.parentClientId)
+    .sort((a,b)=>a.company.localeCompare(b.company));
   return `
   <div class="modal">
     <div class="modal-head"><h3>${c?'Edit client':'New lead'}</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
@@ -1543,6 +1732,32 @@ function clientModalHTML(id){
         <div class="field"><label>Source <span style="color:var(--red);">*</span></label><input id="f_source" value="${c?esc(c.source):''}" placeholder="Warm network, referral, LinkedIn…"></div>
       </div>
       <div class="field"><label>WhatsApp number / external ref <span style="color:var(--red);">*</span></label><input id="f_external_ref" value="${c?esc(c.externalRef||''):''}" placeholder="e.g. 923001234567 — used to match n8n usage events to this client"></div>
+
+      <div style="background:#FAF8F3;border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;">
+        <div style="font-weight:600;font-size:13px;margin-bottom:2px;">Billing &amp; tax</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">
+          Required before this client can go Active — every invoice is issued against these details.
+          Enter the CNIC in the NTN field for an unregistered buyer.
+        </div>
+        <div class="field-row">
+          <div class="field"><label>NTN / CNIC <span style="color:var(--red);">*</span> <span style="font-size:11px;color:var(--muted);font-weight:400;">(to go Active)</span></label><input id="f_ntn" value="${c?esc(c.ntn||''):''}" placeholder="1234567-8"></div>
+          <div class="field"><label>STRN <span style="font-size:11px;color:var(--muted);font-weight:400;">(if sales-tax registered)</span></label><input id="f_strn" value="${c?esc(c.strn||''):''}"></div>
+        </div>
+        <div class="field"><label>Billing address <span style="color:var(--red);">*</span> <span style="font-size:11px;color:var(--muted);font-weight:400;">(to go Active)</span></label><input id="f_billing_address" value="${c?esc(c.billingAddress||''):''}" placeholder="Street, city, province"></div>
+        <div class="field-row">
+          <div class="field"><label>Sales tax rate %</label>
+            <input id="f_tax_rate" type="number" step="0.01" value="${c&&c.taxRate!=null?c.taxRate:''}" placeholder="${isAdmin()?`blank = company default (${state.company.defaultTaxRate||0}%)`:'blank = the company default'}">
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;">Leave blank to use the company default. Enter 0 for an exempt client.</div>
+          </div>
+          <div class="field"><label>Parent account <span style="font-size:11px;color:var(--muted);font-weight:400;">(optional)</span></label>
+            <select id="f_parent">
+              <option value="">— none, this is a top-level account —</option>
+              ${parentOptions.map(x=>`<option value="${x.id}" ${c&&c.parentClientId===x.id?'selected':''}>${esc(x.company)}</option>`).join('')}
+            </select>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;">A sub-account keeps its own package, quota and invoices — the link is for grouping only.</div>
+          </div>
+        </div>
+      </div>
 
       <div id="custom-terms" style="display:${showCustom?'block':'none'};background:#FAF8F3;border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;">
         <div style="font-weight:600;font-size:13px;margin-bottom:2px;">Custom terms</div>
@@ -1589,6 +1804,9 @@ async function saveClient(id){
     source: v('f_source'),
     externalRef: v('f_external_ref'),
     notes: v('f_notes'),
+    ntn: v('f_ntn'), strn: v('f_strn'), billingAddress: v('f_billing_address'),
+    taxRate: v('f_tax_rate')==='' ? null : (parseFloat(v('f_tax_rate'))||0),
+    parentClientId: v('f_parent') || null,
   };
 
   // Everything except Notes is required.
@@ -1598,6 +1816,12 @@ async function saveClient(id){
   ];
   const missing = required.filter(([k])=>!String(data[k]||'').trim()).map(([,l])=>l);
   if(isNaN(data.estValue)) missing.push('Estimated deal value');
+  // The API refuses to activate a client without these, because the activation
+  // raises the first invoice; say so here rather than letting the save bounce.
+  if(data.stage==='active'){
+    if(!data.ntn) missing.push('NTN / CNIC');
+    if(!data.billingAddress) missing.push('Billing address');
+  }
   if(missing.length){ showToast('Required: '+missing.join(', '), 'warn'); return; }
 
   // A stage change needs a comment, and may only move forward.
@@ -1625,17 +1849,23 @@ async function saveClient(id){
     };
   }
   try{
+    let raised = [];
     if(id){
       const updated = await API.put(`/api/clients/${id}`, clientToApi(data));
       const c = state.clients.find(x=>x.id===id);
       const sessions = c.sessionsUsedThisMonth;
       Object.assign(c, clientFromApi(updated));
       c.sessionsUsedThisMonth = sessions;
+      raised = updated.invoices_created||[];
     }else{
       const created = await API.post('/api/clients', clientToApi(data));
       state.clients.push(clientFromApi(created));
+      raised = created.invoices_created||[];
     }
-    closeModal(); render(); showToast('Client saved');
+    // Going active bills the setup fee and first retainer, server-side.
+    state.invoices.push(...raised.map(invoiceFromApi));
+    closeModal(); render();
+    showToast(raised.length ? `Client saved — ${raised.length} invoice${raised.length===1?'':'s'} raised` : 'Client saved');
   }catch(e){ showToast(e.message||'Could not save client','warn'); }
 }
 async function deleteClient(id){
@@ -1649,24 +1879,33 @@ async function deleteClient(id){
 }
 async function generatePortalCredentials(clientId){
   const client = state.clients.find(c=>c.id===clientId);
-  if(client && client.portalEnabled && !confirm('Reset this customer\'s portal password?\n\nTheir current password stops working immediately and anyone signed in is logged out.')) return;
+  // Read the typed password before the panel is replaced by the busy state.
+  const pwEl = document.getElementById('portal_pw_'+clientId);
+  const typed = pwEl ? pwEl.value.trim() : '';
+  if(typed && typed.length < 10){ showToast('Choose a password of at least 10 characters','warn'); return; }
+  if(client && client.portalEnabled && !confirm('Set a new portal password for this customer?\n\nTheir current password stops working immediately and anyone signed in is logged out.')) return;
   const area = document.getElementById('portal-link-area');
-  if(area) area.innerHTML = '<span class="loading-dot"></span> Generating…';
+  if(area) area.innerHTML = '<span class="loading-dot"></span> Saving…';
   try{
-    const r = await API.post(`/api/clients/${clientId}/portal-credentials`, {});
-    if(client){ client.portalEnabled = true; client.portalUsername = r.username; }
+    const r = await API.post(`/api/clients/${clientId}/portal-credentials`, typed ? { password: typed } : {});
+    if(client){ client.portalEnabled = true; client.portalUsername = r.username; client.portalPasswordSetBy='admin'; client.portalPasswordSetAt=new Date().toISOString(); }
     const loginUrl = API.base + '/portal.html';
     if(area) area.innerHTML = `
       <div style="background:var(--teal-light);border:1px solid #BFE3D8;border-radius:10px;padding:12px;">
         <div style="font-weight:600;color:var(--teal-dark);margin-bottom:8px;">Portal login created</div>
         <div style="margin-bottom:4px;">Sign-in page: <a href="${esc(loginUrl)}" target="_blank" rel="noopener" style="color:var(--teal-dark);">${esc(loginUrl)}</a></div>
         <div style="margin-bottom:4px;">Username: <strong style="font-family:'JetBrains Mono',monospace;">${esc(r.username)}</strong></div>
-        <div style="margin-bottom:8px;">Password: <strong style="font-family:'JetBrains Mono',monospace;font-size:14px;">${esc(r.password)}</strong></div>
-        <button class="btn btn-ghost btn-sm" onclick="copyPortalCreds('${esc(r.username)}','${esc(r.password)}','${esc(loginUrl)}')">Copy all three</button>
-        <div style="margin-top:8px;color:#8A5F17;background:var(--amber-light);padding:8px 10px;border-radius:8px;font-size:11.5px;">
-          Copy this password now — it is stored hashed and can never be shown again. Send it to the
-          customer over a channel you trust, separately from the link.
-        </div>
+        ${r.password
+          ? `<div style="margin-bottom:8px;">Password: <strong style="font-family:'JetBrains Mono',monospace;font-size:14px;">${esc(r.password)}</strong></div>
+             <button class="btn btn-ghost btn-sm" onclick="copyPortalCreds('${esc(r.username)}','${esc(r.password)}','${esc(loginUrl)}')">Copy all three</button>
+             <div style="margin-top:8px;color:#8A5F17;background:var(--amber-light);padding:8px 10px;border-radius:8px;font-size:11.5px;">
+               Copy this password now — it is stored hashed and can never be shown again. Send it to the
+               customer over a channel you trust, separately from the link.
+             </div>`
+          : `<div style="margin-bottom:8px;">Password: the one you typed. It is hashed here and cannot be read back, so keep your own copy.</div>
+             <div style="margin-top:8px;color:#8A5F17;background:var(--amber-light);padding:8px 10px;border-radius:8px;font-size:11.5px;">
+               Send it to the customer over a channel you trust, separately from the link.
+             </div>`}
       </div>`;
   }catch(e){
     if(area) area.innerHTML = `<span style="color:var(--red);">${esc(e.message||'Could not create the login')}</span>`;
@@ -2059,6 +2298,11 @@ function clientPanelHTML(id){
     <div class="detail-row"><span class="k">Source</span><span class="v">${esc(c.source||'—')}</span></div>
     <div class="detail-row"><span class="k">External ref (n8n/WhatsApp)</span><span class="v mono" style="font-size:12px;">${esc(c.externalRef||'not set')}</span></div>
     <div class="detail-row"><span class="k">Joined</span><span class="v">${fmtDate(c.joinDate)}</span></div>
+    <div class="detail-row"><span class="k">NTN / CNIC</span><span class="v mono" style="font-size:12px;">${esc(c.ntn||'not set')}</span></div>
+    ${c.strn?`<div class="detail-row"><span class="k">STRN</span><span class="v mono" style="font-size:12px;">${esc(c.strn)}</span></div>`:''}
+    <div class="detail-row"><span class="k">Sales tax rate</span><span class="v">${c.taxRate!=null?c.taxRate+'%':(isAdmin()?`${state.company.defaultTaxRate||0}% (company default)`:'company default')}</span></div>
+    ${c.billingAddress?`<div class="detail-row"><span class="k">Billing address</span><span class="v" style="text-align:right;max-width:60%;">${esc(c.billingAddress)}</span></div>`:''}
+    ${parentOf(c)?`<div class="detail-row"><span class="k">Sub-account of</span><span class="v"><a href="#" onclick="event.preventDefault();openPanel={type:'client',id:'${parentOf(c).id}'};render()">${esc(parentOf(c).company)}</a></span></div>`:''}
     <div class="detail-row"><span class="k">Setup fee</span><span class="v">${p?fmtMoney(p.setupFee):'—'}</span></div>
     <div class="detail-row"><span class="k">Monthly retainer</span><span class="v">${p?fmtMoney(p.retainer):'—'}</span></div>
     ${c.stage==='active'?`
@@ -2068,15 +2312,32 @@ function clientPanelHTML(id){
     </div>`:''}
     <div class="field" style="margin-top:14px;"><label>Notes</label><div style="font-size:13px;color:var(--text);background:#FAF8F3;padding:10px 12px;border-radius:8px;">${esc(c.notes)||'—'}</div></div>
 
+    ${subAccountsOf(c.id).length?`
+    <div class="divider"></div>
+    <h4 style="font-size:13px;margin-bottom:4px;">Sub-accounts (${subAccountsOf(c.id).length})</h4>
+    <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">Each has its own package, quota and invoices. Nothing is pooled.</div>
+    ${subAccountsOf(c.id).map(sc=>{
+      const sp = productOf(sc);
+      return `<div class="detail-row" style="cursor:pointer;" onclick="openPanel={type:'client',id:'${sc.id}'};render()">
+        <span class="k">${esc(sc.company)}</span>
+        <span class="v">${sp?esc(sp.name):'—'} · ${fmtNum(sc.sessionsUsedThisMonth||0)}${sp?' / '+fmtNum(sp.quota):''}</span>
+      </div>`;
+    }).join('')}`:''}
+
     <div class="divider"></div>
     <h4 style="font-size:13px;margin-bottom:8px;">Customer portal</h4>
     <div id="portal-link-area" style="font-size:12.5px;color:var(--muted);">
       ${c.portalEnabled
-        ? `<div style="margin-bottom:8px;">Sign-in is active. Username <strong style="font-family:'JetBrains Mono',monospace;">${esc(c.portalUsername)}</strong></div>
-           <button class="btn btn-ghost btn-sm" onclick="generatePortalCredentials('${c.id}')">Reset password</button>
-           <button class="btn btn-danger-ghost btn-sm" onclick="revokePortalCredentials('${c.id}')">Revoke access</button>`
-        : `<div style="margin-bottom:8px;">No portal login yet. The customer needs a username and password to sign in.</div>
-           <button class="btn btn-ghost btn-sm" onclick="generatePortalCredentials('${c.id}')">${iconArrowRight(13)} Create portal login</button>`}
+        ? `<div style="margin-bottom:6px;">Sign-in is active. Username <strong style="font-family:'JetBrains Mono',monospace;">${esc(c.portalUsername)}</strong></div>
+           <div style="margin-bottom:8px;font-size:11.5px;">Password last set ${c.portalPasswordSetAt?fmtDate(c.portalPasswordSetAt):'—'}${c.portalPasswordSetBy==='customer'?' by the customer themselves':c.portalPasswordSetBy==='admin'?' by an administrator':''}.</div>`
+        : `<div style="margin-bottom:8px;">No portal login yet. The customer needs a username and password to sign in.</div>`}
+      <div class="field" style="margin-bottom:8px;">
+        <label>Password ${c.portalEnabled?'(new)':''} <span style="font-size:11px;color:var(--muted);font-weight:400;">— type one, or leave blank to generate</span></label>
+        <input id="portal_pw_${c.id}" type="text" autocomplete="new-password" placeholder="At least 10 characters">
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="generatePortalCredentials('${c.id}')">${c.portalEnabled?'Set password':iconArrowRight(13)+' Create portal login'}</button>
+      ${c.portalEnabled?`<button class="btn btn-danger-ghost btn-sm" onclick="revokePortalCredentials('${c.id}')">Revoke access</button>`:''}
+      <div style="margin-top:8px;font-size:11.5px;">The customer can also reset it themselves from the portal's "Forgot password" link — whatever they choose becomes their password here too.</div>
     </div>
 
     <div class="divider"></div>
@@ -2110,9 +2371,13 @@ function invoicePanelHTML(id){
     <div style="margin-top:10px;"><span class="pill ${invoiceStatusPillClass(inv.status)}"><span class="pill-dot"></span>${inv.status}</span></div>
   </div>
   <div class="detail-body">
-    <div class="detail-row" style="font-size:20px;"><strong>Amount</strong><span class="v mono">${fmtMoney(inv.amount)}</span></div>
+    <div class="detail-row"><span class="k">Amount excluding tax</span><span class="v mono">${fmtMoney(inv.amount)}</span></div>
+    <div class="detail-row"><span class="k">Sales tax${inv.taxRate?` @ ${inv.taxRate}%`:''}</span><span class="v mono">${fmtMoney(inv.taxAmount||0)}</span></div>
+    <div class="detail-row" style="font-size:20px;"><strong>Total payable</strong><span class="v mono">${fmtMoney(inv.total!=null?inv.total:inv.amount)}</span></div>
+    <div class="detail-row"><span class="k">Invoice number</span><span class="v mono" style="font-size:12px;">${esc(inv.number||'—')}</span></div>
     <div class="detail-row"><span class="k">Package</span><span class="v">${p?esc(p.name):'—'}</span></div>
     <div class="detail-row"><span class="k">Date issued</span><span class="v">${fmtDate(inv.date)}</span></div>
+    ${inv.dueDate?`<div class="detail-row"><span class="k">Due</span><span class="v">${fmtDate(inv.dueDate)}</span></div>`:''}
     ${inv.overageSessions?`<div class="detail-row"><span class="k">Overage sessions</span><span class="v">${fmtNum(inv.overageSessions)}</span></div>`:''}
     <div class="divider"></div>
     <h4 style="font-size:13px;">Update status</h4>
@@ -2122,6 +2387,7 @@ function invoicePanelHTML(id){
       <button class="btn btn-sm ${inv.status==='overdue'?'btn-primary':'btn-ghost'}" onclick="setInvoiceStatus('${inv.id}','overdue')">Overdue</button>
     </div>
     <div style="margin-top:20px;display:flex;gap:8px;">
+      <button class="btn btn-primary btn-sm" onclick="printTaxInvoice('${inv.id}')">${iconReceipt().replace('width="17"','width="13"').replace('height="17"','height="13"')} Print tax invoice</button>
       <button class="btn btn-ghost btn-sm" onclick="downloadInvoice('${inv.id}')">${iconDownload(13)} Download</button>
       <button class="btn btn-danger-ghost btn-sm" onclick="deleteInvoice('${inv.id}')">${iconTrash(13)} Delete</button>
     </div>
@@ -2142,6 +2408,12 @@ async function deleteInvoice(id){
     openPanel=null; render();
   }catch(e){ showToast(e.message||'Could not delete invoice','warn'); }
 }
+/** Opens the printable tax invoice — the document lives in invoice-print.js. */
+async function printTaxInvoice(id){
+  const r = await openTaxInvoice(()=>API.get(`/api/invoices/${id}/tax-invoice`));
+  if(!r.ok) showToast(r.error, 'warn');
+}
+
 function downloadInvoice(id){
   const inv = state.invoices.find(i=>i.id===id);
   const c = state.clients.find(x=>x.id===inv.clientId);
@@ -2222,9 +2494,29 @@ function renderConnectScreen(){
     <div class="field"><label>Work email</label><input id="lg_email" autocomplete="username" placeholder="you@vantriqai.com" onkeydown="if(event.key==='Enter')document.getElementById('lg_pw').focus()"></div>
     <div class="field"><label>Password</label><input id="lg_pw" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitPassword()"></div>
     <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:6px;" onclick="submitPassword()">Continue</button>
+    <p class="footnote" style="text-align:center;margin-top:10px;"><a href="#" onclick="event.preventDefault();forgotPassword()">Forgot your password?</a></p>
     <p class="footnote">You'll get a one-time code by email to finish signing in. Accounts are created by an administrator in the CRM.</p>
     <p class="footnote" style="text-align:center;margin-top:10px;"><a href="#" onclick="event.preventDefault();loginStep='apikey';connectError='';renderConnectScreen()" style="color:var(--muted);">Emergency access with an API key</a></p>`);
   const el = document.getElementById('lg_email'); if(el) el.focus();
+}
+
+/**
+ * Sends a reset link to the address typed in the email box. The answer is the
+ * same whether or not the address belongs to anyone, so nothing here reveals
+ * who has an account.
+ */
+async function forgotPassword(){
+  const email = ((document.getElementById('lg_email')||{}).value || '').trim();
+  if(!email){ connectError = 'Type your work email above first, then choose "Forgot your password?".'; renderConnectScreen(); return; }
+  try{
+    const res = await fetch((API.base||window.location.origin)+'/api/auth/forgot-password', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email }),
+    });
+    const json = await res.json().catch(()=>({}));
+    connectError = '';
+    renderConnectScreen();
+    showToast(json.message || 'If that address belongs to an account, a reset link is on its way.');
+  }catch(e){ connectError = 'Could not reach the server.'; renderConnectScreen(); }
 }
 
 async function submitPassword(){

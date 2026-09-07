@@ -344,3 +344,102 @@ create table if not exists login_challenges (
   created_at timestamptz not null default now()
 );
 create index if not exists idx_login_challenges_user on login_challenges(user_id, created_at desc);
+
+-- =====================================================================
+-- v4 — sub-clients, quota decisions, FBR-compliant invoicing,
+--      manual + self-service passwords, automation-scoped keys
+-- Additive and idempotent.
+-- =====================================================================
+
+-- --- Sub-clients ------------------------------------------------------
+-- A sub-client is a full client in its own right: its own package, its own
+-- quota, its own invoices. The parent link exists for grouping and reporting
+-- only, so a group's usage can be rolled up without pooling their quotas.
+alter table clients add column if not exists parent_client_id uuid references clients(id) on delete set null;
+create index if not exists idx_clients_parent on clients(parent_client_id);
+
+-- --- Tax / FBR --------------------------------------------------------
+-- Client-side registration details. tax_rate null means "use the default
+-- from settings"; 0 is a real rate meaning exempt.
+alter table clients add column if not exists ntn text;
+alter table clients add column if not exists strn text;
+alter table clients add column if not exists tax_rate numeric;
+alter table clients add column if not exists billing_address text;
+create index if not exists idx_clients_ntn on clients(ntn);
+
+-- Your own registration details, printed on every invoice.
+alter table settings add column if not exists ntn text default '';
+alter table settings add column if not exists strn text default '';
+alter table settings add column if not exists address text default '';
+alter table settings add column if not exists default_tax_rate numeric not null default 0;
+alter table settings add column if not exists invoice_prefix text not null default 'VAI';
+
+-- Invoice numbers must be sequential and gapless per FBR. A sequence gives
+-- that atomically even with concurrent issuing.
+create sequence if not exists invoice_number_seq start 1;
+
+-- amount keeps its existing meaning: the value EXCLUDING tax. The new columns
+-- carry the tax breakdown a compliant invoice has to show.
+alter table invoices add column if not exists invoice_number text unique;
+alter table invoices add column if not exists tax_rate numeric not null default 0;
+alter table invoices add column if not exists tax_amount numeric not null default 0;
+alter table invoices add column if not exists total_amount numeric;
+alter table invoices add column if not exists client_ntn text;
+alter table invoices add column if not exists client_strn text;
+alter table invoices add column if not exists billing_address text;
+alter table invoices add column if not exists due_date date;
+update invoices set total_amount = amount where total_amount is null;
+create index if not exists idx_invoices_number on invoices(invoice_number);
+
+-- --- Quota decisions --------------------------------------------------
+-- Service never stops at the quota line. Instead the client is flagged, and an
+-- admin decides per month whether to bill the overage or move them up a tier.
+-- One row per client per month, created the first time they cross.
+create table if not exists quota_events (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  period_month date not null,
+  threshold text not null check (threshold in ('warning','exceeded')),
+  sessions_at_event int not null default 0,
+  quota_at_event int not null default 0,
+  decision text check (decision in ('bill_overage','upgrade','waive')),
+  decided_at timestamptz,
+  decided_by text,
+  note text default '',
+  created_at timestamptz not null default now(),
+  unique (client_id, period_month, threshold)
+);
+create index if not exists idx_quota_events_open on quota_events(decision, period_month desc);
+
+-- --- Password resets --------------------------------------------------
+-- Self-service reset for both internal staff and customer portal logins.
+-- Tokens are hashed, single-use and short-lived.
+create table if not exists password_resets (
+  id uuid primary key default gen_random_uuid(),
+  subject_type text not null check (subject_type in ('staff','portal')),
+  subject_id uuid not null,
+  token_hash text not null unique,
+  expires_at timestamptz not null,
+  used_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_password_resets_subject on password_resets(subject_type, subject_id, created_at desc);
+
+-- --- Automation-scoped API keys --------------------------------------
+-- n8n needs to create clients and invoices, which the webhook scope cannot do
+-- and the admin key should not be handed out for. 'automation' sits between:
+-- day-to-day records, never financials, procurement, settings or the team.
+alter table api_keys drop constraint if exists api_keys_scope_check;
+alter table api_keys add constraint api_keys_scope_check
+  check (scope in ('admin','webhook','automation'));
+
+-- Payment terms drive the due date stamped on each invoice at issue time.
+alter table settings add column if not exists payment_terms_days int not null default 7;
+
+-- Who last set a portal password. A customer resetting their own password
+-- updates this to 'customer', so the CRM shows the change without ever
+-- holding the password itself.
+alter table clients add column if not exists portal_password_set_by text;
+
+-- The same, for internal staff.
+alter table internal_users add column if not exists password_set_by text;

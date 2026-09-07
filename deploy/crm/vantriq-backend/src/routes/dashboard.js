@@ -1,5 +1,6 @@
 const express = require('express');
 const db = require('../db');
+const { isAdminRequest } = require('../middleware/auth');
 const router = express.Router();
 
 router.get('/', async (req, res) => {
@@ -56,7 +57,7 @@ router.get('/', async (req, res) => {
   // Staff run the pipeline; delivery cost, platform cost and margin are
   // Financials data their role deliberately excludes, so they never leave
   // the server for a staff session.
-  const staffOnly = req.user && req.user.role === 'staff';
+  const withholdCosts = !isAdminRequest(req);
 
   const kpis = {
       active_clients: active.length,
@@ -71,7 +72,7 @@ router.get('/', async (req, res) => {
       total_delivery_cost: totalDeliveryCost,
       utilization,
   };
-  if (staffOnly) {
+  if (withholdCosts) {
     for (const k of ['net_monthly_result','margin_pct','total_platform_cost','total_contract_labour','total_delivery_cost','utilization']) {
       delete kpis[k];
     }
