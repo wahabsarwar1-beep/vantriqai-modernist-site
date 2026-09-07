@@ -38,16 +38,28 @@ ls -lh /root/crm-stack/vantriq-backend-v3.zip
 
 ## 3. Add the new settings
 
+> **Never paste a real token into this file.** This repository is public. An
+> earlier version of this runbook carried a live Hostinger mail token in the
+> block below; it is in the git history and must be treated as compromised.
+> Get a fresh token from hPanel (Emails → API tokens) and type it straight into
+> the server's `.env`, which is not in the repository.
+
 ```bash
 cd /root/crm-stack
 cat >> .env <<'EOF'
-HOSTINGER_MAIL_TOKEN=f8ed2ccb62b5650e4980e965db3b677377cfa0503b7c7483b707d718784d92b7
-HOSTINGER_MAILBOX_ID=AC639077da6944831097970eb520d3
+HOSTINGER_MAIL_TOKEN=PASTE_YOUR_MAIL_TOKEN_HERE
+HOSTINGER_MAILBOX_ID=PASTE_YOUR_MAILBOX_ID_HERE
 MAIL_FROM=support@vantriqai.com
 COMPANY_EMAIL_DOMAIN=vantriqai.com
 ALLOW_API_KEY_LOGIN=true
 EOF
 echo "settings added"
+```
+
+Then open `.env` and replace the two placeholders with the real values:
+
+```bash
+nano /root/crm-stack/.env
 ```
 
 ## 4. Check the mail token works
