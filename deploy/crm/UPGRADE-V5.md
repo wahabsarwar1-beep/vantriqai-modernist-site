@@ -1,7 +1,12 @@
-# Upgrade to v4 — sub-accounts, quotas, FBR invoicing, passwords
+# Upgrade the live CRM — everything since v3
 
-Takes the live CRM from v3 to v4. Nothing in v3 is removed; every change adds
-to what is already there, and the migration is safe to re-run.
+**This is the only upgrade runbook you need.** There is no separate v4 package:
+`vantriq-backend-v5.zip` is a snapshot of the whole backend, so it carries the
+v4 work (sub-accounts, quotas, FBR invoicing, passwords) and the v5 work (the
+business-model pricing and the portal's session detail) in one upload. One
+upload, one rebuild, one migration.
+
+Nothing in v3 is removed; every change adds to what is already there.
 
 **What you get**
 
@@ -14,6 +19,8 @@ to what is already there, and the migration is safe to re-run.
 | **Manual passwords** | You can type a password for a customer or an employee instead of accepting a generated one. |
 | **Forgot password** | Both the CRM and the customer portal have a "Forgot your password?" link. The emailed link is single-use and expires in an hour. Whatever the customer chooses becomes the password the CRM holds. |
 | **Automation key** | A new `automation` API scope for n8n: it can create clients and invoices, but never reads financials, procurement, settings, the team or your delivery costs. |
+| **Business-model pricing** | All six tiers reset to the August 2026 model — Starter goes from a 220-session allowance at PKR 110 overage to 1,500 at PKR 2, and so on up the ladder. Airtable and Google Sheets are gone; this CRM's own Postgres is the data layer. |
+| **Sessions in the customer portal** | Every conversation is listed with its number for the month, and that number shows whether it is inside the allowance or charged at the overage rate. |
 
 Everything below runs in your SSH window (`ssh root@76.13.193.8`) except
 step 2 (drag-and-drop) and steps 7–9 (in the browser). About 20 minutes.
