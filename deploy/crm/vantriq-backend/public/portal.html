@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vantriq AI — Account Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+:root{
+  --ink:#0F1A22; --teal:#12897A; --teal-dark:#0B6357; --teal-light:#E3F1EE;
+  --amber:#DE9C34; --amber-light:#FBF0DD; --red:#BC4B3C; --red-light:#FBE8E4;
+  --paper:#F5F3ED; --card:#FFFFFF; --text:#161F27; --muted:#6C7885; --muted-2:#98A2AC;
+  --border:#E4E0D6; --radius:14px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{font-family:'Inter',sans-serif;background:var(--paper);color:var(--text);-webkit-font-smoothing:antialiased;}
+h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;}
+.mono{font-family:'JetBrains Mono',monospace;}
+button{font-family:'Inter',sans-serif;cursor:pointer;}
+
+#app{max-width:720px;margin:0 auto;padding:0 0 60px;}
+.topbar{
+  background:var(--ink);color:#fff;padding:22px 20px 60px;
+  border-radius:0 0 28px 28px;
+}
+.topbar-inner{max-width:680px;margin:0 auto;}
+.brand-row{display:flex;align-items:center;gap:10px;}
+.brand-mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--teal),#0A4E45);display:flex;align-items:center;justify-content:center;}
+.brand-name{font-family:'Space Grotesk';font-weight:600;font-size:15px;}
+.brand-sub{font-size:10.5px;color:#93A2AB;text-transform:uppercase;letter-spacing:.6px;margin-top:1px;}
+.company-name{font-family:'Space Grotesk';font-size:24px;font-weight:600;margin-top:20px;}
+.status-row{display:flex;align-items:center;gap:8px;margin-top:8px;}
+
+.content{padding:0 20px;margin-top:-40px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;}
+.card h3{font-size:14px;margin:0 0 14px;font-weight:600;}
+
+.tabs{display:flex;gap:6px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:5px;margin-bottom:16px;box-shadow:0 8px 24px rgba(15,26,34,.08);}
+.tab{flex:1;text-align:center;padding:10px 6px;border-radius:10px;font-size:12.5px;font-weight:600;color:var(--muted);}
+.tab.active{background:var(--teal);color:#fff;}
+
+.pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11.5px;font-weight:600;}
+.pill-dot{width:6px;height:6px;border-radius:50%;}
+.pill-active{background:rgba(255,255,255,.15);color:#fff;}
+.pill-active .pill-dot{background:#5DCAA5;}
+.pill-paid{background:var(--teal-light);color:var(--teal-dark);}
+.pill-paid .pill-dot{background:var(--teal);}
+.pill-pending{background:#EEF1F4;color:#5A6672;}
+.pill-pending .pill-dot{background:#8B97A2;}
+.pill-overdue{background:var(--red-light);color:#8F3527;}
+.pill-overdue .pill-dot{background:var(--red);}
+
+.kv{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #F1EFE8;font-size:13.5px;}
+.kv:last-child{border-bottom:none;}
+.kv .k{color:var(--muted);}
+.kv .v{font-weight:600;text-align:right;}
+
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;}
+.stat-card .label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;}
+.stat-card .value{font-family:'Space Grotesk';font-size:22px;font-weight:600;margin-top:5px;}
+
+.progress-track{height:8px;background:#EEEBE2;border-radius:5px;overflow:hidden;margin-top:8px;}
+.progress-fill{height:100%;background:var(--teal);border-radius:5px;transition:width .3s;}
+.progress-fill.warn{background:var(--amber);}
+.progress-fill.danger{background:var(--red);}
+
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--border);}
+td{padding:11px 8px;border-bottom:1px solid #F1EFE8;}
+tr:last-child td{border-bottom:none;}
+tr.row-click{cursor:pointer;}
+tr.row-click:active{background:#FAF8F3;}
+
+.empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px;}
+
+.btn{border:none;border-radius:9px;padding:10px 16px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;}
+.btn-primary{background:var(--teal);color:#fff;}
+.btn-ghost{background:#F0EEE7;color:var(--text);}
+.btn-block{width:100%;justify-content:center;}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(15,26,34,.5);display:flex;align-items:flex-end;justify-content:center;z-index:100;}
+.modal{background:var(--card);border-radius:20px 20px 0 0;width:100%;max-width:720px;padding:24px 20px 28px;max-height:80vh;overflow-y:auto;}
+.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+.close-x{background:#F0EEE7;border:none;border-radius:50%;width:30px;height:30px;color:var(--muted);font-size:16px;}
+
+.footer-note{text-align:center;padding:24px 20px 0;font-size:12px;color:var(--muted-2);}
+.wa-link{display:inline-flex;align-items:center;gap:6px;color:var(--teal-dark);font-weight:600;text-decoration:none;}
+
+.center-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+.loading-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--teal);animation:pulse 1.2s infinite;}
+@keyframes pulse{0%,100%{opacity:.3;}50%{opacity:1;}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+const CURRENCY = 'PKR';
+function fmtMoney(n){ if(n===null||n===undefined||isNaN(n)) n=0; const neg=n<0; n=Math.abs(Math.round(n)); return (neg?'-':'')+CURRENCY+' '+n.toLocaleString('en-US'); }
+function fmtNum(n){ return Math.round(n||0).toLocaleString('en-US'); }
+function fmtDate(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }
+function fmtMonth(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('en-US',{month:'short',year:'numeric'}); }
+function esc(s){ return (s==null?'':s+'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+const params = new URLSearchParams(window.location.search);
+const TOKEN = params.get('t') || params.get('token') || '';
+
+let data = { account:null, usage:null, invoices:[], ledger:null };
+let currentTab = 'overview';
+let error = null;
+let openInvoiceId = null;
+let usageChart = null;
+
+async function api(path){
+  const res = await fetch(`/api/portal/${TOKEN}${path}`);
+  const json = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(json.error || 'Something went wrong');
+  return json;
+}
+
+function stagePill(stage){
+  const map = { active:['pill-active','Active'], lead:['pill-pending','New'], contacted:['pill-pending','In discussion'],
+    proposal:['pill-pending','Proposal sent'], negotiation:['pill-pending','Negotiating'],
+    lost:['pill-pending','Inactive'], churned:['pill-pending','Inactive'] };
+  const [cls,label] = map[stage] || ['pill-pending', stage];
+  return `<span class="pill ${cls}"><span class="pill-dot"></span>${label}</span>`;
+}
+function invoiceStatusClass(s){ return {paid:'pill-paid',pending:'pill-pending',overdue:'pill-overdue'}[s]||'pill-pending'; }
+
+async function boot(){
+  if(!TOKEN){
+    renderError('No account link provided. Use the link Vantriq AI shared with you — it looks like .../portal.html?t=...');
+    return;
+  }
+  document.getElementById('app').innerHTML = `<div class="center-screen"><span class="loading-dot"></span>&nbsp; Loading your account…</div>`;
+  try{
+    const [account, usage, invoices, ledger] = await Promise.all([
+      api('/account'), api('/usage'), api('/invoices'), api('/ledger'),
+    ]);
+    data = { account, usage, invoices, ledger };
+    render();
+  }catch(e){
+    renderError(e.message || 'Could not load your account.');
+  }
+}
+
+function renderError(msg){
+  document.getElementById('app').innerHTML = `
+  <div class="center-screen">
+    <div class="card" style="max-width:400px;text-align:center;">
+      <div style="width:44px;height:44px;border-radius:12px;background:var(--red-light);color:var(--red);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:20px;font-weight:700;">!</div>
+      <h3 style="margin-bottom:8px;">Can't open this portal</h3>
+      <p style="font-size:13px;color:var(--muted);margin:0;">${esc(msg)}</p>
+    </div>
+  </div>`;
+}
+
+function render(){
+  const { account } = data;
+  document.getElementById('app').innerHTML = `
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="brand-row">
+          <div class="brand-mark"><svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M1 10h3l2-6 3 12 2.5-9 1.5 4h6" stroke="#8FD9CC" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div>
+            <div class="brand-name">Vantriq AI</div>
+            <div class="brand-sub">Account portal</div>
+          </div>
+        </div>
+        <div class="company-name">${esc(account.company)}</div>
+        <div class="status-row">
+          ${stagePill(account.stage)}
+          ${account.package ? `<span class="pill pill-active">${esc(account.package.name)} package</span>` : ''}
+        </div>
+      </div>
+    </div>
+    <div class="content">
+      <div class="tabs">
+        <div class="tab ${currentTab==='overview'?'active':''}" onclick="setTab('overview')">Overview</div>
+        <div class="tab ${currentTab==='usage'?'active':''}" onclick="setTab('usage')">Usage</div>
+        <div class="tab ${currentTab==='invoices'?'active':''}" onclick="setTab('invoices')">Invoices</div>
+        <div class="tab ${currentTab==='ledger'?'active':''}" onclick="setTab('ledger')">Statement</div>
+      </div>
+      <div id="tab-content">${renderTab()}</div>
+      <div class="footer-note">
+        Questions about your account? <a class="wa-link" href="https://wa.me/923006789807" target="_blank" rel="noopener">Message Vantriq AI on WhatsApp</a>
+      </div>
+    </div>
+  `;
+  if(currentTab==='usage') requestAnimationFrame(drawUsageChart);
+  renderInvoiceModal();
+}
+
+function setTab(t){ currentTab=t; render(); }
+
+function renderTab(){
+  if(currentTab==='overview') return renderOverview();
+  if(currentTab==='usage') return renderUsage();
+  if(currentTab==='invoices') return renderInvoices();
+  if(currentTab==='ledger') return renderLedger();
+  return '';
+}
+
+function renderOverview(){
+  const { account, ledger } = data;
+  const p = account.package;
+  return `
+  ${ledger.total_outstanding > 0 ? `
+  <div class="card" style="background:var(--amber-light);border-color:#F0D9A8;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#8A5F17;font-weight:700;">Amount due</div>
+        <div style="font-family:'Space Grotesk';font-size:22px;font-weight:600;color:#63430B;margin-top:2px;">${fmtMoney(ledger.total_outstanding)}</div>
+      </div>
+      <button class="btn btn-primary" onclick="setTab('invoices')">View invoices</button>
+    </div>
+  </div>` : `
+  <div class="card" style="background:var(--teal-light);border-color:#BFE3D8;">
+    <div style="font-size:13px;color:var(--teal-dark);font-weight:600;">✓ Your account is fully paid up. Nothing due right now.</div>
+  </div>`}
+
+  <div class="card">
+    <h3>Your package</h3>
+    ${p ? `
+      <div class="kv"><span class="k">Package</span><span class="v">${esc(p.name)}</span></div>
+      <div class="kv"><span class="k">Monthly retainer</span><span class="v">${fmtMoney(p.retainer)}</span></div>
+      <div class="kv"><span class="k">Included sessions / month</span><span class="v">${fmtNum(p.quota)}</span></div>
+      <div class="kv"><span class="k">Overage rate</span><span class="v">${fmtMoney(p.overage_rate)} / session</span></div>
+      <div class="kv"><span class="k">AI model</span><span class="v">${esc(p.ai_model)}</span></div>
+      <div class="kv"><span class="k">Channels</span><span class="v">${esc(p.channels)}</span></div>
+    ` : `<div class="empty">No package assigned yet.</div>`}
+  </div>
+
+  <div class="card">
+    <h3>Account details</h3>
+    <div class="kv"><span class="k">Contact</span><span class="v">${esc(account.contact_name)}</span></div>
+    <div class="kv"><span class="k">Email</span><span class="v">${esc(account.email||'—')}</span></div>
+    <div class="kv"><span class="k">Phone</span><span class="v">${esc(account.phone||'—')}</span></div>
+    <div class="kv"><span class="k">Client since</span><span class="v">${fmtDate(account.join_date)}</span></div>
+  </div>
+  `;
+}
+
+function renderUsage(){
+  const u = data.usage;
+  const pct = u.quota ? Math.min(100, Math.round(u.sessions_used / u.quota * 100)) : 0;
+  const barClass = pct>=100?'danger':pct>=80?'warn':'';
+  return `
+  <div class="card">
+    <h3>This month's usage</h3>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;">
+      <span style="font-family:'Space Grotesk';font-size:26px;font-weight:600;">${fmtNum(u.sessions_used)}</span>
+      <span style="font-size:13px;color:var(--muted);">of ${u.quota?fmtNum(u.quota):'—'} sessions included</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill ${barClass}" style="width:${pct}%"></div></div>
+    ${u.over_quota_sessions > 0 ? `
+      <div style="margin-top:14px;padding:10px 12px;background:var(--amber-light);border-radius:10px;font-size:12.5px;color:#7A5410;">
+        ${fmtNum(u.over_quota_sessions)} sessions over quota this month — estimated overage ${fmtMoney(u.estimated_overage_cost)}, billed on your next retainer invoice.
+      </div>` : `<div style="margin-top:14px;font-size:12.5px;color:var(--muted);">You're within your monthly quota.</div>`}
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card"><div class="label">Messages this month</div><div class="value">${fmtNum(u.messages)}</div></div>
+    <div class="stat-card"><div class="label">Sessions this month</div><div class="value">${fmtNum(u.sessions_used)}</div></div>
+  </div>
+
+  <div class="card">
+    <h3>Last 6 months</h3>
+    <canvas id="usageChart" height="160"></canvas>
+  </div>
+  `;
+}
+function drawUsageChart(){
+  const el = document.getElementById('usageChart');
+  if(!el) return;
+  if(usageChart) usageChart.destroy();
+  const hist = data.usage.history || [];
+  usageChart = new Chart(el, {
+    type:'bar',
+    data:{ labels: hist.map(h=>fmtMonth(h.period_month)), datasets:[{ data: hist.map(h=>h.sessions), backgroundColor:'#12897A', borderRadius:6, maxBarThickness:36 }] },
+    options:{ plugins:{legend:{display:false}}, scales:{ y:{ grid:{color:'#EFEDE6'} }, x:{ grid:{display:false} } } }
+  });
+}
+
+function renderInvoices(){
+  const invs = data.invoices;
+  if(!invs.length) return `<div class="card"><div class="empty">No invoices yet.</div></div>`;
+  return `
+  <div class="card" style="padding:8px 4px;">
+    <table>
+      <thead><tr><th style="padding-left:16px;">Invoice</th><th>Amount</th><th style="padding-right:16px;">Status</th></tr></thead>
+      <tbody>
+        ${invs.map(inv=>`
+        <tr class="row-click" onclick="openInvoiceId='${inv.id}';renderInvoiceModal()">
+          <td style="padding-left:16px;"><div style="font-weight:600;">${esc(inv.type_label)}</div><div style="font-size:11.5px;color:var(--muted);">${esc(inv.period||fmtDate(inv.issued_date))}</div></td>
+          <td class="mono">${fmtMoney(inv.amount)}</td>
+          <td style="padding-right:16px;"><span class="pill ${invoiceStatusClass(inv.status)}"><span class="pill-dot"></span>${inv.status}</span></td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>
+  `;
+}
+
+function renderLedger(){
+  const l = data.ledger;
+  return `
+  <div class="stat-grid">
+    <div class="stat-card"><div class="label">Total paid to date</div><div class="value" style="color:var(--teal-dark);">${fmtMoney(l.total_paid)}</div></div>
+    <div class="stat-card"><div class="label">Outstanding balance</div><div class="value" style="color:${l.total_outstanding>0?'var(--red)':'var(--teal-dark)'};">${fmtMoney(l.total_outstanding)}</div></div>
+  </div>
+  <div class="card" style="padding:8px 4px;">
+    ${l.entries.length ? `
+    <table>
+      <thead><tr><th style="padding-left:16px;">Date</th><th>Description</th><th>Amount</th><th style="padding-right:16px;">Balance</th></tr></thead>
+      <tbody>
+        ${l.entries.map(e=>`
+        <tr>
+          <td style="padding-left:16px;white-space:nowrap;">${fmtDate(e.date)}</td>
+          <td>${esc(e.description)}</td>
+          <td class="mono">${fmtMoney(e.amount)}</td>
+          <td class="mono" style="padding-right:16px;">${fmtMoney(e.running_balance)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>` : `<div class="empty">No account activity yet.</div>`}
+  </div>
+  `;
+}
+
+function renderInvoiceModal(){
+  let root = document.getElementById('invoice-modal-root');
+  if(!root){ root = document.createElement('div'); root.id='invoice-modal-root'; document.body.appendChild(root); }
+  if(!openInvoiceId){ root.innerHTML=''; return; }
+  const inv = data.invoices.find(i=>i.id===openInvoiceId);
+  if(!inv){ openInvoiceId=null; root.innerHTML=''; return; }
+  root.innerHTML = `
+  <div class="modal-overlay" onmousedown="if(event.target===this){openInvoiceId=null;renderInvoiceModal();}">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 style="margin:0;">${esc(inv.type_label)}</h3>
+        <button class="close-x" onclick="openInvoiceId=null;renderInvoiceModal()">✕</button>
+      </div>
+      <div class="kv" style="font-size:22px;padding:6px 0 16px;border:none;"><strong>${fmtMoney(inv.amount)}</strong>
+        <span class="pill ${invoiceStatusClass(inv.status)}"><span class="pill-dot"></span>${inv.status}</span>
+      </div>
+      <div class="kv"><span class="k">Period</span><span class="v">${esc(inv.period||'—')}</span></div>
+      <div class="kv"><span class="k">Issued</span><span class="v">${fmtDate(inv.issued_date)}</span></div>
+      ${inv.overage_sessions ? `<div class="kv"><span class="k">Overage sessions</span><span class="v">${fmtNum(inv.overage_sessions)}</span></div>` : ''}
+      <button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="downloadInvoice()">Download</button>
+    </div>
+  </div>`;
+}
+function downloadInvoice(){
+  const inv = data.invoices.find(i=>i.id===openInvoiceId);
+  if(!inv) return;
+  const text = [
+    'Vantriq AI — Invoice', `Bill to: ${data.account.company}`, `Type: ${inv.type_label}`,
+    `Period: ${inv.period||'—'}`, `Issued: ${inv.issued_date}`, `Status: ${inv.status}`, `Amount: ${fmtMoney(inv.amount)}`,
+  ].join('\n');
+  const blob = new Blob([text], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `vantriq-invoice-${inv.issued_date}.txt`;
+  a.click();
+}
+
+boot();
+</script>
+</body>
+</html>
