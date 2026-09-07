@@ -322,11 +322,48 @@ class ApiError extends Error{ constructor(msg,status){ super(msg); this.status=s
 const INVOICE_TYPE_TO_API = {'Setup fee':'setup_fee','Retainer':'retainer','Overage':'overage','Add-on / change request':'addon'};
 const INVOICE_TYPE_FROM_API = {'setup_fee':'Setup fee','retainer':'Retainer','overage':'Overage','addon':'Add-on / change request'};
 
-function productFromApi(p){ return { id:p.id, name:p.name, targetTier:p.target_tier, setupFee:+p.setup_fee, retainer:+p.retainer, msgsPerSession:+p.msgs_per_session, quota:+p.quota, overageRate:+p.overage_rate, deliveryCostFull:+p.delivery_cost_full, automation:p.automation, dataLayer:p.data_layer, aiModel:p.ai_model, channels:p.channels, order:p.sort_order }; }
+function productFromApi(p){ return { id:p.id, name:p.name, isStandard:p.is_standard!==false, targetTier:p.target_tier, setupFee:+p.setup_fee, retainer:+p.retainer, msgsPerSession:+p.msgs_per_session, quota:+p.quota, overageRate:+p.overage_rate, deliveryCostFull:+p.delivery_cost_full, automation:p.automation, dataLayer:p.data_layer, aiModel:p.ai_model, channels:p.channels, order:p.sort_order }; }
 function productToApi(p){ return { name:p.name, target_tier:p.targetTier, setup_fee:p.setupFee, retainer:p.retainer, msgs_per_session:p.msgsPerSession, quota:p.quota, overage_rate:p.overageRate, delivery_cost_full:p.deliveryCostFull, automation:p.automation, data_layer:p.dataLayer, ai_model:p.aiModel, channels:p.channels }; }
 
-function clientFromApi(c){ return { id:c.id, name:c.name, company:c.company, email:c.email, phone:c.phone, externalRef:c.external_ref||'', productId:c.product_id, stage:c.stage, estValue:+c.est_value||0, source:c.source, notes:c.notes, joinDate:c.join_date, sessionsUsedThisMonth:0, ownerRepId:c.owner_rep_id||null, salesStage:c.sales_stage||null, closeOutcome:c.close_outcome||null }; }
-function clientToApi(c){ return { name:c.name, company:c.company, email:c.email, phone:c.phone, external_ref:c.externalRef||null, product_id:c.productId||null, stage:c.stage, est_value:c.estValue, source:c.source, notes:c.notes }; }
+function clientFromApi(c){ return { id:c.id, name:c.name, company:c.company, email:c.email, phone:c.phone, externalRef:c.external_ref||'', productId:c.product_id, stage:c.stage, estValue:+c.est_value||0, source:c.source, notes:c.notes, joinDate:c.join_date, sessionsUsedThisMonth:0, ownerRepId:c.owner_rep_id||null, salesStage:c.sales_stage||null, closeOutcome:c.close_outcome||null,
+  portalEnabled:!!c.portal_enabled, portalUsername:c.portal_username||'',
+  customSetupFee:c.custom_setup_fee, customRetainer:c.custom_retainer, customQuota:c.custom_quota,
+  customOverageRate:c.custom_overage_rate, customMsgsPerSession:c.custom_msgs_per_session,
+  customAutomation:c.custom_automation||'', customDataLayer:c.custom_data_layer||'',
+  customAiModel:c.custom_ai_model||'', customChannels:c.custom_channels||'' }; }
+function clientToApi(c){
+  const out = { name:c.name, company:c.company, email:c.email, phone:c.phone, external_ref:c.externalRef||null,
+    product_id:c.productId||null, stage:c.stage, est_value:c.estValue, source:c.source, notes:c.notes };
+  if(c.stageComment) out.stage_comment = c.stageComment;
+  // Custom package terms are only accepted by the API on the Enterprise+ tier.
+  if(c.custom){
+    out.custom_setup_fee = c.custom.setupFee; out.custom_retainer = c.custom.retainer;
+    out.custom_quota = c.custom.quota; out.custom_overage_rate = c.custom.overageRate;
+    out.custom_msgs_per_session = c.custom.msgsPerSession;
+    out.custom_automation = c.custom.automation; out.custom_data_layer = c.custom.dataLayer;
+    out.custom_ai_model = c.custom.aiModel; out.custom_channels = c.custom.channels;
+  }
+  return out;
+}
+
+/* The client lifecycle, mirroring the rules the API enforces: a deal only ever
+   moves forward one step, may be lost before it goes active, and an active
+   client may churn. lost and churned are final. */
+const FORWARD_STAGES = ['lead','contacted','proposal','negotiation','active'];
+function allowedNextStages(from){
+  if(from==='lost'||from==='churned') return [];
+  if(from==='active') return ['churned'];
+  const i = FORWARD_STAGES.indexOf(from);
+  if(i===-1) return [];
+  const next=[];
+  if(i+1<FORWARD_STAGES.length) next.push(FORWARD_STAGES[i+1]);
+  next.push('lost');
+  return next;
+}
+function isCustomTier(productId){
+  const p = state.products.find(x=>x.id===productId);
+  return !!p && p.isStandard === false;
+}
 
 function invoiceFromApi(i){ return { id:i.id, clientId:i.client_id, type:INVOICE_TYPE_FROM_API[i.type]||i.type, amount:+i.amount, period:i.period, status:i.status, date:i.issued_date, overageSessions:i.overage_sessions||0 }; }
 
@@ -360,7 +397,7 @@ let apiConnected = false;
 let connectError = '';
 
 async function loadState(){
-  const [products, clients, invoices, vendors, pos, expenses, settings, dash, reps] = await Promise.all([
+  const [products, clients, invoices, vendors, pos, expenses, settings, dash, reps, packageRequests] = await Promise.all([
     API.get('/api/products'),
     API.get('/api/clients'),
     API.get('/api/invoices'),
@@ -370,6 +407,7 @@ async function loadState(){
     API.get('/api/settings'),
     API.get('/api/dashboard'),
     API.get('/api/reps'),
+    API.get('/api/package-requests?status=pending'),
   ]);
 
   const camelClients = clients.map(clientFromApi);
@@ -381,6 +419,7 @@ async function loadState(){
 
   state = {
     company:{ name:settings.company_name, city:settings.city, founder:settings.founder },
+    packageRequests: packageRequests || [],
     products: products.map(productFromApi),
     clients: camelClients,
     invoices: invoices.map(invoiceFromApi),
@@ -402,7 +441,7 @@ async function refreshUsage(){
     // Never repaint while a modal or detail panel is open: render() rebuilds
     // both with innerHTML, which wipes whatever has been typed into the form.
     // state is already updated above, so the next poll paints the fresh numbers.
-    if(openModal || openPanel) return;
+    if(openModal || openPanel || kanbanDragId) return;
     if(['dashboard','clients','pipeline'].includes(currentView)) render();
   }catch(e){ /* silent — next poll will retry */ }
 }
@@ -441,6 +480,7 @@ const NAV = [
     {id:'pipeline', label:'Pipeline', icon:iconFunnel},
     {id:'clients', label:'Clients', icon:iconUsers},
     {id:'billing', label:'Billing & Invoices', icon:iconReceipt},
+    {id:'requests', label:'Package Requests', icon:iconBox},
     {id:'reps', label:'Sales Reps', icon:iconUsers},
   ]},
   {group:'Operations', items:[
@@ -558,7 +598,8 @@ const VIEW_TITLES = {
   clients:['Clients','Every active and past account'],
   billing:['Billing & Invoices','Setup fees, retainers, and overage'],
   reps:['Sales Reps','Manage rep logins and see every rep\'s pipeline'],
-  products:['Products & Pricing','The six-tier package ladder — fully editable'],
+  products:['Products & Pricing','Standard tiers are fixed by the model; only Enterprise+ is customisable'],
+  requests:['Package Requests','Changes customers have asked for from their portal'],
   procurement:['Procurement','Vendors, tools, and purchase orders behind delivery'],
   financials:['Financials','Contribution margin and P&L, generated from live data'],
   settings:['Settings','Company details and data controls'],
@@ -582,7 +623,6 @@ function renderTopbar(){
 function topbarAction(){
   if(currentView==='pipeline') return `<button class="btn btn-primary" onclick="openModal={type:'client'};render()">${iconPlus(15)} New lead</button>`;
   if(currentView==='clients') return `<button class="btn btn-primary" onclick="openModal={type:'client'};render()">${iconPlus(15)} Add client</button>`;
-  if(currentView==='products') return `<button class="btn btn-primary" onclick="openModal={type:'product'};render()">${iconPlus(15)} New package</button>`;
   if(currentView==='procurement') return `<button class="btn btn-primary" onclick="openModal={type:'vendor'};render()">${iconPlus(15)} Add vendor</button>`;
   if(currentView==='billing') return `<button class="btn btn-primary" onclick="openModal={type:'invoice'};render()">${iconPlus(15)} New invoice</button>`;
   if(currentView==='reps') return `<button class="btn btn-primary" onclick="openModal={type:'rep'};render()">${iconPlus(15)} Add sales rep</button>`;
@@ -596,6 +636,7 @@ function renderView(){
     case 'clients': return renderClients();
     case 'billing': return renderBilling();
     case 'reps': return renderReps();
+    case 'requests': return renderRequests();
     case 'products': return renderProducts();
     case 'procurement': return renderProcurement();
     case 'financials': return renderFinancials();
@@ -747,12 +788,25 @@ async function handleDrop(ev, newStage){
   const client = state.clients.find(c=>c.id===kanbanDragId);
   kanbanDragId=null;
   if(!client) return;
+  if(newStage===client.stage) return;
+
+  const allowed = allowedNextStages(client.stage);
+  if(!allowed.includes(newStage)){
+    showToast(allowed.length
+      ? `A deal only moves forward. From "${stageLabel(client.stage)}" you can go to: ${allowed.map(stageLabel).join(' or ')}.`
+      : `"${stageLabel(client.stage)}" is a final stage.`, 'warn');
+    return;
+  }
+  const comment = prompt(`Moving ${client.company} to ${stageLabel(newStage)}.\n\nAdd a comment explaining this change (required):`);
+  if(comment===null) return;             // cancelled
+  if(!comment.trim()){ showToast('A comment is required to move a deal forward','warn'); return; }
+
   const wasActive = client.stage==='active';
   const prevStage = client.stage;
   client.stage = newStage;
   render(); // optimistic
   try{
-    const updated = await API.put(`/api/clients/${client.id}`, { stage: newStage });
+    const updated = await API.put(`/api/clients/${client.id}`, { stage: newStage, stage_comment: comment.trim() });
     Object.assign(client, { stage: updated.stage, joinDate: updated.join_date });
     if(newStage==='active' && !wasActive){
       const p = productOf(client);
@@ -909,6 +963,58 @@ function renderBilling(){
   `;
 }
 
+/* ====================== PACKAGE REQUESTS (from the portal) ====================== */
+function renderRequests(){
+  const reqs = state.packageRequests || [];
+  if(!reqs.length){
+    return `<div class="card"><div class="empty">No package requests waiting. When a customer asks for a
+      different package from their portal, it appears here for you to approve or decline —
+      nothing changes on their account until you do.</div></div>`;
+  }
+  return `
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Company</th><th>Currently on</th><th>Requested</th><th>New retainer</th><th>Asked</th><th></th></tr></thead>
+      <tbody>
+      ${reqs.map(r=>`
+        <tr>
+          <td><strong>${esc(r.company)}</strong><div style="font-size:11.5px;color:var(--muted);">${esc(r.contact_name||'')}</div></td>
+          <td>${esc(r.current_product_name||'—')}</td>
+          <td><span class="tag">${esc(r.product_name)}</span></td>
+          <td class="mono">${fmtMoney(r.retainer)}</td>
+          <td>${fmtDate(r.created_at)}</td>
+          <td style="white-space:nowrap;">
+            <button class="btn btn-primary btn-sm" onclick="decideRequest('${r.id}','approve')">${iconCheck(13)} Approve</button>
+            <button class="btn btn-danger-ghost btn-sm" onclick="decideRequest('${r.id}','reject')">Decline</button>
+          </td>
+        </tr>
+        ${r.note?`<tr><td colspan="6" style="padding-top:0;font-size:12px;color:var(--muted);">"${esc(r.note)}"</td></tr>`:''}
+      `).join('')}
+      </tbody>
+    </table>
+  </div>
+  <p class="footnote">Approving moves the client onto the package. If they are already active, the new retainer is invoiced straight away.</p>
+  `;
+}
+
+async function decideRequest(id, action){
+  const verb = action==='approve' ? 'Approve' : 'Decline';
+  if(!confirm(`${verb} this package change?`)) return;
+  try{
+    await API.post(`/api/package-requests/${id}/${action}`, {});
+    const [reqs, clients] = await Promise.all([
+      API.get('/api/package-requests?status=pending'),
+      API.get('/api/clients'),
+    ]);
+    state.packageRequests = reqs;
+    const usage = {}; state.clients.forEach(c=>usage[c.id]=c.sessionsUsedThisMonth);
+    state.clients = clients.map(clientFromApi);
+    state.clients.forEach(c=>{ c.sessionsUsedThisMonth = usage[c.id]||0; });
+    render();
+    showToast(action==='approve' ? 'Package change approved' : 'Request declined');
+  }catch(e){ showToast(e.message||'Could not update the request','warn'); }
+}
+
 /* ============================== PRODUCTS ============================== */
 function renderProducts(){
   const sorted = state.products.slice().sort((a,b)=>a.order-b.order);
@@ -929,15 +1035,16 @@ function renderProducts(){
         <div class="prod-stat-row"><span class="k">Overage rate</span><span class="v">${fmtMoney(p.overageRate)}/session</span></div>
         <div class="prod-stat-row"><span class="k">Est. delivery cost (100% quota)</span><span class="v">${fmtMoney(p.deliveryCostFull)}</span></div>
         <div class="prod-actions">
-          <button class="btn btn-ghost btn-sm" onclick="openModal={type:'product',id:'${p.id}'};render()">${iconEdit(13)} Edit</button>
-          <button class="btn btn-danger-ghost btn-sm" onclick="deleteProduct('${p.id}')">${iconTrash(13)} Remove</button>
+          ${p.isStandard===false
+            ? `<button class="btn btn-ghost btn-sm" onclick="openModal={type:'product',id:'${p.id}'};render()">${iconEdit(13)} Edit</button>`
+            : `<span style="font-size:11.5px;color:var(--muted);display:inline-flex;align-items:center;gap:5px;">🔒 Fixed by the business model</span>`}
         </div>
       </div>
     `).join('')}
-    <div class="prod-card" style="display:flex;align-items:center;justify-content:center;flex-direction:column;border-style:dashed;cursor:pointer;color:var(--muted);" onclick="openModal={type:'product'};render()">
-      ${iconPlus(26)}
-      <div style="margin-top:8px;font-weight:600;font-size:13px;">Add a new package</div>
-      <div style="font-size:11.5px;margin-top:2px;">Custom tier, add-on, or vertical bundle</div>
+    <div class="prod-card" style="display:flex;align-items:center;justify-content:center;flex-direction:column;border-style:dashed;color:var(--muted);text-align:center;">
+      <div style="font-size:22px;">🔒</div>
+      <div style="margin-top:8px;font-weight:600;font-size:13px;">The ladder is fixed</div>
+      <div style="font-size:11.5px;margin-top:4px;line-height:1.5;">Standard packages carry the resources set by the<br>business model. For anything bespoke, put the client<br>on <strong>Enterprise+</strong> and set custom terms on their record.</div>
     </div>
   </div>
   `;
@@ -1216,37 +1323,89 @@ function renderModal(){
 }
 function closeModal(){ openModal=null; render(); }
 
+/* Show the custom-terms block only for the customisable (Enterprise+) tier. */
+function toggleCustomTerms(){
+  const sel = document.getElementById('f_product');
+  const box = document.getElementById('custom-terms');
+  if(!sel || !box) return;
+  box.style.display = isCustomTier(sel.value) ? 'block' : 'none';
+}
+/* A comment is only required when the stage is actually changing. */
+function toggleStageComment(originalStage){
+  const sel = document.getElementById('f_stage');
+  const wrap = document.getElementById('stage-comment-wrap');
+  if(!sel || !wrap) return;
+  wrap.style.display = (sel.value !== originalStage) ? 'block' : 'none';
+}
+
 function clientModalHTML(id){
   const c = id ? state.clients.find(x=>x.id===id) : null;
   const products = state.products.slice().sort((a,b)=>a.order-b.order);
+  // Editing an existing client offers only its current stage plus the stages it
+  // may legally advance to; a brand new record can start anywhere.
+  const allowedNext = c ? allowedNextStages(c.stage) : [];
+  const stageOptions = c ? [c.stage, ...allowedNext]
+                         : ['lead','contacted','proposal','negotiation','active','lost','churned'];
+  const showCustom = c ? isCustomTier(c.productId) : false;
   return `
   <div class="modal">
     <div class="modal-head"><h3>${c?'Edit client':'New lead'}</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
     <div class="modal-body">
       <div class="field-row">
-        <div class="field"><label>Contact name</label><input id="f_name" value="${c?esc(c.name):''}"></div>
-        <div class="field"><label>Company</label><input id="f_company" value="${c?esc(c.company):''}"></div>
+        <div class="field"><label>Contact name <span style="color:var(--red);">*</span></label><input id="f_name" value="${c?esc(c.name):''}"></div>
+        <div class="field"><label>Company <span style="color:var(--red);">*</span></label><input id="f_company" value="${c?esc(c.company):''}"></div>
       </div>
       <div class="field-row">
-        <div class="field"><label>Email</label><input id="f_email" value="${c?esc(c.email):''}"></div>
-        <div class="field"><label>Phone</label><input id="f_phone" value="${c?esc(c.phone):''}"></div>
+        <div class="field"><label>Email <span style="color:var(--red);">*</span></label><input id="f_email" value="${c?esc(c.email):''}"></div>
+        <div class="field"><label>Phone <span style="color:var(--red);">*</span></label><input id="f_phone" value="${c?esc(c.phone):''}"></div>
       </div>
       <div class="field-row">
-        <div class="field"><label>Package interest</label>
-          <select id="f_product">${products.map(p=>`<option value="${p.id}" ${c&&c.productId===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select>
+        <div class="field"><label>Package <span style="color:var(--red);">*</span></label>
+          <select id="f_product" onchange="toggleCustomTerms()">${products.map(p=>`<option value="${p.id}" ${c&&c.productId===p.id?'selected':''}>${esc(p.name)}${p.isStandard===false?' (customisable)':''}</option>`).join('')}</select>
         </div>
-        <div class="field"><label>Stage</label>
-          <select id="f_stage">
-            ${['lead','contacted','proposal','negotiation','active','lost','churned'].map(s=>`<option value="${s}" ${c&&c.stage===s?'selected':''}>${stageLabel(s)}</option>`).join('')}
+        <div class="field"><label>Stage <span style="color:var(--red);">*</span></label>
+          <select id="f_stage" onchange="toggleStageComment('${c?c.stage:''}')">
+            ${stageOptions.map(s=>`<option value="${s}" ${c?(c.stage===s?'selected':''):(s==='lead'?'selected':'')}>${stageLabel(s)}</option>`).join('')}
           </select>
+          ${c&&allowedNext.length===0?`<div style="font-size:11px;color:var(--muted);margin-top:4px;">${stageLabel(c.stage)} is a final stage.</div>`:''}
         </div>
       </div>
+      ${c?`<div class="field" id="stage-comment-wrap" style="display:none;">
+        <label>Reason for the stage change <span style="color:var(--red);">*</span></label>
+        <textarea id="f_stage_comment" rows="2" placeholder="Why is this deal moving forward? Recorded permanently against the client."></textarea>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">Deals only move forward, one stage at a time. This cannot be undone.</div>
+      </div>`:''}
       <div class="field-row">
-        <div class="field"><label>Estimated deal value (PKR/mo)</label><input id="f_value" type="number" value="${c?c.estValue:''}"></div>
-        <div class="field"><label>Source</label><input id="f_source" value="${c?esc(c.source):''}" placeholder="Warm network, referral, LinkedIn…"></div>
+        <div class="field"><label>Estimated deal value (PKR/mo) <span style="color:var(--red);">*</span></label><input id="f_value" type="number" value="${c?c.estValue:''}"></div>
+        <div class="field"><label>Source <span style="color:var(--red);">*</span></label><input id="f_source" value="${c?esc(c.source):''}" placeholder="Warm network, referral, LinkedIn…"></div>
       </div>
-      <div class="field"><label>WhatsApp number / external ref</label><input id="f_external_ref" value="${c?esc(c.externalRef||''):''}" placeholder="e.g. 923001234567 — used to match n8n usage events to this client"></div>
-      <div class="field"><label>Notes</label><textarea id="f_notes" rows="3">${c?esc(c.notes):''}</textarea></div>
+      <div class="field"><label>WhatsApp number / external ref <span style="color:var(--red);">*</span></label><input id="f_external_ref" value="${c?esc(c.externalRef||''):''}" placeholder="e.g. 923001234567 — used to match n8n usage events to this client"></div>
+
+      <div id="custom-terms" style="display:${showCustom?'block':'none'};background:#FAF8F3;border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;">
+        <div style="font-weight:600;font-size:13px;margin-bottom:2px;">Custom terms</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">
+          Only Enterprise+ can be customised. Leave a field blank to use the package default.
+          Standard packages are fixed by the business model.
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Setup fee</label><input id="f_c_setup" type="number" value="${c&&c.customSetupFee!=null?c.customSetupFee:''}"></div>
+          <div class="field"><label>Monthly retainer</label><input id="f_c_retainer" type="number" value="${c&&c.customRetainer!=null?c.customRetainer:''}"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Included sessions / month</label><input id="f_c_quota" type="number" value="${c&&c.customQuota!=null?c.customQuota:''}"></div>
+          <div class="field"><label>Overage rate / session</label><input id="f_c_overage" type="number" value="${c&&c.customOverageRate!=null?c.customOverageRate:''}"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Automation</label><input id="f_c_automation" value="${c?esc(c.customAutomation||''):''}"></div>
+          <div class="field"><label>Data layer</label><input id="f_c_datalayer" value="${c?esc(c.customDataLayer||''):''}"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>AI model</label><input id="f_c_aimodel" value="${c?esc(c.customAiModel||''):''}"></div>
+          <div class="field"><label>Channels</label><input id="f_c_channels" value="${c?esc(c.customChannels||''):''}"></div>
+        </div>
+      </div>
+
+      <div class="field"><label>Notes <span style="font-size:11px;color:var(--muted);font-weight:400;">(optional)</span></label><textarea id="f_notes" rows="3">${c?esc(c.notes):''}</textarea></div>
     </div>
     <div class="modal-foot">
       ${c?`<button class="btn btn-danger-ghost" onclick="deleteClient('${c.id}')">Delete</button>`:''}
@@ -1256,20 +1415,52 @@ function clientModalHTML(id){
   </div>`;
 }
 async function saveClient(id){
-  const name=document.getElementById('f_name').value.trim();
-  const company=document.getElementById('f_company').value.trim();
-  if(!name||!company){ showToast('Name and company are required','warn'); return; }
+  const v = (elId)=> (document.getElementById(elId)||{value:''}).value.trim();
+  const existing = id ? state.clients.find(x=>x.id===id) : null;
+
   const data = {
-    name, company,
-    email:document.getElementById('f_email').value.trim(),
-    phone:document.getElementById('f_phone').value.trim(),
-    productId:document.getElementById('f_product').value,
-    stage:document.getElementById('f_stage').value,
-    estValue:parseFloat(document.getElementById('f_value').value)||0,
-    source:document.getElementById('f_source').value.trim(),
-    externalRef:document.getElementById('f_external_ref').value.trim()||null,
-    notes:document.getElementById('f_notes').value.trim(),
+    name: v('f_name'), company: v('f_company'), email: v('f_email'), phone: v('f_phone'),
+    productId: v('f_product'),
+    stage: v('f_stage'),
+    estValue: parseFloat(v('f_value')),
+    source: v('f_source'),
+    externalRef: v('f_external_ref'),
+    notes: v('f_notes'),
   };
+
+  // Everything except Notes is required.
+  const required = [
+    ['name','Contact name'],['company','Company'],['email','Email'],['phone','Phone'],
+    ['productId','Package'],['stage','Stage'],['source','Source'],['externalRef','WhatsApp number / external ref'],
+  ];
+  const missing = required.filter(([k])=>!String(data[k]||'').trim()).map(([,l])=>l);
+  if(isNaN(data.estValue)) missing.push('Estimated deal value');
+  if(missing.length){ showToast('Required: '+missing.join(', '), 'warn'); return; }
+
+  // A stage change needs a comment, and may only move forward.
+  if(existing && data.stage !== existing.stage){
+    const allowed = allowedNextStages(existing.stage);
+    if(!allowed.includes(data.stage)){
+      showToast(allowed.length
+        ? `A deal only moves forward. From "${stageLabel(existing.stage)}": ${allowed.map(stageLabel).join(' or ')}.`
+        : `"${stageLabel(existing.stage)}" is a final stage.`, 'warn');
+      return;
+    }
+    const comment = v('f_stage_comment');
+    if(!comment){ showToast('A comment is required to move a deal to the next stage','warn'); return; }
+    data.stageComment = comment;
+  }
+
+  // Custom terms travel only for the customisable tier; blanks mean "use the default".
+  if(isCustomTier(data.productId)){
+    const num = (elId)=>{ const raw=v(elId); return raw===''?null:(parseFloat(raw)||0); };
+    data.custom = {
+      setupFee:num('f_c_setup'), retainer:num('f_c_retainer'), quota:num('f_c_quota'),
+      overageRate:num('f_c_overage'), msgsPerSession:null,
+      automation:v('f_c_automation')||null, dataLayer:v('f_c_datalayer')||null,
+      aiModel:v('f_c_aimodel')||null, channels:v('f_c_channels')||null,
+    };
+  }
   try{
     if(id){
       const updated = await API.put(`/api/clients/${id}`, clientToApi(data));
@@ -1293,7 +1484,48 @@ async function deleteClient(id){
     closeModal(); openPanel=null; render(); showToast('Client deleted');
   }catch(e){ showToast(e.message||'Could not delete client','warn'); }
 }
-async function generatePortalLink(clientId, regenerate){
+async function generatePortalCredentials(clientId){
+  const client = state.clients.find(c=>c.id===clientId);
+  if(client && client.portalEnabled && !confirm('Reset this customer\'s portal password?\n\nTheir current password stops working immediately and anyone signed in is logged out.')) return;
+  const area = document.getElementById('portal-link-area');
+  if(area) area.innerHTML = '<span class="loading-dot"></span> Generating…';
+  try{
+    const r = await API.post(`/api/clients/${clientId}/portal-credentials`, {});
+    if(client){ client.portalEnabled = true; client.portalUsername = r.username; }
+    const loginUrl = API.base + '/portal.html';
+    if(area) area.innerHTML = `
+      <div style="background:var(--teal-light);border:1px solid #BFE3D8;border-radius:10px;padding:12px;">
+        <div style="font-weight:600;color:var(--teal-dark);margin-bottom:8px;">Portal login created</div>
+        <div style="margin-bottom:4px;">Sign-in page: <a href="${esc(loginUrl)}" target="_blank" rel="noopener" style="color:var(--teal-dark);">${esc(loginUrl)}</a></div>
+        <div style="margin-bottom:4px;">Username: <strong style="font-family:'JetBrains Mono',monospace;">${esc(r.username)}</strong></div>
+        <div style="margin-bottom:8px;">Password: <strong style="font-family:'JetBrains Mono',monospace;font-size:14px;">${esc(r.password)}</strong></div>
+        <button class="btn btn-ghost btn-sm" onclick="copyPortalCreds('${esc(r.username)}','${esc(r.password)}','${esc(loginUrl)}')">Copy all three</button>
+        <div style="margin-top:8px;color:#8A5F17;background:var(--amber-light);padding:8px 10px;border-radius:8px;font-size:11.5px;">
+          Copy this password now — it is stored hashed and can never be shown again. Send it to the
+          customer over a channel you trust, separately from the link.
+        </div>
+      </div>`;
+  }catch(e){
+    if(area) area.innerHTML = `<span style="color:var(--red);">${esc(e.message||'Could not create the login')}</span>`;
+  }
+}
+
+function copyPortalCreds(u, pw, url){
+  const text = `Vantriq AI account portal\nSign in: ${url}\nUsername: ${u}\nPassword: ${pw}`;
+  navigator.clipboard.writeText(text).then(()=>showToast('Login details copied'), ()=>showToast('Could not copy','warn'));
+}
+
+async function revokePortalCredentials(clientId){
+  if(!confirm('Revoke this customer\'s portal access?\n\nTheir login stops working immediately.')) return;
+  try{
+    await API.del(`/api/clients/${clientId}/portal-credentials`);
+    const client = state.clients.find(c=>c.id===clientId);
+    if(client){ client.portalEnabled = false; client.portalUsername = ''; }
+    render(); showToast('Portal access revoked');
+  }catch(e){ showToast(e.message||'Could not revoke access','warn'); }
+}
+
+async function generatePortalLink_unused(clientId, regenerate){
   const area = document.getElementById('portal-link-area');
   if(area) area.innerHTML = '<span class="loading-dot"></span> Generating…';
   try{
@@ -1676,7 +1908,12 @@ function clientPanelHTML(id){
     <div class="divider"></div>
     <h4 style="font-size:13px;margin-bottom:8px;">Customer portal</h4>
     <div id="portal-link-area" style="font-size:12.5px;color:var(--muted);">
-      <button class="btn btn-ghost btn-sm" onclick="generatePortalLink('${c.id}')">${iconArrowRight(13)} Get shareable portal link</button>
+      ${c.portalEnabled
+        ? `<div style="margin-bottom:8px;">Sign-in is active. Username <strong style="font-family:'JetBrains Mono',monospace;">${esc(c.portalUsername)}</strong></div>
+           <button class="btn btn-ghost btn-sm" onclick="generatePortalCredentials('${c.id}')">Reset password</button>
+           <button class="btn btn-danger-ghost btn-sm" onclick="revokePortalCredentials('${c.id}')">Revoke access</button>`
+        : `<div style="margin-bottom:8px;">No portal login yet. The customer needs a username and password to sign in.</div>
+           <button class="btn btn-ghost btn-sm" onclick="generatePortalCredentials('${c.id}')">${iconArrowRight(13)} Create portal login</button>`}
     </div>
 
     <div class="divider"></div>

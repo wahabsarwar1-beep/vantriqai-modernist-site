@@ -106,17 +106,30 @@ function fmtDate(d){ if(!d) return '—'; return new Date(d).toLocaleDateString(
 function fmtMonth(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('en-US',{month:'short',year:'numeric'}); }
 function esc(s){ return (s==null?'':s+'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-const params = new URLSearchParams(window.location.search);
-const TOKEN = params.get('t') || params.get('token') || '';
+/* Access is by username + password now. The old ?t=<token> links no longer
+   open an account on their own — the session below is the only credential. */
+const SESSION_KEY = 'vantriq_portal_session';
+let SESSION = '';
+try { SESSION = localStorage.getItem(SESSION_KEY) || ''; } catch(e) { SESSION = ''; }
 
-let data = { account:null, usage:null, invoices:[], ledger:null };
+let data = { account:null, usage:null, invoices:[], ledger:null, packages:null };
 let currentTab = 'overview';
 let error = null;
 let openInvoiceId = null;
 let usageChart = null;
+let loginBusy = false;
 
-async function api(path){
-  const res = await fetch(`/api/portal/${TOKEN}${path}`);
+function setSession(t){
+  SESSION = t || '';
+  try { t ? localStorage.setItem(SESSION_KEY, t) : localStorage.removeItem(SESSION_KEY); } catch(e){}
+}
+
+async function api(path, opts){
+  const res = await fetch(`/api/portal${path}`, {
+    ...(opts||{}),
+    headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SESSION, ...((opts||{}).headers||{}) },
+  });
+  if(res.status === 401){ setSession(''); const e = new Error('SESSION_EXPIRED'); e.expired = true; throw e; }
   const json = await res.json().catch(()=>({}));
   if(!res.ok) throw new Error(json.error || 'Something went wrong');
   return json;
@@ -132,20 +145,75 @@ function stagePill(stage){
 function invoiceStatusClass(s){ return {paid:'pill-paid',pending:'pill-pending',overdue:'pill-overdue'}[s]||'pill-pending'; }
 
 async function boot(){
-  if(!TOKEN){
-    renderError('No account link provided. Use the link Vantriq AI shared with you — it looks like .../portal.html?t=...');
-    return;
-  }
+  if(!SESSION){ renderLogin(); return; }
   document.getElementById('app').innerHTML = `<div class="center-screen"><span class="loading-dot"></span>&nbsp; Loading your account…</div>`;
   try{
-    const [account, usage, invoices, ledger] = await Promise.all([
-      api('/account'), api('/usage'), api('/invoices'), api('/ledger'),
+    const [account, usage, invoices, ledger, packages] = await Promise.all([
+      api('/account'), api('/usage'), api('/invoices'), api('/ledger'), api('/packages'),
     ]);
-    data = { account, usage, invoices, ledger };
+    data = { account, usage, invoices, ledger, packages };
     render();
   }catch(e){
+    if(e.expired){ renderLogin('Your session has ended. Please sign in again.'); return; }
     renderError(e.message || 'Could not load your account.');
   }
+}
+
+/* ----------------------------- Sign in ----------------------------- */
+function renderLogin(msg){
+  document.getElementById('app').innerHTML = `
+  <div class="center-screen">
+    <div class="card" style="max-width:380px;width:100%;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+        <div class="brand-mark"><svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M1 10h3l2-6 3 12 2.5-9 1.5 4h6" stroke="#8FD9CC" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div><div class="brand-name">Vantriq AI</div><div class="brand-sub">Account portal</div></div>
+      </div>
+      <h3 style="margin:0 0 4px;">Sign in</h3>
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">Use the username and password Vantriq AI gave you.</p>
+      ${msg?`<div id="login-msg" style="background:var(--red-light);color:#8F3527;padding:9px 11px;border-radius:8px;font-size:12.5px;margin-bottom:12px;">${esc(msg)}</div>`:'<div id="login-msg" style="display:none;"></div>'}
+      <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;">Username</label>
+      <input id="lg_user" autocomplete="username" style="width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;margin-bottom:10px;box-sizing:border-box;">
+      <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;">Password</label>
+      <input id="lg_pass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()" style="width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;margin-bottom:14px;box-sizing:border-box;">
+      <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="doLogin()">Sign in</button>
+      <p style="font-size:11.5px;color:var(--muted);margin:14px 0 0;text-align:center;">
+        Lost your details? <a class="wa-link" href="https://wa.me/923006789807" target="_blank" rel="noopener">Message us on WhatsApp</a>
+      </p>
+    </div>
+  </div>`;
+  const u = document.getElementById('lg_user'); if(u) u.focus();
+}
+
+async function doLogin(){
+  if(loginBusy) return;
+  const box = document.getElementById('login-msg');
+  const username = (document.getElementById('lg_user')||{}).value || '';
+  const password = (document.getElementById('lg_pass')||{}).value || '';
+  const show = (m)=>{ if(box){ box.style.display='block'; box.style.background='var(--red-light)'; box.style.color='#8F3527'; box.style.padding='9px 11px'; box.style.borderRadius='8px'; box.style.fontSize='12.5px'; box.style.marginBottom='12px'; box.textContent=m; } };
+  if(!username.trim() || !password){ show('Enter both your username and password.'); return; }
+  loginBusy = true;
+  try{
+    const res = await fetch('/api/portal/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ username: username.trim(), password }),
+    });
+    const json = await res.json().catch(()=>({}));
+    if(!res.ok){ show(json.error || 'Could not sign you in.'); loginBusy=false; return; }
+    setSession(json.session);
+    loginBusy = false;
+    boot();
+  }catch(e){
+    show('Could not reach the server. Check your connection and try again.');
+    loginBusy = false;
+  }
+}
+
+async function doLogout(){
+  try{ await fetch('/api/portal/logout', { method:'POST', headers:{'Authorization':'Bearer '+SESSION} }); }catch(e){}
+  setSession('');
+  data = { account:null, usage:null, invoices:[], ledger:null, packages:null };
+  currentTab = 'overview';
+  renderLogin('You have been signed out.');
 }
 
 function renderError(msg){
@@ -184,10 +252,13 @@ function render(){
         <div class="tab ${currentTab==='usage'?'active':''}" onclick="setTab('usage')">Usage</div>
         <div class="tab ${currentTab==='invoices'?'active':''}" onclick="setTab('invoices')">Invoices</div>
         <div class="tab ${currentTab==='ledger'?'active':''}" onclick="setTab('ledger')">Statement</div>
+        <div class="tab ${currentTab==='packages'?'active':''}" onclick="setTab('packages')">Packages</div>
       </div>
       <div id="tab-content">${renderTab()}</div>
       <div class="footer-note">
         Questions about your account? <a class="wa-link" href="https://wa.me/923006789807" target="_blank" rel="noopener">Message Vantriq AI on WhatsApp</a>
+        <span style="margin:0 8px;color:var(--border);">|</span>
+        <a class="wa-link" href="#" onclick="event.preventDefault();doLogout()">Sign out</a>
       </div>
     </div>
   `;
@@ -202,6 +273,7 @@ function renderTab(){
   if(currentTab==='usage') return renderUsage();
   if(currentTab==='invoices') return renderInvoices();
   if(currentTab==='ledger') return renderLedger();
+  if(currentTab==='packages') return renderPackages();
   return '';
 }
 
@@ -230,7 +302,6 @@ function renderOverview(){
       <div class="kv"><span class="k">Monthly retainer</span><span class="v">${fmtMoney(p.retainer)}</span></div>
       <div class="kv"><span class="k">Included sessions / month</span><span class="v">${fmtNum(p.quota)}</span></div>
       <div class="kv"><span class="k">Overage rate</span><span class="v">${fmtMoney(p.overage_rate)} / session</span></div>
-      <div class="kv"><span class="k">AI model</span><span class="v">${esc(p.ai_model)}</span></div>
       <div class="kv"><span class="k">Channels</span><span class="v">${esc(p.channels)}</span></div>
     ` : `<div class="empty">No package assigned yet.</div>`}
   </div>
@@ -243,6 +314,67 @@ function renderOverview(){
     <div class="kv"><span class="k">Client since</span><span class="v">${fmtDate(account.join_date)}</span></div>
   </div>
   `;
+}
+
+function renderPackages(){
+  const pk = data.packages;
+  if(!pk) return `<div class="empty">Packages are unavailable right now.</div>`;
+  const pending = pk.pending_request;
+  return `
+  ${pending ? `
+  <div class="card" style="background:var(--amber-light);border-color:#F0D9A8;">
+    <div style="font-size:13px;color:#63430B;">
+      <strong>Change requested.</strong> You have asked to move to <strong>${esc(pending.product_name)}</strong>.
+      Vantriq AI is reviewing it — nothing on your account changes until it is approved.
+    </div>
+  </div>` : `
+  <div class="card">
+    <div style="font-size:13px;color:var(--muted);">
+      Choose a package below to request a change. Nothing changes and nothing is billed
+      until Vantriq AI approves the request.
+    </div>
+  </div>`}
+
+  <div class="card">
+    <h3>Available packages</h3>
+    ${pk.packages.map(p=>{
+      const current = p.id === pk.current_product_id;
+      return `
+      <div style="border:1px solid ${current?'var(--teal)':'var(--border)'};background:${current?'var(--teal-light)':'transparent'};border-radius:10px;padding:14px;margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+          <div>
+            <div style="font-family:'Space Grotesk';font-weight:600;font-size:15px;">${esc(p.name)}${current?' <span class="pill pill-active" style="margin-left:6px;">Your package</span>':''}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">${esc(p.target_tier||'')}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:'Space Grotesk';font-size:17px;font-weight:600;">${fmtMoney(p.retainer)}<span style="font-size:12px;color:var(--muted);font-weight:400;">/mo</span></div>
+            <div style="font-size:11.5px;color:var(--muted);">${fmtMoney(p.setup_fee)} setup</div>
+          </div>
+        </div>
+        <div class="kv"><span class="k">Included sessions / month</span><span class="v">${fmtNum(p.quota)}</span></div>
+        <div class="kv"><span class="k">Overage rate</span><span class="v">${fmtMoney(p.overage_rate)} / session</span></div>
+        <div class="kv"><span class="k">Channels</span><span class="v">${esc(p.channels||'—')}</span></div>
+        ${current || pending ? '' : `
+        <button class="btn btn-primary" style="margin-top:12px;" onclick="requestPackage('${p.id}','${esc(p.name).replace(/'/g,"\\'")}')">Request this package</button>`}
+      </div>`;
+    }).join('')}
+    <p style="font-size:11.5px;color:var(--muted);margin:6px 0 0;">
+      Need something beyond these? Enterprise+ is scoped and priced individually —
+      <a class="wa-link" href="https://wa.me/923006789807" target="_blank" rel="noopener">talk to us</a>.
+    </p>
+  </div>`;
+}
+
+async function requestPackage(productId, name){
+  if(!confirm(`Request a change to the ${name} package?\n\nVantriq AI will review it. Nothing changes on your account until it is approved.`)) return;
+  try{
+    await api('/subscribe', { method:'POST', body: JSON.stringify({ product_id: productId }) });
+    data.packages = await api('/packages');
+    render();
+  }catch(e){
+    if(e.expired){ renderLogin('Your session has ended. Please sign in again.'); return; }
+    alert(e.message || 'Could not send your request.');
+  }
 }
 
 function renderUsage(){
