@@ -42,8 +42,8 @@ it's safe to paste into n8n.
 
 ```json
 {
-  "external_ref": "{{ $json.from }}",
-  "session_id": "{{ $json.from }}-{{ $now.format('yyyy-MM-dd') }}",
+  "external_ref": "{{ $json.entry[0].changes[0].value.metadata.display_phone_number }}",
+  "session_id": "{{ $json.entry[0].changes[0].value.messages[0].from }}-{{ $now.format('yyyy-MM-dd') }}",
   "channel": "whatsapp",
   "ai_model": "{{ $json.model }}",
   "input_tokens": {{ $json.usage.input_tokens }},
@@ -55,14 +55,23 @@ it's safe to paste into n8n.
 Adjust the expressions to match your actual node output field names —
 the important parts are:
 
-- **`external_ref`** — the customer's WhatsApp number (or however you
-  identify them). This must match the "External ref" field you set on
-  the client in the Vantriq CRM (Clients -> edit client), so the event
-  gets attributed to the right account.
-- **`session_id`** — one ID per 24-hour WhatsApp conversation window.
-  Using `{customer number}-{date}` is a simple, reliable pattern since
-  WhatsApp's own billing windows reset daily-ish; adjust if your billing
-  logic differs.
+- **`external_ref`** — **your client's** WhatsApp Business number: the
+  number the message arrived *on*, which is
+  `value.metadata.display_phone_number` on a WhatsApp Business webhook.
+  It must match the "External ref" field you set on the client in the
+  Vantriq CRM (Clients -> edit client), so the event gets attributed to
+  the right account.
+
+  It is **not** `messages[0].from`. That is the end consumer who wrote
+  in — a different number on every message. Using it here would create a
+  `404 No client found` on every single conversation, or worse, silently
+  bill the wrong account if that number ever matched a client.
+- **`session_id`** — one ID per 24-hour WhatsApp conversation window,
+  and *this* is where the consumer's number belongs. `{consumer
+  number}-{date}` is a simple, reliable pattern since WhatsApp's own
+  billing windows reset daily-ish; adjust if your billing logic differs.
+  Posting the same `session_id` twice counts as one conversation, so
+  retries can never inflate a client's bill.
 - **`input_tokens` / `output_tokens`** — every major provider returns
   these automatically:
   - **Claude (Anthropic API):** `response.usage.input_tokens` / `response.usage.output_tokens`
@@ -74,10 +83,12 @@ the important parts are:
 
 ## 4. Don't let this slow down the customer reply
 
-Set the HTTP Request node's **"Always Output Data"** on and put it on a
-branch that runs *after* you've already sent the WhatsApp reply, not
-before — or use n8n's built-in **"Execute Once"** / parallel branching so
-usage logging never blocks the actual conversation.
+Put the node on a branch that runs *after* you've already sent the
+WhatsApp reply, never between the customer and their answer. Set its
+**On Error** to **Continue (using regular output)** and turn on
+**Never Error** under Response options, so a CRM that is down or slow
+costs you a usage row rather than a conversation. The wiring kit
+workflow below already has both set.
 
 ## 5. New client checklist
 
@@ -85,8 +96,9 @@ Every time you onboard a new client in the CRM:
 
 1. Create/move them to **Active** in the Pipeline or Clients tab.
 2. Open the client, click **Edit**, and set **"WhatsApp number / external ref"**
-   to the exact number their WhatsApp Business account uses (matching
-   whatever value `{{ $json.from }}` resolves to in your n8n workflow).
+   to the exact number their WhatsApp Business account receives on —
+   digits only, no `+` and no spaces, matching whatever
+   `value.metadata.display_phone_number` resolves to in your n8n workflow.
 3. That's it — usage starts flowing in automatically from the next
    message onward, visible on their client page within ~20 seconds
    (the CRM polls for updates automatically).
@@ -259,35 +271,68 @@ Billing the same client for the same period twice answers `409` with
 double-bill anyone. Treat `409` as success-already-done, not as an error to
 retry.
 
-`vantriq-monthly-billing.json` in this folder is that workflow, ready to import
-into your self-hosted n8n (**Workflows → ⋯ → Import from File**).
+That workflow already exists in your self-hosted n8n — **Vantriq — monthly
+billing run**, `n8n.vantriqai.com/workflow/xlEO0ypQbpduh7CP`. It is **inactive**
+and will stay that way until you publish it. `vantriq-monthly-billing.json` in
+this folder is the same workflow as a file, kept only as a backup: if the VPS is
+rebuilt, import it rather than rebuilding the flow by hand.
 
 > A draft of it also exists in the n8n **Cloud** account
 > (`wahabsarwar.app.n8n.cloud`) from an earlier session. That is a different
-> instance from the `n8n_app` container on this VPS. If the VPS one is your
-> production n8n — it is, per the business model — ignore or delete the Cloud
-> draft and import the file here instead. Running both would bill every client
-> twice.
+> instance from the `n8n_app` container on this VPS. The VPS one is production,
+> per the business model — **delete the Cloud draft**. Running both would bill
+> every client twice.
 
 Before publishing it:
 
-1. Check both URLs point at your CRM (they default to
-   `https://crm.vantriqai.com`).
-2. Create the credential it asks for — a **Custom Auth (templated)** credential
-   with the template
+1. Create the credential it asks for. Both HTTP nodes are set to **Custom Auth
+   (templated)** but have no credential attached yet — n8n cannot create one for
+   you. Make it with the template
 
    ```json
    { "headers": { "x-api-key": "{{api_key}}" } }
    ```
 
-   and `api_key` set to the automation key from `create-key`. Putting the key in
-   a credential rather than in the node keeps it out of the workflow JSON and
-   out of exports.
-3. Run it once by hand and read the **Summarise the run** output. Each client
+   and `api_key` set to the automation key from `create-key`. Name it
+   **Vantriq automation key**. Putting the key in a credential rather than in
+   the node keeps it out of the workflow JSON and out of exports.
+2. Run it once by hand and read the **Summarise the run** output. Each client
    comes back as `invoiced`, `already invoiced`, or `FAILED` with the reason.
+   Nothing is billed twice if you run it again — a repeat answers `409`.
 
 Only then publish it. It fires on the 1st at 03:00 and bills the month that
 just ended.
+
+## The wiring kit for consumer workflows
+
+**Vantriq — CRM wiring kit (copy these nodes)**,
+`n8n.vantriqai.com/workflow/nGQkFd2GZ9yD4DFY`, is not meant to run. It holds the
+three nodes every consumer workflow needs, wired in the right order and
+annotated: open it, select the nodes, copy them, and paste them into the
+WhatsApp or website-chat workflow you are onboarding.
+
+```
+[trigger] -> [identify the conversation] -> [may we answer?] -> [paused?]
+                                                                  |  |
+                        your reply generation  <-------------------  +--> [holding reply]
+                                 |
+                                 +--> [record this conversation] -> [crossed a threshold?] -> [alert]
+```
+
+Two things about it are deliberate and should survive being pasted:
+
+- **The gate goes first, the meter goes last.** The service-status check runs
+  before you spend a token; the usage post runs *after* the customer already has
+  their reply, with `onError: continueRegularOutput`, so a CRM outage costs you
+  a usage row and never a conversation.
+- **`external_ref` is the number the message arrived on**
+  (`metadata.display_phone_number`), not `messages[0].from`. It identifies *your
+  client* in the CRM. `from` is their customer, and it belongs in `session_id`,
+  not in `external_ref`. Getting these the wrong way round attributes every
+  conversation to the wrong account — or to no account, and the webhook answers
+  `404`.
+
+`vantriq-crm-wiring-kit.json` in this folder is the same kit as a file.
 
 ---
 
@@ -387,9 +432,10 @@ A row for the client whose `external_ref` matches that WhatsApp number means the
 whole chain is live: WhatsApp → n8n → CRM → Postgres → the customer's portal.
 
 If nothing appears, the usual cause is `external_ref`. It must be the client's
-WhatsApp number exactly as n8n sends it — no `+`, no spaces. The webhook answers
-`404` with the ref it could not match, so check the n8n execution log for that
-message rather than guessing.
+own WhatsApp Business number exactly as n8n sends it — no `+`, no spaces — and
+not the number of the person who wrote in. The webhook answers `404` with the
+ref it could not match, so check the n8n execution log for that message rather
+than guessing.
 
 ---
 
