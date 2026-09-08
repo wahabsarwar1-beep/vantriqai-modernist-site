@@ -113,7 +113,7 @@ environment variable and deploy.
 
 **This is not how Vantriq Ops is actually deployed.** It runs as a Docker
 container on the Hostinger VPS, on the same box and the same Docker
-network as n8n and Postgres — see `../DEPLOY.md` and `../UPGRADE-V5.md`.
+network as n8n and Postgres — see `../DEPLOY.md` and `../UPGRADE-V6.md`.
 Follow those, not this step; the section above is kept only for anyone
 standing the CRM up somewhere else from scratch.
 

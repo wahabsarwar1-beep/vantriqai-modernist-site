@@ -1,10 +1,16 @@
 # Upgrade the live CRM — everything since v3
 
-**This is the only upgrade runbook you need.** There is no separate v4 package:
-`vantriq-backend-v5.zip` is a snapshot of the whole backend, so it carries the
-v4 work (sub-accounts, quotas, FBR invoicing, passwords) and the v5 work (the
-business-model pricing and the portal's session detail) in one upload. One
-upload, one rebuild, one migration.
+**This is the only upgrade runbook you need, and there is only one zip.**
+`vantriq-backend-v6.zip` is a snapshot of the whole backend, not a patch, so it
+carries the v4 work (sub-accounts, quotas, FBR invoicing, passwords), the v5
+work (business-model pricing, the portal's session detail) and the v6 work
+(service suspension, the over-quota policy, `/api/webhooks/service-status`) in
+one upload. One upload, one rebuild, one migration.
+
+The file is named for the newest version inside it. If you are looking for a
+"v6 file" and only see a different number, the zip was renamed and this line
+was not — check the version list above against what you expect, and trust the
+contents over the filename.
 
 Nothing in v3 is removed; every change adds to what is already there.
 
@@ -43,19 +49,19 @@ ls -lh /root/vantriq-backup-*.sql
 In **WinSCP**: left panel = your PC, right panel = the server.
 
 - Right panel path box: `/root/crm-stack`
-- Drag **`vantriq-backend-v5.zip`** from left to right
+- Drag **`vantriq-backend-v6.zip`** from left to right
 
 Then confirm it arrived:
 
 ```bash
-ls -lh /root/crm-stack/vantriq-backend-v5.zip
+ls -lh /root/crm-stack/vantriq-backend-v6.zip
 ```
 
 ## 3. Unpack it
 
 ```bash
 cd /root/crm-stack
-unzip -o vantriq-backend-v5.zip
+unzip -o vantriq-backend-v6.zip
 ls -1 vantriq-backend/src/routes/quota.js vantriq-backend/public/reset.html vantriq-backend/Dockerfile
 ```
 
