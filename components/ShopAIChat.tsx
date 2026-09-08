@@ -188,10 +188,13 @@ export default function ShopAIChat() {
     let mounted = true;
     let observer: MutationObserver | null = null;
 
-    /*  Defaulted, not required. NEXT_PUBLIC_* is inlined at BUILD time, so a
-     *  value set in a host's env panel does nothing until the site is rebuilt
-     *  — and on Hostinger's git auto-deploy it is easy for a build to run
-     *  without it. When the value is missing @n8n/chat does not fail loudly:
+    /*  Defaulted, not required. NEXT_PUBLIC_* is inlined at BUILD time, and on
+     *  this site's Hostinger git auto-deploy the panel's environment variables
+     *  reach the RUNTIME process only, never the compile — verified by setting
+     *  the variable and rebuilding twice, with the bundle still carrying an
+     *  empty value. So this one cannot be configured from the host at all.
+     *
+     *  When the value is missing @n8n/chat does not fail loudly:
      *  it treats an empty webhookUrl as a same-origin relative path, POSTs to
      *  this very site, gets the page's own HTML back, and renders that markup
      *  into the chat window as the assistant's reply. Visitors saw
