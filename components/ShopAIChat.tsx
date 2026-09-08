@@ -188,10 +188,42 @@ export default function ShopAIChat() {
     let mounted = true;
     let observer: MutationObserver | null = null;
 
+    /*  Defaulted, not required. NEXT_PUBLIC_* is inlined at BUILD time, and on
+     *  this site's Hostinger git auto-deploy the panel's environment variables
+     *  reach the RUNTIME process only, never the compile — verified by setting
+     *  the variable and rebuilding twice, with the bundle still carrying an
+     *  empty value. So this one cannot be configured from the host at all.
+     *
+     *  When the value is missing @n8n/chat does not fail loudly:
+     *  it treats an empty webhookUrl as a same-origin relative path, POSTs to
+     *  this very site, gets the page's own HTML back, and renders that markup
+     *  into the chat window as the assistant's reply. Visitors saw
+     *  "<!DOCTYPE html>" where an answer should be.
+     *
+     *  So the production endpoint is the default and the env var is an
+     *  override, for pointing a preview build at a different workflow. This is
+     *  not a secret: it is a public webhook, CORS-restricted server-side to
+     *  vantriqai.com, and it already ships inside the client bundle whichever
+     *  way it is set. Hard-coding it costs nothing and removes a whole class
+     *  of deploy-time breakage. */
+    const DEFAULT_WEBHOOK_URL =
+      "https://n8n.vantriqai.com/webhook/678305e8-7b54-4a7f-9a04-4662389631b2/chat";
+
+    const webhookUrl = process.env.NEXT_PUBLIC_N8N_CHAT_WEBHOOK_URL || DEFAULT_WEBHOOK_URL;
+    if (!/^https?:\/\//i.test(webhookUrl)) {
+      console.error(
+        "[chat] NEXT_PUBLIC_N8N_CHAT_WEBHOOK_URL is set but is not an absolute " +
+          "http(s) URL, so the assistant was not mounted rather than posting to " +
+          "this site's own origin. Fix the value and REBUILD — a restart will " +
+          "not pick it up — or unset it to fall back to the production webhook.",
+      );
+      return;
+    }
+
     loadChatBundle().then(({ createChat }) => {
       if (!mounted) return;
       createChat({
-        webhookUrl: process.env.NEXT_PUBLIC_N8N_CHAT_WEBHOOK_URL!,
+        webhookUrl,
         mode: "window",
         showWelcomeScreen: false,
         initialMessages: [
