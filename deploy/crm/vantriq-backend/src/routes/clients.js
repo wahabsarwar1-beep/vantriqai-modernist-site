@@ -308,6 +308,43 @@ router.get('/:id/quota', async (req, res) => {
   res.json(status);
 });
 
+/* ---------------------------- Suspend / resume ---------------------------- */
+/**
+ * Stopping and restarting service for one client. This is the collections
+ * lever — a deliberate decision about a specific account, separate from the
+ * automatic over-quota policy in Settings. It always wins over that policy.
+ *
+ * Suspending does not touch their portal login: a suspended customer can still
+ * sign in, see exactly why, and see what they owe. Locking them out of the
+ * explanation would only generate a phone call.
+ */
+router.post('/:id/suspend', blockAutomation, async (req, res) => {
+  const reason = String((req.body || {}).reason || '').trim().slice(0, 500);
+  if (!reason) {
+    return res.status(400).json({ error: 'Give a reason — the customer is shown it, and it is what you will read when deciding to restore them.' });
+  }
+  const by = (req.user && req.user.email) || 'api key';
+  const { rows } = await db.query(
+    `update clients set service_status = 'suspended', suspended_at = now(),
+            suspended_by = $2, suspension_reason = $3
+      where id = $1 returning *`,
+    [req.params.id, by, reason]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Client not found' });
+  res.json(strip(rows[0]));
+});
+
+router.post('/:id/resume', blockAutomation, async (req, res) => {
+  const { rows } = await db.query(
+    `update clients set service_status = 'active', suspended_at = null,
+            suspended_by = null, suspension_reason = ''
+      where id = $1 returning *`,
+    [req.params.id]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Client not found' });
+  res.json(strip(rows[0]));
+});
+
 /* ---------------------------- Portal credentials ---------------------------- */
 // Creates or resets the customer's portal login. An admin may type the
 // password (send `password`), or leave it out and have one generated. Either

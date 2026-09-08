@@ -390,3 +390,50 @@ If nothing appears, the usual cause is `external_ref`. It must be the client's
 WhatsApp number exactly as n8n sends it — no `+`, no spaces. The webhook answers
 `404` with the ref it could not match, so check the n8n execution log for that
 message rather than guessing.
+
+---
+
+# Blocking service when a client is over quota
+
+`GET /api/webhooks/service-status?external_ref=923001234567` answers whether
+this client's customers should be answered right now. Call it at the **top** of
+the WhatsApp flow, before generating a reply, and branch on `allow`.
+
+```json
+{ "allow": true,  "reason": "ok", "quota": 1500, "sessions_used": 812, "percent_used": 54 }
+{ "allow": false, "reason": "suspended",  "detail": "Invoice VAI-2026-000004 unpaid since August." }
+{ "allow": false, "reason": "over_quota", "detail": "Used 2000 of 1500 included conversations this month; the block policy stops at 1500." }
+```
+
+Use the **webhook** key — the same credential as the usage node.
+
+Two things decide the answer, and they are deliberately separate:
+
+- **An admin suspended that client** in the CRM. A decision about one account,
+  usually non-payment. It always wins.
+- **The company-wide over-quota policy** in Settings, which is `serve` by
+  default: keep answering past the allowance and settle it on the invoice. An
+  admin can switch it to `grace` (stop at a multiple of quota) or `block` (stop
+  at the allowance).
+
+**Out of the box this endpoint always answers `allow: true`.** It only starts
+refusing once someone changes one of those two things, so wiring it in now is
+safe and costs nothing.
+
+## It fails open, and your flow should too
+
+If the lookup throws, the endpoint answers `allow: true` rather than an error —
+a database hiccup must never take a client's agent off the air. Build the same
+instinct into the IF node: branch on `{{ $json.allow === false }}` and let
+everything else through. That way a timeout or a bad response serves the
+customer instead of silencing them.
+
+## What to send when the answer is no
+
+Don't leave the customer with silence — they are your client's customer, and
+they did nothing wrong. Reply with something plain:
+
+> Thanks for your message. We can't respond automatically right now, but the
+> team has your message and will come back to you.
+
+Then notify your client, not their customer, that their agent is paused.

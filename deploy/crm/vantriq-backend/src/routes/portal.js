@@ -119,6 +119,15 @@ router.get('/account', async (req, res) => {
     stage: client.stage,
     join_date: client.join_date,
     provider: settingsRes.rows[0],
+    // A suspended customer can still sign in and read exactly why, and what
+    // they owe. Meeting them with silence would only generate a phone call.
+    service: {
+      status: client.service_status || 'active',
+      suspended_at: client.suspended_at || null,
+      reason: client.service_status === 'suspended'
+        ? (client.suspension_reason || 'Your service is paused. Please get in touch.')
+        : null,
+    },
     // Their own billing details, so a wrong NTN is visible to them before it
     // ends up on an invoice.
     billing: { ntn: client.ntn || '', strn: client.strn || '', address: client.billing_address || '' },

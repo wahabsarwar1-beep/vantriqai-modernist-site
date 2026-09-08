@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { recordQuotaCrossing } = require('../utils/quota');
+const { serviceStatusFor } = require('../utils/serviceStatus');
 const router = express.Router();
 
 /**
@@ -81,6 +82,38 @@ router.post('/usage', async (req, res) => {
     month_to_date: usageRows[0] || { sessions: 0, messages: 0, input_tokens: 0, output_tokens: 0 },
     quota,
   });
+});
+
+/**
+ * GET /api/webhooks/service-status?external_ref=923001234567
+ *
+ * Ask before replying: should this client's customers be answered right now?
+ * n8n calls this at the top of the WhatsApp flow and branches on `allow`.
+ *
+ *   { "allow": true,  "reason": "ok" }
+ *   { "allow": false, "reason": "suspended",  "detail": "..." }
+ *   { "allow": false, "reason": "over_quota", "detail": "..." }
+ *
+ * Out of the box `allow` is always true — the default policy is to keep
+ * serving and settle overage on the invoice, which is what the business model
+ * assumes. It only starts denying once an admin suspends a client or changes
+ * the over-quota policy in Settings.
+ *
+ * It fails OPEN. If the lookup throws, this answers allow:true rather than
+ * 500, because a database hiccup must never take a client's WhatsApp agent
+ * off the air. The error is logged for us, not surfaced to the caller.
+ */
+router.get('/service-status', async (req, res) => {
+  const { external_ref, client_id } = req.query;
+  if (!external_ref && !client_id) {
+    return res.status(400).json({ error: 'external_ref or client_id is required' });
+  }
+  try {
+    res.json(await serviceStatusFor({ external_ref, client_id }));
+  } catch (err) {
+    console.error('service-status check failed, allowing', err);
+    res.json({ allow: true, reason: 'check_failed', detail: 'The status check failed, so service continues.' });
+  }
 });
 
 module.exports = router;

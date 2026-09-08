@@ -342,6 +342,8 @@ function clientFromApi(c){ return { id:c.id, name:c.name, company:c.company, ema
   portalEnabled:!!c.portal_enabled, portalUsername:c.portal_username||'',
   portalPasswordSetBy:c.portal_password_set_by||'', portalPasswordSetAt:c.portal_password_set_at||null,
   parentClientId:c.parent_client_id||null,
+  serviceStatus:c.service_status||'active', suspendedAt:c.suspended_at||null,
+  suspensionReason:c.suspension_reason||'', suspendedBy:c.suspended_by||'',
   ntn:c.ntn||'', strn:c.strn||'', taxRate:(c.tax_rate===null||c.tax_rate===undefined)?null:+c.tax_rate,
   billingAddress:c.billing_address||'',
   customSetupFee:c.custom_setup_fee, customRetainer:c.custom_retainer, customQuota:c.custom_quota,
@@ -439,7 +441,8 @@ async function loadState(){
     adminOnly('/api/purchase-orders', []),
     adminOnly('/api/expenses', []),
     adminOnly('/api/settings', { company_name:'Vantriq AI', city:'', founder:'', currency:'PKR', utilization:0.7,
-      ntn:'', strn:'', address:'', default_tax_rate:0, invoice_prefix:'VAI', payment_terms_days:7 }),
+      ntn:'', strn:'', address:'', default_tax_rate:0, invoice_prefix:'VAI', payment_terms_days:7,
+      overage_policy:'serve', overage_grace_pct:120 }),
     API.get('/api/dashboard'),
     adminOnly('/api/reps', []),
     API.get('/api/package-requests?status=pending'),
@@ -459,6 +462,8 @@ async function loadState(){
       ntn:settings.ntn||'', strn:settings.strn||'', address:settings.address||'',
       defaultTaxRate:settings.default_tax_rate!=null?+settings.default_tax_rate:0,
       invoicePrefix:settings.invoice_prefix||'VAI',
+      overagePolicy:settings.overage_policy||'serve',
+      overageGracePct:settings.overage_grace_pct!=null?+settings.overage_grace_pct:120,
       paymentTermsDays:settings.payment_terms_days!=null?+settings.payment_terms_days:7,
       currency:settings.currency||'PKR' },
     packageRequests: packageRequests || [],
@@ -841,6 +846,7 @@ function renderPipeline(){
             <div class="co">${esc(c.company)}</div>
             <div class="meta">
               <span class="tag">${p?esc(p.name):'—'}</span>
+      ${c.serviceStatus==='suspended'?`<span class="pill pill-overdue"><span class="pill-dot"></span>Service paused</span>`:''}
               <span class="mono" style="font-size:12px;font-weight:700;">${fmtMoney(c.estValue)}</span>
             </div>
           </div>`;
@@ -1557,6 +1563,34 @@ function renderSettings(){
     <button class="btn btn-primary" onclick="saveTaxSettings()">Save tax details</button>
   </div>
   <div class="card" style="max-width:520px;margin-top:16px;">
+    <h3 style="margin-top:0;font-size:14.5px;">When a client runs out of conversations</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:0;">
+      What happens automatically the moment a client uses up their monthly allowance.
+      This is separate from pausing one client for non-payment, which you do on their own record.
+    </p>
+    <div class="field"><label>Policy</label>
+      <select id="setOveragePolicy" onchange="toggleGraceField()">
+        <option value="serve" ${state.company.overagePolicy==='serve'?'selected':''}>Keep answering — bill the overage (recommended)</option>
+        <option value="grace" ${state.company.overagePolicy==='grace'?'selected':''}>Keep answering up to a limit, then stop</option>
+        <option value="block" ${state.company.overagePolicy==='block'?'selected':''}>Stop the moment the allowance runs out</option>
+      </select>
+    </div>
+    <div class="field" id="grace-field" style="display:${state.company.overagePolicy==='grace'?'block':'none'};">
+      <label>Stop at this percentage of the allowance</label>
+      <input id="setOverageGrace" type="number" min="100" max="1000" value="${state.company.overageGracePct||120}">
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">
+        120 means a Starter client keeps being answered to 1,800 conversations, then stops.
+      </div>
+    </div>
+    <div style="background:var(--amber-light);color:#7A5410;padding:10px 12px;border-radius:8px;font-size:11.5px;margin-bottom:12px;">
+      Stopping means a customer of theirs messages your client's WhatsApp number and gets
+      silence. On Starter, the conversation you would be refusing costs
+      ${fmtMoney(0.45)} to serve and bills at ${fmtMoney(2)}. Your business model assumes
+      you keep answering and settle it on the invoice — which is why "keep answering" is the default.
+    </div>
+    <button class="btn btn-primary" onclick="saveOveragePolicy()">Save policy</button>
+  </div>
+  <div class="card" style="max-width:520px;margin-top:16px;">
     <h3 style="margin-top:0;font-size:14.5px;">API connection</h3>
     <p style="font-size:12.5px;color:var(--muted);margin-top:0;">
       Connected to <strong class="mono" style="font-size:12px;">${esc(API.base)}</strong>.
@@ -1592,8 +1626,31 @@ function applySettings(updated){
     ntn:updated.ntn||'', strn:updated.strn||'', address:updated.address||'',
     defaultTaxRate:updated.default_tax_rate!=null?+updated.default_tax_rate:0,
     invoicePrefix:updated.invoice_prefix||'VAI',
+    overagePolicy:updated.overage_policy||'serve',
+    overageGracePct:updated.overage_grace_pct!=null?+updated.overage_grace_pct:120,
     paymentTermsDays:updated.payment_terms_days!=null?+updated.payment_terms_days:7,
     currency:updated.currency||'PKR' };
+}
+
+function toggleGraceField(){
+  const el = document.getElementById('grace-field');
+  const sel = document.getElementById('setOveragePolicy');
+  if(el && sel) el.style.display = sel.value==='grace' ? 'block' : 'none';
+}
+
+async function saveOveragePolicy(){
+  const policy = (document.getElementById('setOveragePolicy')||{}).value || 'serve';
+  const pct = parseInt((document.getElementById('setOverageGrace')||{}).value, 10) || 120;
+  if(policy!=='serve' && !confirm(
+    policy==='block'
+      ? 'Stop answering the moment a client uses up their allowance?\n\nTheir customers will get silence rather than a reply. Nothing warns them first.'
+      : `Stop answering once a client passes ${pct}% of their allowance?\n\nTheir customers will get silence beyond that point.`
+  )) return;
+  try{
+    const updated = await API.put('/api/settings', { overage_policy: policy, overage_grace_pct: pct });
+    applySettings(updated);
+    render(); showToast('Policy saved');
+  }catch(e){ showToast(e.message||'Could not save the policy','warn'); }
 }
 
 async function saveTaxSettings(){
@@ -1877,6 +1934,28 @@ async function deleteClient(id){
     closeModal(); openPanel=null; render(); showToast('Client deleted');
   }catch(e){ showToast(e.message||'Could not delete client','warn'); }
 }
+async function suspendClient(id){
+  const c = state.clients.find(x=>x.id===id);
+  const reason = prompt(`Pause service for ${c?c.company:'this client'}?\n\nTheir agent stops replying immediately. The reason is shown to them in their portal — write it for them to read:`);
+  if(reason===null) return;
+  if(!reason.trim()){ showToast('A reason is required','warn'); return; }
+  try{
+    const updated = await API.post(`/api/clients/${id}/suspend`, { reason: reason.trim() });
+    Object.assign(c, clientFromApi(updated));
+    render(); showToast('Service paused');
+  }catch(e){ showToast(e.message||'Could not pause service','warn'); }
+}
+
+async function resumeClient(id){
+  const c = state.clients.find(x=>x.id===id);
+  if(!confirm(`Resume service for ${c?c.company:'this client'}?\n\nTheir agent starts answering again immediately.`)) return;
+  try{
+    const updated = await API.post(`/api/clients/${id}/resume`, {});
+    Object.assign(c, clientFromApi(updated));
+    render(); showToast('Service resumed');
+  }catch(e){ showToast(e.message||'Could not resume service','warn'); }
+}
+
 async function generatePortalCredentials(clientId){
   const client = state.clients.find(c=>c.id===clientId);
   // Read the typed password before the panel is replaced by the busy state.
@@ -2289,6 +2368,7 @@ function clientPanelHTML(id){
     <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
       <span class="pill ${stagePillClass(c.stage)}"><span class="pill-dot"></span>${stageLabel(c.stage)}</span>
       <span class="tag">${p?esc(p.name):'—'}</span>
+      ${c.serviceStatus==='suspended'?`<span class="pill pill-overdue"><span class="pill-dot"></span>Service paused</span>`:''}
       ${repNameOf(c)?`<span class="tag" style="background:var(--teal-light);color:var(--teal-dark);">Rep: ${esc(repNameOf(c))}</span>`:''}
     </div>
   </div>
@@ -2323,6 +2403,18 @@ function clientPanelHTML(id){
         <span class="v">${sp?esc(sp.name):'—'} · ${fmtNum(sc.sessionsUsedThisMonth||0)}${sp?' / '+fmtNum(sp.quota):''}</span>
       </div>`;
     }).join('')}`:''}
+
+    <div class="divider"></div>
+    <h4 style="font-size:13px;margin-bottom:4px;">Service</h4>
+    ${c.serviceStatus==='suspended'
+      ? `<div style="background:var(--red-light);border-radius:8px;padding:10px 12px;font-size:12.5px;color:#8F3527;margin-bottom:8px;">
+           <strong>Paused ${c.suspendedAt?fmtDate(c.suspendedAt):''}</strong>${c.suspendedBy?` by ${esc(c.suspendedBy)}`:''}<br>
+           ${esc(c.suspensionReason||'')}
+         </div>
+         <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">Their agent is not answering. They can still sign in to the portal and see this reason.</div>
+         <button class="btn btn-primary btn-sm" onclick="resumeClient('${c.id}')">Resume service</button>`
+      : `<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">Answering normally. Pausing stops their agent replying — use it for non-payment, not for going over quota, which bills instead.</div>
+         <button class="btn btn-danger-ghost btn-sm" onclick="suspendClient('${c.id}')">Pause service</button>`}
 
     <div class="divider"></div>
     <h4 style="font-size:13px;margin-bottom:8px;">Customer portal</h4>

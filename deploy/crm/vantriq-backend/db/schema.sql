@@ -528,3 +528,36 @@ begin
   insert into applied_migrations (name, note)
   values ('v5_model_realignment', 'Ladder, stack and cost base set from the VantriqAI Business Model, August 2026.');
 end $$;
+
+-- =====================================================================
+-- v6 — service suspension and the over-quota policy
+--
+-- Two separate controls, deliberately:
+--
+--   clients.service_status   an admin's own decision about one client.
+--                            'suspended' means stop answering, whatever the
+--                            usage says. This is the collections lever.
+--
+--   settings.overage_policy  what happens automatically when a client uses up
+--                            their allowance:
+--                              'serve' — keep answering (the default, and what
+--                                        the business model assumes)
+--                              'grace' — keep answering up to overage_grace_pct
+--                                        of quota, then stop
+--                              'block' — stop at 100%
+--
+-- The default is 'serve', so applying this migration changes nothing until an
+-- admin chooses otherwise.
+-- =====================================================================
+
+alter table clients add column if not exists service_status text not null default 'active'
+  check (service_status in ('active','suspended'));
+alter table clients add column if not exists suspended_at timestamptz;
+alter table clients add column if not exists suspended_by text;
+alter table clients add column if not exists suspension_reason text default '';
+create index if not exists idx_clients_service_status on clients(service_status)
+  where service_status = 'suspended';
+
+alter table settings add column if not exists overage_policy text not null default 'serve'
+  check (overage_policy in ('serve','grace','block'));
+alter table settings add column if not exists overage_grace_pct int not null default 120;
