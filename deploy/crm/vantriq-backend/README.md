@@ -108,8 +108,14 @@ Any Node hosting works. **Railway** is the fastest path:
    admin key from Step 4 (it's stored in the database, not tied to
    your laptop).
 
-Render, Fly.io, and Vercel (with a serverless adapter) work the same
-way — set `DATABASE_URL` as an environment variable and deploy.
+Render and Fly.io work the same way — set `DATABASE_URL` as an
+environment variable and deploy.
+
+**This is not how Vantriq Ops is actually deployed.** It runs as a Docker
+container on the Hostinger VPS, on the same box and the same Docker
+network as n8n and Postgres — see `../DEPLOY.md` and `../UPGRADE-V5.md`.
+Follow those, not this step; the section above is kept only for anyone
+standing the CRM up somewhere else from scratch.
 
 ## Step 7 — Point n8n at it
 
