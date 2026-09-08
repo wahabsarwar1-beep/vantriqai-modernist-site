@@ -188,10 +188,27 @@ export default function ShopAIChat() {
     let mounted = true;
     let observer: MutationObserver | null = null;
 
+    /*  NEXT_PUBLIC_* is inlined at BUILD time, so a value set in the host's
+     *  env panel does nothing until the site is rebuilt — restarting is not
+     *  enough. When it is missing the widget does not fail loudly: @n8n/chat
+     *  treats an empty webhookUrl as a same-origin relative path, POSTs to
+     *  this very site, gets the page's own HTML back, and renders that markup
+     *  to the visitor as the assistant's reply. Refuse to mount instead —
+     *  no assistant is bad, an assistant answering in raw HTML is worse. */
+    const webhookUrl = process.env.NEXT_PUBLIC_N8N_CHAT_WEBHOOK_URL;
+    if (!webhookUrl || !/^https?:\/\//i.test(webhookUrl)) {
+      console.error(
+        "[chat] NEXT_PUBLIC_N8N_CHAT_WEBHOOK_URL is missing or not an absolute " +
+          "URL, so the assistant was not mounted. Set it in the host's " +
+          "environment variables and REBUILD — a restart will not pick it up.",
+      );
+      return;
+    }
+
     loadChatBundle().then(({ createChat }) => {
       if (!mounted) return;
       createChat({
-        webhookUrl: process.env.NEXT_PUBLIC_N8N_CHAT_WEBHOOK_URL!,
+        webhookUrl,
         mode: "window",
         showWelcomeScreen: false,
         initialMessages: [
