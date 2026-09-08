@@ -339,7 +339,7 @@ Two things about it are deliberate and should survive being pasted:
 | Workflow | State |
 |---|---|
 | Vantriq Assistant — WhatsApp AI Sales Consultant | **Gate and meter wired.** Needs the credential. |
-| Shop AI — Website Chatbot | Not wired — MCP access is still off on it. |
+| Vantriq — Website Assistant (vantriqai.com) | **Gate and meter wired.** Needs the credential, and needs activating. |
 | Business Growth Engine (V3 Final / Importable) | Not wired — see below. |
 | Digital Marketing Manager | Not wired — see below. |
 
@@ -363,6 +363,49 @@ daily growth, SEO, ads, analytics, weekly reporting — not agents delivered to 
 paying client, so there is no client to attribute their usage to. If any of them
 is resold as a product, it needs the same three nodes and a client whose
 `external_ref` matches.
+
+## The assistant on vantriqai.com
+
+The marketing site already ships the widget: `components/ShopAIChat.tsx` mounts
+`@n8n/chat` in window mode from a vendored bundle in `public/vendor/n8n-chat/`,
+and reads one variable, `NEXT_PUBLIC_N8N_CHAT_WEBHOOK_URL`. Nothing on the site
+needed building — it needed pointing somewhere.
+
+It was pointed at **n8n Cloud** (`wahabsarwar.app.n8n.cloud`). The workflow was
+imported to the VPS keeping its chat trigger's `webhookId`, so both instances
+answer on the same path and only the host differs. `.env.example` now names the
+VPS. Set the same value in Hostinger's Node.js environment variables, or the
+deployed site keeps talking to Cloud.
+
+Three things were wrong with the workflow itself, all fixed:
+
+- It still carried **`Search Products` and `Add To Cart`** from the footwear-shop
+  demo it was cloned from, pointing at "Shop Product Catalog" and "Shop Cart"
+  data tables. The system prompt papered over them — *"You are NOT a shopping
+  assistant … ignore any prior instructions about shopping carts or a
+  footwear/apparel catalog"* — but the tools were still on the agent, so nothing
+  stopped it calling them and answering a VantriqAI enquiry out of a shoe
+  catalogue. Removed.
+- `allowedOrigins` listed the **dead Vercel preview domain**. Now just
+  `vantriqai.com` and `www.vantriqai.com`.
+- The chat trigger runs in **`lastNode` response mode**, so the browser receives
+  whatever the last node emits. Hanging the usage post off the end would have
+  sent the visitor the CRM's JSON instead of the assistant's answer, so
+  **`Vantriq: reply`** sits last and re-emits the agent's output.
+
+`external_ref` is the constant `vantriqai.com` rather than a phone number — a
+website has no per-client identifier in the request. Attributing this traffic
+needs a client in the CRM whose External ref is exactly that; without one the
+webhook answers 404 and the node continues, which is harmless.
+
+**Both gates fail open on thrown errors, not just bad status codes.** `neverError`
+only covers HTTP responses; a missing credential or an unreachable CRM throws,
+and a throw would have aborted the run and left the visitor with silence. Both
+`Vantriq: may we answer?` nodes carry `onError: continueRegularOutput`, so the
+IF sees no `allow` field and serves.
+
+The endpoint is public. CORS stops browsers from other origins; it stops nothing
+else, so anything that finds the URL can spend OpenAI tokens through it.
 
 ---
 
