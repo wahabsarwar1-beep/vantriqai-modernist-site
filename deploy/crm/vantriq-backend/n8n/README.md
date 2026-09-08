@@ -334,6 +334,36 @@ Two things about it are deliberate and should survive being pasted:
 
 `vantriq-crm-wiring-kit.json` in this folder is the same kit as a file.
 
+## What is wired, and what is not
+
+| Workflow | State |
+|---|---|
+| Vantriq Assistant — WhatsApp AI Sales Consultant | **Gate and meter wired.** Needs the credential. |
+| Shop AI — Website Chatbot | Not wired — MCP access is still off on it. |
+| Business Growth Engine (V3 Final / Importable) | Not wired — see below. |
+| Digital Marketing Manager | Not wired — see below. |
+
+The WhatsApp flow already had a usage node, and it had `external_ref` set to
+`contacts[0].wa_id` — the prospect writing in. Every conversation would have
+come back `404 No client found`. It now sends `metadata.display_phone_number`
+and calls `http://crm_app:8080` rather than the public domain.
+
+Three things were added to it:
+
+- **`Vantriq: may we answer?`** — the gate, ahead of the agent, so nothing is
+  spent on a suspended client.
+- **`Paused: holding reply`** — feeds the existing send node, so a paused
+  client's customer gets an answer instead of silence.
+- **`Vantriq: did we actually serve this?`** — sits between the send node and
+  the usage post. Without it a refused conversation would still be reported as
+  usage, and a blocked client would accrue overage for replies they never got.
+
+The Growth Engine and Marketing Manager flows are Vantriq's own machinery —
+daily growth, SEO, ads, analytics, weekly reporting — not agents delivered to a
+paying client, so there is no client to attribute their usage to. If any of them
+is resold as a product, it needs the same three nodes and a client whose
+`external_ref` matches.
+
 ---
 
 # Running n8n on the same VPS as the CRM
