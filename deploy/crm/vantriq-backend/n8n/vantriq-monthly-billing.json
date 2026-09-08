@@ -50,7 +50,7 @@
       ],
       "parameters": {
         "method": "GET",
-        "url": "https://crm.vantriqai.com/api/clients?stage=active",
+        "url": "http://crm_app:8080/api/clients?stage=active",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpTemplatedCustomAuth",
         "options": {}
@@ -100,7 +100,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "https://crm.vantriqai.com/api/invoices",
+        "url": "http://crm_app:8080/api/invoices",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpTemplatedCustomAuth",
         "sendBody": true,
@@ -142,7 +142,7 @@
         -130
       ],
       "parameters": {
-        "content": "## Monthly billing run\n\nRaises each active client's retainer for the month that just ended, priced off their real usage: the CRM works out retainer + (conversations over quota x overage rate), applies the client's sales tax rate, allocates the next sequential invoice number and stamps the due date.\n\n**Before activating:** point both URLs at your CRM, and set the credential template to `{\"headers\":{\"x-api-key\":\"{{api_key}}\"}}` with an **automation**-scoped key (`npm run create-key -- \"n8n automation\" automation`). Never put the admin key here.\n\nA 409 means that client was already invoiced for that period — the run is safe to repeat and cannot double-bill anyone.",
+        "content": "## Monthly billing run\n\nRaises each active client's retainer for the month that just ended, priced off their real usage: the CRM works out retainer + (conversations over quota x overage rate), applies the client's sales tax rate, allocates the next sequential invoice number and stamps the due date.\n\n**Before activating:** the URLs use `http://crm_app:8080` — the CRM's container name on the shared Docker network, which is how n8n reaches it without leaving the box. If n8n ever moves off this VPS, change them to `https://crm.vantriqai.com`. Also and set the credential template to `{\"headers\":{\"x-api-key\":\"{{api_key}}\"}}` with an **automation**-scoped key (`npm run create-key -- \"n8n automation\" automation`). Never put the admin key here.\n\nA 409 means that client was already invoiced for that period — the run is safe to repeat and cannot double-bill anyone.",
         "color": 4,
         "width": 1440,
         "height": 280

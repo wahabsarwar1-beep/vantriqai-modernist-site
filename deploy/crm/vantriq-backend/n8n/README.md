@@ -259,10 +259,15 @@ Billing the same client for the same period twice answers `409` with
 double-bill anyone. Treat `409` as success-already-done, not as an error to
 retry.
 
-That workflow already exists in your n8n as a **draft**, called
-**Vantriq — monthly billing run**. It is not active and will not fire until you
-publish it. `vantriq-monthly-billing.json` in this folder is the same workflow,
-for import elsewhere or as a backup.
+`vantriq-monthly-billing.json` in this folder is that workflow, ready to import
+into your self-hosted n8n (**Workflows → ⋯ → Import from File**).
+
+> A draft of it also exists in the n8n **Cloud** account
+> (`wahabsarwar.app.n8n.cloud`) from an earlier session. That is a different
+> instance from the `n8n_app` container on this VPS. If the VPS one is your
+> production n8n — it is, per the business model — ignore or delete the Cloud
+> draft and import the file here instead. Running both would bill every client
+> twice.
 
 Before publishing it:
 
@@ -283,3 +288,105 @@ Before publishing it:
 
 Only then publish it. It fires on the 1st at 03:00 and bills the month that
 just ended.
+
+---
+
+# Running n8n on the same VPS as the CRM
+
+This is the deployment the business model assumes: n8n Community and the CRM in
+containers on one box, sharing a Docker network and one Postgres instance.
+Three things follow from that.
+
+## 1. Reach the CRM by container name, not by domain
+
+Every workflow in this folder calls **`http://crm_app:8080`**. That is the CRM
+container's name on `app-stack_app-network`, which Docker's embedded DNS
+resolves for any container on that network.
+
+Do not use `https://crm.vantriqai.com` from n8n on this box. Going out to the
+public domain and back in through Nginx Proxy Manager adds a TLS handshake and
+a round trip to every call, and it makes your billing run depend on the
+certificate and the public DNS still being healthy. The internal call depends on
+neither.
+
+Prove n8n can actually reach it — this is the one check worth running before
+anything else:
+
+```bash
+docker exec n8n_app wget -qO- http://crm_app:8080/api/health; echo
+```
+
+**Expect** `{"ok":true,"time":"..."}`. If instead you get
+`bad address 'crm_app'`, the two containers are not on the same network:
+
+```bash
+docker inspect n8n_app  --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}'
+docker inspect crm_app  --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}'
+```
+
+They must share a name. If they don't, attach the CRM to n8n's network:
+
+```bash
+docker network connect app-stack_app-network crm_app
+```
+
+## 2. Talk to the API, never to the CRM's tables
+
+n8n and the CRM share a Postgres server, so it is tempting to point an n8n
+**Postgres** node straight at the `vantriq` database. Don't — not for writes.
+
+Posting a usage event through `/api/webhooks/usage` does work the database
+cannot do on its own:
+
+- resolves `external_ref` to the right client
+- records the 80% and over-quota flags, once per client per month
+- returns the client's live quota position so the flow can react
+
+and raising an invoice through `/api/invoices` allocates the sequential invoice
+number, applies the client's tax rate, snapshots their NTN onto the invoice and
+stamps the due date. An `INSERT` does none of it. You would get usage rows that
+never trigger a quota flag and invoices with no number and no tax — silently
+wrong, and only discovered at an audit.
+
+**Reads are fine.** A Postgres node running `select` against `v_monthly_usage`
+or `products` for a dashboard is harmless. It is writes that must go through the
+API.
+
+## 3. One key per job
+
+```bash
+docker exec crm_app npm run create-key -- "n8n usage webhook" webhook
+docker exec crm_app npm run create-key -- "n8n automation"    automation
+```
+
+- **webhook key** — the usage node, and nothing else. It can only write usage.
+- **automation key** — onboarding and billing. Clients, invoices, packages;
+  never financials, procurement, settings, the team or delivery costs.
+
+Store both as n8n **credentials** (Custom Auth, templated), not as literal text
+in a node. A credential stays out of the workflow JSON, so exporting or sharing
+a workflow cannot leak the key:
+
+```json
+{ "headers": { "x-api-key": "{{api_key}}" } }
+```
+
+## 4. End-to-end check
+
+With the usage node wired into your WhatsApp flow, send one real message to the
+agent, then:
+
+```bash
+docker exec postgres_db psql -U n8n -d vantriq -tAc \
+  "select c.company, u.session_id, u.messages_count, u.occurred_at
+     from usage_events u join clients c on c.id = u.client_id
+    order by u.created_at desc limit 5;"
+```
+
+A row for the client whose `external_ref` matches that WhatsApp number means the
+whole chain is live: WhatsApp → n8n → CRM → Postgres → the customer's portal.
+
+If nothing appears, the usual cause is `external_ref`. It must be the client's
+WhatsApp number exactly as n8n sends it — no `+`, no spaces. The webhook answers
+`404` with the ref it could not match, so check the n8n execution log for that
+message rather than guessing.
