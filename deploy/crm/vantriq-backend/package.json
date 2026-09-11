@@ -1,7 +1,7 @@
 {
   "name": "vantriq-crm-backend",
   "version": "1.0.0",
-  "description": "Vantriq AI \u2014 CRM, billing, procurement, and usage-ingestion API backed by Postgres/Supabase",
+  "description": "Vantriq AI — CRM, billing, procurement, and usage-ingestion API backed by Postgres/Supabase",
   "main": "src/index.js",
   "type": "commonjs",
   "scripts": {
@@ -9,7 +9,8 @@
     "dev": "node --watch src/index.js",
     "migrate": "node src/utils/migrate.js",
     "create-key": "node src/utils/createKey.js",
-    "create-user": "node src/utils/createUser.js"
+    "create-user": "node src/utils/createUser.js",
+    "test:webhooks": "node test/webhooks-lead.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

@@ -561,3 +561,32 @@ create index if not exists idx_clients_service_status on clients(service_status)
 alter table settings add column if not exists overage_policy text not null default 'serve'
   check (overage_policy in ('serve','grace','block'));
 alter table settings add column if not exists overage_grace_pct int not null default 120;
+
+-- =====================================================================
+-- v7 — conversations from the AI agents
+--
+-- The WhatsApp and website agents both hold their context in an n8n memory
+-- buffer that is wiped on restart, so until now nothing durable survived a
+-- conversation except the billing row. This is where the transcript lands:
+-- one row per turn, linked to the client the agent was talking to.
+-- ---------------------------------------------------------------------
+create table if not exists conversation_messages (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid references clients(id) on delete cascade,
+  -- Kept alongside client_id so a turn is still attributable when the
+  -- prospect has not been promoted to a client record yet.
+  external_ref text not null default '',
+  session_id text not null default '',
+  channel text not null default 'whatsapp'
+    check (channel in ('whatsapp','website','instagram','voice','email')),
+  role text not null check (role in ('customer','agent')),
+  content text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_conv_client on conversation_messages(client_id, created_at desc);
+create index if not exists idx_conv_session on conversation_messages(session_id, created_at asc);
+create index if not exists idx_conv_ref on conversation_messages(external_ref, created_at desc);
+
+-- Where new-lead notifications go. Comma-separated; blank falls back to
+-- MAIL_FROM so a fresh install still reaches somebody.
+alter table settings add column if not exists lead_notify_emails text not null default '';

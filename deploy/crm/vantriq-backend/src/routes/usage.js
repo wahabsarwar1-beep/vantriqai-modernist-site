@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../db');
 const { recordQuotaCrossing } = require('../utils/quota');
 const { serviceStatusFor } = require('../utils/serviceStatus');
+const { sendMail, mailConfigured } = require('../utils/mailer');
 const router = express.Router();
 
 /**
@@ -114,6 +115,204 @@ router.get('/service-status', async (req, res) => {
     console.error('service-status check failed, allowing', err);
     res.json({ allow: true, reason: 'check_failed', detail: 'The status check failed, so service continues.' });
   }
+});
+
+/**
+ * POST /api/webhooks/lead
+ *
+ * Called by the WhatsApp and website agents the moment they have enough to
+ * identify a prospect. Deliberately on the webhook scope, not automation:
+ * this is machine traffic from the same n8n instance that already posts
+ * usage, and issuing it a second, more powerful key just to record a name
+ * would be the wrong trade.
+ *
+ * It is far more forgiving than POST /api/clients, and that is the point.
+ * A cold WhatsApp lead has no package, no deal value and often no email
+ * yet; demanding them would either block the write or, worse, invite the
+ * agent to invent them. Only external_ref is required.
+ *
+ * Body:
+ * {
+ *   "external_ref": "923001234567",   // required — the prospect's WhatsApp number, or the web session id
+ *   "name": "Ayesha Khan",
+ *   "company": "Khan Textiles",
+ *   "email": "ayesha@khantextiles.pk",
+ *   "phone": "923001234567",
+ *   "channel": "whatsapp",            // whatsapp | website | instagram | voice | email
+ *   "source": "WhatsApp AI agent",
+ *   "notes": "Order tracking on WhatsApp. ~200 msgs/day. Wants it this month."
+ * }
+ *
+ * An existing prospect is never overwritten: a second call fills in the
+ * blanks only. Whatever a human has typed into the CRM outranks whatever
+ * the agent inferred on the next message.
+ */
+router.post('/lead', async (req, res) => {
+  const body = req.body || {};
+  const externalRef = String(body.external_ref || '').trim();
+  if (!externalRef) return res.status(400).json({ error: 'external_ref is required' });
+
+  const text = (v, max = 500) => String(v ?? '').trim().slice(0, max);
+  const incoming = {
+    name: text(body.name, 160),
+    company: text(body.company, 200),
+    email: text(body.email, 200),
+    phone: text(body.phone, 40) || externalRef,
+    notes: text(body.notes, 4000),
+    source: text(body.source, 120) || 'AI agent',
+  };
+
+  try {
+    const { rows: existingRows } = await db.query(
+      `select * from clients where external_ref = $1`, [externalRef]
+    );
+    const existing = existingRows[0];
+
+    if (existing) {
+      // Fill blanks only. A human who corrected a misheard company name must
+      // not have it overwritten the next time the agent guesses.
+      const fills = ['name', 'company', 'email', 'phone']
+        .filter((f) => {
+          const current = String(existing[f] || '').trim();
+          return (current === '' || current === '—') && incoming[f] !== '';
+        });
+      const notes = incoming.notes && !String(existing.notes || '').includes(incoming.notes)
+        ? [existing.notes, incoming.notes].filter(Boolean).join('\n---\n').slice(0, 8000)
+        : existing.notes;
+
+      const sets = fills.map((f, i) => `${f} = $${i + 2}`);
+      sets.push(`notes = $${fills.length + 2}`, 'updated_at = now()');
+      const { rows } = await db.query(
+        `update clients set ${sets.join(', ')} where id = $1 returning *`,
+        [existing.id, ...fills.map((f) => incoming[f]), notes]
+      );
+      return res.json({ ok: true, created: false, client_id: rows[0].id, stage: rows[0].stage, filled: fills });
+    }
+
+    // A brand-new prospect starts on the entry package. Staff set the real
+    // one when they qualify it; picking here would be a guess with a price
+    // attached to it.
+    const { rows: productRows } = await db.query(
+      `select id from products where archived = false order by sort_order asc, created_at asc limit 1`
+    );
+
+    const { rows } = await db.query(
+      `insert into clients (name, company, email, phone, external_ref, product_id, stage, est_value, source, notes, join_date)
+       values ($1,$2,$3,$4,$5,$6,'lead',0,$7,$8, current_date) returning *`,
+      [
+        // name and company are NOT NULL. An em dash is an honest placeholder
+        // a human can spot in the pipeline; a fabricated name is not.
+        incoming.name || '—',
+        incoming.company || '—',
+        incoming.email,
+        incoming.phone,
+        externalRef,
+        productRows[0] ? productRows[0].id : null,
+        incoming.source,
+        incoming.notes,
+      ]
+    );
+    const client = rows[0];
+
+    await db.query(
+      `insert into client_stage_history (client_id, from_stage, to_stage, comment) values ($1,null,'lead',$2)`,
+      [client.id, `Created by ${incoming.source}`.slice(0, 1000)]
+    );
+
+    // Notification is best-effort: a mail outage must not cost us the lead
+    // row we just wrote, so this never throws into the response.
+    notifyNewLead(client, text(body.channel, 40) || 'whatsapp').catch((err) =>
+      console.error('lead notification failed', err)
+    );
+
+    res.status(201).json({ ok: true, created: true, client_id: client.id, stage: client.stage });
+  } catch (err) {
+    if (err.code === '23505') {
+      // Two agent turns raced. The other one won; that is a success here.
+      return res.json({ ok: true, created: false, raced: true });
+    }
+    throw err;
+  }
+});
+
+/** Emails whoever is on the notify list that a new lead just arrived. */
+async function notifyNewLead(client, channel) {
+  if (!mailConfigured()) return;
+  let configured = '';
+  try {
+    const { rows } = await db.query(`select lead_notify_emails from settings limit 1`);
+    configured = (rows[0] && rows[0].lead_notify_emails) || '';
+  } catch (err) {
+    // Settings row or column missing on an un-migrated install — fall back.
+  }
+  const recipients = (configured || process.env.LEAD_NOTIFY_EMAIL || process.env.MAIL_FROM || '')
+    .split(',').map((s) => s.trim()).filter(Boolean);
+  if (!recipients.length) return;
+
+  const named = client.company && client.company !== '—' ? ` (${client.company})` : '';
+  const lines = [
+    `A new lead came in through the ${channel} agent.`,
+    '',
+    `Name:     ${client.name}`,
+    `Company:  ${client.company}`,
+    `Email:    ${client.email || '—'}`,
+    `Phone:    ${client.phone || '—'}`,
+    `Ref:      ${client.external_ref}`,
+    '',
+    client.notes || '(no notes captured yet)',
+  ].join('\n');
+
+  await Promise.all(recipients.map((to) =>
+    sendMail({ to, subject: `New ${channel} lead: ${client.name}${named}`, text: lines })
+  ));
+}
+
+/**
+ * POST /api/webhooks/conversation
+ *
+ * Stores what was actually said. The agents keep only a short in-memory
+ * buffer that a restart wipes, so without this the transcript behind a
+ * lead is gone by the time anyone opens the CRM to read it.
+ *
+ * Body: { external_ref, session_id, channel, messages: [{ role, content }] }
+ * role is "customer" or "agent". Unknown roles are dropped rather than
+ * failing the batch — a lost turn is better than a lost conversation.
+ */
+router.post('/conversation', async (req, res) => {
+  const body = req.body || {};
+  const externalRef = String(body.external_ref || '').trim();
+  if (!externalRef) return res.status(400).json({ error: 'external_ref is required' });
+
+  const CHANNELS = ['whatsapp', 'website', 'instagram', 'voice', 'email'];
+  const channel = CHANNELS.includes(body.channel) ? body.channel : 'whatsapp';
+  const sessionId = String(body.session_id || '').trim().slice(0, 200);
+
+  const incoming = Array.isArray(body.messages) ? body.messages : [];
+  const messages = incoming
+    .map((m) => ({ role: m && m.role, content: String((m && m.content) ?? '').trim() }))
+    .filter((m) => (m.role === 'customer' || m.role === 'agent') && m.content !== '')
+    .slice(0, 50);
+  if (!messages.length) {
+    return res.status(400).json({ error: 'messages must contain at least one customer or agent turn' });
+  }
+
+  const { rows: clientRows } = await db.query(`select id from clients where external_ref = $1`, [externalRef]);
+  const clientId = clientRows[0] ? clientRows[0].id : null;
+
+  const values = [];
+  const placeholders = messages.map((m, i) => {
+    const base = i * 6;
+    values.push(clientId, externalRef, sessionId, channel, m.role, m.content.slice(0, 8000));
+    return `($${base + 1},$${base + 2},$${base + 3},$${base + 4},$${base + 5},$${base + 6})`;
+  });
+
+  await db.query(
+    `insert into conversation_messages (client_id, external_ref, session_id, channel, role, content)
+     values ${placeholders.join(',')}`,
+    values
+  );
+
+  res.status(201).json({ ok: true, stored: messages.length, client_id: clientId });
 });
 
 module.exports = router;
