@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vantriq AI — Sales Rep Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0F1A22; --ink-2:#16242E; --teal:#12897A; --teal-dark:#0B6357; --teal-light:#E3F1EE;
+  --amber:#DE9C34; --amber-light:#FBF0DD; --red:#BC4B3C; --red-light:#FBE8E4; --blue:#3E6FA8;
+  --paper:#F5F3ED; --card:#FFFFFF; --text:#161F27; --muted:#6C7885; --muted-2:#98A2AC;
+  --border:#E4E0D6; --radius:12px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{font-family:'Inter',sans-serif;background:var(--paper);color:var(--text);-webkit-font-smoothing:antialiased;}
+h1,h2,h3{font-family:'Space Grotesk',sans-serif;}
+.mono{font-family:'JetBrains Mono',monospace;}
+button{font-family:'Inter',sans-serif;cursor:pointer;}
+
+#app{min-height:100vh;}
+.topbar{background:var(--ink);color:#fff;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;}
+.brand-row{display:flex;align-items:center;gap:10px;}
+.brand-mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--teal),#0A4E45);display:flex;align-items:center;justify-content:center;}
+.brand-name{font-family:'Space Grotesk';font-weight:600;font-size:15px;}
+.brand-sub{font-size:10.5px;color:#93A2AB;text-transform:uppercase;letter-spacing:.6px;}
+.rep-badge{font-size:12.5px;color:#C7D0D5;}
+
+.content{max-width:1200px;margin:0 auto;padding:22px 20px 60px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;}
+.grid{display:grid;gap:14px;}
+.kpi-row{grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:20px;}
+.kpi .label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;}
+.kpi .value{font-family:'Space Grotesk';font-size:22px;font-weight:600;margin-top:5px;}
+
+.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+.btn{border:none;border-radius:9px;padding:10px 16px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;}
+.btn-primary{background:var(--teal);color:#fff;}
+.btn-primary:hover{background:var(--teal-dark);}
+.btn-ghost{background:#F0EEE7;color:var(--text);}
+.btn-sm{padding:7px 12px;font-size:12px;}
+
+.kanban{display:flex;gap:14px;overflow-x:auto;padding-bottom:10px;}
+.kanban-col{flex:0 0 250px;background:#F0EEE6;border-radius:12px;padding:10px;}
+.kanban-col-head{display:flex;justify-content:space-between;align-items:center;padding:4px 6px 10px;}
+.kanban-col-head .t{font-size:12.5px;font-weight:700;}
+.kanban-col-head .n{font-size:11px;color:var(--muted);font-family:'JetBrains Mono';}
+.kcard{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:11px 12px;margin-bottom:9px;cursor:pointer;}
+.kcard:hover{box-shadow:0 2px 10px rgba(0,0,0,.06);}
+.kcard .name{font-size:13px;font-weight:700;}
+.kcard .co{font-size:11.5px;color:var(--muted);margin-top:1px;}
+.kcard .meta{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
+.tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;background:#F0EEE7;color:var(--muted);}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;}
+.pill-dot{width:6px;height:6px;border-radius:50%;}
+.pill-won{background:var(--teal-light);color:var(--teal-dark);}
+.pill-won .pill-dot{background:var(--teal);}
+.pill-lost{background:var(--red-light);color:#8F3527;}
+.pill-lost .pill-dot{background:var(--red);}
+
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px;}
+.field input,.field select,.field textarea{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;font-family:'Inter';background:#FCFBF9;}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(15,26,34,.5);display:flex;align-items:flex-start;justify-content:center;z-index:100;padding:40px 16px;overflow-y:auto;}
+.modal{background:var(--card);border-radius:14px;width:100%;max-width:520px;}
+.modal-head{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.modal-body{padding:20px 22px;max-height:65vh;overflow-y:auto;}
+.modal-foot{padding:16px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
+.close-x{background:none;border:none;color:var(--muted);font-size:18px;}
+
+.center-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+.loading-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--teal);animation:pulse 1.2s infinite;}
+@keyframes pulse{0%,100%{opacity:.3;}50%{opacity:1;}}
+.footnote{font-size:11.5px;color:var(--muted-2);margin-top:10px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="modal-root"></div>
+
+<script>
+const CURRENCY = 'PKR';
+const LS_BASE = 'vantriq_rep_base';
+const LS_KEY = 'vantriq_rep_key';
+
+function fmtMoney(n){ if(n==null||isNaN(n)) n=0; return CURRENCY+' '+Math.round(n).toLocaleString('en-US'); }
+function fmtNum(n){ return Math.round(n||0).toLocaleString('en-US'); }
+function fmtDate(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }
+function esc(s){ return (s==null?'':s+'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+const STAGES = [
+  {id:'qualification', label:'Qualification'},
+  {id:'needs_assessment', label:'Needs Assessment'},
+  {id:'proposal_submission', label:'Proposal Submission'},
+  {id:'negotiation', label:'Negotiation'},
+  {id:'closure', label:'Closure'},
+];
+function stageLabel(id){ const s = STAGES.find(x=>x.id===id); return s?s.label:id; }
+
+const API = {
+  base: localStorage.getItem(LS_BASE) || window.location.origin,
+  key: localStorage.getItem(LS_KEY) || '',
+  configured(){ return !!(this.base && this.key); },
+  setConfig(base,key){ this.base=base.replace(/\/$/,''); this.key=key; localStorage.setItem(LS_BASE,this.base); localStorage.setItem(LS_KEY,this.key); },
+  clearConfig(){ localStorage.removeItem(LS_BASE); localStorage.removeItem(LS_KEY); this.base=''; this.key=''; },
+  async req(method, path, body){
+    let res;
+    try{ res = await fetch(this.base+path, {method, headers:{'Content-Type':'application/json','x-api-key':this.key}, body: body!==undefined?JSON.stringify(body):undefined}); }
+    catch(e){ throw new Error('Could not reach the server — check the URL.'); }
+    if(res.status===204) return null;
+    let data=null; try{ data = await res.json(); }catch(e){}
+    if(!res.ok) throw new Error((data&&data.error)||`Request failed (${res.status})`);
+    return data;
+  },
+  get(p){ return this.req('GET',p); }, post(p,b){ return this.req('POST',p,b); }, put(p,b){ return this.req('PUT',p,b); },
+};
+
+let leads = [], summary = null, products = [];
+let openModal = null;
+let connectError = '';
+
+function sidebarPulseSVG(){ return `<svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M1 10h3l2-6 3 12 2.5-9 1.5 4h6" stroke="#8FD9CC" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`; }
+
+function renderConnectScreen(){
+  document.getElementById('app').innerHTML = `
+  <div class="center-screen">
+    <div class="card" style="max-width:420px;width:100%;padding:28px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;">
+        <div class="brand-mark">${sidebarPulseSVG()}</div>
+        <div><div style="font-family:'Space Grotesk';font-weight:600;font-size:16px;">Vantriq AI</div><div style="font-size:11.5px;color:var(--muted);">Sales rep login</div></div>
+      </div>
+      ${connectError?`<div style="background:var(--red-light);color:#8F3527;padding:10px 12px;border-radius:8px;font-size:12.5px;margin-bottom:14px;">${esc(connectError)}</div>`:''}
+      <div class="field"><label>API base URL</label><input id="conn_base" value="${esc(API.base||window.location.origin)}"></div>
+      <div class="field"><label>Your rep login key</label><input id="conn_key" type="password" value="${esc(API.key)}" placeholder="rep_..."></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="attemptConnect()">Log in</button>
+      <p class="footnote">Don't have a key? Ask your admin to add you under Sales Reps in the main CRM.</p>
+    </div>
+  </div>`;
+}
+async function attemptConnect(){
+  const base = document.getElementById('conn_base').value.trim();
+  const key = document.getElementById('conn_key').value.trim();
+  if(!base||!key){ connectError='Both fields are required.'; renderConnectScreen(); return; }
+  API.setConfig(base,key);
+  await boot();
+}
+
+async function boot(){
+  if(!API.configured()){ renderConnectScreen(); return; }
+  document.getElementById('app').innerHTML = `<div class="center-screen"><span class="loading-dot"></span>&nbsp; Loading your pipeline…</div>`;
+  try{
+    const [leadsRes, summaryRes, productsRes] = await Promise.all([
+      API.get('/api/rep/leads'), API.get('/api/rep/summary'), API.get('/api/rep/products'),
+    ]);
+    leads = leadsRes; summary = summaryRes; products = productsRes;
+    render();
+  }catch(e){
+    connectError = e.message || 'Could not log in.';
+    if(e.message && e.message.includes('401')) API.clearConfig();
+    renderConnectScreen();
+  }
+}
+
+async function refreshAll(){
+  const [leadsRes, summaryRes] = await Promise.all([API.get('/api/rep/leads'), API.get('/api/rep/summary')]);
+  leads = leadsRes; summary = summaryRes;
+}
+
+function render(){
+  document.getElementById('app').innerHTML = `
+    <div class="topbar">
+      <div class="brand-row">
+        <div class="brand-mark">${sidebarPulseSVG()}</div>
+        <div><div class="brand-name">Vantriq AI</div><div class="brand-sub">Sales Rep Portal</div></div>
+      </div>
+      <div class="rep-badge">${esc(summary.rep.name)} · <a href="#" onclick="logout();return false;" style="color:#93A2AB;">Log out</a></div>
+    </div>
+    <div class="content">
+      <div class="grid kpi-row">
+        <div class="card kpi"><div class="label">Total leads</div><div class="value">${summary.total_leads}</div></div>
+        <div class="card kpi"><div class="label">Open pipeline value</div><div class="value mono" style="font-size:18px;">${fmtMoney(summary.open_pipeline_value)}</div></div>
+        <div class="card kpi"><div class="label">Won</div><div class="value" style="color:var(--teal-dark);">${summary.won_count} <span style="font-size:13px;color:var(--muted);font-weight:500;">(${fmtMoney(summary.won_value)})</span></div></div>
+        <div class="card kpi"><div class="label">Win rate</div><div class="value">${summary.win_rate!=null?summary.win_rate.toFixed(0)+'%':'—'}</div></div>
+      </div>
+
+      <div class="toolbar">
+        <div></div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost" onclick="exportExcel()">⬇ Export to Excel</button>
+          <button class="btn btn-primary" onclick="openModal={type:'lead'};renderModal()">+ New lead</button>
+        </div>
+      </div>
+
+      <div class="kanban">
+        ${STAGES.map(s=>{
+          const items = leads.filter(l=>(l.salesStage||'qualification')===s.id);
+          return `<div class="kanban-col">
+            <div class="kanban-col-head"><span class="t">${s.label}</span><span class="n">${items.length}</span></div>
+            ${items.map(l=>`
+              <div class="kcard" onclick="openModal={type:'lead',id:'${l.id}'};renderModal()">
+                <div class="name">${esc(l.name)}</div>
+                <div class="co">${esc(l.company)}</div>
+                <div class="meta">
+                  <span class="tag">${l.productName?esc(l.productName):'—'}</span>
+                  <span class="mono" style="font-size:12px;font-weight:700;">${fmtMoney(l.estValue)}</span>
+                </div>
+                ${s.id==='closure'&&l.closeOutcome?`<div style="margin-top:8px;"><span class="pill ${l.closeOutcome==='won'?'pill-won':'pill-lost'}"><span class="pill-dot"></span>${l.closeOutcome}</span></div>`:''}
+              </div>
+            `).join('') || `<div style="padding:14px 4px;color:var(--muted-2);font-size:12px;">No leads here yet</div>`}
+          </div>`;
+        }).join('')}
+      </div>
+      <p class="footnote">You can only see and edit leads you've created. Move a lead to Closure and mark it Won or Lost to complete it.</p>
+    </div>
+  `;
+  renderModal();
+}
+
+function logout(){
+  if(!confirm('Log out of the rep portal?')) return;
+  API.clearConfig();
+  boot();
+}
+
+function renderModal(){
+  const root = document.getElementById('modal-root');
+  if(!openModal){ root.innerHTML=''; return; }
+  const lead = openModal.id ? leads.find(l=>l.id===openModal.id) : null;
+  root.innerHTML = `
+  <div class="modal-overlay" onmousedown="if(event.target===this){openModal=null;renderModal();}">
+    <div class="modal">
+      <div class="modal-head"><h3 style="margin:0;font-size:16px;">${lead?'Lead details':'New lead'}</h3><button class="close-x" onclick="openModal=null;renderModal()">✕</button></div>
+      <div class="modal-body">
+        <div class="field-row">
+          <div class="field"><label>Contact name</label><input id="f_name" value="${lead?esc(lead.name):''}"></div>
+          <div class="field"><label>Company</label><input id="f_company" value="${lead?esc(lead.company):''}"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Email</label><input id="f_email" value="${lead?esc(lead.email||''):''}"></div>
+          <div class="field"><label>Phone</label><input id="f_phone" value="${lead?esc(lead.phone||''):''}"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Package interest</label>
+            <select id="f_product"><option value="">—</option>${products.map(p=>`<option value="${p.id}" ${lead&&lead.productId===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select>
+          </div>
+          <div class="field"><label>Est. value (PKR/mo)</label><input id="f_value" type="number" value="${lead?lead.estValue:''}"></div>
+        </div>
+        <div class="field"><label>Source</label><input id="f_source" value="${lead?esc(lead.source||''):''}" placeholder="Referral, cold outreach, LinkedIn…"></div>
+        <div class="field"><label>Notes</label><textarea id="f_notes" rows="3">${lead?esc(lead.notes||''):''}</textarea></div>
+        ${lead?`
+        <div class="field"><label>Stage</label>
+          <select id="f_stage">${STAGES.map(s=>`<option value="${s.id}" ${lead.salesStage===s.id?'selected':''}>${s.label}</option>`).join('')}</select>
+        </div>
+        <div class="field" id="outcome_field" style="display:${lead.salesStage==='closure'?'block':'none'};">
+          <label>Outcome</label>
+          <select id="f_outcome">
+            <option value="">Not yet decided</option>
+            <option value="won" ${lead.closeOutcome==='won'?'selected':''}>Won</option>
+            <option value="lost" ${lead.closeOutcome==='lost'?'selected':''}>Lost</option>
+          </select>
+        </div>`:''}
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-ghost" onclick="openModal=null;renderModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveLead(${lead?`'${lead.id}'`:'null'})">${lead?'Save changes':'Create lead'}</button>
+      </div>
+    </div>
+  </div>`;
+  const stageSelect = document.getElementById('f_stage');
+  if(stageSelect){
+    stageSelect.addEventListener('change', () => {
+      document.getElementById('outcome_field').style.display = stageSelect.value==='closure' ? 'block' : 'none';
+    });
+  }
+}
+
+async function saveLead(id){
+  const name = document.getElementById('f_name').value.trim();
+  const company = document.getElementById('f_company').value.trim();
+  if(!name||!company){ alert('Name and company are required'); return; }
+  const payload = {
+    name, company,
+    email: document.getElementById('f_email').value.trim(),
+    phone: document.getElementById('f_phone').value.trim(),
+    product_id: document.getElementById('f_product').value || null,
+    est_value: parseFloat(document.getElementById('f_value').value)||0,
+    source: document.getElementById('f_source').value.trim(),
+    notes: document.getElementById('f_notes').value.trim(),
+  };
+  try{
+    if(id){
+      const stageEl = document.getElementById('f_stage');
+      const outcomeEl = document.getElementById('f_outcome');
+      if(stageEl) payload.salesStage = stageEl.value;
+      if(outcomeEl) payload.closeOutcome = outcomeEl.value || null;
+      await API.put(`/api/rep/leads/${id}`, payload);
+    }else{
+      await API.post('/api/rep/leads', payload);
+    }
+    await refreshAll();
+    openModal = null;
+    render();
+  }catch(e){ alert(e.message || 'Could not save lead'); }
+}
+
+function exportExcel(){
+  const url = `${API.base}/api/rep/export`;
+  fetch(url, { headers: { 'x-api-key': API.key } })
+    .then(r => { if(!r.ok) throw new Error('Export failed'); return r.blob(); })
+    .then(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'my-pipeline.xlsx';
+      a.click();
+    })
+    .catch(e => alert(e.message));
+}
+
+boot();
+</script>
+</body>
+</html>

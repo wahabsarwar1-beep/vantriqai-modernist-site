@@ -1,0 +1,2698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vantriq Ops — CRM &amp; Revenue Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="/invoice-print.js"></script>
+<style>
+:root{
+  --ink:#0F1A22;
+  --ink-2:#16242E;
+  --ink-3:#1E3038;
+  --paper:#F5F3ED;
+  --card:#FFFFFF;
+  --teal:#12897A;
+  --teal-dark:#0B6357;
+  --teal-light:#E3F1EE;
+  --amber:#DE9C34;
+  --amber-light:#FBF0DD;
+  --red:#BC4B3C;
+  --red-light:#FBE8E4;
+  --blue:#3E6FA8;
+  --text:#161F27;
+  --muted:#6C7885;
+  --muted-2:#98A2AC;
+  --border:#E4E0D6;
+  --border-dark:#2A3E47;
+  --radius:10px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:'Inter',sans-serif;
+  background:var(--paper);
+  color:var(--text);
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4,.display{font-family:'Space Grotesk',sans-serif;}
+.mono{font-family:'JetBrains Mono',monospace;}
+button{font-family:'Inter',sans-serif;cursor:pointer;}
+::selection{background:var(--teal-light);}
+
+/* Layout */
+#app{display:flex;min-height:100vh;}
+.sidebar{
+  width:236px;flex-shrink:0;background:var(--ink);
+  color:#DCE4E8;display:flex;flex-direction:column;
+  position:sticky;top:0;height:100vh;overflow-y:auto;
+}
+.brand{
+  padding:22px 20px 18px 20px;border-bottom:1px solid var(--border-dark);
+  display:flex;align-items:center;gap:10px;
+}
+.brand-mark{
+  width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--teal),#0A4E45);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;overflow:hidden;
+}
+.brand-mark svg{position:relative;z-index:2;}
+.brand-name{font-family:'Space Grotesk';font-weight:600;font-size:15.5px;color:#fff;letter-spacing:.2px;}
+.brand-sub{font-size:10.5px;color:#7C8B94;margin-top:1px;letter-spacing:.5px;text-transform:uppercase;}
+.nav{padding:14px 10px;flex:1;}
+.nav-group-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#5D6C75;padding:14px 12px 6px;font-weight:600;}
+.nav-item{
+  display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;
+  color:#B7C2C9;font-size:13.5px;font-weight:500;margin-bottom:2px;
+  transition:background .12s,color .12s;position:relative;
+}
+.nav-item:hover{background:var(--ink-2);color:#fff;}
+.nav-item.active{background:var(--ink-3);color:#fff;}
+.nav-item.active::before{
+  content:'';position:absolute;left:-10px;top:8px;bottom:8px;width:3px;
+  background:var(--teal);border-radius:0 3px 3px 0;
+}
+.nav-item svg{flex-shrink:0;opacity:.85;}
+.nav-badge{
+  margin-left:auto;font-size:10.5px;background:var(--ink-3);color:#9BADB6;
+  padding:1px 7px;border-radius:20px;font-family:'JetBrains Mono';
+}
+.sidebar-foot{padding:14px 20px;border-top:1px solid var(--border-dark);font-size:11px;color:#5D6C75;}
+
+.main{flex:1;min-width:0;display:flex;flex-direction:column;}
+.topbar{
+  background:var(--card);border-bottom:1px solid var(--border);
+  padding:16px 28px;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:20;
+}
+.topbar h1{font-size:19px;margin:0;font-weight:600;}
+.topbar-sub{font-size:12.5px;color:var(--muted);margin-top:2px;}
+.content{padding:26px 28px 60px;max-width:1360px;width:100%;margin:0 auto;}
+
+/* Reusable */
+.grid{display:grid;gap:16px;}
+.kpi-row{grid-template-columns:repeat(auto-fit,minmax(200px,1fr));}
+.card{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:18px 20px;
+}
+.kpi{position:relative;overflow:hidden;}
+.kpi .label{font-size:11.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:600;}
+.kpi .value{font-family:'Space Grotesk';font-size:26px;font-weight:600;margin-top:6px;letter-spacing:-.3px;}
+.kpi .delta{font-size:11.5px;margin-top:6px;font-family:'JetBrains Mono';}
+.delta.up{color:var(--teal-dark);}
+.delta.down{color:var(--red);}
+.section-title{display:flex;align-items:center;justify-content:space-between;margin:30px 0 12px;}
+.section-title h2{font-size:15.5px;font-weight:600;margin:0;}
+.section-title .hint{font-size:12px;color:var(--muted);margin-top:2px;}
+
+.btn{
+  border:none;border-radius:8px;padding:9px 15px;font-size:13px;font-weight:600;
+  display:inline-flex;align-items:center;gap:6px;transition:opacity .12s,transform .05s;
+}
+.btn:active{transform:scale(.98);}
+.btn-primary{background:var(--teal);color:#fff;}
+.btn-primary:hover{background:var(--teal-dark);}
+.btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border);}
+.btn-ghost:hover{background:#F0EEE7;}
+.btn-danger-ghost{background:transparent;color:var(--red);border:1px solid #EBD2CC;}
+.btn-danger-ghost:hover{background:var(--red-light);}
+.btn-sm{padding:6px 11px;font-size:12px;}
+.btn-icon{width:32px;height:32px;padding:0;justify-content:center;border-radius:8px;}
+
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{
+  text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;
+  color:var(--muted);font-weight:600;padding:8px 12px;border-bottom:1px solid var(--border);
+  white-space:nowrap;
+}
+td{padding:11px 12px;border-bottom:1px solid #EFEDE6;vertical-align:middle;}
+tr.row-click{cursor:pointer;}
+tr.row-click:hover td{background:#FBFAF7;}
+.table-wrap{overflow-x:auto;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);}
+.table-wrap table{min-width:640px;}
+
+.pill{
+  display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;
+  font-size:11px;font-weight:600;white-space:nowrap;
+}
+.pill-dot{width:6px;height:6px;border-radius:50%;}
+.pill-lead{background:#EEF1F4;color:#5A6672;}
+.pill-lead .pill-dot{background:#8B97A2;}
+.pill-contacted{background:var(--amber-light);color:#8A5F17;}
+.pill-contacted .pill-dot{background:var(--amber);}
+.pill-proposal{background:#E9EEF8;color:#2E5389;}
+.pill-proposal .pill-dot{background:var(--blue);}
+.pill-negotiation{background:#F3E9F8;color:#7A3F94;}
+.pill-negotiation .pill-dot{background:#9B5CB8;}
+.pill-active,.pill-paid{background:var(--teal-light);color:var(--teal-dark);}
+.pill-active .pill-dot,.pill-paid .pill-dot{background:var(--teal);}
+.pill-churned,.pill-lost,.pill-overdue{background:var(--red-light);color:#8F3527;}
+.pill-churned .pill-dot,.pill-lost .pill-dot,.pill-overdue .pill-dot{background:var(--red);}
+.pill-pending{background:#EEF1F4;color:#5A6672;}
+.pill-pending .pill-dot{background:#8B97A2;}
+
+.tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;background:#F0EEE7;color:var(--muted);}
+
+/* Kanban */
+.kanban{display:flex;gap:14px;overflow-x:auto;padding-bottom:8px;}
+.kanban-col{flex:0 0 250px;background:#F0EEE6;border-radius:12px;padding:10px;min-height:200px;}
+.kanban-col-head{display:flex;align-items:center;justify-content:space-between;padding:4px 6px 10px;}
+.kanban-col-head .t{font-size:12.5px;font-weight:700;}
+.kanban-col-head .n{font-size:11px;color:var(--muted);font-family:'JetBrains Mono';}
+.kcard{
+  background:var(--card);border:1px solid var(--border);border-radius:9px;padding:11px 12px;
+  margin-bottom:9px;cursor:grab;transition:box-shadow .15s,border-color .15s;
+}
+.kcard:hover{box-shadow:0 2px 10px rgba(0,0,0,.06);border-color:#D6D1C4;}
+.kcard.dragging{opacity:.4;}
+.kcard .name{font-size:13px;font-weight:700;}
+.kcard .co{font-size:11.5px;color:var(--muted);margin-top:1px;}
+.kcard .meta{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
+.kanban-drop{outline:2px dashed var(--teal);outline-offset:-4px;border-radius:12px;}
+
+/* Modal */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(15,26,34,.5);display:flex;align-items:flex-start;justify-content:center;
+  z-index:100;padding:40px 16px;overflow-y:auto;
+}
+.modal{
+  background:var(--card);border-radius:14px;width:100%;max-width:560px;padding:0;
+  box-shadow:0 20px 60px rgba(0,0,0,.25);
+}
+.modal-head{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.modal-head h3{margin:0;font-size:16px;}
+.modal-body{padding:20px 22px;max-height:70vh;overflow-y:auto;}
+.modal-foot{padding:16px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px;}
+.field input,.field select,.field textarea{
+  width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;
+  font-family:'Inter';background:#FCFBF9;
+}
+.field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--teal);outline-offset:0;border-color:transparent;}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.close-x{background:none;border:none;color:var(--muted);font-size:18px;line-height:1;padding:4px;}
+
+/* Product cards */
+.prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;}
+.prod-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;position:relative;}
+.prod-card .tier-tag{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--teal-dark);font-weight:700;}
+.prod-card h3{margin:4px 0 2px;font-size:19px;}
+.prod-card .target{font-size:12px;color:var(--muted);margin-bottom:12px;}
+.prod-price{display:flex;align-items:baseline;gap:6px;margin-bottom:14px;}
+.prod-price .amt{font-family:'JetBrains Mono';font-size:20px;font-weight:600;}
+.prod-price .per{font-size:11.5px;color:var(--muted);}
+.prod-stat-row{display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-top:1px dashed var(--border);}
+.prod-stat-row .k{color:var(--muted);}
+.prod-stat-row .v{font-weight:600;font-family:'JetBrains Mono';}
+.prod-actions{display:flex;gap:6px;margin-top:14px;}
+
+.empty{
+  text-align:center;padding:50px 20px;color:var(--muted);
+}
+.empty svg{opacity:.35;margin-bottom:10px;}
+.empty .t{font-weight:600;color:var(--text);font-size:14px;}
+.empty .s{font-size:12.5px;margin-top:4px;}
+
+.detail-panel{position:fixed;top:0;right:0;bottom:0;width:420px;max-width:92vw;background:var(--card);
+  box-shadow:-8px 0 32px rgba(0,0,0,.18);z-index:90;overflow-y:auto;transform:translateX(100%);transition:transform .22s ease;}
+.detail-panel.open{transform:translateX(0);}
+.detail-head{padding:20px 22px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card);}
+.detail-body{padding:18px 22px;}
+.detail-row{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #F1EFE8;font-size:13px;}
+.detail-row .k{color:var(--muted);}
+.detail-row .v{font-weight:600;text-align:right;}
+.scrim{position:fixed;inset:0;background:rgba(15,26,34,.4);z-index:85;}
+
+.toast-wrap{position:fixed;bottom:22px;right:22px;z-index:200;display:flex;flex-direction:column;gap:8px;}
+.toast{background:var(--ink);color:#fff;padding:11px 16px;border-radius:9px;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.25);
+  display:flex;align-items:center;gap:8px;animation:toastIn .18s ease;}
+@keyframes toastIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;}
+.chart-card h3{font-size:13.5px;margin:0 0 14px;font-weight:600;}
+.two-col{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;}
+@media(max-width:900px){.two-col{grid-template-columns:1fr;}}
+
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:18px;}
+.tab{padding:9px 14px;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;}
+.tab.active{color:var(--teal-dark);border-color:var(--teal);}
+
+.progress-track{height:6px;background:#EEEBE2;border-radius:4px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--teal);border-radius:4px;}
+.progress-fill.warn{background:var(--amber);}
+.progress-fill.danger{background:var(--red);}
+
+.stat-strip{display:flex;gap:22px;flex-wrap:wrap;padding:14px 18px;background:var(--ink);border-radius:12px;color:#fff;margin-bottom:6px;}
+.stat-strip .s-item .l{font-size:10.5px;color:#93A2AB;text-transform:uppercase;letter-spacing:.5px;}
+.stat-strip .s-item .v{font-family:'JetBrains Mono';font-size:17px;font-weight:600;margin-top:2px;}
+
+.hamburger{display:none;background:none;border:none;padding:6px;}
+@media(max-width:860px){
+  .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:150;transform:translateX(-100%);transition:transform .2s;}
+  .sidebar.open{transform:translateX(0);}
+  .hamburger{display:block;}
+  .content{padding:18px 16px 50px;}
+  .topbar{padding:14px 16px;}
+}
+.loading-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--teal);animation:pulse 1.2s infinite;}
+@keyframes pulse{0%,100%{opacity:.3;}50%{opacity:1;}}
+
+a.plain{color:var(--teal-dark);text-decoration:none;font-weight:600;}
+.footnote{font-size:11.5px;color:var(--muted-2);margin-top:10px;}
+.divider{height:1px;background:var(--border);margin:18px 0;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="modal-root"></div>
+<div id="panel-root"></div>
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<script>
+/* =========================================================================
+   VANTRIQ OPS — CRM, Product Catalog, Procurement, Billing & Financials
+   Single-file app. Talks to the Vantriq API (Node/Express + Postgres) for
+   all data. Usage numbers come from real usage_events rows that n8n posts
+   in real time after each AI call — see /api/webhooks/usage on the server.
+   ========================================================================= */
+
+const CURRENCY = 'PKR';
+const LS_BASE = 'vantriq_api_base';
+const LS_KEY = 'vantriq_api_key';
+
+/* ---------------------------- API client ---------------------------- */
+const LS_SESS = 'vantriq_staff_session';
+const API = {
+  base: localStorage.getItem(LS_BASE) || window.location.origin,
+  key: localStorage.getItem(LS_KEY) || '',
+  session: localStorage.getItem(LS_SESS) || '',
+  // Signed in either as an employee (session) or, for emergencies only, with
+  // an admin API key.
+  configured(){ return !!(this.base && (this.session || this.key)); },
+  setSession(base, token){
+    this.base = (base||this.base||window.location.origin).replace(/\/$/,'');
+    this.session = token;
+    localStorage.setItem(LS_BASE, this.base); localStorage.setItem(LS_SESS, token);
+  },
+  setConfig(base, key){
+    this.base = base.replace(/\/$/,''); this.key = key;
+    localStorage.setItem(LS_BASE, this.base); localStorage.setItem(LS_KEY, this.key);
+  },
+  clearConfig(){
+    localStorage.removeItem(LS_BASE); localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_SESS);
+    this.base=''; this.key=''; this.session='';
+  },
+  async req(method, path, body){
+    let res;
+    const headers = {'Content-Type':'application/json'};
+    if(this.session) headers['Authorization'] = 'Bearer ' + this.session;
+    else if(this.key) headers['x-api-key'] = this.key;
+    try{
+      res = await fetch(this.base+path, {
+        method, headers,
+        body: body!==undefined ? JSON.stringify(body) : undefined,
+      });
+    }catch(e){ throw new ApiError('Could not reach the API — check the API URL in Settings.', 0); }
+    if(res.status===204) return null;
+    let data=null;
+    try{ data = await res.json(); }catch(e){ /* empty body */ }
+    if(!res.ok){ throw new ApiError((data&&data.error)||`Request failed (${res.status})`, res.status); }
+    return data;
+  },
+  get(path){ return this.req('GET', path); },
+  post(path,body){ return this.req('POST', path, body); },
+  put(path,body){ return this.req('PUT', path, body); },
+  patch(path,body){ return this.req('PATCH', path, body); },
+  del(path){ return this.req('DELETE', path); },
+};
+class ApiError extends Error{ constructor(msg,status){ super(msg); this.status=status; } }
+
+/* -------------------- Field-name mapping: API (snake_case) <-> UI (camelCase) -------------------- */
+const INVOICE_TYPE_TO_API = {'Setup fee':'setup_fee','Retainer':'retainer','Overage':'overage','Add-on / change request':'addon'};
+const INVOICE_TYPE_FROM_API = {'setup_fee':'Setup fee','retainer':'Retainer','overage':'Overage','addon':'Add-on / change request'};
+
+function productFromApi(p){ return { id:p.id, name:p.name, isStandard:p.is_standard!==false, targetTier:p.target_tier, setupFee:+p.setup_fee, retainer:+p.retainer, msgsPerSession:+p.msgs_per_session, quota:+p.quota, overageRate:+p.overage_rate, deliveryCostFull:+p.delivery_cost_full, automation:p.automation, dataLayer:p.data_layer, aiModel:p.ai_model, channels:p.channels, order:p.sort_order }; }
+function productToApi(p){ return { name:p.name, target_tier:p.targetTier, setup_fee:p.setupFee, retainer:p.retainer, msgs_per_session:p.msgsPerSession, quota:p.quota, overage_rate:p.overageRate, delivery_cost_full:p.deliveryCostFull, automation:p.automation, data_layer:p.dataLayer, ai_model:p.aiModel, channels:p.channels }; }
+
+function clientFromApi(c){ return { id:c.id, name:c.name, company:c.company, email:c.email, phone:c.phone, externalRef:c.external_ref||'', productId:c.product_id, stage:c.stage, estValue:+c.est_value||0, source:c.source, notes:c.notes, joinDate:c.join_date, sessionsUsedThisMonth:0, ownerRepId:c.owner_rep_id||null, salesStage:c.sales_stage||null, closeOutcome:c.close_outcome||null,
+  portalEnabled:!!c.portal_enabled, portalUsername:c.portal_username||'',
+  portalPasswordSetBy:c.portal_password_set_by||'', portalPasswordSetAt:c.portal_password_set_at||null,
+  parentClientId:c.parent_client_id||null,
+  serviceStatus:c.service_status||'active', suspendedAt:c.suspended_at||null,
+  suspensionReason:c.suspension_reason||'', suspendedBy:c.suspended_by||'',
+  ntn:c.ntn||'', strn:c.strn||'', taxRate:(c.tax_rate===null||c.tax_rate===undefined)?null:+c.tax_rate,
+  billingAddress:c.billing_address||'',
+  customSetupFee:c.custom_setup_fee, customRetainer:c.custom_retainer, customQuota:c.custom_quota,
+  customOverageRate:c.custom_overage_rate, customMsgsPerSession:c.custom_msgs_per_session,
+  customAutomation:c.custom_automation||'', customDataLayer:c.custom_data_layer||'',
+  customAiModel:c.custom_ai_model||'', customChannels:c.custom_channels||'' }; }
+function clientToApi(c){
+  const out = { name:c.name, company:c.company, email:c.email, phone:c.phone, external_ref:c.externalRef||null,
+    product_id:c.productId||null, stage:c.stage, est_value:c.estValue, source:c.source, notes:c.notes,
+    // Billing identity. The API needs NTN and a billing address before a client
+    // can go active — that is what its invoices are issued against.
+    parent_client_id:c.parentClientId||null, ntn:c.ntn||'', strn:c.strn||'',
+    tax_rate:(c.taxRate===null||c.taxRate===undefined||c.taxRate==='')?null:c.taxRate,
+    billing_address:c.billingAddress||'' };
+  if(c.stageComment) out.stage_comment = c.stageComment;
+  // Custom package terms are only accepted by the API on the Enterprise+ tier.
+  if(c.custom){
+    out.custom_setup_fee = c.custom.setupFee; out.custom_retainer = c.custom.retainer;
+    out.custom_quota = c.custom.quota; out.custom_overage_rate = c.custom.overageRate;
+    out.custom_msgs_per_session = c.custom.msgsPerSession;
+    out.custom_automation = c.custom.automation; out.custom_data_layer = c.custom.dataLayer;
+    out.custom_ai_model = c.custom.aiModel; out.custom_channels = c.custom.channels;
+  }
+  return out;
+}
+
+/* The client lifecycle, mirroring the rules the API enforces: a deal only ever
+   moves forward one step, may be lost before it goes active, and an active
+   client may churn. lost and churned are final. */
+const FORWARD_STAGES = ['lead','contacted','proposal','negotiation','active'];
+function allowedNextStages(from){
+  if(from==='lost'||from==='churned') return [];
+  if(from==='active') return ['churned'];
+  const i = FORWARD_STAGES.indexOf(from);
+  if(i===-1) return [];
+  const next=[];
+  if(i+1<FORWARD_STAGES.length) next.push(FORWARD_STAGES[i+1]);
+  next.push('lost');
+  return next;
+}
+function isCustomTier(productId){
+  const p = state.products.find(x=>x.id===productId);
+  return !!p && p.isStandard === false;
+}
+
+// amount stays the value excluding tax, as the API stores it; tax and total
+// come alongside so the CRM shows the same breakdown the invoice prints.
+function invoiceFromApi(i){ return { id:i.id, clientId:i.client_id, type:INVOICE_TYPE_FROM_API[i.type]||i.type,
+  amount:+i.amount, period:i.period, status:i.status, date:i.issued_date, overageSessions:i.overage_sessions||0,
+  number:i.invoice_number||'', taxRate:+i.tax_rate||0, taxAmount:+i.tax_amount||0,
+  total:(i.total_amount===null||i.total_amount===undefined)?+i.amount:+i.total_amount, dueDate:i.due_date||null }; }
+
+function vendorFromApi(v){ return { id:v.id, name:v.name, category:v.category, tiers:v.tiers, costMin:+v.cost_min, costMax:+v.cost_max, status:v.status }; }
+function vendorToApi(v){ return { name:v.name, category:v.category, tiers:v.tiers, cost_min:v.costMin, cost_max:v.costMax, status:v.status }; }
+
+function poFromApi(p){ return { id:p.id, vendorId:p.vendor_id, item:p.item, amount:+p.amount, date:p.po_date, status:p.status }; }
+
+function expenseFromApi(e){ return { id:e.id, label:e.label, category:e.category, amount:+e.amount, recurring:e.recurring, startDate:e.start_date }; }
+
+function fmtMoney(n){
+  if(n===null||n===undefined||isNaN(n)) n=0;
+  const neg = n<0; n=Math.abs(Math.round(n));
+  return (neg?'-':'')+CURRENCY+' '+n.toLocaleString('en-US');
+}
+function fmtNum(n){ return Math.round(n).toLocaleString('en-US'); }
+function uid(prefix){ return prefix+'_'+Math.random().toString(36).slice(2,9); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function fmtDate(d){ if(!d) return '—'; const dt=new Date(d); return dt.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }
+function addMonths(dateStr,n){ const d=new Date(dateStr); d.setMonth(d.getMonth()+n); return d.toISOString().slice(0,10); }
+function esc(s){ return (s+'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function monthLabel(dateStr){ const d=new Date(dateStr); return d.toLocaleDateString('en-US',{month:'short',year:'numeric'}); }
+
+/* ---------------------------- State + live API loading ---------------------------- */
+// `state` mirrors the previous local shape so every render*() function below
+// is untouched — but every field in it now comes from the real Postgres
+// database via the API, and every mutation writes straight back to it.
+let state = null;
+let apiConnected = false;
+let connectError = '';
+
+/* Staff logins cannot see procurement, expenses, settings or reps — asking for
+   them would 403 and take the whole load down with it, so they resolve to an
+   empty default instead. */
+function adminOnly(path, fallback){
+  return isAdmin() ? API.get(path) : Promise.resolve(fallback);
+}
+
+async function loadState(){
+  const [products, clients, invoices, vendors, pos, expenses, settings, dash, reps, packageRequests] = await Promise.all([
+    API.get('/api/products'),
+    API.get('/api/clients'),
+    API.get('/api/invoices'),
+    adminOnly('/api/vendors', []),
+    adminOnly('/api/purchase-orders', []),
+    adminOnly('/api/expenses', []),
+    adminOnly('/api/settings', { company_name:'Vantriq AI', city:'', founder:'', currency:'PKR', utilization:0.7,
+      ntn:'', strn:'', address:'', default_tax_rate:0, invoice_prefix:'VAI', payment_terms_days:7,
+      overage_policy:'serve', overage_grace_pct:120 }),
+    API.get('/api/dashboard'),
+    adminOnly('/api/reps', []),
+    API.get('/api/package-requests?status=pending'),
+  ]);
+
+  const camelClients = clients.map(clientFromApi);
+  // merge in this month's *live* usage (from real usage_events, posted by n8n)
+  camelClients.forEach(c=>{
+    const u = dash.usage_by_client[c.id];
+    c.sessionsUsedThisMonth = u ? +u.sessions : 0;
+  });
+
+  state = {
+    company:{ name:settings.company_name, city:settings.city, founder:settings.founder,
+      // Tax and invoicing details. Staff sessions cannot read /api/settings, so
+      // these fall back to the defaults rather than breaking the whole load.
+      ntn:settings.ntn||'', strn:settings.strn||'', address:settings.address||'',
+      defaultTaxRate:settings.default_tax_rate!=null?+settings.default_tax_rate:0,
+      invoicePrefix:settings.invoice_prefix||'VAI',
+      overagePolicy:settings.overage_policy||'serve',
+      overageGracePct:settings.overage_grace_pct!=null?+settings.overage_grace_pct:120,
+      paymentTermsDays:settings.payment_terms_days!=null?+settings.payment_terms_days:7,
+      currency:settings.currency||'PKR' },
+    packageRequests: packageRequests || [],
+    products: products.map(productFromApi),
+    clients: camelClients,
+    invoices: invoices.map(invoiceFromApi),
+    vendors: vendors.map(vendorFromApi),
+    pos: pos.map(poFromApi),
+    expenses: expenses.map(expenseFromApi),
+    reps: reps.map(repFromApi),
+    utilization: +settings.utilization,
+  };
+}
+function repFromApi(r){ return { id:r.id, name:r.name, email:r.email, active:r.active, leadCount:+r.lead_count||0, wonCount:+r.won_count||0, createdAt:r.created_at, lastUsedAt:r.last_used_at }; }
+
+/* Lightweight refresh — re-pulls usage + dashboard numbers only, so the
+   dashboard/clients/pipeline views reflect n8n activity without a full reload. */
+async function refreshUsage(){
+  try{
+    const dash = await API.get('/api/dashboard');
+    state.clients.forEach(c=>{ const u = dash.usage_by_client[c.id]; c.sessionsUsedThisMonth = u ? +u.sessions : 0; });
+    // Never repaint while a modal or detail panel is open: render() rebuilds
+    // both with innerHTML, which wipes whatever has been typed into the form.
+    // state is already updated above, so the next poll paints the fresh numbers.
+    if(openModal || openPanel || kanbanDragId) return;
+    if(['dashboard','clients','pipeline'].includes(currentView)) render();
+  }catch(e){ /* silent — next poll will retry */ }
+}
+let usagePollTimer = null;
+function startUsagePolling(){
+  clearInterval(usagePollTimer);
+  usagePollTimer = setInterval(refreshUsage, 20000); // near-real-time: refresh every 20s
+}
+
+/* No-op kept so existing render code that calls saveState() after local-only
+   tweaks doesn't break; real writes go through the API functions below. */
+function saveState(){ return Promise.resolve(); }
+
+/* ---------------------------- Toasts ---------------------------- */
+function showToast(msg, kind){
+  const wrap = document.getElementById('toast-wrap');
+  const el = document.createElement('div');
+  el.className='toast';
+  el.innerHTML = `<span>${kind==='warn'?'⚠️':'✓'}</span><span>${esc(msg)}</span>`;
+  wrap.appendChild(el);
+  setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(),300); }, 2600);
+}
+
+/* ---------------------------- Router / view state ---------------------------- */
+let currentView = 'dashboard';
+let authUser = null;   // {id,email,name,role} when signed in as an employee
+function isAdmin(){ return !authUser || authUser.role === 'admin'; }  // an API-key session is admin
+let sidebarOpen = false;
+let openPanel = null; // {type:'client'|'invoiceDetail', id}
+let openModal = null; // {type, id}
+let kanbanDragId = null;
+
+const NAV = [
+  {group:'Overview', items:[
+    {id:'dashboard', label:'Dashboard', icon:iconGrid},
+  ]},
+  {group:'Revenue', items:[
+    {id:'pipeline', label:'Pipeline', icon:iconFunnel},
+    {id:'clients', label:'Clients', icon:iconUsers},
+    {id:'billing', label:'Billing & Invoices', icon:iconReceipt},
+    {id:'quota', label:'Quota & Overage', icon:iconChart},
+    {id:'requests', label:'Package Requests', icon:iconBox},
+    {id:'reps', label:'Sales Reps', icon:iconUsers},
+  ]},
+  {group:'Operations', items:[
+    {id:'products', label:'Products & Pricing', icon:iconBox},
+    {id:'procurement', label:'Procurement', icon:iconTruck, adminOnly:true},
+    {id:'financials', label:'Financials', icon:iconChart, adminOnly:true},
+  ]},
+  {group:'', items:[
+    {id:'team', label:'Team', icon:iconUsers, adminOnly:true},
+    {id:'settings', label:'Settings', icon:iconGear, adminOnly:true},
+  ]},
+];
+
+/* Nav filtered to what this account may actually open. */
+function visibleNav(){
+  return NAV
+    .map(g=>({ ...g, items: g.items.filter(it=> !it.adminOnly || isAdmin()) }))
+    .filter(g=>g.items.length);
+}
+
+function navigate(view){ currentView=view; sidebarOpen=false; openPanel=null; render(); window.scrollTo(0,0); }
+
+/* ---------------------------- Icons (inline SVG, stroke style) ---------------------------- */
+function icon(paths, size=17){ return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`; }
+function iconGrid(){ return icon('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'); }
+function iconFunnel(){ return icon('<path d="M4 4h16l-6 8v6l-4 2v-8z"/>'); }
+function iconUsers(){ return icon('<circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5"/><circle cx="17" cy="8.5" r="2.6"/><path d="M15.5 13.6c2.9.4 5 2.7 5 6.4"/>'); }
+function iconReceipt(){ return icon('<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>'); }
+function iconBox(){ return icon('<path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>'); }
+function iconTruck(){ return icon('<rect x="1" y="7" width="13" height="10" rx="1"/><path d="M14 10h4l3 3v4h-7z"/><circle cx="6" cy="19" r="1.6"/><circle cx="17.5" cy="19" r="1.6"/>'); }
+function iconChart(){ return icon('<path d="M4 20V10M11 20V4M18 20v-7"/><path d="M2 20h20"/>'); }
+function iconGear(){ return icon('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1 1.55V21a2 2 0 11-4 0v-.09a1.7 1.7 0 00-1-1.55 1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.7 1.7 0 00.34-1.87 1.7 1.7 0 00-1.55-1H3a2 2 0 110-4h.09a1.7 1.7 0 001.55-1 1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06a1.7 1.7 0 001.87.34H9a1.7 1.7 0 001-1.55V3a2 2 0 114 0v.09a1.7 1.7 0 001 1.55 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06a1.7 1.7 0 00-.34 1.87V9a1.7 1.7 0 001.55 1H21a2 2 0 110 4h-.09a1.7 1.7 0 00-1.55 1z"/>'); }
+function iconPlus(size){ return icon('<path d="M12 5v14M5 12h14"/>', size); }
+function iconX(size){ return icon('<path d="M18 6L6 18M6 6l12 12"/>', size); }
+function iconEdit(size){ return icon('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/>', size); }
+function iconTrash(size){ return icon('<path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>', size); }
+function iconArrowRight(size){ return icon('<path d="M5 12h14M13 6l6 6-6 6"/>', size); }
+function iconDownload(size){ return icon('<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/>', size); }
+function iconCheck(size){ return icon('<path d="M20 6L9 17l-5-5"/>', size); }
+function iconInbox(size){ return icon('<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/>', size); }
+
+/* ---------------------------- Derived data helpers ---------------------------- */
+function productOf(client){ return state.products.find(p=>p.id===client.productId); }
+function activeClients(){ return state.clients.filter(c=>c.stage==='active'); }
+function pipelineClients(){ return state.clients.filter(c=>['lead','contacted','proposal','negotiation'].includes(c.stage)); }
+function mrr(){ return activeClients().reduce((s,c)=>{ const p=productOf(c); return s+(p?p.retainer:0); },0); }
+function pipelineValue(){ return pipelineClients().reduce((s,c)=>s+(c.estValue||0),0); }
+function vendorMidCost(v){ return (Number(v.costMin)+Number(v.costMax))/2; }
+function totalPlatformCostMonthly(){
+  if(state.fixedPlatformOverrideMonthly!=null) return state.fixedPlatformOverrideMonthly;
+  return state.vendors.reduce((s,v)=>s+vendorMidCost(v),0);
+}
+function totalContractLabourMonthly(){
+  return state.expenses.filter(e=>e.category==='Contract labour' && e.recurring).reduce((s,e)=>s+Number(e.amount),0);
+}
+function clientDeliveryCostEstimate(client){
+  const p = productOf(client); if(!p) return 0;
+  return p.deliveryCostFull * state.utilization;
+}
+function totalVariableDeliveryCostMonthly(){
+  return activeClients().reduce((s,c)=>s+clientDeliveryCostEstimate(c),0);
+}
+function revenueByTier(){
+  const map={};
+  state.products.forEach(p=>map[p.id]={name:p.name, revenue:0, count:0});
+  activeClients().forEach(c=>{ if(map[c.productId]){ map[c.productId].revenue+=productOf(c).retainer; map[c.productId].count++; } });
+  return Object.values(map);
+}
+function stageLabel(s){ return {lead:'Lead',contacted:'Contacted',proposal:'Proposal sent',negotiation:'Negotiation',active:'Active',lost:'Lost',churned:'Churned'}[s]||s; }
+function stagePillClass(s){ return {lead:'pill-lead',contacted:'pill-contacted',proposal:'pill-proposal',negotiation:'pill-negotiation',active:'pill-active',lost:'pill-lost',churned:'pill-churned'}[s]||'pill-lead'; }
+function invoiceStatusPillClass(s){ return {paid:'pill-paid',pending:'pill-pending',overdue:'pill-overdue'}[s]||'pill-pending'; }
+
+/* ============================== RENDER ROOT ============================== */
+function render(){
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    ${renderSidebar()}
+    <div class="main">
+      ${renderTopbar()}
+      <div class="content">${renderView()}</div>
+    </div>
+    ${sidebarOpen?'<div class="scrim" onclick="sidebarOpen=false;render()"></div>':''}
+  `;
+  renderModal();
+  renderPanel();
+  attachPostRenderHooks();
+}
+
+function renderSidebar(){
+  return `
+  <div class="sidebar ${sidebarOpen?'open':''}">
+    <div class="brand">
+      <div class="brand-mark">${sidebarPulseSVG()}</div>
+      <div>
+        <div class="brand-name">Vantriq Ops</div>
+        <div class="brand-sub">Revenue Console</div>
+      </div>
+    </div>
+    <div class="nav">
+      ${visibleNav().map(g=>`
+        ${g.group?`<div class="nav-group-label">${g.group}</div>`:''}
+        ${g.items.map(it=>`
+          <div class="nav-item ${currentView===it.id?'active':''}" onclick="navigate('${it.id}')">
+            ${it.icon()}<span>${it.label}</span>
+            ${it.id==='pipeline'?`<span class="nav-badge">${pipelineClients().length}</span>`:''}
+            ${it.id==='billing'?`<span class="nav-badge">${state.invoices.filter(i=>i.status==='pending'||i.status==='overdue').length}</span>`:''}
+          </div>
+        `).join('')}
+      `).join('')}
+    </div>
+    <div class="sidebar-foot">
+      ${authUser ? `
+        <div style="color:#B9C6CE;font-weight:600;font-size:11.5px;">${esc(authUser.name)}</div>
+        <div style="margin-bottom:6px;">${esc(authUser.email)} · ${authUser.role==='admin'?'Admin':'Staff'}</div>
+        <a href="#" onclick="event.preventDefault();signOut()" style="color:#8FD9CC;">Sign out</a>
+      ` : `
+        <div style="margin-bottom:6px;color:#C7A76B;">Signed in with an API key (emergency access)</div>
+        <a href="#" onclick="event.preventDefault();signOut()" style="color:#8FD9CC;">Sign out</a>
+      `}
+      <div style="margin-top:8px;">${esc(state.company.name)} · ${esc(state.company.city)}</div>
+    </div>
+  </div>`;
+}
+function sidebarPulseSVG(){
+  return `<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+    <path d="M1 10h3l2-6 3 12 2.5-9 1.5 4h6" stroke="#8FD9CC" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+}
+
+const VIEW_TITLES = {
+  dashboard:['Dashboard','Where the business stands right now'],
+  pipeline:['Pipeline','Move deals from lead to active client'],
+  clients:['Clients','Every active and past account'],
+  billing:['Billing & Invoices','Setup fees, retainers, and overage'],
+  reps:['Sales Reps','Manage rep logins and see every rep\'s pipeline'],
+  team:['Team','Internal logins for Vantriq AI employees'],
+  products:['Products & Pricing','Standard tiers are fixed by the model; only Enterprise+ is customisable'],
+  requests:['Package Requests','Changes customers have asked for from their portal'],
+  procurement:['Procurement','Vendors, tools, and purchase orders behind delivery'],
+  financials:['Financials','Contribution margin and P&L, generated from live data'],
+  settings:['Settings','Company details and data controls'],
+};
+function renderTopbar(){
+  const [title,sub] = VIEW_TITLES[currentView]||['',''];
+  return `
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button class="hamburger" onclick="sidebarOpen=true;render()">${icon('<path d="M3 6h18M3 12h18M3 18h18"/>',20)}</button>
+      <div>
+        <h1>${title}</h1>
+        <div class="topbar-sub">${sub}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      ${topbarAction()}
+    </div>
+  </div>`;
+}
+function topbarAction(){
+  if(currentView==='pipeline') return `<button class="btn btn-primary" onclick="openModal={type:'client'};render()">${iconPlus(15)} New lead</button>`;
+  if(currentView==='clients') return `<button class="btn btn-primary" onclick="openModal={type:'client'};render()">${iconPlus(15)} Add client</button>`;
+  if(currentView==='procurement') return `<button class="btn btn-primary" onclick="openModal={type:'vendor'};render()">${iconPlus(15)} Add vendor</button>`;
+  if(currentView==='billing') return `<button class="btn btn-primary" onclick="openModal={type:'invoice'};render()">${iconPlus(15)} New invoice</button>`;
+  if(currentView==='reps') return `<button class="btn btn-primary" onclick="openModal={type:'rep'};render()">${iconPlus(15)} Add sales rep</button>`;
+  return '';
+}
+
+function renderView(){
+  switch(currentView){
+    case 'dashboard': return renderDashboard();
+    case 'pipeline': return renderPipeline();
+    case 'clients': return renderClients();
+    case 'billing': return renderBilling();
+    case 'quota': return renderQuota();
+    case 'reps': return renderReps();
+    case 'team': return renderTeam();
+    case 'requests': return renderRequests();
+    case 'products': return renderProducts();
+    case 'procurement': return renderProcurement();
+    case 'financials': return renderFinancials();
+    case 'settings': return renderSettings();
+    default: return '';
+  }
+}
+
+/* ============================== DASHBOARD ============================== */
+let dashboardCharts = [];
+function renderDashboard(){
+  const active = activeClients();
+  const mrrVal = mrr();
+  const pipeVal = pipelineValue();
+  const overdue = state.invoices.filter(i=>i.status==='overdue');
+  const pending = state.invoices.filter(i=>i.status==='pending');
+  const totalDelivery = totalVariableDeliveryCostMonthly();
+  const totalFixed = totalPlatformCostMonthly() + totalContractLabourMonthly();
+  const netMonthly = mrrVal - totalDelivery - totalFixed;
+  const marginPct = mrrVal>0 ? ((mrrVal-totalDelivery)/mrrVal*100) : 0;
+
+  return `
+  <div class="grid kpi-row">
+    <div class="card kpi">
+      <div class="label">Active clients</div>
+      <div class="value">${active.length}</div>
+      <div class="delta up">${pipelineClients().length} in pipeline</div>
+    </div>
+    <div class="card kpi">
+      <div class="label">Monthly recurring revenue</div>
+      <div class="value mono">${fmtMoney(mrrVal)}</div>
+      <div class="delta up">${fmtMoney(mrrVal*12)} annualised</div>
+    </div>
+    <div class="card kpi">
+      <div class="label">Pipeline value</div>
+      <div class="value mono">${fmtMoney(pipeVal)}</div>
+      <div class="delta">${pipelineClients().length} open deals</div>
+    </div>
+    ${isAdmin() ? `<div class="card kpi">
+      <div class="label">Est. net monthly result</div>
+      <div class="value mono" style="color:${netMonthly>=0?'var(--teal-dark)':'var(--red)'}">${fmtMoney(netMonthly)}</div>
+      <div class="delta ${marginPct>=35?'up':'down'}">${marginPct.toFixed(0)}% contribution margin</div>
+    </div>` : ''}
+  </div>
+
+  <div class="section-title"><h2>Revenue by package</h2><div class="hint">Active clients, monthly retainer</div></div>
+  <div class="two-col">
+    <div class="chart-card"><canvas id="chartRevByTier" height="220"></canvas></div>
+    <div class="chart-card">
+      <h3>Pipeline by stage</h3>
+      <canvas id="chartPipeline" height="220"></canvas>
+    </div>
+  </div>
+
+  <div class="section-title"><h2>Needs attention</h2><div class="hint">Overdue and pending invoices</div></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Client</th><th>Type</th><th>Amount</th><th>Due / period</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        ${[...overdue,...pending].slice(0,6).map(inv=>{
+          const c = state.clients.find(cl=>cl.id===inv.clientId);
+          return `<tr class="row-click" onclick="openPanel={type:'invoice',id:'${inv.id}'};render()">
+            <td><strong>${esc(c?c.company:'—')}</strong></td>
+            <td>${esc(inv.type)}</td>
+            <td class="mono">${fmtMoney(inv.amount)}</td>
+            <td>${esc(inv.period||fmtDate(inv.date))}</td>
+            <td><span class="pill ${invoiceStatusPillClass(inv.status)}"><span class="pill-dot"></span>${inv.status}</span></td>
+            <td>${iconArrowRight(14)}</td>
+          </tr>`;
+        }).join('') || `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px;">Nothing outstanding — all invoices settled.</td></tr>`}
+      </tbody>
+    </table>
+  </div>
+
+  ${isAdmin() ? `
+  <div class="section-title"><h2>Platform cost footprint</h2><div class="hint">Procurement + delivery, this month</div></div>
+  <div class="grid kpi-row">
+    <div class="card kpi"><div class="label">Vendor / tooling cost</div><div class="value mono" style="font-size:19px;">${fmtMoney(totalPlatformCostMonthly())}</div></div>
+    <div class="card kpi"><div class="label">Contract labour</div><div class="value mono" style="font-size:19px;">${fmtMoney(totalContractLabourMonthly())}</div></div>
+    <div class="card kpi"><div class="label">Est. AI + messaging delivery cost</div><div class="value mono" style="font-size:19px;">${fmtMoney(totalDelivery)}</div></div>
+    <div class="card kpi"><div class="label">Assumed avg. quota utilization</div><div class="value" style="font-size:19px;">${Math.round(state.utilization*100)}%</div></div>
+  </div>` : ''}
+  `;
+}
+
+function drawDashboardCharts(){
+  // The chart library is loaded from a CDN. If it can't be reached, draw
+  // nothing rather than throwing — the numbers matter more than the graphs.
+  if(typeof Chart === 'undefined'){
+    document.querySelectorAll('canvas').forEach(el=>{
+      const note = document.createElement('div');
+      note.style.cssText = 'font-size:12px;color:var(--muted);padding:18px 0;text-align:center;';
+      note.textContent = 'Charts need an internet connection — the figures above are live either way.';
+      el.replaceWith(note);
+    });
+    return;
+  }
+  dashboardCharts.forEach(c=>c.destroy());
+  dashboardCharts=[];
+  const revEl = document.getElementById('chartRevByTier');
+  if(revEl){
+    const data = revenueByTier();
+    dashboardCharts.push(new Chart(revEl, {
+      type:'bar',
+      data:{ labels:data.map(d=>d.name), datasets:[{ data:data.map(d=>d.revenue), backgroundColor:'#12897A', borderRadius:6, maxBarThickness:42 }]},
+      options:{ plugins:{legend:{display:false}, tooltip:{callbacks:{label:(ctx)=>fmtMoney(ctx.raw)}}},
+        scales:{ y:{ticks:{callback:(v)=>fmtMoney(v)}, grid:{color:'#EFEDE6'}}, x:{grid:{display:false}} } }
+    }));
+  }
+  const pipeEl = document.getElementById('chartPipeline');
+  if(pipeEl){
+    const stages=['lead','contacted','proposal','negotiation'];
+    const counts = stages.map(s=>state.clients.filter(c=>c.stage===s).length);
+    dashboardCharts.push(new Chart(pipeEl,{
+      type:'doughnut',
+      data:{ labels:stages.map(stageLabel), datasets:[{ data:counts, backgroundColor:['#98A2AC','#DE9C34','#3E6FA8','#9B5CB8'] }]},
+      options:{ plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}}} }
+    }));
+  }
+}
+
+/* ============================== PIPELINE (Kanban) ============================== */
+const STAGES = ['lead','contacted','proposal','negotiation','active'];
+function renderPipeline(){
+  return `
+  <div class="kanban">
+    ${STAGES.map(stage=>{
+      const items = state.clients.filter(c=>c.stage===stage);
+      return `
+      <div class="kanban-col" data-stage="${stage}" ondragover="event.preventDefault();this.classList.add('kanban-drop')" ondragleave="this.classList.remove('kanban-drop')" ondrop="handleDrop(event,'${stage}')">
+        <div class="kanban-col-head"><span class="t">${stageLabel(stage)}</span><span class="n">${items.length}</span></div>
+        ${items.map(c=>{
+          const p = productOf(c);
+          return `<div class="kcard" draggable="true" ondragstart="kanbanDragId='${c.id}';event.dataTransfer.effectAllowed='move'" onclick="openPanel={type:'client',id:'${c.id}'};render()">
+            <div class="name">${esc(c.name)}</div>
+            <div class="co">${esc(c.company)}</div>
+            <div class="meta">
+              <span class="tag">${p?esc(p.name):'—'}</span>
+      ${c.serviceStatus==='suspended'?`<span class="pill pill-overdue"><span class="pill-dot"></span>Service paused</span>`:''}
+              <span class="mono" style="font-size:12px;font-weight:700;">${fmtMoney(c.estValue)}</span>
+            </div>
+          </div>`;
+        }).join('') || `<div style="padding:16px 6px;color:var(--muted-2);font-size:12px;">Drop deals here</div>`}
+      </div>`;
+    }).join('')}
+    <div class="kanban-col" style="background:#F4E7E4;flex:0 0 210px;" ondragover="event.preventDefault();this.classList.add('kanban-drop')" ondrop="handleDrop(event,'lost')">
+      <div class="kanban-col-head"><span class="t" style="color:#8F3527;">Lost / churned</span><span class="n">${state.clients.filter(c=>c.stage==='lost'||c.stage==='churned').length}</span></div>
+      ${state.clients.filter(c=>c.stage==='lost'||c.stage==='churned').map(c=>`
+        <div class="kcard" onclick="openPanel={type:'client',id:'${c.id}'};render()">
+          <div class="name">${esc(c.name)}</div><div class="co">${esc(c.company)}</div>
+          <div class="meta"><span class="pill ${stagePillClass(c.stage)}"><span class="pill-dot"></span>${stageLabel(c.stage)}</span></div>
+        </div>`).join('')}
+    </div>
+  </div>
+  <p class="footnote">Drag a card between columns to move a deal through the pipeline. Moving a card into "Active" converts it to a live client and starts its billing cycle.</p>
+  `;
+}
+async function handleDrop(ev, newStage){
+  ev.preventDefault();
+  document.querySelectorAll('.kanban-drop').forEach(el=>el.classList.remove('kanban-drop'));
+  if(!kanbanDragId) return;
+  const client = state.clients.find(c=>c.id===kanbanDragId);
+  kanbanDragId=null;
+  if(!client) return;
+  if(newStage===client.stage) return;
+
+  const allowed = allowedNextStages(client.stage);
+  if(!allowed.includes(newStage)){
+    showToast(allowed.length
+      ? `A deal only moves forward. From "${stageLabel(client.stage)}" you can go to: ${allowed.map(stageLabel).join(' or ')}.`
+      : `"${stageLabel(client.stage)}" is a final stage.`, 'warn');
+    return;
+  }
+  const comment = prompt(`Moving ${client.company} to ${stageLabel(newStage)}.\n\nAdd a comment explaining this change (required):`);
+  if(comment===null) return;             // cancelled
+  if(!comment.trim()){ showToast('A comment is required to move a deal forward','warn'); return; }
+
+  const wasActive = client.stage==='active';
+  const prevStage = client.stage;
+  client.stage = newStage;
+  render(); // optimistic
+  try{
+    const updated = await API.put(`/api/clients/${client.id}`, { stage: newStage, stage_comment: comment.trim() });
+    Object.assign(client, { stage: updated.stage, joinDate: updated.join_date });
+    if(newStage==='active' && !wasActive){
+      // The server raises the setup fee and first retainer as part of the
+      // activation, so a client onboarded by n8n is billed the same way. It
+      // hands them back here rather than the browser creating them.
+      const raised = (updated.invoices_created||[]).map(invoiceFromApi);
+      state.invoices.push(...raised);
+      showToast(raised.length
+        ? `${client.company} moved to Active — ${raised.length} invoice${raised.length===1?'':'s'} raised`
+        : `${client.company} moved to Active`);
+    }
+    render();
+  }catch(e){
+    client.stage = prevStage; render();
+    showToast(e.message||'Could not update stage','warn');
+  }
+}
+
+/* ============================== CLIENTS ============================== */
+function renderClients(){
+  const rows = state.clients.slice().sort((a,b)=> (a.stage==='active'?0:1)-(b.stage==='active'?0:1) || a.company.localeCompare(b.company));
+  return `
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Company</th><th>Contact</th><th>Package</th><th>Stage</th><th>Retainer</th><th>Usage</th><th>Joined</th><th></th></tr></thead>
+      <tbody>
+      ${rows.map(c=>{
+        const p = productOf(c);
+        const usagePct = p&&p.quota ? Math.min(100, Math.round((c.sessionsUsedThisMonth||0)/p.quota*100)) : 0;
+        const usageClass = usagePct>=100?'danger':usagePct>=80?'warn':'';
+        return `<tr class="row-click" onclick="openPanel={type:'client',id:'${c.id}'};render()">
+          <td><strong>${esc(c.company)}</strong></td>
+          <td>${esc(c.name)}</td>
+          <td><span class="tag">${p?esc(p.name):'—'}</span></td>
+          <td><span class="pill ${stagePillClass(c.stage)}"><span class="pill-dot"></span>${stageLabel(c.stage)}</span></td>
+          <td class="mono">${p?fmtMoney(p.retainer):'—'}</td>
+          <td style="min-width:110px;">
+            ${c.stage==='active'?`<div class="progress-track"><div class="progress-fill ${usageClass}" style="width:${usagePct}%"></div></div><div style="font-size:10.5px;color:var(--muted);margin-top:3px;">${fmtNum(c.sessionsUsedThisMonth||0)} / ${p?fmtNum(p.quota):0}</div>`:'—'}
+          </td>
+          <td>${fmtDate(c.joinDate)}</td>
+          <td>${iconArrowRight(14)}</td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table>
+  </div>
+  `;
+}
+
+/* ============================== SALES REPS ============================== */
+const SALES_STAGE_LABEL = {qualification:'Qualification', needs_assessment:'Needs Assessment', proposal_submission:'Proposal Submission', negotiation:'Negotiation', closure:'Closure'};
+function parentOf(client){ return client.parentClientId ? state.clients.find(x=>x.id===client.parentClientId) : null; }
+function subAccountsOf(id){ return state.clients.filter(x=>x.parentClientId===id).sort((a,b)=>a.company.localeCompare(b.company)); }
+
+function repNameOf(client){ const r = state.reps.find(r=>r.id===client.ownerRepId); return r?r.name:null; }
+
+function renderReps(){
+  const reps = state.reps.slice().sort((a,b)=>b.leadCount-a.leadCount);
+  return `
+  <div class="grid kpi-row" style="margin-bottom:22px;">
+    <div class="card kpi"><div class="label">Active reps</div><div class="value">${reps.filter(r=>r.active).length}</div></div>
+    <div class="card kpi"><div class="label">Total rep-sourced leads</div><div class="value">${reps.reduce((s,r)=>s+r.leadCount,0)}</div></div>
+    <div class="card kpi"><div class="label">Total won by reps</div><div class="value" style="color:var(--teal-dark);">${reps.reduce((s,r)=>s+r.wonCount,0)}</div></div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Rep</th><th>Email</th><th>Leads</th><th>Won</th><th>Status</th><th>Last active</th><th></th></tr></thead>
+      <tbody>
+      ${reps.map(r=>`
+        <tr>
+          <td><strong>${esc(r.name)}</strong></td>
+          <td>${esc(r.email||'—')}</td>
+          <td>${r.leadCount}</td>
+          <td>${r.wonCount}</td>
+          <td><span class="pill ${r.active?'pill-active':'pill-churned'}"><span class="pill-dot"></span>${r.active?'Active':'Deactivated'}</span></td>
+          <td>${r.lastUsedAt?fmtDate(r.lastUsedAt):'Never logged in'}</td>
+          <td style="display:flex;gap:6px;">
+            <button class="btn btn-ghost btn-sm" onclick="resetRepKey('${r.id}')">Reset key</button>
+            ${r.active?`<button class="btn btn-danger-ghost btn-sm" onclick="deactivateRep('${r.id}')">Deactivate</button>`:''}
+          </td>
+        </tr>
+      `).join('') || `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">No sales reps yet.</td></tr>`}
+      </tbody>
+    </table>
+  </div>
+  <p class="footnote">Each rep logs in separately at <span class="mono">/rep.html</span> with their own key. They can only see and edit leads they created, move them through Qualification → Needs Assessment → Proposal Submission → Negotiation → Closure, and export their own pipeline to Excel — nothing else in the CRM is visible to them.</p>
+  `;
+}
+async function resetRepKey(id){
+  if(!confirm('Issue a new login key for this rep? Their old key stops working immediately.')) return;
+  try{
+    const result = await API.post(`/api/reps/${id}/reset-key`, {});
+    showRepKeyModal(result);
+  }catch(e){ showToast(e.message||'Could not reset key','warn'); }
+}
+async function deactivateRep(id){
+  if(!confirm('Deactivate this rep? Their key will stop working, but their historical leads stay intact.')) return;
+  try{
+    await API.del(`/api/reps/${id}`);
+    const r = state.reps.find(x=>x.id===id); if(r) r.active=false;
+    render(); showToast('Rep deactivated');
+  }catch(e){ showToast(e.message||'Could not deactivate rep','warn'); }
+}
+function showRepKeyModal(result){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `
+  <div class="modal-overlay">
+    <div class="modal">
+      <div class="modal-head"><h3>${esc(result.name)}'s login key</h3></div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--muted);">Copy this now — it won't be shown again. Send it to the rep along with this URL: <span class="mono">${esc(API.base)}/rep.html</span></p>
+        <input readonly value="${esc(result.key)}" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-family:'JetBrains Mono';font-size:12.5px;background:#FAF8F3;" onclick="this.select()">
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-primary" onclick="document.getElementById('modal-root').innerHTML=''">Done</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ============================== BILLING ============================== */
+let billingFilter = 'all';
+function renderBilling(){
+  const invoices = state.invoices.slice().sort((a,b)=> new Date(b.date)-new Date(a.date));
+  const filtered = billingFilter==='all'?invoices:invoices.filter(i=>i.status===billingFilter);
+  // Totals are what the customer actually owes, i.e. including sales tax.
+  const payable = (i)=> i.total!=null ? i.total : i.amount;
+  const totalPaid = invoices.filter(i=>i.status==='paid').reduce((s,i)=>s+payable(i),0);
+  const totalPending = invoices.filter(i=>i.status==='pending').reduce((s,i)=>s+payable(i),0);
+  const totalOverdue = invoices.filter(i=>i.status==='overdue').reduce((s,i)=>s+payable(i),0);
+  const totalTax = invoices.reduce((s,i)=>s+(i.taxAmount||0),0);
+  return `
+  <div class="grid kpi-row" style="margin-bottom:22px;">
+    <div class="card kpi"><div class="label">Collected</div><div class="value mono" style="font-size:19px;color:var(--teal-dark)">${fmtMoney(totalPaid)}</div></div>
+    <div class="card kpi"><div class="label">Pending</div><div class="value mono" style="font-size:19px;">${fmtMoney(totalPending)}</div></div>
+    <div class="card kpi"><div class="label">Overdue</div><div class="value mono" style="font-size:19px;color:var(--red)">${fmtMoney(totalOverdue)}</div></div>
+    <div class="card kpi"><div class="label">Sales tax billed</div><div class="value mono" style="font-size:19px;">${fmtMoney(totalTax)}</div></div>
+    <div class="card kpi"><div class="label">Total invoices</div><div class="value" style="font-size:19px;">${invoices.length}</div></div>
+  </div>
+  <div class="tabs">
+    ${['all','paid','pending','overdue'].map(f=>`<div class="tab ${billingFilter===f?'active':''}" onclick="billingFilter='${f}';render()">${f[0].toUpperCase()+f.slice(1)}</div>`).join('')}
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Invoice #</th><th>Client</th><th>Type</th><th>Period</th><th>Excl. tax</th><th>Tax</th><th>Total</th><th>Date</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      ${filtered.map(inv=>{
+        const c = state.clients.find(cl=>cl.id===inv.clientId);
+        return `<tr class="row-click" onclick="openPanel={type:'invoice',id:'${inv.id}'};render()">
+          <td class="mono" style="font-size:11.5px;">${esc(inv.number||'—')}</td>
+          <td><strong>${esc(c?c.company:'—')}</strong></td>
+          <td>${esc(inv.type)}${inv.overageSessions?` <span class="tag">+${inv.overageSessions} overage</span>`:''}</td>
+          <td>${esc(inv.period||'—')}</td>
+          <td class="mono">${fmtMoney(inv.amount)}</td>
+          <td class="mono" style="color:var(--muted);">${inv.taxAmount?fmtMoney(inv.taxAmount):'—'}</td>
+          <td class="mono"><strong>${fmtMoney(payable(inv))}</strong></td>
+          <td>${fmtDate(inv.date)}</td>
+          <td><span class="pill ${invoiceStatusPillClass(inv.status)}"><span class="pill-dot"></span>${inv.status}</span></td>
+          <td>${iconArrowRight(14)}</td>
+        </tr>`;
+      }).join('') || `<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--muted);">No invoices in this filter.</td></tr>`}
+      </tbody>
+    </table>
+  </div>
+  `;
+}
+
+/* ============================== QUOTA & OVERAGE ============================== */
+/**
+ * Clients who have used up — or nearly used up — the conversations their
+ * package includes. Service is never cut off at the quota line; each month is
+ * flagged here and waits for a decision: bill the overage, move them up a
+ * tier, or waive it this once.
+ */
+let quotaFlags = null;
+let quotaFilter = 'open';
+
+async function loadQuota(){
+  try{ quotaFlags = await API.get('/api/quota?status='+quotaFilter); render(); }
+  catch(e){ quotaFlags = { error: e.message || 'Could not load quota flags' }; render(); }
+}
+
+function setQuotaFilter(f){ quotaFilter = f; quotaFlags = null; render(); }
+
+function renderQuota(){
+  if(quotaFlags === null){ requestAnimationFrame(loadQuota); return `<div class="card"><div class="empty"><span class="loading-dot"></span> Loading quota flags…</div></div>`; }
+  if(quotaFlags.error) return `<div class="card" style="color:var(--red);">${esc(quotaFlags.error)}</div>`;
+
+  const rows = quotaFlags;
+  const open = rows.filter(r=>!r.decision);
+  return `
+  <div class="grid kpi-row" style="margin-bottom:22px;">
+    <div class="card kpi"><div class="label">Awaiting a decision</div><div class="value" style="font-size:19px;${open.length?'color:var(--red);':''}">${open.length}</div></div>
+    <div class="card kpi"><div class="label">Over quota now</div><div class="value" style="font-size:19px;">${rows.filter(r=>r.threshold==='exceeded'&&!r.decision).length}</div></div>
+    <div class="card kpi"><div class="label">Billable overage</div><div class="value mono" style="font-size:19px;">${fmtMoney(open.reduce((s,r)=>s+(+r.estimated_overage_cost||0),0))}</div></div>
+  </div>
+  <div style="background:var(--teal-light);border:1px solid #BFE3D8;border-radius:10px;padding:11px 13px;font-size:12px;color:var(--teal-dark);margin-bottom:18px;">
+    Running past the quota never stops a client's service. Their conversations keep being answered —
+    what happens is that the month lands here for you to decide on.
+  </div>
+  <div class="tabs">
+    ${[['open','Awaiting decision'],['all','All flags']].map(([f,l])=>`<div class="tab ${quotaFilter===f?'active':''}" onclick="setQuotaFilter('${f}')">${l}</div>`).join('')}
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Client</th><th>Month</th><th>Flag</th><th>Used / included</th><th>Over</th><th>Overage value</th><th>Decision</th></tr></thead>
+      <tbody>
+      ${rows.map(r=>{
+        const over = +r.over_quota_sessions||0;
+        return `<tr>
+          <td><strong>${esc(r.company)}</strong>${r.parent_client_id?`<div style="font-size:11px;color:var(--muted);">sub-account</div>`:''}</td>
+          <td>${fmtDate(r.period_month)}</td>
+          <td><span class="pill ${r.threshold==='exceeded'?'pill-overdue':'pill-pending'}"><span class="pill-dot"></span>${r.threshold==='exceeded'?'Over quota':'80% used'}</span></td>
+          <td class="mono">${fmtNum(r.sessions_now)} / ${fmtNum(r.quota_at_event)}</td>
+          <td class="mono">${over?fmtNum(over):'—'}</td>
+          <td class="mono">${r.estimated_overage_cost?fmtMoney(r.estimated_overage_cost):'—'}</td>
+          <td>${r.decision
+            ? `<span class="tag">${esc(QUOTA_DECISION_LABEL[r.decision]||r.decision)}</span><div style="font-size:11px;color:var(--muted);margin-top:2px;">${esc(r.decided_by||'')}</div>`
+            : `<div style="display:flex;gap:5px;flex-wrap:wrap;">
+                 <button class="btn btn-primary btn-sm" ${over?'':'disabled title="Nothing over quota to bill"'} onclick="decideQuota('${r.id}','bill_overage')">Bill overage</button>
+                 <button class="btn btn-ghost btn-sm" onclick="decideQuota('${r.id}','upgrade')">Upgrade</button>
+                 <button class="btn btn-ghost btn-sm" onclick="decideQuota('${r.id}','waive')">Waive</button>
+               </div>`}</td>
+        </tr>`;
+      }).join('') || `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted);">No clients are near their quota.</td></tr>`}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+const QUOTA_DECISION_LABEL = { bill_overage:'Billed as overage', upgrade:'Moving up a tier', waive:'Waived' };
+
+async function decideQuota(id, decision){
+  const prompts = {
+    bill_overage: 'Bill this month\'s overage?\n\nAn overage invoice is raised immediately, priced off their live usage.',
+    upgrade: 'Record that this client is moving up a tier?\n\nNothing is billed. Change their package on the client record.',
+    waive: 'Waive this month\'s overage?\n\nNothing is billed and the month is closed.',
+  };
+  if(!confirm(prompts[decision])) return;
+  const note = prompt('Add a note (optional) — recorded against the decision:') || '';
+  try{
+    const r = await API.post(`/api/quota/${id}/decision`, { decision, note });
+    if(r.invoice) state.invoices.push(invoiceFromApi(r.invoice));
+    quotaFlags = null;
+    render();
+    showToast(r.invoice ? `Overage invoice ${r.invoice.invoice_number} raised` : 'Decision recorded');
+  }catch(e){ showToast(e.message||'Could not record the decision','warn'); }
+}
+
+/* ============================== TEAM ============================== */
+let teamUsers = null;
+
+async function loadTeam(){
+  try{ teamUsers = await API.get('/api/team'); render(); }
+  catch(e){ showToast(e.message||'Could not load the team','warn'); }
+}
+
+function renderTeam(){
+  if(teamUsers === null){ requestAnimationFrame(loadTeam); return `<div class="card"><div class="empty"><span class="loading-dot"></span> Loading the team…</div></div>`; }
+  return `
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div style="font-size:12.5px;color:var(--muted);max-width:520px;">
+        Internal logins for @vantriqai.com addresses. Everyone signs in with a password
+        <strong>and</strong> a one-time code emailed to them. Admins see everything; staff get the
+        pipeline, clients, billing and package requests, but not financials, procurement,
+        settings or this screen.
+      </div>
+      <button class="btn btn-primary" onclick="openModal={type:'teamUser'};render()">${iconPlus(15)} Add employee</button>
+    </div>
+  </div>
+  <div id="new-user-creds"></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last signed in</th><th></th></tr></thead>
+      <tbody>
+      ${teamUsers.map(u=>`
+        <tr style="${u.active?'':'opacity:.55;'}">
+          <td><strong>${esc(u.name)}</strong>${u.must_change_password?' <span class="pill pill-pending" style="margin-left:6px;">must change password</span>':''}</td>
+          <td class="mono" style="font-size:12px;">${esc(u.email)}</td>
+          <td><span class="tag">${u.role==='admin'?'Admin':'Staff'}</span></td>
+          <td>${u.active?'<span class="pill pill-active"><span class="pill-dot"></span>Active</span>':'<span class="pill pill-pending"><span class="pill-dot"></span>Deactivated</span>'}</td>
+          <td>${u.last_login_at?fmtDate(u.last_login_at):'—'}</td>
+          <td style="white-space:nowrap;">
+            <button class="btn btn-ghost btn-sm" onclick="resetUserPassword('${u.id}')">Reset password</button>
+            <button class="btn btn-ghost btn-sm" onclick="setUserRole('${u.id}','${u.role==='admin'?'staff':'admin'}')">Make ${u.role==='admin'?'staff':'admin'}</button>
+            ${u.active
+              ? `<button class="btn btn-danger-ghost btn-sm" onclick="setUserActive('${u.id}',false)">Deactivate</button>`
+              : `<button class="btn btn-ghost btn-sm" onclick="setUserActive('${u.id}',true)">Reactivate</button>`}
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function showCreds(title, email, password){
+  const box = document.getElementById('new-user-creds');
+  if(!box || !password) return;   // a password the admin typed is never echoed back
+  box.innerHTML = `
+    <div class="card" style="background:var(--teal-light);border-color:#BFE3D8;">
+      <div style="font-weight:600;color:var(--teal-dark);margin-bottom:8px;">${esc(title)}</div>
+      <div style="font-size:13px;margin-bottom:4px;">Email: <strong class="mono">${esc(email)}</strong></div>
+      <div style="font-size:13px;margin-bottom:10px;">Password: <strong class="mono" style="font-size:15px;">${esc(password)}</strong></div>
+      <button class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText('${esc(email)}  ${esc(password)}').then(()=>showToast('Copied'))">Copy</button>
+      <div style="margin-top:10px;background:var(--amber-light);color:#8A5F17;padding:8px 10px;border-radius:8px;font-size:11.5px;">
+        Shown once. Send it over a channel you trust — not the same inbox the sign-in code goes to.
+        They will still need the emailed code to get in.
+      </div>
+    </div>`;
+}
+
+async function saveTeamUser(){
+  const email=(document.getElementById('tu_email')||{}).value||'';
+  const name=(document.getElementById('tu_name')||{}).value||'';
+  const role=(document.getElementById('tu_role')||{}).value||'staff';
+  const password=((document.getElementById('tu_password')||{}).value||'').trim();
+  if(!email.trim()||!name.trim()){ showToast('Name and email are required','warn'); return; }
+  if(password && password.length < 10){ showToast('Choose a password of at least 10 characters','warn'); return; }
+  try{
+    const r = await API.post('/api/team', { email:email.trim(), name:name.trim(), role, ...(password?{password}:{}) });
+    closeModal(); teamUsers=null; render();
+    setTimeout(()=>showCreds('Login created for '+r.user.name, r.user.email, r.password), 400);
+    showToast('Employee added');
+  }catch(e){ showToast(e.message||'Could not add the employee','warn'); }
+}
+
+async function resetUserPassword(id){
+  if(!confirm('Set a new password for this employee?\n\nTheir current one stops working and any session they have open is closed.')) return;
+  // Leaving the box empty generates one; typing a password sets exactly that.
+  const typed = (prompt('Type the new password, or leave this blank to have one generated:') || '').trim();
+  if(typed && typed.length < 10){ showToast('Choose a password of at least 10 characters','warn'); return; }
+  try{
+    const r = await API.post(`/api/team/${id}/reset-password`, typed ? { password: typed } : {});
+    teamUsers=null; render();
+    if(r.password) setTimeout(()=>showCreds('New password for '+r.user.name, r.user.email, r.password), 400);
+    else showToast('Password set. Any session they had open is now closed.');
+  }catch(e){ showToast(e.message||'Could not set the password','warn'); }
+}
+
+async function setUserRole(id, role){
+  try{ await API.post(`/api/team/${id}/role`, { role }); teamUsers=null; render(); showToast('Role updated'); }
+  catch(e){ showToast(e.message||'Could not change the role','warn'); }
+}
+
+async function setUserActive(id, active){
+  if(!active && !confirm('Deactivate this employee?\n\nThey are signed out immediately and cannot sign back in.')) return;
+  try{ await API.post(`/api/team/${id}/${active?'activate':'deactivate'}`, {}); teamUsers=null; render(); showToast(active?'Reactivated':'Deactivated'); }
+  catch(e){ showToast(e.message||'Could not update the account','warn'); }
+}
+
+/* ====================== PACKAGE REQUESTS (from the portal) ====================== */
+function renderRequests(){
+  const reqs = state.packageRequests || [];
+  if(!reqs.length){
+    return `<div class="card"><div class="empty">No package requests waiting. When a customer asks for a
+      different package from their portal, it appears here for you to approve or decline —
+      nothing changes on their account until you do.</div></div>`;
+  }
+  return `
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Company</th><th>Currently on</th><th>Requested</th><th>New retainer</th><th>Asked</th><th></th></tr></thead>
+      <tbody>
+      ${reqs.map(r=>`
+        <tr>
+          <td><strong>${esc(r.company)}</strong><div style="font-size:11.5px;color:var(--muted);">${esc(r.contact_name||'')}</div></td>
+          <td>${esc(r.current_product_name||'—')}</td>
+          <td><span class="tag">${esc(r.product_name)}</span></td>
+          <td class="mono">${fmtMoney(r.retainer)}</td>
+          <td>${fmtDate(r.created_at)}</td>
+          <td style="white-space:nowrap;">
+            <button class="btn btn-primary btn-sm" onclick="decideRequest('${r.id}','approve')">${iconCheck(13)} Approve</button>
+            <button class="btn btn-danger-ghost btn-sm" onclick="decideRequest('${r.id}','reject')">Decline</button>
+          </td>
+        </tr>
+        ${r.note?`<tr><td colspan="6" style="padding-top:0;font-size:12px;color:var(--muted);">"${esc(r.note)}"</td></tr>`:''}
+      `).join('')}
+      </tbody>
+    </table>
+  </div>
+  <p class="footnote">Approving moves the client onto the package. If they are already active, the new retainer is invoiced straight away.</p>
+  `;
+}
+
+async function decideRequest(id, action){
+  const verb = action==='approve' ? 'Approve' : 'Decline';
+  if(!confirm(`${verb} this package change?`)) return;
+  try{
+    await API.post(`/api/package-requests/${id}/${action}`, {});
+    const [reqs, clients] = await Promise.all([
+      API.get('/api/package-requests?status=pending'),
+      API.get('/api/clients'),
+    ]);
+    state.packageRequests = reqs;
+    const usage = {}; state.clients.forEach(c=>usage[c.id]=c.sessionsUsedThisMonth);
+    state.clients = clients.map(clientFromApi);
+    state.clients.forEach(c=>{ c.sessionsUsedThisMonth = usage[c.id]||0; });
+    render();
+    showToast(action==='approve' ? 'Package change approved' : 'Request declined');
+  }catch(e){ showToast(e.message||'Could not update the request','warn'); }
+}
+
+/* ============================== PRODUCTS ============================== */
+function renderProducts(){
+  const sorted = state.products.slice().sort((a,b)=>a.order-b.order);
+  return `
+  <div class="prod-grid">
+    ${sorted.map(p=>`
+      <div class="prod-card">
+        <div class="tier-tag">Tier ${p.order.toString().padStart(2,'0')}</div>
+        <h3>${esc(p.name)}</h3>
+        <div class="target">${esc(p.targetTier)}</div>
+        <div class="prod-price"><span class="amt">${fmtMoney(p.setupFee)}</span><span class="per">setup</span></div>
+        <div class="prod-price" style="margin-top:-8px;"><span class="amt" style="font-size:16px;color:var(--teal-dark)">${fmtMoney(p.retainer)}</span><span class="per">/month retainer</span></div>
+        <div class="prod-stat-row"><span class="k">Automation</span><span class="v" style="font-family:'Inter';font-weight:600;">${esc(p.automation)}</span></div>
+        <div class="prod-stat-row"><span class="k">Data layer</span><span class="v" style="font-family:'Inter';font-weight:600;">${esc(p.dataLayer)}</span></div>
+        <div class="prod-stat-row"><span class="k">AI model</span><span class="v" style="font-family:'Inter';font-weight:600;">${esc(p.aiModel)}</span></div>
+        <div class="prod-stat-row"><span class="k">Channels</span><span class="v" style="font-family:'Inter';font-weight:600;">${esc(p.channels)}</span></div>
+        <div class="prod-stat-row"><span class="k">Quota / month</span><span class="v">${fmtNum(p.quota)}</span></div>
+        <div class="prod-stat-row"><span class="k">Overage rate</span><span class="v">${fmtMoney(p.overageRate)}/session</span></div>
+        <div class="prod-stat-row"><span class="k">Est. delivery cost (100% quota)</span><span class="v">${fmtMoney(p.deliveryCostFull)}</span></div>
+        <div class="prod-actions">
+          ${p.isStandard===false
+            ? `<button class="btn btn-ghost btn-sm" onclick="openModal={type:'product',id:'${p.id}'};render()">${iconEdit(13)} Edit</button>`
+            : `<span style="font-size:11.5px;color:var(--muted);display:inline-flex;align-items:center;gap:5px;">🔒 Fixed by the business model</span>`}
+        </div>
+      </div>
+    `).join('')}
+    <div class="prod-card" style="display:flex;align-items:center;justify-content:center;flex-direction:column;border-style:dashed;color:var(--muted);text-align:center;">
+      <div style="font-size:22px;">🔒</div>
+      <div style="margin-top:8px;font-weight:600;font-size:13px;">The ladder is fixed</div>
+      <div style="font-size:11.5px;margin-top:4px;line-height:1.5;">Standard packages carry the resources set by the<br>business model. For anything bespoke, put the client<br>on <strong>Enterprise+</strong> and set custom terms on their record.</div>
+    </div>
+  </div>
+  `;
+}
+async function deleteProduct(id){
+  const inUse = state.clients.some(c=>c.productId===id);
+  if(inUse){ showToast('Cannot remove — clients are assigned to this package', 'warn'); return; }
+  if(!confirm('Remove this package from the catalog?')) return;
+  try{
+    await API.del(`/api/products/${id}`);
+    state.products = state.products.filter(p=>p.id!==id);
+    render(); showToast('Package removed');
+  }catch(e){ showToast(e.message||'Could not remove package','warn'); }
+}
+
+/* ============================== PROCUREMENT ============================== */
+function renderProcurement(){
+  const totalMid = totalPlatformCostMonthly();
+  return `
+  <div class="section-title" style="margin-top:0;"><h2>Vendors & tooling</h2><div class="hint">Billed at agency level, scales in steps with client volume</div></div>
+  <div class="table-wrap" style="margin-bottom:26px;">
+    <table>
+      <thead><tr><th>Vendor</th><th>Category</th><th>Applies to</th><th>Monthly cost range</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      ${state.vendors.map(v=>`
+        <tr>
+          <td><strong>${esc(v.name)}</strong></td>
+          <td>${esc(v.category)}</td>
+          <td>${esc(v.tiers)}</td>
+          <td class="mono">${fmtMoney(v.costMin)} – ${fmtMoney(v.costMax)}</td>
+          <td><span class="pill pill-active"><span class="pill-dot"></span>${esc(v.status)}</span></td>
+          <td style="display:flex;gap:6px;">
+            <button class="btn btn-ghost btn-icon" onclick="openModal={type:'vendor',id:'${v.id}'};render()">${iconEdit(13)}</button>
+            <button class="btn btn-danger-ghost btn-icon" onclick="deleteVendor('${v.id}')">${iconTrash(13)}</button>
+          </td>
+        </tr>
+      `).join('')}
+      </tbody>
+      <tfoot><tr><td colspan="3" style="text-align:right;font-weight:700;padding:12px;">Total (midpoint)</td><td class="mono" style="font-weight:700;padding:12px;">${fmtMoney(totalMid)}</td><td colspan="2"></td></tr></tfoot>
+    </table>
+  </div>
+
+  <div class="section-title"><h2>Purchase orders</h2><div class="hint">One-off and upgrade spend against vendors above</div></div>
+  <div class="table-wrap" style="margin-bottom:20px;">
+    <table>
+      <thead><tr><th>Vendor</th><th>Item</th><th>Amount</th><th>Date</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      ${state.pos.slice().sort((a,b)=>new Date(b.date)-new Date(a.date)).map(po=>{
+        const v = state.vendors.find(vv=>vv.id===po.vendorId);
+        return `<tr>
+          <td>${esc(v?v.name:'—')}</td>
+          <td>${esc(po.item)}</td>
+          <td class="mono">${fmtMoney(po.amount)}</td>
+          <td>${fmtDate(po.date)}</td>
+          <td><span class="pill ${po.status==='Received'?'pill-paid':'pill-pending'}"><span class="pill-dot"></span>${esc(po.status)}</span></td>
+          <td><button class="btn btn-danger-ghost btn-icon" onclick="deletePO('${po.id}')">${iconTrash(13)}</button></td>
+        </tr>`;
+      }).join('') || `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">No purchase orders yet.</td></tr>`}
+      </tbody>
+    </table>
+  </div>
+  <button class="btn btn-ghost" onclick="openModal={type:'po'};render()">${iconPlus(15)} Log purchase order</button>
+  <p class="footnote">The WhatsApp Business Solution Provider (BSP) is billed directly to each client and intentionally excluded from Vantriq's cost base.</p>
+  `;
+}
+async function deleteVendor(id){
+  if(!confirm('Remove this vendor from procurement?')) return;
+  try{
+    await API.del(`/api/vendors/${id}`);
+    state.vendors = state.vendors.filter(v=>v.id!==id);
+    state.pos = state.pos.filter(po=>po.vendorId!==id);
+    render(); showToast('Vendor removed');
+  }catch(e){ showToast(e.message||'Could not remove vendor','warn'); }
+}
+async function deletePO(id){
+  try{
+    await API.del(`/api/purchase-orders/${id}`);
+    state.pos = state.pos.filter(p=>p.id!==id);
+    render();
+  }catch(e){ showToast(e.message||'Could not delete purchase order','warn'); }
+}
+
+/* ============================== FINANCIALS ============================== */
+function renderFinancials(){
+  const rev = revenueByTier();
+  const totalRetainerRev = rev.reduce((s,r)=>s+r.revenue,0);
+  const totalSetupCollectedThisPeriod = state.invoices.filter(i=>i.type==='Setup fee' && i.status==='paid').reduce((s,i)=>s+i.amount,0);
+  const delivery = totalVariableDeliveryCostMonthly();
+  const cm = totalRetainerRev - delivery;
+  const cmPct = totalRetainerRev>0 ? (cm/totalRetainerRev*100) : 0;
+  const fixedPlatform = totalPlatformCostMonthly();
+  const contractLabour = totalContractLabourMonthly();
+  const netResult = cm - fixedPlatform - contractLabour;
+
+  return `
+  <div class="stat-strip">
+    <div class="s-item"><div class="l">Monthly revenue (retainer)</div><div class="v">${fmtMoney(totalRetainerRev)}</div></div>
+    <div class="s-item"><div class="l">Contribution margin</div><div class="v">${fmtMoney(cm)} (${cmPct.toFixed(0)}%)</div></div>
+    <div class="s-item"><div class="l">Net monthly result</div><div class="v" style="color:${netResult>=0?'#8FD9CC':'#F0A897'}">${fmtMoney(netResult)}</div></div>
+    <div class="s-item"><div class="l">Utilization assumption</div><div class="v">${Math.round(state.utilization*100)}%</div></div>
+  </div>
+
+  <div class="section-title"><h2>Profit &amp; loss statement</h2><div class="hint">Generated live from clients, packages, procurement, and labour</div></div>
+  <div class="card" style="max-width:640px;">
+    <div class="field" style="max-width:220px;margin-bottom:18px;">
+      <label>Quota utilization assumption</label>
+      <select id="utilInput" onchange="setUtilization(parseFloat(this.value))">
+        ${[0.5,0.6,0.7,0.8,0.9,1.0].map(u=>`<option value="${u}" ${state.utilization===u?'selected':''}>${Math.round(u*100)}% of quota</option>`).join('')}
+      </select>
+    </div>
+    <div class="detail-row"><span class="k">Setup revenue (collected, all-time)</span><span class="v mono">${fmtMoney(totalSetupCollectedThisPeriod)}</span></div>
+    <div class="detail-row"><span class="k">Retainer revenue (monthly, active clients)</span><span class="v mono">${fmtMoney(totalRetainerRev)}</span></div>
+    <div class="divider"></div>
+    <div class="detail-row"><span class="k">Variable delivery cost (LLM + WhatsApp, est.)</span><span class="v mono">−${fmtMoney(delivery)}</span></div>
+    <div class="detail-row"><strong>Contribution margin</strong><span class="v mono" style="color:var(--teal-dark)">${fmtMoney(cm)} (${cmPct.toFixed(1)}%)</span></div>
+    <div class="divider"></div>
+    <div class="detail-row"><span class="k">Fixed platform / tooling cost</span><span class="v mono">−${fmtMoney(fixedPlatform)}</span></div>
+    <div class="detail-row"><span class="k">Contract labour</span><span class="v mono">−${fmtMoney(contractLabour)}</span></div>
+    <div class="divider"></div>
+    <div class="detail-row" style="font-size:15px;"><strong>Net monthly result</strong><span class="v mono" style="color:${netResult>=0?'var(--teal-dark)':'var(--red)'}">${fmtMoney(netResult)}</span></div>
+    <div style="margin-top:16px;"><button class="btn btn-ghost" onclick="exportPnL()">${iconDownload(14)} Export as CSV</button></div>
+  </div>
+
+  <div class="section-title"><h2>Revenue &amp; margin by package</h2></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Package</th><th>Active clients</th><th>Monthly revenue</th><th>Delivery cost (@ ${Math.round(state.utilization*100)}%)</th><th>Margin</th></tr></thead>
+      <tbody>
+      ${state.products.map(p=>{
+        const clients = activeClients().filter(c=>c.productId===p.id);
+        const revenue = clients.length*p.retainer;
+        const cost = clients.length*p.deliveryCostFull*state.utilization;
+        const margin = revenue-cost;
+        const pct = revenue>0?(margin/revenue*100):0;
+        return `<tr>
+          <td><strong>${esc(p.name)}</strong></td>
+          <td>${clients.length}</td>
+          <td class="mono">${fmtMoney(revenue)}</td>
+          <td class="mono">${fmtMoney(cost)}</td>
+          <td class="mono">${fmtMoney(margin)} ${revenue>0?`<span style="color:var(--muted)">(${pct.toFixed(0)}%)</span>`:''}</td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section-title"><h2>Contract labour &amp; fixed costs</h2><div class="hint">Recurring line items feeding the P&amp;L</div></div>
+  <div class="table-wrap" style="margin-bottom:14px;">
+    <table>
+      <thead><tr><th>Item</th><th>Category</th><th>Monthly amount</th><th>Since</th><th></th></tr></thead>
+      <tbody>
+      ${state.expenses.map(e=>`
+        <tr>
+          <td>${esc(e.label)}</td>
+          <td><span class="tag">${esc(e.category)}</span></td>
+          <td class="mono">${fmtMoney(e.amount)}</td>
+          <td>${fmtDate(e.startDate)}</td>
+          <td><button class="btn btn-danger-ghost btn-icon" onclick="deleteExpense('${e.id}')">${iconTrash(13)}</button></td>
+        </tr>
+      `).join('') || `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--muted);">No recurring cost lines yet.</td></tr>`}
+      </tbody>
+    </table>
+  </div>
+  <button class="btn btn-ghost" onclick="openModal={type:'expense'};render()">${iconPlus(15)} Add cost line</button>
+  `;
+}
+async function setUtilization(u){
+  const prev = state.utilization;
+  state.utilization = u; render();
+  try{ await API.put('/api/settings', { utilization:u }); }
+  catch(e){ state.utilization = prev; render(); showToast('Could not save utilization','warn'); }
+}
+async function deleteExpense(id){
+  try{
+    await API.del(`/api/expenses/${id}`);
+    state.expenses=state.expenses.filter(e=>e.id!==id); render();
+  }catch(e){ showToast(e.message||'Could not delete cost line','warn'); }
+}
+function exportPnL(){
+  const rev = revenueByTier();
+  const totalRetainerRev = rev.reduce((s,r)=>s+r.revenue,0);
+  const delivery = totalVariableDeliveryCostMonthly();
+  const cm = totalRetainerRev-delivery;
+  const fixedPlatform = totalPlatformCostMonthly();
+  const contractLabour = totalContractLabourMonthly();
+  const net = cm-fixedPlatform-contractLabour;
+  const rows = [
+    ['Vantriq AI — Monthly P&L Statement'],
+    ['Generated', new Date().toISOString()],
+    [],
+    ['Line item','Amount (PKR)'],
+    ['Retainer revenue', totalRetainerRev],
+    ['Variable delivery cost', -delivery],
+    ['Contribution margin', cm],
+    ['Fixed platform / tooling cost', -fixedPlatform],
+    ['Contract labour', -contractLabour],
+    ['Net monthly result', net],
+  ];
+  const csv = rows.map(r=>r.join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'vantriq-pnl-'+todayISO()+'.csv';
+  a.click();
+  showToast('P&L exported');
+}
+
+/* ============================== SETTINGS ============================== */
+function renderSettings(){
+  return `
+  <div class="card" style="max-width:520px;">
+    <h3 style="margin-top:0;font-size:14.5px;">Company</h3>
+    <div class="field"><label>Company name</label><input id="setCompanyName" value="${esc(state.company.name)}"></div>
+    <div class="field"><label>City</label><input id="setCompanyCity" value="${esc(state.company.city)}"></div>
+    <div class="field"><label>Founder</label><input id="setCompanyFounder" value="${esc(state.company.founder)}"></div>
+    <button class="btn btn-primary" onclick="saveSettings()">Save changes</button>
+  </div>
+  <div class="card" style="max-width:520px;margin-top:16px;">
+    <h3 style="margin-top:0;font-size:14.5px;">Tax &amp; invoicing</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:0;">
+      Printed on every invoice you issue. Changing these affects invoices raised from now on —
+      invoices already issued keep the details they were issued with.
+    </p>
+    <div class="field-row">
+      <div class="field"><label>Your NTN</label><input id="setNtn" value="${esc(state.company.ntn||'')}" placeholder="1234567-8"></div>
+      <div class="field"><label>Your STRN</label><input id="setStrn" value="${esc(state.company.strn||'')}" placeholder="32-77-8899-001-46"></div>
+    </div>
+    <div class="field"><label>Registered address</label><input id="setAddress" value="${esc(state.company.address||'')}" placeholder="Printed on the invoice as the seller's address"></div>
+    <div class="field-row">
+      <div class="field"><label>Default sales tax rate %</label><input id="setTaxRate" type="number" step="0.01" value="${state.company.defaultTaxRate!=null?state.company.defaultTaxRate:0}">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">Applied to any client without a rate of their own.</div></div>
+      <div class="field"><label>Payment terms (days)</label><input id="setTerms" type="number" value="${state.company.paymentTermsDays!=null?state.company.paymentTermsDays:7}">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">Sets the due date stamped on each invoice.</div></div>
+    </div>
+    <div class="field"><label>Invoice number prefix</label><input id="setPrefix" value="${esc(state.company.invoicePrefix||'VAI')}">
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">Numbers run in sequence, e.g. ${esc(state.company.invoicePrefix||'VAI')}-${new Date().getFullYear()}-000123.</div></div>
+    <button class="btn btn-primary" onclick="saveTaxSettings()">Save tax details</button>
+  </div>
+  <div class="card" style="max-width:520px;margin-top:16px;">
+    <h3 style="margin-top:0;font-size:14.5px;">When a client runs out of conversations</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:0;">
+      What happens automatically the moment a client uses up their monthly allowance.
+      This is separate from pausing one client for non-payment, which you do on their own record.
+    </p>
+    <div class="field"><label>Policy</label>
+      <select id="setOveragePolicy" onchange="toggleGraceField()">
+        <option value="serve" ${state.company.overagePolicy==='serve'?'selected':''}>Keep answering — bill the overage (recommended)</option>
+        <option value="grace" ${state.company.overagePolicy==='grace'?'selected':''}>Keep answering up to a limit, then stop</option>
+        <option value="block" ${state.company.overagePolicy==='block'?'selected':''}>Stop the moment the allowance runs out</option>
+      </select>
+    </div>
+    <div class="field" id="grace-field" style="display:${state.company.overagePolicy==='grace'?'block':'none'};">
+      <label>Stop at this percentage of the allowance</label>
+      <input id="setOverageGrace" type="number" min="100" max="1000" value="${state.company.overageGracePct||120}">
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">
+        120 means a Starter client keeps being answered to 1,800 conversations, then stops.
+      </div>
+    </div>
+    <div style="background:var(--amber-light);color:#7A5410;padding:10px 12px;border-radius:8px;font-size:11.5px;margin-bottom:12px;">
+      Stopping means a customer of theirs messages your client's WhatsApp number and gets
+      silence. On Starter, the conversation you would be refusing costs
+      ${fmtMoney(0.45)} to serve and bills at ${fmtMoney(2)}. Your business model assumes
+      you keep answering and settle it on the invoice — which is why "keep answering" is the default.
+    </div>
+    <button class="btn btn-primary" onclick="saveOveragePolicy()">Save policy</button>
+  </div>
+  <div class="card" style="max-width:520px;margin-top:16px;">
+    <h3 style="margin-top:0;font-size:14.5px;">API connection</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:0;">
+      Connected to <strong class="mono" style="font-size:12px;">${esc(API.base)}</strong>.
+      Usage data refreshes automatically every 20 seconds as n8n posts new sessions.
+    </p>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+      <span class="pill pill-active"><span class="pill-dot"></span>Connected</span>
+      <button class="btn btn-danger-ghost btn-sm" onclick="disconnectApi()">Disconnect</button>
+    </div>
+  </div>
+  <div class="card" style="max-width:520px;margin-top:16px;">
+    <h3 style="margin-top:0;font-size:14.5px;">Data</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:0;">All data lives in your Postgres database, not in this browser.</p>
+    <button class="btn btn-ghost" onclick="exportAllData()">${iconDownload(14)} Export current view as JSON</button>
+  </div>
+  `;
+}
+async function saveSettings(){
+  const payload = {
+    company_name: document.getElementById('setCompanyName').value || state.company.name,
+    city: document.getElementById('setCompanyCity').value || state.company.city,
+    founder: document.getElementById('setCompanyFounder').value || state.company.founder,
+  };
+  try{
+    const updated = await API.put('/api/settings', payload);
+    applySettings(updated);
+    render(); showToast('Settings saved');
+  }catch(e){ showToast(e.message||'Could not save settings','warn'); }
+}
+
+function applySettings(updated){
+  state.company = { name:updated.company_name, city:updated.city, founder:updated.founder,
+    ntn:updated.ntn||'', strn:updated.strn||'', address:updated.address||'',
+    defaultTaxRate:updated.default_tax_rate!=null?+updated.default_tax_rate:0,
+    invoicePrefix:updated.invoice_prefix||'VAI',
+    overagePolicy:updated.overage_policy||'serve',
+    overageGracePct:updated.overage_grace_pct!=null?+updated.overage_grace_pct:120,
+    paymentTermsDays:updated.payment_terms_days!=null?+updated.payment_terms_days:7,
+    currency:updated.currency||'PKR' };
+}
+
+function toggleGraceField(){
+  const el = document.getElementById('grace-field');
+  const sel = document.getElementById('setOveragePolicy');
+  if(el && sel) el.style.display = sel.value==='grace' ? 'block' : 'none';
+}
+
+async function saveOveragePolicy(){
+  const policy = (document.getElementById('setOveragePolicy')||{}).value || 'serve';
+  const pct = parseInt((document.getElementById('setOverageGrace')||{}).value, 10) || 120;
+  if(policy!=='serve' && !confirm(
+    policy==='block'
+      ? 'Stop answering the moment a client uses up their allowance?\n\nTheir customers will get silence rather than a reply. Nothing warns them first.'
+      : `Stop answering once a client passes ${pct}% of their allowance?\n\nTheir customers will get silence beyond that point.`
+  )) return;
+  try{
+    const updated = await API.put('/api/settings', { overage_policy: policy, overage_grace_pct: pct });
+    applySettings(updated);
+    render(); showToast('Policy saved');
+  }catch(e){ showToast(e.message||'Could not save the policy','warn'); }
+}
+
+async function saveTaxSettings(){
+  const v = (id)=> (document.getElementById(id)||{value:''}).value.trim();
+  const rate = parseFloat(v('setTaxRate'));
+  if(isNaN(rate) || rate < 0 || rate > 100){ showToast('Tax rate must be a percentage between 0 and 100','warn'); return; }
+  try{
+    const updated = await API.put('/api/settings', {
+      ntn: v('setNtn'), strn: v('setStrn'), address: v('setAddress'),
+      default_tax_rate: rate,
+      payment_terms_days: parseInt(v('setTerms'),10) || 0,
+      invoice_prefix: v('setPrefix') || 'VAI',
+    });
+    applySettings(updated);
+    render(); showToast('Tax details saved');
+  }catch(e){ showToast(e.message||'Could not save tax details','warn'); }
+}
+function exportAllData(){
+  const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'vantriq-crm-export-'+todayISO()+'.json';
+  a.click();
+}
+function disconnectApi(){
+  if(!confirm('Disconnect from the API? You will need your key again to reconnect.')) return;
+  clearInterval(usagePollTimer);
+  API.clearConfig();
+  boot();
+}
+
+/* ============================== MODALS ============================== */
+function renderModal(){
+  const root = document.getElementById('modal-root');
+  if(!openModal){ root.innerHTML=''; return; }
+  let html='';
+  if(openModal.type==='client') html = clientModalHTML(openModal.id);
+  else if(openModal.type==='teamUser') html = teamUserModalHTML();
+  else if(openModal.type==='product') html = productModalHTML(openModal.id);
+  else if(openModal.type==='vendor') html = vendorModalHTML(openModal.id);
+  else if(openModal.type==='po') html = poModalHTML();
+  else if(openModal.type==='invoice') html = invoiceModalHTML();
+  else if(openModal.type==='expense') html = expenseModalHTML();
+  else if(openModal.type==='rep') html = repModalHTML();
+  root.innerHTML = `<div class="modal-overlay" onmousedown="if(event.target===this){openModal=null;render();}">${html}</div>`;
+  if(openModal.type==='invoice') requestAnimationFrame(prefillInvoiceAmount);
+}
+function closeModal(){ openModal=null; render(); }
+
+/* Show the custom-terms block only for the customisable (Enterprise+) tier. */
+function toggleCustomTerms(){
+  const sel = document.getElementById('f_product');
+  const box = document.getElementById('custom-terms');
+  if(!sel || !box) return;
+  box.style.display = isCustomTier(sel.value) ? 'block' : 'none';
+}
+/* A comment is only required when the stage is actually changing. */
+function toggleStageComment(originalStage){
+  const sel = document.getElementById('f_stage');
+  const wrap = document.getElementById('stage-comment-wrap');
+  if(!sel || !wrap) return;
+  wrap.style.display = (sel.value !== originalStage) ? 'block' : 'none';
+}
+
+function teamUserModalHTML(){
+  return `
+  <div class="modal">
+    <div class="modal-head"><h3>Add an employee</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Full name <span style="color:var(--red);">*</span></label><input id="tu_name"></div>
+      <div class="field"><label>Work email <span style="color:var(--red);">*</span></label>
+        <input id="tu_email" placeholder="someone@vantriqai.com">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">Must be an @vantriqai.com address — the sign-in code is emailed there.</div>
+      </div>
+      <div class="field"><label>Role</label>
+        <select id="tu_role">
+          <option value="staff">Staff — pipeline, clients, billing, package requests</option>
+          <option value="admin">Admin — everything, including team and financials</option>
+        </select>
+      </div>
+      <div class="field"><label>Password <span style="font-size:11px;color:var(--muted);font-weight:400;">— type one, or leave blank to generate</span></label>
+        <input id="tu_password" type="text" autocomplete="new-password" placeholder="At least 10 characters">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">A generated password is shown once and must be changed at first sign-in. One you type is theirs to keep.</div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTeamUser()">${iconCheck(14)} Create login</button>
+    </div>
+  </div>`;
+}
+
+function clientModalHTML(id){
+  const c = id ? state.clients.find(x=>x.id===id) : null;
+  const products = state.products.slice().sort((a,b)=>a.order-b.order);
+  // Editing an existing client offers only its current stage plus the stages it
+  // may legally advance to; a brand new record can start anywhere.
+  const allowedNext = c ? allowedNextStages(c.stage) : [];
+  const stageOptions = c ? [c.stage, ...allowedNext]
+                         : ['lead','contacted','proposal','negotiation','active','lost','churned'];
+  const showCustom = c ? isCustomTier(c.productId) : false;
+  // Only top-level accounts may be a parent, and never this client itself.
+  const parentOptions = state.clients
+    .filter(x=>(!c||x.id!==c.id) && !x.parentClientId)
+    .sort((a,b)=>a.company.localeCompare(b.company));
+  return `
+  <div class="modal">
+    <div class="modal-head"><h3>${c?'Edit client':'New lead'}</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
+    <div class="modal-body">
+      <div class="field-row">
+        <div class="field"><label>Contact name <span style="color:var(--red);">*</span></label><input id="f_name" value="${c?esc(c.name):''}"></div>
+        <div class="field"><label>Company <span style="color:var(--red);">*</span></label><input id="f_company" value="${c?esc(c.company):''}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Email <span style="color:var(--red);">*</span></label><input id="f_email" value="${c?esc(c.email):''}"></div>
+        <div class="field"><label>Phone <span style="color:var(--red);">*</span></label><input id="f_phone" value="${c?esc(c.phone):''}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Package <span style="color:var(--red);">*</span></label>
+          <select id="f_product" onchange="toggleCustomTerms()">${products.map(p=>`<option value="${p.id}" ${c&&c.productId===p.id?'selected':''}>${esc(p.name)}${p.isStandard===false?' (customisable)':''}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label>Stage <span style="color:var(--red);">*</span></label>
+          <select id="f_stage" onchange="toggleStageComment('${c?c.stage:''}')">
+            ${stageOptions.map(s=>`<option value="${s}" ${c?(c.stage===s?'selected':''):(s==='lead'?'selected':'')}>${stageLabel(s)}</option>`).join('')}
+          </select>
+          ${c&&allowedNext.length===0?`<div style="font-size:11px;color:var(--muted);margin-top:4px;">${stageLabel(c.stage)} is a final stage.</div>`:''}
+        </div>
+      </div>
+      ${c?`<div class="field" id="stage-comment-wrap" style="display:none;">
+        <label>Reason for the stage change <span style="color:var(--red);">*</span></label>
+        <textarea id="f_stage_comment" rows="2" placeholder="Why is this deal moving forward? Recorded permanently against the client."></textarea>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">Deals only move forward, one stage at a time. This cannot be undone.</div>
+      </div>`:''}
+      <div class="field-row">
+        <div class="field"><label>Estimated deal value (PKR/mo) <span style="color:var(--red);">*</span></label><input id="f_value" type="number" value="${c?c.estValue:''}"></div>
+        <div class="field"><label>Source <span style="color:var(--red);">*</span></label><input id="f_source" value="${c?esc(c.source):''}" placeholder="Warm network, referral, LinkedIn…"></div>
+      </div>
+      <div class="field"><label>WhatsApp number / external ref <span style="color:var(--red);">*</span></label><input id="f_external_ref" value="${c?esc(c.externalRef||''):''}" placeholder="e.g. 923001234567 — used to match n8n usage events to this client"></div>
+
+      <div style="background:#FAF8F3;border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;">
+        <div style="font-weight:600;font-size:13px;margin-bottom:2px;">Billing &amp; tax</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">
+          Required before this client can go Active — every invoice is issued against these details.
+          Enter the CNIC in the NTN field for an unregistered buyer.
+        </div>
+        <div class="field-row">
+          <div class="field"><label>NTN / CNIC <span style="color:var(--red);">*</span> <span style="font-size:11px;color:var(--muted);font-weight:400;">(to go Active)</span></label><input id="f_ntn" value="${c?esc(c.ntn||''):''}" placeholder="1234567-8"></div>
+          <div class="field"><label>STRN <span style="font-size:11px;color:var(--muted);font-weight:400;">(if sales-tax registered)</span></label><input id="f_strn" value="${c?esc(c.strn||''):''}"></div>
+        </div>
+        <div class="field"><label>Billing address <span style="color:var(--red);">*</span> <span style="font-size:11px;color:var(--muted);font-weight:400;">(to go Active)</span></label><input id="f_billing_address" value="${c?esc(c.billingAddress||''):''}" placeholder="Street, city, province"></div>
+        <div class="field-row">
+          <div class="field"><label>Sales tax rate %</label>
+            <input id="f_tax_rate" type="number" step="0.01" value="${c&&c.taxRate!=null?c.taxRate:''}" placeholder="${isAdmin()?`blank = company default (${state.company.defaultTaxRate||0}%)`:'blank = the company default'}">
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;">Leave blank to use the company default. Enter 0 for an exempt client.</div>
+          </div>
+          <div class="field"><label>Parent account <span style="font-size:11px;color:var(--muted);font-weight:400;">(optional)</span></label>
+            <select id="f_parent">
+              <option value="">— none, this is a top-level account —</option>
+              ${parentOptions.map(x=>`<option value="${x.id}" ${c&&c.parentClientId===x.id?'selected':''}>${esc(x.company)}</option>`).join('')}
+            </select>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;">A sub-account keeps its own package, quota and invoices — the link is for grouping only.</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="custom-terms" style="display:${showCustom?'block':'none'};background:#FAF8F3;border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;">
+        <div style="font-weight:600;font-size:13px;margin-bottom:2px;">Custom terms</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">
+          Only Enterprise+ can be customised. Leave a field blank to use the package default.
+          Standard packages are fixed by the business model.
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Setup fee</label><input id="f_c_setup" type="number" value="${c&&c.customSetupFee!=null?c.customSetupFee:''}"></div>
+          <div class="field"><label>Monthly retainer</label><input id="f_c_retainer" type="number" value="${c&&c.customRetainer!=null?c.customRetainer:''}"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Included sessions / month</label><input id="f_c_quota" type="number" value="${c&&c.customQuota!=null?c.customQuota:''}"></div>
+          <div class="field"><label>Overage rate / session</label><input id="f_c_overage" type="number" value="${c&&c.customOverageRate!=null?c.customOverageRate:''}"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Automation</label><input id="f_c_automation" value="${c?esc(c.customAutomation||''):''}"></div>
+          <div class="field"><label>Data layer</label><input id="f_c_datalayer" value="${c?esc(c.customDataLayer||''):''}"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>AI model</label><input id="f_c_aimodel" value="${c?esc(c.customAiModel||''):''}"></div>
+          <div class="field"><label>Channels</label><input id="f_c_channels" value="${c?esc(c.customChannels||''):''}"></div>
+        </div>
+      </div>
+
+      <div class="field"><label>Notes <span style="font-size:11px;color:var(--muted);font-weight:400;">(optional)</span></label><textarea id="f_notes" rows="3">${c?esc(c.notes):''}</textarea></div>
+    </div>
+    <div class="modal-foot">
+      ${c?`<button class="btn btn-danger-ghost" onclick="deleteClient('${c.id}')">Delete</button>`:''}
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveClient(${c?`'${c.id}'`:'null'})">${iconCheck(14)} Save</button>
+    </div>
+  </div>`;
+}
+async function saveClient(id){
+  const v = (elId)=> (document.getElementById(elId)||{value:''}).value.trim();
+  const existing = id ? state.clients.find(x=>x.id===id) : null;
+
+  const data = {
+    name: v('f_name'), company: v('f_company'), email: v('f_email'), phone: v('f_phone'),
+    productId: v('f_product'),
+    stage: v('f_stage'),
+    estValue: parseFloat(v('f_value')),
+    source: v('f_source'),
+    externalRef: v('f_external_ref'),
+    notes: v('f_notes'),
+    ntn: v('f_ntn'), strn: v('f_strn'), billingAddress: v('f_billing_address'),
+    taxRate: v('f_tax_rate')==='' ? null : (parseFloat(v('f_tax_rate'))||0),
+    parentClientId: v('f_parent') || null,
+  };
+
+  // Everything except Notes is required.
+  const required = [
+    ['name','Contact name'],['company','Company'],['email','Email'],['phone','Phone'],
+    ['productId','Package'],['stage','Stage'],['source','Source'],['externalRef','WhatsApp number / external ref'],
+  ];
+  const missing = required.filter(([k])=>!String(data[k]||'').trim()).map(([,l])=>l);
+  if(isNaN(data.estValue)) missing.push('Estimated deal value');
+  // The API refuses to activate a client without these, because the activation
+  // raises the first invoice; say so here rather than letting the save bounce.
+  if(data.stage==='active'){
+    if(!data.ntn) missing.push('NTN / CNIC');
+    if(!data.billingAddress) missing.push('Billing address');
+  }
+  if(missing.length){ showToast('Required: '+missing.join(', '), 'warn'); return; }
+
+  // A stage change needs a comment, and may only move forward.
+  if(existing && data.stage !== existing.stage){
+    const allowed = allowedNextStages(existing.stage);
+    if(!allowed.includes(data.stage)){
+      showToast(allowed.length
+        ? `A deal only moves forward. From "${stageLabel(existing.stage)}": ${allowed.map(stageLabel).join(' or ')}.`
+        : `"${stageLabel(existing.stage)}" is a final stage.`, 'warn');
+      return;
+    }
+    const comment = v('f_stage_comment');
+    if(!comment){ showToast('A comment is required to move a deal to the next stage','warn'); return; }
+    data.stageComment = comment;
+  }
+
+  // Custom terms travel only for the customisable tier; blanks mean "use the default".
+  if(isCustomTier(data.productId)){
+    const num = (elId)=>{ const raw=v(elId); return raw===''?null:(parseFloat(raw)||0); };
+    data.custom = {
+      setupFee:num('f_c_setup'), retainer:num('f_c_retainer'), quota:num('f_c_quota'),
+      overageRate:num('f_c_overage'), msgsPerSession:null,
+      automation:v('f_c_automation')||null, dataLayer:v('f_c_datalayer')||null,
+      aiModel:v('f_c_aimodel')||null, channels:v('f_c_channels')||null,
+    };
+  }
+  try{
+    let raised = [];
+    if(id){
+      const updated = await API.put(`/api/clients/${id}`, clientToApi(data));
+      const c = state.clients.find(x=>x.id===id);
+      const sessions = c.sessionsUsedThisMonth;
+      Object.assign(c, clientFromApi(updated));
+      c.sessionsUsedThisMonth = sessions;
+      raised = updated.invoices_created||[];
+    }else{
+      const created = await API.post('/api/clients', clientToApi(data));
+      state.clients.push(clientFromApi(created));
+      raised = created.invoices_created||[];
+    }
+    // Going active bills the setup fee and first retainer, server-side.
+    state.invoices.push(...raised.map(invoiceFromApi));
+    closeModal(); render();
+    showToast(raised.length ? `Client saved — ${raised.length} invoice${raised.length===1?'':'s'} raised` : 'Client saved');
+  }catch(e){ showToast(e.message||'Could not save client','warn'); }
+}
+async function deleteClient(id){
+  if(!confirm('Delete this client and their invoices?')) return;
+  try{
+    await API.del(`/api/clients/${id}`);
+    state.clients = state.clients.filter(c=>c.id!==id);
+    state.invoices = state.invoices.filter(i=>i.clientId!==id);
+    closeModal(); openPanel=null; render(); showToast('Client deleted');
+  }catch(e){ showToast(e.message||'Could not delete client','warn'); }
+}
+async function suspendClient(id){
+  const c = state.clients.find(x=>x.id===id);
+  const reason = prompt(`Pause service for ${c?c.company:'this client'}?\n\nTheir agent stops replying immediately. The reason is shown to them in their portal — write it for them to read:`);
+  if(reason===null) return;
+  if(!reason.trim()){ showToast('A reason is required','warn'); return; }
+  try{
+    const updated = await API.post(`/api/clients/${id}/suspend`, { reason: reason.trim() });
+    Object.assign(c, clientFromApi(updated));
+    render(); showToast('Service paused');
+  }catch(e){ showToast(e.message||'Could not pause service','warn'); }
+}
+
+async function resumeClient(id){
+  const c = state.clients.find(x=>x.id===id);
+  if(!confirm(`Resume service for ${c?c.company:'this client'}?\n\nTheir agent starts answering again immediately.`)) return;
+  try{
+    const updated = await API.post(`/api/clients/${id}/resume`, {});
+    Object.assign(c, clientFromApi(updated));
+    render(); showToast('Service resumed');
+  }catch(e){ showToast(e.message||'Could not resume service','warn'); }
+}
+
+async function generatePortalCredentials(clientId){
+  const client = state.clients.find(c=>c.id===clientId);
+  // Read the typed password before the panel is replaced by the busy state.
+  const pwEl = document.getElementById('portal_pw_'+clientId);
+  const typed = pwEl ? pwEl.value.trim() : '';
+  if(typed && typed.length < 10){ showToast('Choose a password of at least 10 characters','warn'); return; }
+  if(client && client.portalEnabled && !confirm('Set a new portal password for this customer?\n\nTheir current password stops working immediately and anyone signed in is logged out.')) return;
+  const area = document.getElementById('portal-link-area');
+  if(area) area.innerHTML = '<span class="loading-dot"></span> Saving…';
+  try{
+    const r = await API.post(`/api/clients/${clientId}/portal-credentials`, typed ? { password: typed } : {});
+    if(client){ client.portalEnabled = true; client.portalUsername = r.username; client.portalPasswordSetBy='admin'; client.portalPasswordSetAt=new Date().toISOString(); }
+    const loginUrl = API.base + '/portal.html';
+    if(area) area.innerHTML = `
+      <div style="background:var(--teal-light);border:1px solid #BFE3D8;border-radius:10px;padding:12px;">
+        <div style="font-weight:600;color:var(--teal-dark);margin-bottom:8px;">Portal login created</div>
+        <div style="margin-bottom:4px;">Sign-in page: <a href="${esc(loginUrl)}" target="_blank" rel="noopener" style="color:var(--teal-dark);">${esc(loginUrl)}</a></div>
+        <div style="margin-bottom:4px;">Username: <strong style="font-family:'JetBrains Mono',monospace;">${esc(r.username)}</strong></div>
+        ${r.password
+          ? `<div style="margin-bottom:8px;">Password: <strong style="font-family:'JetBrains Mono',monospace;font-size:14px;">${esc(r.password)}</strong></div>
+             <button class="btn btn-ghost btn-sm" onclick="copyPortalCreds('${esc(r.username)}','${esc(r.password)}','${esc(loginUrl)}')">Copy all three</button>
+             <div style="margin-top:8px;color:#8A5F17;background:var(--amber-light);padding:8px 10px;border-radius:8px;font-size:11.5px;">
+               Copy this password now — it is stored hashed and can never be shown again. Send it to the
+               customer over a channel you trust, separately from the link.
+             </div>`
+          : `<div style="margin-bottom:8px;">Password: the one you typed. It is hashed here and cannot be read back, so keep your own copy.</div>
+             <div style="margin-top:8px;color:#8A5F17;background:var(--amber-light);padding:8px 10px;border-radius:8px;font-size:11.5px;">
+               Send it to the customer over a channel you trust, separately from the link.
+             </div>`}
+      </div>`;
+  }catch(e){
+    if(area) area.innerHTML = `<span style="color:var(--red);">${esc(e.message||'Could not create the login')}</span>`;
+  }
+}
+
+function copyPortalCreds(u, pw, url){
+  const text = `Vantriq AI account portal\nSign in: ${url}\nUsername: ${u}\nPassword: ${pw}`;
+  navigator.clipboard.writeText(text).then(()=>showToast('Login details copied'), ()=>showToast('Could not copy','warn'));
+}
+
+async function revokePortalCredentials(clientId){
+  if(!confirm('Revoke this customer\'s portal access?\n\nTheir login stops working immediately.')) return;
+  try{
+    await API.del(`/api/clients/${clientId}/portal-credentials`);
+    const client = state.clients.find(c=>c.id===clientId);
+    if(client){ client.portalEnabled = false; client.portalUsername = ''; }
+    render(); showToast('Portal access revoked');
+  }catch(e){ showToast(e.message||'Could not revoke access','warn'); }
+}
+
+async function generatePortalLink_unused(clientId, regenerate){
+  const area = document.getElementById('portal-link-area');
+  if(area) area.innerHTML = '<span class="loading-dot"></span> Generating…';
+  try{
+    const result = await API.post(`/api/clients/${clientId}/portal-link`, regenerate ? {regenerate:true} : {});
+    const fullUrl = API.base + result.path;
+    if(!area) return;
+    area.innerHTML = `
+      <div style="display:flex;gap:6px;">
+        <input readonly value="${esc(fullUrl)}" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:'JetBrains Mono';background:#FAF8F3;" onclick="this.select()">
+        <button class="btn btn-primary btn-sm" onclick="copyPortalLink('${fullUrl.replace(/'/g,"\\'")}')">Copy</button>
+      </div>
+      <div style="margin-top:8px;">
+        <button class="btn btn-danger-ghost btn-sm" onclick="generatePortalLink('${clientId}', true)">Regenerate (invalidates old link)</button>
+      </div>`;
+  }catch(e){
+    if(area) area.innerHTML = `<span style="color:var(--red);">${esc(e.message||'Could not generate link')}</span>`;
+  }
+}
+function copyPortalLink(url){
+  navigator.clipboard.writeText(url).then(()=>showToast('Portal link copied')).catch(()=>showToast('Could not copy — select and copy manually','warn'));
+}
+
+function productModalHTML(id){
+  const p = id ? state.products.find(x=>x.id===id) : null;
+  return `
+  <div class="modal">
+    <div class="modal-head"><h3>${p?'Edit package':'New package'}</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
+    <div class="modal-body">
+      <div class="field-row">
+        <div class="field"><label>Package name</label><input id="p_name" value="${p?esc(p.name):''}"></div>
+        <div class="field"><label>Best suited to</label><input id="p_target" value="${p?esc(p.targetTier):''}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Setup fee (PKR)</label><input id="p_setup" type="number" value="${p?p.setupFee:''}"></div>
+        <div class="field"><label>Monthly retainer (PKR)</label><input id="p_retainer" type="number" value="${p?p.retainer:''}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Avg. messages / session</label><input id="p_msgs" type="number" value="${p?p.msgsPerSession:''}"></div>
+        <div class="field"><label>Included quota / month</label><input id="p_quota" type="number" value="${p?p.quota:''}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Overage rate (PKR/session)</label><input id="p_overage" type="number" value="${p?p.overageRate:''}"></div>
+        <div class="field"><label>Est. delivery cost @ 100% quota (PKR)</label><input id="p_delivery" type="number" value="${p?p.deliveryCostFull:''}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Automation layer</label><input id="p_automation" value="${p?esc(p.automation):'n8n Cloud'}"></div>
+        <div class="field"><label>Data layer</label><input id="p_data" value="${p?esc(p.dataLayer):'Vantriq CRM (Postgres)'}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>AI model</label><input id="p_ai" value="${p?esc(p.aiModel):''}"></div>
+        <div class="field"><label>Channels</label><input id="p_channels" value="${p?esc(p.channels):''}"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveProduct(${p?`'${p.id}'`:'null'})">${iconCheck(14)} Save package</button>
+    </div>
+  </div>`;
+}
+async function saveProduct(id){
+  const name = document.getElementById('p_name').value.trim();
+  if(!name){ showToast('Package name required','warn'); return; }
+  const data = {
+    name,
+    targetTier: document.getElementById('p_target').value.trim(),
+    setupFee: parseFloat(document.getElementById('p_setup').value)||0,
+    retainer: parseFloat(document.getElementById('p_retainer').value)||0,
+    msgsPerSession: parseFloat(document.getElementById('p_msgs').value)||0,
+    quota: parseFloat(document.getElementById('p_quota').value)||0,
+    overageRate: parseFloat(document.getElementById('p_overage').value)||0,
+    deliveryCostFull: parseFloat(document.getElementById('p_delivery').value)||0,
+    automation: document.getElementById('p_automation').value.trim(),
+    dataLayer: document.getElementById('p_data').value.trim(),
+    aiModel: document.getElementById('p_ai').value.trim(),
+    channels: document.getElementById('p_channels').value.trim(),
+  };
+  try{
+    if(id){
+      const updated = await API.put(`/api/products/${id}`, productToApi(data));
+      Object.assign(state.products.find(p=>p.id===id), productFromApi(updated));
+    }else{
+      const maxOrder = Math.max(0,...state.products.map(p=>p.order));
+      const created = await API.post('/api/products', Object.assign(productToApi(data), {sort_order:maxOrder+1}));
+      state.products.push(productFromApi(created));
+    }
+    closeModal(); render(); showToast('Package saved');
+  }catch(e){ showToast(e.message||'Could not save package','warn'); }
+}
+
+function vendorModalHTML(id){
+  const v = id ? state.vendors.find(x=>x.id===id) : null;
+  return `
+  <div class="modal">
+    <div class="modal-head"><h3>${v?'Edit vendor':'Add vendor'}</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Vendor / tool name</label><input id="v_name" value="${v?esc(v.name):''}"></div>
+      <div class="field-row">
+        <div class="field"><label>Category</label><input id="v_category" value="${v?esc(v.category):''}" placeholder="Automation, Data layer, RAG…"></div>
+        <div class="field"><label>Applies to (tiers)</label><input id="v_tiers" value="${v?esc(v.tiers):''}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Monthly cost — min (PKR)</label><input id="v_min" type="number" value="${v?v.costMin:0}"></div>
+        <div class="field"><label>Monthly cost — max (PKR)</label><input id="v_max" type="number" value="${v?v.costMax:0}"></div>
+      </div>
+      <div class="field"><label>Status</label><input id="v_status" value="${v?esc(v.status):'Active'}"></div>
+    </div>
+    <div class="modal-foot">
+      ${v?`<button class="btn btn-danger-ghost" onclick="deleteVendor('${v.id}');closeModal()">Delete</button>`:''}
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveVendor(${v?`'${v.id}'`:'null'})">${iconCheck(14)} Save vendor</button>
+    </div>
+  </div>`;
+}
+async function saveVendor(id){
+  const name = document.getElementById('v_name').value.trim();
+  if(!name){ showToast('Vendor name required','warn'); return; }
+  const data = {
+    name, category:document.getElementById('v_category').value.trim(),
+    tiers:document.getElementById('v_tiers').value.trim(),
+    costMin:parseFloat(document.getElementById('v_min').value)||0,
+    costMax:parseFloat(document.getElementById('v_max').value)||0,
+    status:document.getElementById('v_status').value.trim(),
+  };
+  try{
+    if(id){
+      const updated = await API.put(`/api/vendors/${id}`, vendorToApi(data));
+      Object.assign(state.vendors.find(v=>v.id===id), vendorFromApi(updated));
+    }else{
+      const created = await API.post('/api/vendors', vendorToApi(data));
+      state.vendors.push(vendorFromApi(created));
+    }
+    closeModal(); render(); showToast('Vendor saved');
+  }catch(e){ showToast(e.message||'Could not save vendor','warn'); }
+}
+
+function poModalHTML(){
+  return `
+  <div class="modal">
+    <div class="modal-head"><h3>Log purchase order</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Vendor</label>
+        <select id="po_vendor">${state.vendors.map(v=>`<option value="${v.id}">${esc(v.name)}</option>`).join('')}</select>
+      </div>
+      <div class="field"><label>Item / description</label><input id="po_item" placeholder="e.g. VPS — annual renewal"></div>
+      <div class="field-row">
+        <div class="field"><label>Amount (PKR)</label><input id="po_amount" type="number"></div>
+        <div class="field"><label>Date</label><input id="po_date" type="date" value="${todayISO()}"></div>
+      </div>
+      <div class="field"><label>Status</label>
+        <select id="po_status"><option>Ordered</option><option>Received</option><option>Cancelled</option></select>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="savePO()">${iconCheck(14)} Save</button>
+    </div>
+  </div>`;
+}
+async function savePO(){
+  const item = document.getElementById('po_item').value.trim();
+  if(!item){ showToast('Item description required','warn'); return; }
+  try{
+    const created = await API.post('/api/purchase-orders', {
+      vendor_id:document.getElementById('po_vendor').value, item,
+      amount:parseFloat(document.getElementById('po_amount').value)||0,
+      po_date:document.getElementById('po_date').value||todayISO(),
+      status:document.getElementById('po_status').value,
+    });
+    state.pos.push(poFromApi(created));
+    closeModal(); render(); showToast('Purchase order logged');
+  }catch(e){ showToast(e.message||'Could not save purchase order','warn'); }
+}
+
+function invoiceModalHTML(){
+  const active = state.clients.filter(c=>c.stage==='active');
+  return `
+  <div class="modal">
+    <div class="modal-head"><h3>New invoice</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Client</label>
+        <select id="i_client" onchange="prefillInvoiceAmount()">
+          ${active.map(c=>`<option value="${c.id}">${esc(c.company)}</option>`).join('') || '<option value="">No active clients yet</option>'}
+        </select>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Type</label>
+          <select id="i_type" onchange="prefillInvoiceAmount()">
+            <option>Retainer</option><option>Setup fee</option><option>Overage</option><option>Add-on / change request</option>
+          </select>
+        </div>
+        <div class="field"><label>Amount (PKR)</label><input id="i_amount" type="number"></div>
+      </div>
+      <div class="field" id="i_auto_wrap" style="display:flex;align-items:center;gap:8px;background:var(--teal-light);padding:10px 12px;border-radius:8px;">
+        <input type="checkbox" id="i_auto" checked onchange="toggleAutoPrice()" style="width:auto;">
+        <label style="margin:0;color:var(--teal-dark);" for="i_auto">Auto-price from this month's live usage (sessions logged by n8n)</label>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Sessions used this month (live)</label><input id="i_sessions" type="number" readonly></div>
+        <div class="field"><label>Period</label><input id="i_period" value="${monthLabel(todayISO())}"></div>
+      </div>
+      <div class="field"><label>Status</label>
+        <select id="i_status"><option value="pending">Pending</option><option value="paid">Paid</option><option value="overdue">Overdue</option></select>
+      </div>
+      <p class="footnote" id="i_overage_hint"></p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveInvoice()">${iconCheck(14)} Create invoice</button>
+    </div>
+  </div>`;
+}
+function toggleAutoPrice(){
+  const auto = document.getElementById('i_auto').checked;
+  document.getElementById('i_amount').disabled = auto;
+  prefillInvoiceAmount();
+}
+function prefillInvoiceAmount(){
+  const clientId = document.getElementById('i_client').value;
+  const type = document.getElementById('i_type').value;
+  const c = state.clients.find(x=>x.id===clientId);
+  const autoEl = document.getElementById('i_auto');
+  const autoWrap = document.getElementById('i_auto_wrap');
+  autoWrap.style.display = type==='Retainer' ? 'flex' : 'none';
+  if(!c) return;
+  const p = productOf(c);
+  if(!p) return;
+  const amountEl = document.getElementById('i_amount');
+  const sessionsEl = document.getElementById('i_sessions');
+  const hint = document.getElementById('i_overage_hint');
+  sessionsEl.value = c.sessionsUsedThisMonth || 0;
+
+  const auto = type==='Retainer' && autoEl.checked;
+  amountEl.disabled = auto;
+
+  if(type==='Setup fee'){ amountEl.value = p.setupFee; hint.textContent=''; return; }
+  if(type!=='Retainer'){ hint.textContent=''; return; }
+
+  const used = c.sessionsUsedThisMonth || 0;
+  if(used > p.quota){
+    const overSessions = used - p.quota;
+    const overCost = overSessions * p.overageRate;
+    amountEl.value = p.retainer + overCost;
+    hint.textContent = `${fmtNum(overSessions)} sessions over quota × ${fmtMoney(p.overageRate)} = ${fmtMoney(overCost)} added to retainer, based on this month's live usage.`;
+  } else {
+    amountEl.value = p.retainer;
+    hint.textContent = `Client is within quota (${fmtNum(used)} / ${fmtNum(p.quota)} sessions this month) — no overage.`;
+  }
+}
+async function saveInvoice(){
+  const clientId = document.getElementById('i_client').value;
+  if(!clientId){ showToast('Add an active client first','warn'); return; }
+  const type = document.getElementById('i_type').value;
+  const auto = type==='Retainer' && document.getElementById('i_auto').checked;
+  const payload = {
+    client_id: clientId,
+    type: INVOICE_TYPE_TO_API[type],
+    status: document.getElementById('i_status').value,
+    period: document.getElementById('i_period').value,
+  };
+  if(auto){
+    payload.auto_from_usage = true;
+    payload.month = new Date().toISOString().slice(0,7)+'-01';
+  }else{
+    payload.amount = parseFloat(document.getElementById('i_amount').value)||0;
+  }
+  try{
+    const created = await API.post('/api/invoices', payload);
+    state.invoices.push(invoiceFromApi(created));
+    closeModal(); render(); showToast('Invoice created');
+  }catch(e){ showToast(e.message||'Could not create invoice','warn'); }
+}
+
+function repModalHTML(){
+  return `
+  <div class="modal">
+    <div class="modal-head"><h3>Add sales rep</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Name</label><input id="r_name" placeholder="e.g. Ahmed Raza"></div>
+      <div class="field"><label>Email (optional)</label><input id="r_email" placeholder="ahmed@vantriq.ai"></div>
+      <p class="footnote" style="margin-top:0;">A login key is generated on save. The rep uses it to log in at <span class="mono">/rep.html</span> — they'll only ever see leads they create there.</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveRep()">${iconCheck(14)} Create rep</button>
+    </div>
+  </div>`;
+}
+async function saveRep(){
+  const name = document.getElementById('r_name').value.trim();
+  if(!name){ showToast('Name required','warn'); return; }
+  try{
+    const created = await API.post('/api/reps', { name, email: document.getElementById('r_email').value.trim() });
+    state.reps.push({ id:created.id, name:created.name, email:created.email, active:created.active, leadCount:0, wonCount:0, createdAt:created.created_at, lastUsedAt:null });
+    closeModal();
+    showRepKeyModal(created);
+  }catch(e){ showToast(e.message||'Could not create rep','warn'); }
+}
+
+function expenseModalHTML(){
+  return `
+  <div class="modal">
+    <div class="modal-head"><h3>Add cost line</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Label</label><input id="e_label" placeholder="e.g. Contract AI engineer — overflow"></div>
+      <div class="field-row">
+        <div class="field"><label>Category</label>
+          <select id="e_category"><option>Contract labour</option><option>Marketing</option><option>Software / tooling</option><option>Other</option></select>
+        </div>
+        <div class="field"><label>Monthly amount (PKR)</label><input id="e_amount" type="number"></div>
+      </div>
+      <div class="field"><label>Recurring</label>
+        <select id="e_recurring"><option value="true">Yes — recurs monthly</option><option value="false">No — one-off</option></select>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveExpense()">${iconCheck(14)} Save</button>
+    </div>
+  </div>`;
+}
+async function saveExpense(){
+  const label = document.getElementById('e_label').value.trim();
+  if(!label){ showToast('Label required','warn'); return; }
+  try{
+    const created = await API.post('/api/expenses', {
+      label, category:document.getElementById('e_category').value,
+      amount:parseFloat(document.getElementById('e_amount').value)||0,
+      recurring:document.getElementById('e_recurring').value==='true',
+    });
+    state.expenses.push(expenseFromApi(created));
+    closeModal(); render(); showToast('Cost line added');
+  }catch(e){ showToast(e.message||'Could not add cost line','warn'); }
+}
+
+/* ============================== SIDE PANELS ============================== */
+function renderPanel(){
+  const root = document.getElementById('panel-root');
+  if(!openPanel){ root.innerHTML=''; return; }
+  let html='';
+  if(openPanel.type==='client') html = clientPanelHTML(openPanel.id);
+  else if(openPanel.type==='invoice') html = invoicePanelHTML(openPanel.id);
+  root.innerHTML = `<div class="scrim" onclick="openPanel=null;render()"></div><div class="detail-panel open">${html}</div>`;
+}
+function clientPanelHTML(id){
+  const c = state.clients.find(x=>x.id===id);
+  if(!c) return '';
+  const p = productOf(c);
+  const clientInvoices = state.invoices.filter(i=>i.clientId===id).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const usagePct = p&&p.quota ? Math.min(100, Math.round((c.sessionsUsedThisMonth||0)/p.quota*100)) : 0;
+  return `
+  <div class="detail-head">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+      <div>
+        <h3 style="margin:0;">${esc(c.company)}</h3>
+        <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">${esc(c.name)} · ${esc(c.email||'no email')}</div>
+      </div>
+      <button class="close-x" onclick="openPanel=null;render()">${iconX(18)}</button>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
+      <span class="pill ${stagePillClass(c.stage)}"><span class="pill-dot"></span>${stageLabel(c.stage)}</span>
+      <span class="tag">${p?esc(p.name):'—'}</span>
+      ${c.serviceStatus==='suspended'?`<span class="pill pill-overdue"><span class="pill-dot"></span>Service paused</span>`:''}
+      ${repNameOf(c)?`<span class="tag" style="background:var(--teal-light);color:var(--teal-dark);">Rep: ${esc(repNameOf(c))}</span>`:''}
+    </div>
+  </div>
+  <div class="detail-body">
+    ${c.ownerRepId?`<div class="detail-row"><span class="k">Sales stage (rep pipeline)</span><span class="v">${SALES_STAGE_LABEL[c.salesStage]||'—'}${c.closeOutcome?` · <span style="color:${c.closeOutcome==='won'?'var(--teal-dark)':'var(--red)'}">${c.closeOutcome}</span>`:''}</span></div>`:''}
+    <div class="detail-row"><span class="k">Phone</span><span class="v">${esc(c.phone||'—')}</span></div>
+    <div class="detail-row"><span class="k">Source</span><span class="v">${esc(c.source||'—')}</span></div>
+    <div class="detail-row"><span class="k">External ref (n8n/WhatsApp)</span><span class="v mono" style="font-size:12px;">${esc(c.externalRef||'not set')}</span></div>
+    <div class="detail-row"><span class="k">Joined</span><span class="v">${fmtDate(c.joinDate)}</span></div>
+    <div class="detail-row"><span class="k">NTN / CNIC</span><span class="v mono" style="font-size:12px;">${esc(c.ntn||'not set')}</span></div>
+    ${c.strn?`<div class="detail-row"><span class="k">STRN</span><span class="v mono" style="font-size:12px;">${esc(c.strn)}</span></div>`:''}
+    <div class="detail-row"><span class="k">Sales tax rate</span><span class="v">${c.taxRate!=null?c.taxRate+'%':(isAdmin()?`${state.company.defaultTaxRate||0}% (company default)`:'company default')}</span></div>
+    ${c.billingAddress?`<div class="detail-row"><span class="k">Billing address</span><span class="v" style="text-align:right;max-width:60%;">${esc(c.billingAddress)}</span></div>`:''}
+    ${parentOf(c)?`<div class="detail-row"><span class="k">Sub-account of</span><span class="v"><a href="#" onclick="event.preventDefault();openPanel={type:'client',id:'${parentOf(c).id}'};render()">${esc(parentOf(c).company)}</a></span></div>`:''}
+    <div class="detail-row"><span class="k">Setup fee</span><span class="v">${p?fmtMoney(p.setupFee):'—'}</span></div>
+    <div class="detail-row"><span class="k">Monthly retainer</span><span class="v">${p?fmtMoney(p.retainer):'—'}</span></div>
+    ${c.stage==='active'?`
+    <div style="margin:14px 0;">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px;"><span class="k">Session usage this month <span style="color:var(--teal-dark);">● live</span></span><span>${fmtNum(c.sessionsUsedThisMonth||0)} / ${p?fmtNum(p.quota):0}</span></div>
+      <div class="progress-track"><div class="progress-fill ${usagePct>=100?'danger':usagePct>=80?'warn':''}" style="width:${usagePct}%"></div></div>
+    </div>`:''}
+    <div class="field" style="margin-top:14px;"><label>Notes</label><div style="font-size:13px;color:var(--text);background:#FAF8F3;padding:10px 12px;border-radius:8px;">${esc(c.notes)||'—'}</div></div>
+
+    ${subAccountsOf(c.id).length?`
+    <div class="divider"></div>
+    <h4 style="font-size:13px;margin-bottom:4px;">Sub-accounts (${subAccountsOf(c.id).length})</h4>
+    <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">Each has its own package, quota and invoices. Nothing is pooled.</div>
+    ${subAccountsOf(c.id).map(sc=>{
+      const sp = productOf(sc);
+      return `<div class="detail-row" style="cursor:pointer;" onclick="openPanel={type:'client',id:'${sc.id}'};render()">
+        <span class="k">${esc(sc.company)}</span>
+        <span class="v">${sp?esc(sp.name):'—'} · ${fmtNum(sc.sessionsUsedThisMonth||0)}${sp?' / '+fmtNum(sp.quota):''}</span>
+      </div>`;
+    }).join('')}`:''}
+
+    <div class="divider"></div>
+    <h4 style="font-size:13px;margin-bottom:4px;">Service</h4>
+    ${c.serviceStatus==='suspended'
+      ? `<div style="background:var(--red-light);border-radius:8px;padding:10px 12px;font-size:12.5px;color:#8F3527;margin-bottom:8px;">
+           <strong>Paused ${c.suspendedAt?fmtDate(c.suspendedAt):''}</strong>${c.suspendedBy?` by ${esc(c.suspendedBy)}`:''}<br>
+           ${esc(c.suspensionReason||'')}
+         </div>
+         <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">Their agent is not answering. They can still sign in to the portal and see this reason.</div>
+         <button class="btn btn-primary btn-sm" onclick="resumeClient('${c.id}')">Resume service</button>`
+      : `<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">Answering normally. Pausing stops their agent replying — use it for non-payment, not for going over quota, which bills instead.</div>
+         <button class="btn btn-danger-ghost btn-sm" onclick="suspendClient('${c.id}')">Pause service</button>`}
+
+    <div class="divider"></div>
+    <h4 style="font-size:13px;margin-bottom:8px;">Customer portal</h4>
+    <div id="portal-link-area" style="font-size:12.5px;color:var(--muted);">
+      ${c.portalEnabled
+        ? `<div style="margin-bottom:6px;">Sign-in is active. Username <strong style="font-family:'JetBrains Mono',monospace;">${esc(c.portalUsername)}</strong></div>
+           <div style="margin-bottom:8px;font-size:11.5px;">Password last set ${c.portalPasswordSetAt?fmtDate(c.portalPasswordSetAt):'—'}${c.portalPasswordSetBy==='customer'?' by the customer themselves':c.portalPasswordSetBy==='admin'?' by an administrator':''}.</div>`
+        : `<div style="margin-bottom:8px;">No portal login yet. The customer needs a username and password to sign in.</div>`}
+      <div class="field" style="margin-bottom:8px;">
+        <label>Password ${c.portalEnabled?'(new)':''} <span style="font-size:11px;color:var(--muted);font-weight:400;">— type one, or leave blank to generate</span></label>
+        <input id="portal_pw_${c.id}" type="text" autocomplete="new-password" placeholder="At least 10 characters">
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="generatePortalCredentials('${c.id}')">${c.portalEnabled?'Set password':iconArrowRight(13)+' Create portal login'}</button>
+      ${c.portalEnabled?`<button class="btn btn-danger-ghost btn-sm" onclick="revokePortalCredentials('${c.id}')">Revoke access</button>`:''}
+      <div style="margin-top:8px;font-size:11.5px;">The customer can also reset it themselves from the portal's "Forgot password" link — whatever they choose becomes their password here too.</div>
+    </div>
+
+    <div class="divider"></div>
+    <h4 style="font-size:13px;margin-bottom:8px;">Invoice history</h4>
+    ${clientInvoices.length? clientInvoices.map(inv=>`
+      <div class="detail-row" style="cursor:pointer;" onclick="openPanel={type:'invoice',id:'${inv.id}'};render()">
+        <span class="k">${esc(inv.type)} · ${fmtDate(inv.date)}</span>
+        <span class="v"><span class="pill ${invoiceStatusPillClass(inv.status)}" style="margin-right:6px;"><span class="pill-dot"></span>${inv.status}</span>${fmtMoney(inv.amount)}</span>
+      </div>`).join('') : `<div style="font-size:12.5px;color:var(--muted);">No invoices yet.</div>`}
+
+    <div style="margin-top:20px;display:flex;gap:8px;">
+      <button class="btn btn-primary btn-sm" onclick="openModal={type:'client',id:'${c.id}'};render()">${iconEdit(13)} Edit client</button>
+      <button class="btn btn-danger-ghost btn-sm" onclick="deleteClient('${c.id}')">${iconTrash(13)} Delete</button>
+    </div>
+  </div>`;
+}
+function invoicePanelHTML(id){
+  const inv = state.invoices.find(i=>i.id===id);
+  if(!inv) return '';
+  const c = state.clients.find(x=>x.id===inv.clientId);
+  const p = c?productOf(c):null;
+  return `
+  <div class="detail-head">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+      <div>
+        <h3 style="margin:0;">${esc(inv.type)}</h3>
+        <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">${esc(c?c.company:'—')} · ${esc(inv.period||fmtDate(inv.date))}</div>
+      </div>
+      <button class="close-x" onclick="openPanel=null;render()">${iconX(18)}</button>
+    </div>
+    <div style="margin-top:10px;"><span class="pill ${invoiceStatusPillClass(inv.status)}"><span class="pill-dot"></span>${inv.status}</span></div>
+  </div>
+  <div class="detail-body">
+    <div class="detail-row"><span class="k">Amount excluding tax</span><span class="v mono">${fmtMoney(inv.amount)}</span></div>
+    <div class="detail-row"><span class="k">Sales tax${inv.taxRate?` @ ${inv.taxRate}%`:''}</span><span class="v mono">${fmtMoney(inv.taxAmount||0)}</span></div>
+    <div class="detail-row" style="font-size:20px;"><strong>Total payable</strong><span class="v mono">${fmtMoney(inv.total!=null?inv.total:inv.amount)}</span></div>
+    <div class="detail-row"><span class="k">Invoice number</span><span class="v mono" style="font-size:12px;">${esc(inv.number||'—')}</span></div>
+    <div class="detail-row"><span class="k">Package</span><span class="v">${p?esc(p.name):'—'}</span></div>
+    <div class="detail-row"><span class="k">Date issued</span><span class="v">${fmtDate(inv.date)}</span></div>
+    ${inv.dueDate?`<div class="detail-row"><span class="k">Due</span><span class="v">${fmtDate(inv.dueDate)}</span></div>`:''}
+    ${inv.overageSessions?`<div class="detail-row"><span class="k">Overage sessions</span><span class="v">${fmtNum(inv.overageSessions)}</span></div>`:''}
+    <div class="divider"></div>
+    <h4 style="font-size:13px;">Update status</h4>
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+      <button class="btn btn-sm ${inv.status==='paid'?'btn-primary':'btn-ghost'}" onclick="setInvoiceStatus('${inv.id}','paid')">${iconCheck(13)} Mark paid</button>
+      <button class="btn btn-sm ${inv.status==='pending'?'btn-primary':'btn-ghost'}" onclick="setInvoiceStatus('${inv.id}','pending')">Pending</button>
+      <button class="btn btn-sm ${inv.status==='overdue'?'btn-primary':'btn-ghost'}" onclick="setInvoiceStatus('${inv.id}','overdue')">Overdue</button>
+    </div>
+    <div style="margin-top:20px;display:flex;gap:8px;">
+      <button class="btn btn-primary btn-sm" onclick="printTaxInvoice('${inv.id}')">${iconReceipt().replace('width="17"','width="13"').replace('height="17"','height="13"')} Print tax invoice</button>
+      <button class="btn btn-ghost btn-sm" onclick="downloadInvoice('${inv.id}')">${iconDownload(13)} Download</button>
+      <button class="btn btn-danger-ghost btn-sm" onclick="deleteInvoice('${inv.id}')">${iconTrash(13)} Delete</button>
+    </div>
+  </div>`;
+}
+async function setInvoiceStatus(id, status){
+  const inv = state.invoices.find(i=>i.id===id);
+  const prev = inv.status;
+  inv.status = status; render();
+  try{ await API.patch(`/api/invoices/${id}/status`, {status}); showToast('Invoice updated'); }
+  catch(e){ inv.status = prev; render(); showToast(e.message||'Could not update invoice','warn'); }
+}
+async function deleteInvoice(id){
+  if(!confirm('Delete this invoice?')) return;
+  try{
+    await API.del(`/api/invoices/${id}`);
+    state.invoices = state.invoices.filter(i=>i.id!==id);
+    openPanel=null; render();
+  }catch(e){ showToast(e.message||'Could not delete invoice','warn'); }
+}
+/** Opens the printable tax invoice — the document lives in invoice-print.js. */
+async function printTaxInvoice(id){
+  const r = await openTaxInvoice(()=>API.get(`/api/invoices/${id}/tax-invoice`));
+  if(!r.ok) showToast(r.error, 'warn');
+}
+
+function downloadInvoice(id){
+  const inv = state.invoices.find(i=>i.id===id);
+  const c = state.clients.find(x=>x.id===inv.clientId);
+  const p = c?productOf(c):null;
+  const text = [
+    `${state.company.name} — Invoice`,
+    `Bill to: ${c?c.company:'—'} (${c?c.name:''})`,
+    `Type: ${inv.type}`,
+    `Package: ${p?p.name:'—'}`,
+    `Period: ${inv.period||'—'}`,
+    `Date: ${inv.date}`,
+    `Status: ${inv.status}`,
+    `Amount: ${fmtMoney(inv.amount)}`,
+  ].join('\n');
+  const blob = new Blob([text], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `invoice-${(c?c.company:'client').replace(/\s+/g,'-')}-${inv.date}.txt`;
+  a.click();
+}
+
+/* ============================== Hooks after render ============================== */
+function attachPostRenderHooks(){
+  if(currentView==='dashboard'){
+    requestAnimationFrame(drawDashboardCharts);
+  }
+}
+
+/* ============================== Sign in ============================== */
+/* Employees sign in with their company email and password, then a one-time
+   code emailed to that address. The API-key route still exists but is a
+   deliberate break-glass path, not the everyday way in. */
+let loginStep = 'password';      // 'password' | 'otp' | 'apikey'
+let loginChallenge = null;
+let loginBusy = false;
+
+function shell(inner){
+  return `
+  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;">
+    <div class="card" style="max-width:400px;width:100%;padding:30px 28px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;">
+        <div class="brand-mark" style="background:linear-gradient(135deg,#12897A,#0A4E45);">${sidebarPulseSVG()}</div>
+        <div><div style="font-family:'Space Grotesk';font-weight:600;font-size:16px;">Vantriq Ops</div><div style="font-size:11.5px;color:var(--muted);">Internal sign-in</div></div>
+      </div>
+      ${connectError?`<div style="background:var(--red-light);color:#8F3527;padding:10px 12px;border-radius:8px;font-size:12.5px;margin-bottom:14px;">${esc(connectError)}</div>`:''}
+      ${inner}
+    </div>
+  </div>`;
+}
+
+function renderConnectScreen(){
+  const app = document.getElementById('app');
+  if(loginStep === 'apikey'){
+    app.innerHTML = shell(`
+      <div style="background:var(--amber-light);color:#63430B;padding:9px 11px;border-radius:8px;font-size:11.5px;margin-bottom:14px;">
+        Emergency access. Use your Vantriq Ops account unless sign-in by email is unavailable.
+      </div>
+      <div class="field"><label>API base URL</label><input id="conn_base" value="${esc(API.base||window.location.origin)}"></div>
+      <div class="field"><label>Admin API key</label><input id="conn_key" type="password" placeholder="vq_..."></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:6px;" onclick="attemptConnect()">Connect with key</button>
+      <p class="footnote" style="text-align:center;"><a href="#" onclick="event.preventDefault();loginStep='password';connectError='';renderConnectScreen()">Back to normal sign-in</a></p>`);
+    return;
+  }
+  if(loginStep === 'otp'){
+    app.innerHTML = shell(`
+      <h3 style="margin:0 0 4px;font-size:15px;">Check your email</h3>
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">${esc((loginChallenge&&loginChallenge.message)||'We sent you a 6-digit code.')}</p>
+      <div class="field"><label>6-digit code</label>
+        <input id="otp_code" inputmode="numeric" autocomplete="one-time-code" maxlength="6"
+               style="letter-spacing:6px;font-size:19px;font-family:'JetBrains Mono',monospace;text-align:center;"
+               onkeydown="if(event.key==='Enter')submitOtp()"></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitOtp()">Verify and sign in</button>
+      <p class="footnote" style="text-align:center;"><a href="#" onclick="event.preventDefault();loginStep='password';loginChallenge=null;connectError='';renderConnectScreen()">Start again</a></p>`);
+    const el = document.getElementById('otp_code'); if(el) el.focus();
+    return;
+  }
+  app.innerHTML = shell(`
+    <div class="field"><label>Work email</label><input id="lg_email" autocomplete="username" placeholder="you@vantriqai.com" onkeydown="if(event.key==='Enter')document.getElementById('lg_pw').focus()"></div>
+    <div class="field"><label>Password</label><input id="lg_pw" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitPassword()"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:6px;" onclick="submitPassword()">Continue</button>
+    <p class="footnote" style="text-align:center;margin-top:10px;"><a href="#" onclick="event.preventDefault();forgotPassword()">Forgot your password?</a></p>
+    <p class="footnote">You'll get a one-time code by email to finish signing in. Accounts are created by an administrator in the CRM.</p>
+    <p class="footnote" style="text-align:center;margin-top:10px;"><a href="#" onclick="event.preventDefault();loginStep='apikey';connectError='';renderConnectScreen()" style="color:var(--muted);">Emergency access with an API key</a></p>`);
+  const el = document.getElementById('lg_email'); if(el) el.focus();
+}
+
+/**
+ * Sends a reset link to the address typed in the email box. The answer is the
+ * same whether or not the address belongs to anyone, so nothing here reveals
+ * who has an account.
+ */
+async function forgotPassword(){
+  const email = ((document.getElementById('lg_email')||{}).value || '').trim();
+  if(!email){ connectError = 'Type your work email above first, then choose "Forgot your password?".'; renderConnectScreen(); return; }
+  try{
+    const res = await fetch((API.base||window.location.origin)+'/api/auth/forgot-password', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email }),
+    });
+    const json = await res.json().catch(()=>({}));
+    connectError = '';
+    renderConnectScreen();
+    showToast(json.message || 'If that address belongs to an account, a reset link is on its way.');
+  }catch(e){ connectError = 'Could not reach the server.'; renderConnectScreen(); }
+}
+
+async function submitPassword(){
+  if(loginBusy) return;
+  const email = (document.getElementById('lg_email')||{}).value || '';
+  const password = (document.getElementById('lg_pw')||{}).value || '';
+  if(!email.trim() || !password){ connectError='Enter your email and password.'; renderConnectScreen(); return; }
+  loginBusy = true;
+  try{
+    const res = await fetch((API.base||window.location.origin)+'/api/auth/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email: email.trim(), password }),
+    });
+    const json = await res.json().catch(()=>({}));
+    loginBusy = false;
+    if(!res.ok){ connectError = json.error || 'Could not sign you in.'; renderConnectScreen(); return; }
+    loginChallenge = json; loginStep = 'otp'; connectError = '';
+    renderConnectScreen();
+  }catch(e){
+    loginBusy = false; connectError = 'Could not reach the server.'; renderConnectScreen();
+  }
+}
+
+async function submitOtp(){
+  if(loginBusy) return;
+  const code = (document.getElementById('otp_code')||{}).value || '';
+  if(!code.trim()){ connectError='Enter the code from your email.'; renderConnectScreen(); return; }
+  loginBusy = true;
+  try{
+    const res = await fetch((API.base||window.location.origin)+'/api/auth/verify', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ challenge_id: loginChallenge.challenge_id, code: code.trim() }),
+    });
+    const json = await res.json().catch(()=>({}));
+    loginBusy = false;
+    if(!res.ok){ connectError = json.error || 'That code was not accepted.'; renderConnectScreen(); return; }
+    API.setSession(API.base || window.location.origin, json.session);
+    authUser = json.user;
+    loginStep='password'; loginChallenge=null; connectError='';
+    await boot();
+  }catch(e){
+    loginBusy = false; connectError = 'Could not reach the server.'; renderConnectScreen();
+  }
+}
+
+async function signOut(){
+  try{ if(API.session) await fetch(API.base+'/api/auth/logout',{method:'POST',headers:{'Authorization':'Bearer '+API.session}}); }catch(e){}
+  API.clearConfig(); authUser=null; apiConnected=false;
+  API.base = window.location.origin;
+  loginStep='password'; connectError='';
+  renderConnectScreen();
+}
+
+async function attemptConnect(){
+  const base = document.getElementById('conn_base').value.trim();
+  const key = document.getElementById('conn_key').value.trim();
+  if(!base||!key){ connectError='Both fields are required.'; renderConnectScreen(); return; }
+  API.setConfig(base, key);
+  await boot();
+}
+
+/* ============================== Boot ============================== */
+async function boot(){
+  if(!API.configured()){ renderConnectScreen(); return; }
+  document.getElementById('app').innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;gap:10px;color:#6C7885;font-family:Inter;"><span class="loading-dot"></span> Connecting to Vantriq API…</div>`;
+  try{
+    if(API.session){
+      const me = await fetch(API.base+'/api/auth/me',{headers:{'Authorization':'Bearer '+API.session}});
+      if(!me.ok){ API.clearConfig(); API.base = window.location.origin; renderConnectScreen(); return; }
+      authUser = await me.json();
+    } else { authUser = null; }
+    await loadState();
+    apiConnected = true; connectError='';
+    render();
+    startUsagePolling();
+  }catch(e){
+    apiConnected = false;
+    connectError = e instanceof ApiError ? e.message : 'Could not connect. Check the API URL and key.';
+    if(e && e.status===401) { API.clearConfig(); }
+    renderConnectScreen();
+  }
+}
+boot();
+window.addEventListener('error', function(e){ console.error(e); });
+</script>
+</body>
+</html>

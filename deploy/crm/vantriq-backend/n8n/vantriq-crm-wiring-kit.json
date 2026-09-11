@@ -1,0 +1,375 @@
+{
+  "name": "Vantriq — CRM wiring kit (copy these nodes)",
+  "nodes": [
+    {
+      "id": "67c335b8-aa81-4e87-99e8-e09f72a6cfbe",
+      "name": "Test with this, then copy the nodes below",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        96
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "1d46aa4d-5857-44e4-a9b5-7f129c540b7d",
+      "name": "Vantriq: identify this conversation",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        96
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ref",
+              "name": "vq_external_ref",
+              "value": "={{ $json.entry?.[0]?.changes?.[0]?.value?.metadata?.display_phone_number ?? $json.vq_external_ref ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "consumer",
+              "name": "vq_consumer",
+              "value": "={{ $json.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.from ?? $json.from ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "session",
+              "name": "vq_session_id",
+              "value": "={{ ($json.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.from ?? $json.from ?? \"unknown\") + \"-\" + $now.toFormat(\"yyyy-MM-dd\") }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "e5c52437-a589-414d-b325-3bacdcf75c8a",
+      "name": "Vantriq: may we answer?",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        96
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "http://crm_app:8080/api/webhooks/service-status",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "external_ref",
+              "value": "={{ $json.vq_external_ref }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 5000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "c2c9388c-a613-4921-80ab-376137015ff9",
+      "name": "Vantriq: is this client paused?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        96
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "blocked",
+              "leftValue": "={{ $json.allow === false }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "cac0e3ef-4d6a-4e32-945c-aa7d15453efb",
+      "name": "Send this instead of a reply",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "reply",
+              "name": "reply_text",
+              "value": "Thanks for your message. We can not respond automatically right now, but the team has your message and will come back to you.",
+              "type": "string"
+            },
+            {
+              "id": "why",
+              "name": "vq_paused_reason",
+              "value": "={{ $json.reason }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "aa79185a-341a-4615-8ef8-962da1121307",
+      "name": "YOUR EXISTING REPLY FLOW GOES HERE",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        896,
+        192
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "2ab215f5-c510-44f5-8d8c-55e5f09f5186",
+      "name": "Vantriq: record this conversation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1120,
+        192
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://crm_app:8080/api/webhooks/usage",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ external_ref: $(\"Vantriq: identify this conversation\").item.json.vq_external_ref, session_id: $(\"Vantriq: identify this conversation\").item.json.vq_session_id, channel: \"whatsapp\", ai_model: $json.model ?? \"\", input_tokens: $json.usage?.input_tokens ?? $json.usage?.prompt_tokens ?? 0, output_tokens: $json.usage?.output_tokens ?? $json.usage?.completion_tokens ?? 0, messages_count: 1 }) }}",
+        "options": {
+          "timeout": 5000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "1eefbb19-2651-41b0-8821-667a34c7bc77",
+      "name": "Vantriq: did they just cross a threshold?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1344,
+        192
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "flagged",
+              "leftValue": "={{ $json.quota?.flagged != null }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "8ecb6087-a062-481c-a52d-3f8a96895291",
+      "name": "ALERT YOURSELF (Slack / email / WhatsApp)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1568,
+        192
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "e5c01b2d-1bce-4839-b5ca-319b7bf8cf44",
+      "name": "Sticky Note 401598e6",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -400
+      ],
+      "parameters": {
+        "content": "## Vantriq CRM wiring kit — copy these nodes into your consumer workflows\n\nThese are the only three nodes a consumer workflow needs to be billed correctly. Select them, Ctrl+C, and paste into the WhatsApp / website-chat workflow.\n\n**Two credentials, both Custom Auth (templated), template {\"headers\":{\"x-api-key\":\"{{api_key}}\"}}:**\n- Vantriq usage webhook key — webhook scope. Used by both nodes here.\n- Vantriq automation key — automation scope. Used by the monthly billing run only.\n\nCreate them on the box: docker exec crm_app npm run create-key -- \"n8n usage webhook\" webhook",
+        "color": 4,
+        "width": 1740,
+        "height": 260
+      }
+    },
+    {
+      "id": "8bab1f3a-1e83-4e9d-a817-1a059876ba73",
+      "name": "Sticky Note ea6db473",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        400,
+        360
+      ],
+      "parameters": {
+        "content": "### 1. The gate — put this at the TOP, before you generate a reply\n\nexternal_ref identifies YOUR CLIENT in the CRM, not the person messaging. On a WhatsApp Business webhook that is the number the message ARRIVED ON (metadata.display_phone_number), not messages[0].from. Set the same value in the CRM on the client record.\n\nIt fails open: a timeout or a bad response answers allow: true, and the IF branches on allow === false, so a database hiccup can never take a client's agent off the air. Out of the box it always allows — it only starts refusing once an admin suspends a client or switches the over-quota policy off \"serve\".",
+        "color": 3,
+        "width": 620,
+        "height": 320
+      }
+    },
+    {
+      "id": "e8e9d5eb-d804-4600-955d-57444605dc42",
+      "name": "Sticky Note 61caab71",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1060,
+        360
+      ],
+      "parameters": {
+        "content": "### 2. The meter — put this AFTER you have already sent the reply\n\nNever before: usage logging must not sit between the customer and their answer. onError is continueRegularOutput and neverError is on, so a CRM outage costs you a usage row, not a conversation.\n\nsession_id is one ID per 24-hour conversation window — that is what the packages count and what the customer sees numbered in their portal. Same id twice = one conversation, so retries cannot inflate anyone's bill.\n\nquota.flagged is set ONLY on the post that crosses 80% or the allowance, once per client per month — branch on it, not on quota.state, which stays \"exceeded\" for every message for the rest of the month.",
+        "color": 5,
+        "width": 660,
+        "height": 320
+      }
+    }
+  ],
+  "connections": {
+    "Test with this, then copy the nodes below": {
+      "main": [
+        [
+          {
+            "node": "Vantriq: identify this conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vantriq: identify this conversation": {
+      "main": [
+        [
+          {
+            "node": "Vantriq: may we answer?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vantriq: may we answer?": {
+      "main": [
+        [
+          {
+            "node": "Vantriq: is this client paused?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vantriq: is this client paused?": {
+      "main": [
+        [
+          {
+            "node": "Send this instead of a reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "YOUR EXISTING REPLY FLOW GOES HERE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YOUR EXISTING REPLY FLOW GOES HERE": {
+      "main": [
+        [
+          {
+            "node": "Vantriq: record this conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vantriq: record this conversation": {
+      "main": [
+        [
+          {
+            "node": "Vantriq: did they just cross a threshold?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vantriq: did they just cross a threshold?": {
+      "main": [
+        [
+          {
+            "node": "ALERT YOURSELF (Slack / email / WhatsApp)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "vantriq-self-hosted"
+  },
+  "tags": []
+}

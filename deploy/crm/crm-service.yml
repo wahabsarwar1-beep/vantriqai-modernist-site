@@ -1,0 +1,39 @@
+# ---------------------------------------------------------------------------
+# Vantriq Ops CRM — compose service block.
+#
+# MERGE this into /root/app-stack/docker-compose.yml, REPLACING the existing
+# Twenty CRM service (the one running twentycrm/twenty:latest as crm_app).
+# Keep the indentation: these are children of the top-level `services:` key.
+#
+# Assumes the source tree lives at /root/app-stack/vantriq-backend/ with the
+# Dockerfile from this folder copied into it.
+# ---------------------------------------------------------------------------
+
+  crm_app:
+    build: ./vantriq-backend
+    container_name: crm_app
+    restart: unless-stopped
+    environment:
+      # postgres_db is the container name of your existing Postgres — Docker's
+      # embedded DNS resolves it on the shared network. Replace CHANGEME with
+      # the POSTGRES_PASSWORD already set on that container.
+      DATABASE_URL: postgres://postgres:CHANGEME@postgres_db:5432/vantriq
+      # MUST be false. The app defaults this to true for Supabase; a local
+      # Postgres container speaks plaintext and the handshake would fail.
+      DATABASE_SSL: "false"
+      PORT: "8080"
+      CORS_ORIGIN: https://crm.vantriqai.com,https://portal.vantriqai.com
+      # Internal sign-in emails the one-time code through Hostinger's mail API.
+      # Without a token nobody can finish signing in.
+      HOSTINGER_MAIL_TOKEN: PASTE_MAIL_TOKEN
+      HOSTINGER_MAILBOX_ID: AC639077da6944831097970eb520d3
+      MAIL_FROM: support@vantriqai.com
+      COMPANY_EMAIL_DOMAIN: vantriqai.com
+      # Break-glass admin API key. Set to "false" once everyone has an account.
+      ALLOW_API_KEY_LOGIN: "true"
+    depends_on:
+      - postgres_db
+    # No `ports:` on purpose — Nginx Proxy Manager reaches it over the internal
+    # network. Publishing 8080 to the host would expose the API bypassing TLS.
+    networks:
+      - appnet
