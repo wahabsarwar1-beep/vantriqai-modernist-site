@@ -168,6 +168,18 @@ const settle = () => new Promise((r) => setTimeout(r, 20));
   assert.ok(/New website lead: Bilal \(Bilal Motors\)/.test(recent[0].subject));
   console.log('✓ every configured recipient is notified, channel named correctly');
 
+  // 7b. Semicolons are what people actually paste, so they must work too.
+  sent.length = 0;
+  state.settings.lead_notify_emails = 'sales@vantriqai.com; ceo@vantriqai.com ;md@vantriqai.com';
+  await post('/api/webhooks/lead', { external_ref: '923777888999', name: 'Sana', company: 'Sana Foods' });
+  await settle();
+  assert.deepStrictEqual(
+    sent.map((m) => m.to),
+    ['sales@vantriqai.com', 'ceo@vantriqai.com', 'md@vantriqai.com'],
+    'semicolon-separated list is split and trimmed',
+  );
+  console.log('✓ a semicolon-separated list reaches every recipient');
+
   // 8. Transcript turns land, and attach to the client when one exists.
   r = await post('/api/webhooks/conversation', {
     external_ref: '923001112233', session_id: 's-1', channel: 'whatsapp',

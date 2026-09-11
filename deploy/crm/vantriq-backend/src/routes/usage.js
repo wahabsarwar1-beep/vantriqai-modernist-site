@@ -245,8 +245,12 @@ async function notifyNewLead(client, channel) {
   } catch (err) {
     // Settings row or column missing on an un-migrated install — fall back.
   }
+  // Semicolons as well as commas: mail clients separate addresses with a
+  // semicolon, so that is what people paste in. Accepting only commas turns
+  // the whole list into one malformed address and every send fails — and it
+  // fails quietly, which is the worst way for a lead alert to break.
   const recipients = (configured || process.env.LEAD_NOTIFY_EMAIL || process.env.MAIL_FROM || '')
-    .split(',').map((s) => s.trim()).filter(Boolean);
+    .split(/[,;]/).map((s) => s.trim()).filter(Boolean);
   if (!recipients.length) return;
 
   const named = client.company && client.company !== '—' ? ` (${client.company})` : '';
