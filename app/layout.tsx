@@ -4,7 +4,7 @@ import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 import CustomCursor from "@/components/CustomCursor";
 import BackToTop from "@/components/BackToTop";
-import ChatWidget from "@/components/ChatWidget";
+import ShopAIChat from "@/components/ShopAIChat";
 import "./globals.css";
 
 const sora = Sora({
@@ -32,7 +32,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <BackToTop />
         <Nav />
         {children}
-        <ChatWidget />
+        <ShopAIChat />
         <Footer />
       </body>
     </html>

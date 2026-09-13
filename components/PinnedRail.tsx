@@ -118,7 +118,7 @@ export default function PinnedRail({ steps }: { steps: JStep[] }) {
             <div key={s.n} style={{ width: "100vw", flex: "none", padding: "0 clamp(20px,5vw,64px)", boxSizing: "border-box" }}>
               <div style={{ maxWidth: 1280, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(290px,100%),1fr))", gap: "clamp(16px,3vw,48px)", alignItems: "start", borderTop: "1px solid var(--color-divider)", paddingTop: "clamp(14px,2.2vw,24px)" }}>
                 <div>
-                  <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(40px,7vw,100px)", lineHeight: 0.84, letterSpacing: "-0.05em", margin: 0, color: "var(--color-accent)" }}>{s.n}</p>
+                  <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(34px,5.5vw,80px)", lineHeight: 0.84, letterSpacing: "-0.05em", margin: 0, color: "var(--color-accent)" }}>{s.n}</p>
                   <h2 style={{ fontSize: "clamp(22px,3vw,40px)", lineHeight: 1.05, letterSpacing: "-0.03em", margin: "10px 0 0", maxWidth: "16ch" }}>{s.title}</h2>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "clamp(14px,2vw,22px)" }}>

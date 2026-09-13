@@ -40,7 +40,7 @@ export default function PosterCTA({
       }}
     >
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(38px,5vw,68px) clamp(20px,5vw,64px)" }}>
-        <h2 style={{ fontSize: "clamp(32px,5.5vw,64px)", lineHeight: 0.94, letterSpacing: "-0.035em", margin: "0 0 28px", color: "var(--color-bg)" }}>
+        <h2 style={{ fontSize: "clamp(28px,4.6vw,54px)", lineHeight: 0.94, letterSpacing: "-0.035em", margin: "0 0 28px", color: "var(--color-bg)" }}>
           <LineReveal>{headline}</LineReveal>
         </h2>
         <p data-anim="" style={{ fontSize: 17, lineHeight: "29px", margin: "0 0 34px", maxWidth: "50ch", color: "var(--color-bg)" }}>

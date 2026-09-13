@@ -35,7 +35,7 @@ export default function Contact() {
           <div aria-hidden="true" data-hero-texture="" style={{ position: "absolute", top: 0, bottom: 0, left: "50%", width: "calc(100vw + 24px)", marginLeft: "calc(-50vw - 12px)", zIndex: 0, pointerEvents: "none" }} />
           <div style={{ position: "relative", zIndex: 1 }}>
             <Kicker label="Contact" />
-            <h1 style={{ fontSize: "clamp(36px,5.6vw,72px)", lineHeight: 0.96, letterSpacing: "-0.03em", margin: 0 }}>
+            <h1 style={{ fontSize: "clamp(32px,4.8vw,60px)", lineHeight: 0.96, letterSpacing: "-0.03em", margin: 0 }}>
               <LineReveal>
                 Let&rsquo;s <span style={{ color: "var(--color-accent)" }}>talk.</span>
               </LineReveal>

@@ -90,7 +90,7 @@ export default function HeroRotator() {
                   pointerEvents: i === scene ? "auto" : "none",
                 }}
               >
-                <h1 style={{ fontSize: "clamp(38px,6vw,76px)", lineHeight: 0.98, letterSpacing: "-0.03em", margin: 0, maxWidth: "16ch", overflowWrap: "break-word" }}>
+                <h1 style={{ fontSize: "clamp(34px,5vw,64px)", lineHeight: 0.98, letterSpacing: "-0.03em", margin: 0, maxWidth: "16ch", overflowWrap: "break-word" }}>
                   <span style={{ display: "block" }}>{s.lines[0]}</span>
                   <span style={{ display: "block", color: "var(--color-accent)" }}>{s.lines[1]}</span>
                 </h1>

@@ -112,7 +112,7 @@ export default function Home() {
               <div data-anim="" style={{ position: "relative", display: "grid", justifyItems: "center", alignContent: "center", minHeight: "clamp(400px,42vw,520px)" }}>
                 <TileBand />
                 <ConversationDemo />
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(228px,100%),1fr))", gap: "0 clamp(24px,4vw,56px)", marginTop: "clamp(28px,4vw,44px)" }}>
+                <div style={{ position: "relative", zIndex: 1, background: "var(--color-bg)", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(228px,100%),1fr))", gap: "0 clamp(24px,4vw,56px)", marginTop: "clamp(28px,4vw,44px)" }}>
                   <div style={{ borderTop: "1px solid var(--color-divider)", padding: "16px 0" }}>
                     <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "color-mix(in srgb, var(--color-text) 62%, transparent)", margin: "0 0 8px" }}>Checked stock</p>
                     <p style={{ fontSize: 15, lineHeight: "25px", margin: 0 }}>Against live inventory, not a canned answer.</p>

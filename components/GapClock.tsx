@@ -47,7 +47,7 @@ export default function GapClock() {
       style={{
         fontFamily: "var(--font-heading)",
         fontWeight: 800,
-        fontSize: "clamp(44px,6.4vw,94px)",
+        fontSize: "clamp(38px,5.2vw,76px)",
         lineHeight: 0.9,
         letterSpacing: "-0.05em",
         margin: "16px 0 0",

@@ -21,7 +21,7 @@ export default function PageHero({
         <div className="stack-mobile" style={{ position: "relative", zIndex: 1, display: "grid", gridTemplateColumns: "minmax(min(420px,100%),1.6fr) minmax(min(150px,100%),0.4fr)", gap: "clamp(28px,4vw,56px)", alignItems: "center" }}>
           <div>
             <Kicker label={kicker} marginBottom="clamp(24px,4vw,44px)" />
-            <h1 style={{ fontSize: "clamp(32px,5vw,66px)", lineHeight: 1, letterSpacing: "-0.03em", margin: 0, maxWidth: maxWidthCh, overflowWrap: "break-word" }}>{heading}</h1>
+            <h1 style={{ fontSize: "clamp(30px,4.4vw,58px)", lineHeight: 1, letterSpacing: "-0.03em", margin: 0, maxWidth: maxWidthCh, overflowWrap: "break-word" }}>{heading}</h1>
             <p data-anim="" style={{ fontSize: 18, lineHeight: "30px", maxWidth: "52ch", margin: "32px 0 0" }}>{body}</p>
           </div>
           {orbit}

@@ -262,5 +262,9 @@ export default function ShopAIChat() {
     };
   }, []);
 
-  return null;
+  // @n8n/chat's default target is the CSS selector "#n8n-chat" — createChat()
+  // calls Vue's app.mount() against it, which fails silently (a console
+  // warning, no crash) if the element isn't already in the DOM. This div is
+  // that mount point.
+  return <div id="n8n-chat" />;
 }

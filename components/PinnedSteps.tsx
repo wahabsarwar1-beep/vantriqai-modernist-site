@@ -80,7 +80,7 @@ export default function PinnedSteps({ steps }: { steps: Step[] }) {
                     pointerEvents: active === i ? "auto" : "none",
                   }}
                 >
-                  <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(64px,12vw,150px)", lineHeight: 0.86, letterSpacing: "-0.05em", margin: 0, color: "var(--color-accent)" }}>{s.n}</p>
+                  <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(52px,9vw,120px)", lineHeight: 0.86, letterSpacing: "-0.05em", margin: 0, color: "var(--color-accent)" }}>{s.n}</p>
                   <h2 style={{ fontSize: "clamp(30px,4.4vw,58px)", lineHeight: 1, letterSpacing: "-0.03em", margin: "12px 0 18px" }}>{s.title}</h2>
                   <p style={{ fontSize: 17, lineHeight: "29px", margin: 0, maxWidth: "44ch", ...bodyMuted }}>{s.body}</p>
                 </div>
