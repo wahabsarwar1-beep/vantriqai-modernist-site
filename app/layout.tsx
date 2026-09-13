@@ -5,6 +5,8 @@ import Footer from "@/components/Footer";
 import CustomCursor from "@/components/CustomCursor";
 import BackToTop from "@/components/BackToTop";
 import ShopAIChat from "@/components/ShopAIChat";
+import RouteWipe from "@/components/RouteWipe";
+import SmoothScroll from "@/components/SmoothScroll";
 import "./globals.css";
 
 const sora = Sora({
@@ -28,6 +30,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${sora.variable} ${manrope.variable}`}>
       <body>
+        <SmoothScroll />
+        <RouteWipe />
         <CustomCursor />
         <BackToTop />
         <Nav />

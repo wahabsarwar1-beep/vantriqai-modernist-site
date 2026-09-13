@@ -7,6 +7,8 @@ import TileBand from "@/components/TileBand";
 import PinnedSteps from "@/components/PinnedSteps";
 import PinnedRail from "@/components/PinnedRail";
 import Marquee from "@/components/Marquee";
+import WorkspaceCards from "@/components/WorkspaceCards";
+import MotionBackground from "@/components/MotionBackground";
 import { BENCH, MISSED, ANSWERED, AGENTS, JSTEPS, INTEGRATIONS, MARQUEE_ITEMS, WHY, STEPS } from "@/lib/content";
 
 const bodyMuted = { color: "color-mix(in srgb, var(--color-text) 78%, transparent)" };
@@ -16,7 +18,9 @@ export default function Home() {
     <>
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" }}>
         <section style={{ padding: "clamp(44px,6vw,78px) 0 clamp(30px,4.2vw,54px)", position: "relative" }}>
-          <div aria-hidden="true" data-hero-texture="" style={{ position: "absolute", top: 0, bottom: 0, left: "50%", width: "calc(100vw + 24px)", marginLeft: "calc(-50vw - 12px)", zIndex: 0, pointerEvents: "none" }} />
+          <div aria-hidden="true" style={{ position: "absolute", top: 0, bottom: 0, left: "50%", width: "calc(100vw + 24px)", marginLeft: "calc(-50vw - 12px)", zIndex: 0, pointerEvents: "none", overflow: "hidden" }}>
+            <MotionBackground />
+          </div>
           <div style={{ position: "relative", zIndex: 1 }}>
             <HeroRotator />
           </div>
@@ -179,29 +183,7 @@ export default function Home() {
             <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: 0, maxWidth: "22ch" }}>For work that is bigger than one inbox.</h2>
             <p data-anim="" style={{ fontSize: 16, lineHeight: "28px", margin: 0, maxWidth: "46ch", ...bodyMuted }}>Switch on the modules you need, watch one thread carry a customer to a booking, and read the week in a minute.</p>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(288px,100%),1fr))", gap: "clamp(20px,2.6vw,32px)", alignItems: "stretch" }}>
-            <div data-anim="" style={{ display: "flex", flexDirection: "column", background: "var(--color-neutral-100)", border: "1px solid var(--color-divider)", borderRadius: 30, padding: "clamp(22px,2.4vw,30px) clamp(26px,3vw,38px)", gap: "clamp(16px,1.8vw,24px)" }}>
-              <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 15, marginTop: "auto", order: 2 }}>
-                <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11.5, letterSpacing: "0.14em", color: "var(--color-accent)", margin: "0 0 9px" }}>01</p>
-                <h3 style={{ fontSize: 20, lineHeight: 1.16, letterSpacing: "-0.02em", margin: "0 0 9px" }}>Organised by default</h3>
-                <p style={{ fontSize: 15, lineHeight: "26px", margin: 0, color: "color-mix(in srgb, var(--color-text) 76%, transparent)" }}>Every branch gets its own thread, its own modules and its own numbers. Nothing bleeds between locations.</p>
-              </div>
-            </div>
-            <div data-anim="" style={{ display: "flex", flexDirection: "column", background: "var(--color-neutral-100)", border: "1px solid var(--color-divider)", borderRadius: 30, padding: "clamp(22px,2.4vw,30px) clamp(26px,3vw,38px)", gap: "clamp(16px,1.8vw,24px)" }}>
-              <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 15, marginTop: "auto" }}>
-                <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11.5, letterSpacing: "0.14em", color: "var(--color-accent)", margin: "0 0 9px" }}>02</p>
-                <h3 style={{ fontSize: 20, lineHeight: 1.16, letterSpacing: "-0.02em", margin: "0 0 9px" }}>One agent, running the show</h3>
-                <p style={{ fontSize: 15, lineHeight: "26px", margin: 0, color: "color-mix(in srgb, var(--color-text) 76%, transparent)" }}>It all happens in a single conversation. Vantriq delegates between modules and keeps the thread moving to the booking.</p>
-              </div>
-            </div>
-            <div data-anim="" style={{ display: "flex", flexDirection: "column", background: "var(--color-neutral-100)", border: "1px solid var(--color-divider)", borderRadius: 30, padding: "clamp(22px,2.4vw,30px) clamp(26px,3vw,38px)", gap: "clamp(16px,1.8vw,24px)" }}>
-              <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 15, marginTop: "auto" }}>
-                <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11.5, letterSpacing: "0.14em", color: "var(--color-accent)", margin: "0 0 9px" }}>03</p>
-                <h3 style={{ fontSize: 20, lineHeight: 1.16, letterSpacing: "-0.02em", margin: "0 0 9px" }}>Your growth, in full view</h3>
-                <p style={{ fontSize: 15, lineHeight: "26px", margin: 0, color: "color-mix(in srgb, var(--color-text) 76%, transparent)" }}>Reply times, booked visits, recovered leads and what is still open — one weekly view you can read in a minute.</p>
-              </div>
-            </div>
-          </div>
+          <WorkspaceCards />
         </div>
       </section>
 
