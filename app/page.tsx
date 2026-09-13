@@ -27,7 +27,7 @@ export default function Home() {
       <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)" }}>
         <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(22px,3vw,40px) clamp(20px,5vw,64px)", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(220px,100%),1fr))", gap: 18 }} data-stagger="">
           {BENCH.map((b) => (
-            <div key={b.fig} data-anim="" style={{ background: "var(--color-surface)", padding: "clamp(26px,3.4vw,46px) clamp(18px,2.4vw,34px)", borderRadius: 28, border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-sm)", display: "flex", flexDirection: "column" }}>
+            <div key={b.fig} data-anim="" data-tilt="" className="hover-lift" style={{ background: "var(--color-surface)", padding: "clamp(26px,3.4vw,46px) clamp(18px,2.4vw,34px)", borderRadius: 28, border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-sm)", display: "flex", flexDirection: "column" }}>
               <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(34px,3.8vw,54px)", lineHeight: 1, letterSpacing: "-0.04em", margin: 0, fontVariantNumeric: "tabular-nums" }}>{b.fig}</p>
               <p style={{ fontSize: 14.5, lineHeight: "23px", margin: "16px 0 22px", flex: 1, maxWidth: "30ch", ...bodyMuted }}>{b.claim}</p>
               <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 10, lineHeight: "16px", letterSpacing: "0.1em", textTransform: "uppercase", margin: 0, paddingTop: 12, borderTop: "1px solid var(--color-divider)", color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>{b.src}</p>
@@ -56,12 +56,12 @@ export default function Home() {
             </div>
           </div>
           <div style={{ display: "grid", gap: 18 }}>
-            <div data-anim="" style={{ background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: 28, padding: "clamp(24px,3vw,38px) clamp(20px,2.6vw,36px)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+            <div data-anim="" className="hover-tint-solid" style={{ background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: 28, padding: "clamp(24px,3vw,38px) clamp(20px,2.6vw,36px)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
               <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(30px,3.4vw,48px)", lineHeight: 1, letterSpacing: "-0.04em", margin: 0 }}>23%</p>
               <p style={{ fontSize: 14.5, lineHeight: "24px", margin: "12px 0 14px", maxWidth: "34ch", ...bodyMuted }}>Of audited firms never replied to the enquiry at all. Not late — never.</p>
               <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 10, lineHeight: "16px", letterSpacing: "0.1em", textTransform: "uppercase", margin: 0, color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>Harvard Business Review, 2011 · 2,241 firms</p>
             </div>
-            <div data-anim="" style={{ background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: 28, padding: "clamp(24px,3vw,38px) clamp(20px,2.6vw,36px)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+            <div data-anim="" className="hover-tint-solid" style={{ background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: 28, padding: "clamp(24px,3vw,38px) clamp(20px,2.6vw,36px)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
               <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(30px,3.4vw,48px)", lineHeight: 1, letterSpacing: "-0.04em", margin: 0 }}>83%</p>
               <p style={{ fontSize: 14.5, lineHeight: "24px", margin: "12px 0 14px", maxWidth: "34ch", ...bodyMuted }}>Of customers expect to engage immediately when they contact a business.</p>
               <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 10, lineHeight: "16px", letterSpacing: "0.1em", textTransform: "uppercase", margin: 0, color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>Salesforce</p>
@@ -165,7 +165,7 @@ export default function Home() {
       <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)" }}>
         <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(22px,3vw,40px) clamp(20px,5vw,64px)", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(272px,100%),1fr))", gap: 18 }}>
           {AGENTS.map((a) => (
-            <div key={a.n} data-anim="" className="card" style={{ padding: "clamp(24px,3vw,38px) clamp(20px,2.5vw,34px)", display: "flex", flexDirection: "column" }}>
+            <div key={a.n} data-anim="" className="card hover-lift-5" style={{ padding: "clamp(24px,3vw,38px) clamp(20px,2.5vw,34px)", boxShadow: "var(--shadow-sm)", display: "flex", flexDirection: "column" }}>
               <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", color: "var(--color-accent)", margin: "0 0 18px" }}>{a.n}</p>
               <h3 style={{ fontSize: 23, lineHeight: 1.05, letterSpacing: "-0.025em", margin: "0 0 12px" }}>{a.name} Agent</h3>
               <p style={{ fontSize: 14.5, lineHeight: "25px", margin: "0 0 22px", flex: 1, ...bodyMuted }}>{a.body}</p>
@@ -236,7 +236,7 @@ export default function Home() {
               <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 44px", maxWidth: "22ch" }}>A local partner, not a faceless subscription</h2>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(280px,100%),1fr))", gap: "36px clamp(24px,4vw,64px)" }} data-stagger="">
                 {WHY.map((w) => (
-                  <div key={w.title} data-anim="" style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 18 }}>
+                  <div key={w.title} data-anim="" className="hover-border-lift" style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 18 }}>
                     <h3 style={{ fontSize: 21, lineHeight: 1.15, letterSpacing: "-0.02em", margin: "0 0 12px" }}>{w.title}</h3>
                     <p style={{ fontSize: 15.5, lineHeight: "27px", margin: 0, maxWidth: "44ch", ...bodyMuted }}>{w.body}</p>
                   </div>

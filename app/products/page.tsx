@@ -114,11 +114,11 @@ export default function Products() {
       <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)" }}>
         <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(22px,3vw,40px) clamp(20px,5vw,64px)", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(300px,100%),1fr))", gap: 18 }}>
           {PRODUCTS.map((p) => (
-            <div key={p.name} data-anim="" data-tilt="" className="card" style={{ padding: "clamp(26px,3vw,40px) clamp(20px,2.5vw,36px)", display: "flex", flexDirection: "column", ...(p.featured ? { background: "var(--color-accent-100)" } : {}) }}>
+            <div key={p.name} data-anim="" data-tilt="" className="card hover-lift-5" style={{ padding: "clamp(26px,3vw,40px) clamp(20px,2.5vw,36px)", boxShadow: "var(--shadow-sm)", display: "flex", flexDirection: "column", ...(p.featured ? { background: "var(--color-accent-100)" } : {}) }}>
               {p.mark ? (
                 <ProductMark id={p.mark} />
               ) : (
-                <span style={{ display: "grid", placeItems: "center", width: 76, height: 76, flex: "none", borderRadius: 24, background: p.tint === "accent" ? "var(--color-accent)" : "var(--color-text)", marginBottom: 24 }}>
+                <span className="product-mark" style={{ display: "grid", placeItems: "center", width: 76, height: 76, flex: "none", borderRadius: 24, background: p.tint === "accent" ? "var(--color-accent)" : "var(--color-text)", marginBottom: 24 }}>
                   {p.icon}
                 </span>
               )}
@@ -153,7 +153,7 @@ export default function Products() {
               <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 40px", maxWidth: "24ch" }}>The same foundation, whichever modules you run</h2>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(260px,100%),1fr))", gap: "36px clamp(24px,4vw,64px)" }} data-stagger="">
                 {INCLUDED.map((i) => (
-                  <div key={i.title} data-anim="" style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 18 }}>
+                  <div key={i.title} data-anim="" className="hover-border-lift" style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 18 }}>
                     <h3 style={{ fontSize: 20, lineHeight: 1.15, letterSpacing: "-0.02em", margin: "0 0 10px" }}>{i.title}</h3>
                     <p style={{ fontSize: 15, lineHeight: "26px", margin: 0, maxWidth: "42ch", ...bodyMuted }}>{i.body}</p>
                   </div>

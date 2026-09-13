@@ -235,6 +235,11 @@ span[data-chev] { display: inline-block; transition: transform .2s ease; }
 
 @keyframes growBar { from { width: 0; } to { width: var(--bar); } }
 [data-bar] { animation: growBar 1.15s cubic-bezier(.16,1,.3,1) both; }
+/* vertical sparkline bars (WorkspaceCards): grow height, not width — the
+   bar is already full-width, so the default rule above would shrink its
+   width to the fill percentage instead of growing it upward. */
+@keyframes growBarY { from { height: 0; } to { height: var(--bar); } }
+[data-bar="y"] { animation: growBarY 1.15s cubic-bezier(.16,1,.3,1) both; }
 
 @keyframes riseIn { from { opacity: 0; transform: translateY(26px); } to { opacity: 1; transform: none; } }
 @keyframes ruleIn { from { transform: scaleX(0); } to { transform: scaleX(1); } }
@@ -266,7 +271,10 @@ span[data-chev] { display: inline-block; transition: transform .2s ease; }
 [data-spot-item] { transition: opacity .5s ease, transform .55s cubic-bezier(.16,1,.3,1), border-color .4s ease, box-shadow .5s ease, background-color .3s ease; }
 [data-spot-item][data-dim] { opacity: .52; }
 [data-spot-item][data-on] { transform: translateY(-7px); border-color: var(--color-accent) !important; box-shadow: var(--shadow-md) !important; }
-[data-spot-item].spot-tint[data-on] { background: var(--color-accent-100); transform: translateY(-5px); border-color: var(--color-divider) !important; box-shadow: var(--shadow-sm) !important; }
+/* background !important: these cards also set an inline `background` for
+   their resting state, which otherwise outranks this attribute-selector rule. */
+[data-spot-item].spot-tint[data-on] { background: var(--color-accent-100) !important; transform: translateY(-5px); border-color: var(--color-divider) !important; box-shadow: var(--shadow-sm) !important; }
+[data-spot-item].spot-tint-sm[data-on] { background: var(--color-accent-100) !important; transform: translateY(-3px); border-color: var(--color-divider) !important; box-shadow: var(--shadow-sm) !important; }
 
 @supports (animation-timeline: view()) {
   [data-anim] { animation-timeline: view(); animation-range: entry 0% entry 60%; }
@@ -280,6 +288,7 @@ span[data-chev] { display: inline-block; transition: transform .2s ease; }
   [data-line] { opacity: 1 !important; transform: none !important; animation: none !important; }
   [data-bar], [data-anim] { animation: none !important; }
   [data-bar] { width: var(--bar); }
+  [data-bar="y"] { width: 100%; height: var(--bar); }
   [data-spot-item][data-dim] { opacity: 1; }
   [data-spot-item][data-on] { transform: none; }
 }
@@ -329,14 +338,34 @@ span[data-chev] { display: inline-block; transition: transform .2s ease; }
   .chat-launcher-label { display: none !important; }
 }
 
+/* !important on background throughout this block: several cards these classes
+   apply to also set an inline `background` (React style prop) for their resting
+   state — an inline declaration always outranks a plain external :hover rule,
+   so without !important the tint would only show on cards with no inline bg. */
 .step-row-hover { transition: background-color .3s ease; }
-.step-row-hover:hover { background: color-mix(in srgb, var(--color-accent) 7%, transparent); }
+.step-row-hover:hover { background: color-mix(in srgb, var(--color-accent) 7%, transparent) !important; }
 
 .hover-lift { transition: background-color .3s ease, transform .3s ease; }
-/* !important: elements using this also carry [data-anim], whose riseIn keyframe
-   ends on `transform: none` held by fill-mode "both" — CSS animation output
-   otherwise outranks this plain :hover rule and the lift never shows. */
-.hover-lift:hover { background: var(--color-accent-100); transform: translateY(-4px) !important; }
+/* transform also !important: elements using this also carry [data-anim], whose
+   riseIn keyframe ends on `transform: none` held by fill-mode "both" — CSS
+   animation output otherwise outranks this plain :hover rule too. */
+.hover-lift:hover { background: var(--color-accent-100) !important; transform: translateY(-4px) !important; }
 
 .hover-tint { transition: background-color .3s ease; }
-.hover-tint:hover { background: color-mix(in srgb, var(--color-accent) 7%, transparent); }
+.hover-tint:hover { background: color-mix(in srgb, var(--color-accent) 7%, transparent) !important; }
+
+/* deeper lift variant (agent/product cards): same [data-anim] conflict as .hover-lift. */
+.hover-lift-5 { transition: background-color .3s ease, transform .3s ease; }
+.hover-lift-5:hover { background: var(--color-accent-100) !important; transform: translateY(-5px) !important; }
+
+/* tint only, no movement (paired stat cards) */
+.hover-tint-solid { transition: background-color .3s ease; }
+.hover-tint-solid:hover { background: var(--color-accent-100) !important; }
+
+/* border-to-accent + lift (feature-list cards) */
+.hover-border-lift { transition: border-color .3s ease, transform .3s ease; }
+.hover-border-lift:hover { border-top-color: var(--color-accent) !important; transform: translateY(-4px) !important; }
+
+/* product icon field: scale + tilt on card hover */
+.product-mark { transition: transform .35s cubic-bezier(.16,1,.3,1); }
+.product-mark:hover { transform: scale(1.1) rotate(-4deg); }

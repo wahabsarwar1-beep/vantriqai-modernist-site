@@ -146,6 +146,7 @@ function MarkGlyph({ id }: { id: MarkId }) {
 export default function ProductMark({ id }: { id: MarkId }) {
   return (
     <span
+      className="product-mark"
       style={{
         display: "grid",
         placeItems: "center",

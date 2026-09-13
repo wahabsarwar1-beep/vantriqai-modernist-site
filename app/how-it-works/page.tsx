@@ -5,16 +5,17 @@ import Kicker from "@/components/Kicker";
 import PosterCTA from "@/components/PosterCTA";
 import Marquee from "@/components/Marquee";
 import SpotlightGrid, { SpotlightItem } from "@/components/SpotlightGrid";
+import Counter from "@/components/Counter";
 import { STEPS, BMK, COMPARISON, HOOD } from "@/lib/content";
 
 const bodyMuted = { color: "color-mix(in srgb, var(--color-text) 78%, transparent)" };
 const mutedLabel = { color: "color-mix(in srgb, var(--color-text) 62%, transparent)" };
 
 const RESPONSE_WINDOW = [
-  { title: "Inside 1 minute", src: "Velocify", pct: 96, body: "conversion lift on first contact", stat: "+391%" },
-  { title: "Inside 5 minutes", src: "MIT / InsideSales.com", pct: 74, body: "more likely to qualify than at 30 minutes", stat: "21×" },
-  { title: "Inside 1 hour", src: "Harvard Business Review", pct: 52, body: "more likely to qualify than after 24 hours", stat: "60×" },
-  { title: "After 24 hours", src: "Harvard Business Review", pct: 14, body: "of firms never reply at all", stat: "23%" },
+  { title: "Inside 1 minute", src: "Velocify", pct: 96, body: "conversion lift on first contact", statTarget: 391, statPrefix: "+", statSuffix: "%" },
+  { title: "Inside 5 minutes", src: "MIT / InsideSales.com", pct: 74, body: "more likely to qualify than at 30 minutes", statTarget: 21, statSuffix: "×" },
+  { title: "Inside 1 hour", src: "Harvard Business Review", pct: 52, body: "more likely to qualify than after 24 hours", statTarget: 60, statSuffix: "×" },
+  { title: "After 24 hours", src: "Harvard Business Review", pct: 14, body: "of firms never reply at all", statTarget: 23, statSuffix: "%" },
 ];
 
 const BENCHMARK_SOURCES = ["MIT / InsideSales.com", "Harvard Business Review", "SuperOffice", "Salesforce", "HubSpot", "Velocify", "Meta", "Mobilesquared"];
@@ -72,6 +73,7 @@ export default function HowItWorks() {
                 <SpotlightItem
                   key={item.title}
                   index={i}
+                  className="spot-tint-sm"
                   style={{
                     background: "var(--color-surface)",
                     border: "1px solid var(--color-divider)",
@@ -94,7 +96,9 @@ export default function HowItWorks() {
                     </div>
                     <p style={{ fontSize: 14, lineHeight: "22px", margin: "12px 0 0", ...bodyMuted }}>{item.body}</p>
                   </div>
-                  <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(26px,3vw,40px)", lineHeight: 1, letterSpacing: "-0.03em", margin: 0, color: "var(--color-accent-700)", justifySelf: "end" }}>{item.stat}</p>
+                  <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(26px,3vw,40px)", lineHeight: 1, letterSpacing: "-0.03em", margin: 0, color: "var(--color-accent-700)", justifySelf: "end" }}>
+                    <Counter target={item.statTarget} prefix={item.statPrefix} suffix={item.statSuffix} />
+                  </p>
                 </SpotlightItem>
               ))}
             </SpotlightGrid>
