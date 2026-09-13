@@ -8,7 +8,6 @@ import PinnedSteps from "@/components/PinnedSteps";
 import PinnedRail from "@/components/PinnedRail";
 import Marquee from "@/components/Marquee";
 import WorkspaceCards from "@/components/WorkspaceCards";
-import MotionBackground from "@/components/MotionBackground";
 import { BENCH, MISSED, ANSWERED, AGENTS, JSTEPS, INTEGRATIONS, MARQUEE_ITEMS, WHY, STEPS } from "@/lib/content";
 
 const bodyMuted = { color: "color-mix(in srgb, var(--color-text) 78%, transparent)" };
@@ -18,9 +17,7 @@ export default function Home() {
     <>
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" }}>
         <section style={{ padding: "clamp(44px,6vw,78px) 0 clamp(30px,4.2vw,54px)", position: "relative" }}>
-          <div aria-hidden="true" style={{ position: "absolute", top: 0, bottom: 0, left: "50%", width: "calc(100vw + 24px)", marginLeft: "calc(-50vw - 12px)", zIndex: 0, pointerEvents: "none", overflow: "hidden" }}>
-            <MotionBackground />
-          </div>
+          <div aria-hidden="true" data-hero-texture="" style={{ position: "absolute", top: 0, bottom: 0, left: "50%", width: "calc(100vw + 24px)", marginLeft: "calc(-50vw - 12px)", zIndex: 0, pointerEvents: "none" }} />
           <div style={{ position: "relative", zIndex: 1 }}>
             <HeroRotator />
           </div>
