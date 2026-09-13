@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { Manrope, Sora } from "next/font/google";
+import { Sora, Manrope } from "next/font/google";
 import Nav from "@/components/Nav";
-import Motion from "@/components/Motion";
-import RouteWipe from "@/components/RouteWipe";
-import ShopAIChat from "@/components/ShopAIChat";
-import SmoothScroll from "@/components/SmoothScroll";
+import Footer from "@/components/Footer";
+import CustomCursor from "@/components/CustomCursor";
+import BackToTop from "@/components/BackToTop";
+import ChatWidget from "@/components/ChatWidget";
 import "./globals.css";
 
 const sora = Sora({
@@ -20,21 +20,20 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "VantriqAI — WhatsApp AI agents for Pakistani SMEs",
-  description:
-    "AI agents that reply, qualify, and book — 24 hours a day. On WhatsApp, Instagram, and your website, in seconds, at any volume.",
+  title: "VantriqAI — Where Business Meets Intelligence",
+  description: "VantriqAI — Where Business Meets Intelligence",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${sora.variable} ${manrope.variable}`}>
       <body>
-        <SmoothScroll />
-        <RouteWipe />
+        <CustomCursor />
+        <BackToTop />
         <Nav />
         {children}
-        <Motion />
-        <ShopAIChat />
+        <ChatWidget />
+        <Footer />
       </body>
     </html>
   );

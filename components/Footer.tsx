@@ -1,18 +1,9 @@
-"use client";
-
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import BrandName from "@/components/BrandName";
+import Wordmark from "@/components/Wordmark";
 import { NAV_LINKS } from "@/lib/nav-links";
+import { waLink, WHATSAPP_DISPLAY } from "@/lib/whatsapp";
 
-type FooterProps = {
-  /** Home omits the city; the rest of the site still carries it. */
-  showLocation?: boolean;
-};
-
-export default function Footer({ showLocation = true }: FooterProps) {
-  const pathname = usePathname();
-
+export default function Footer() {
   return (
     <footer style={{ borderTop: "1px solid var(--color-divider)" }}>
       <div
@@ -31,16 +22,17 @@ export default function Footer({ showLocation = true }: FooterProps) {
         }}
       >
         <span>
-          <BrandName inkColor="inherit" /> · Intelligent automation for business
-          {showLocation ? " · Islamabad, Pakistan" : ""}
+          <span style={{ textTransform: "none", fontFamily: "var(--font-heading)", fontWeight: 800, letterSpacing: "-0.01em" }}>
+            <Wordmark />
+          </span>{" "}
+          · Intelligent automation for business ·{" "}
+          <a href={waLink()} target="_blank" rel="noopener" style={{ textTransform: "none" }}>
+            {WHATSAPP_DISPLAY}
+          </a>
         </span>
-        {/* These are the only navigation on a phone once the reader is past
-            the nav, so they carry the 44px touch target the rest of the site
-            does. The negative margin keeps the padded rows from adding a
-            visible gap to the footer's own 36px padding. */}
-        <span style={{ display: "flex", gap: "0 24px", flexWrap: "wrap", margin: "-11px 0" }}>
-          {NAV_LINKS.filter((link) => link.href !== pathname).map((link) => (
-            <Link key={link.href} href={link.href} style={{ display: "inline-flex", alignItems: "center", minHeight: 44 }}>
+        <span style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+          {NAV_LINKS.map((link) => (
+            <Link key={link.href} href={link.href}>
               {link.label}
             </Link>
           ))}

@@ -1,496 +1,278 @@
-import AdvantageBand from "@/components/AdvantageBand";
-import BrandName from "@/components/BrandName";
-import CtaBand from "@/components/CtaBand";
-import Footer from "@/components/Footer";
-import MotionBackground from "@/components/MotionBackground";
-import ResponseGap from "@/components/ResponseGap";
-import SplitHeader from "@/components/SplitHeader";
-import StepRail from "@/components/StepRail";
-import WorkspaceCards from "@/components/WorkspaceCards";
-import { AGENTS, BENCH, INTEGRATIONS } from "@/lib/home-data";
-import { waLink } from "@/lib/whatsapp";
+import Kicker from "@/components/Kicker";
+import PosterCTA from "@/components/PosterCTA";
+import HeroRotator from "@/components/HeroRotator";
+import GapClock from "@/components/GapClock";
+import ConversationDemo, { ReplayButton } from "@/components/ConversationDemo";
+import TileBand from "@/components/TileBand";
+import PinnedSteps from "@/components/PinnedSteps";
+import PinnedRail from "@/components/PinnedRail";
+import Marquee from "@/components/Marquee";
+import { BENCH, MISSED, ANSWERED, AGENTS, JSTEPS, INTEGRATIONS, MARQUEE_ITEMS, WHY, STEPS } from "@/lib/content";
 
 const bodyMuted = { color: "color-mix(in srgb, var(--color-text) 78%, transparent)" };
-
-const STEPS = [
-  {
-    n: "01",
-    title: "Engage",
-    body: "Replies instantly on WhatsApp, Instagram, or your website — any hour, any volume, no queue.",
-  },
-  {
-    n: "02",
-    title: "Execute",
-    body: "Books the appointment, shares the catalogue, checks availability, logs the lead in your CRM.",
-  },
-  {
-    n: "03",
-    title: "Escalate",
-    body: "Hands to your team the moment judgement is needed — with the full conversation attached.",
-  },
-];
-
-const INDUSTRIES = [
-  "E-commerce & Retail",
-  "Real Estate",
-  "Healthcare",
-  "Education",
-  "Hospitality",
-  "Legal & Consulting",
-  "Travel & Tourism",
-  "HR & Operations",
-  "Marketing Agencies",
-  "Logistics",
-];
-
-const WHY = [
-  {
-    title: "Built for you, not off the shelf",
-    body: "Every agent is configured to your workflow, catalogue, and tone — not a template with your logo on it.",
-  },
-  {
-    title: "A relationship, not a dashboard",
-    body: "A dedicated local team manages, tunes, and improves your agent every single month.",
-  },
-  {
-    title: "Priced in PKR, built for Pakistan",
-    body: "No confusing USD billing, no overseas support hours, no timezone gap when something breaks.",
-  },
-  {
-    title: "Enterprise experience, SME flexibility",
-    body: "14+ years experience across enterprise and government collaborations, applied to businesses of every size.",
-  },
-];
-
-const shell = { maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" };
-
-function MarqueeTrack({ ariaHidden }: { ariaHidden?: boolean }) {
-  return (
-    <div aria-hidden={ariaHidden} style={{ display: "flex", alignItems: "center" }}>
-      {INDUSTRIES.map((name) => (
-        <span
-          key={name}
-          style={{
-            fontFamily: "var(--font-heading)",
-            fontWeight: 800,
-            fontSize: "clamp(26px,3.6vw,50px)",
-            letterSpacing: "-0.03em",
-            padding: "0 26px",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {name}
-          <span style={{ color: "var(--color-accent)", paddingLeft: 26 }}>/</span>
-        </span>
-      ))}
-    </div>
-  );
-}
 
 export default function Home() {
   return (
     <>
-      <div style={shell}>
-        <section style={{ padding: "clamp(56px,9vw,110px) 0 clamp(48px,7vw,90px)", position: "relative", overflow: "hidden" }}>
-          <MotionBackground />
-          <span
-            data-par="0.10"
-            aria-hidden="true"
-            style={{ position: "absolute", right: "6%", top: "12%", width: 120, height: 120, border: "1px solid var(--color-accent)", borderRadius: "var(--radius-lg)", pointerEvents: "none" }}
-          />
-          <span
-            data-par="-0.10"
-            aria-hidden="true"
-            style={{ position: "absolute", right: "13%", top: "30%", width: 56, height: 56, background: "var(--color-accent)", borderRadius: "var(--radius-md)", opacity: 0.9, pointerEvents: "none" }}
-          />
-          <span
-            data-par="-0.08"
-            aria-hidden="true"
-            style={{ position: "absolute", right: "2%", top: "70%", width: 180, height: 1, background: "var(--color-text)", opacity: 0.5, pointerEvents: "none" }}
-          />
-
+      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" }}>
+        <section style={{ padding: "clamp(44px,6vw,78px) 0 clamp(30px,4.2vw,54px)", position: "relative" }}>
+          <div aria-hidden="true" data-hero-texture="" style={{ position: "absolute", top: 0, bottom: 0, left: "50%", width: "calc(100vw + 24px)", marginLeft: "calc(-50vw - 12px)", zIndex: 0, pointerEvents: "none" }} />
           <div style={{ position: "relative", zIndex: 1 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(28px,5vw,54px)" }}>
-              <span data-anim="rise" style={{ fontSize: 13, letterSpacing: "0.08em" }}>
-                <BrandName inkColor="var(--color-text)" />
-              </span>
-              <span data-anim="rule" style={{ flex: 1, height: 1, background: "var(--color-divider)" }} />
-            </div>
-            <h1 style={{ fontSize: "clamp(38px,6vw,76px)", lineHeight: 0.98, letterSpacing: "-0.03em", margin: 0, maxWidth: "16ch", overflowWrap: "break-word" }}>
-              <span style={{ display: "block", overflow: "hidden", paddingBottom: "0.16em", marginBottom: "-0.12em" }}>
-                <span data-line="" style={{ display: "block" }}>
-                  Never miss another
-                </span>
-              </span>
-              <span style={{ display: "block", overflow: "hidden", paddingBottom: "0.16em", marginBottom: "-0.12em" }}>
-                <span data-line="" style={{ display: "block", color: "var(--color-accent)" }}>
-                  customer message.
-                </span>
-              </span>
-            </h1>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit,minmax(min(300px,100%),1fr))",
-                gap: "24px clamp(24px,5vw,80px)",
-                marginTop: "clamp(32px,4vw,56px)",
-                alignItems: "end",
-              }}
-            >
-              <p data-anim="rise" style={{ fontSize: 18, lineHeight: "30px", maxWidth: "48ch", margin: 0 }}>
-                AI agents that reply, qualify, and book — 24 hours a day. On WhatsApp, Instagram, and your website, in
-                seconds, at any volume.
-              </p>
-              <div data-anim="rise" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <a
-                  className="btn btn-primary"
-                  href={waLink()}
-                  target="_blank"
-                  rel="noopener"
-                  style={{ minHeight: 52, paddingInline: 24, fontSize: 15, letterSpacing: "0.02em" }}
-                >
-                  Message us on WhatsApp
-                </a>
-                <a
-                  className="btn btn-secondary"
-                  href="/how-it-works"
-                  style={{ minHeight: 52, paddingInline: 24, fontSize: 15, letterSpacing: "0.02em" }}
-                >
-                  See how it works
-                </a>
-              </div>
-            </div>
+            <HeroRotator />
           </div>
         </section>
       </div>
 
       <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)" }}>
-        <div
-          style={{
-            maxWidth: 1280,
-            margin: "0 auto",
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(min(240px,100%),1fr))",
-            gap: 18,
-            padding: "clamp(22px,3vw,40px) clamp(20px,5vw,64px)",
-          }}
-        >
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(22px,3vw,40px) clamp(20px,5vw,64px)", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(220px,100%),1fr))", gap: 18 }} data-stagger="">
           {BENCH.map((b) => (
-            <div
-              key={b.fig}
-              data-anim="rise"
-              className="cell-hover"
-              style={{ padding: "clamp(26px,3.4vw,46px) clamp(18px,2.4vw,34px)", display: "flex", flexDirection: "column" }}
-            >
-              <p
-                style={{
-                  fontFamily: "var(--font-heading)",
-                  fontWeight: 800,
-                  fontSize: "clamp(34px,3.8vw,54px)",
-                  lineHeight: 1,
-                  letterSpacing: "-0.04em",
-                  margin: 0,
-                  fontFeatureSettings: "'tnum' 1",
-                }}
-              >
-                {b.fig}
-              </p>
-              <p style={{ fontSize: 14.5, lineHeight: "23px", margin: "16px 0 22px", flex: 1, maxWidth: "30ch", ...bodyMuted }}>
-                {b.claim}
-              </p>
-              <p
-                style={{
-                  fontFamily: "var(--font-heading)",
-                  fontWeight: 800,
-                  fontSize: 10,
-                  lineHeight: "16px",
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  margin: 0,
-                  paddingTop: 12,
-                  borderTop: "1px solid var(--color-divider)",
-                  color: "color-mix(in srgb, var(--color-text) 50%, transparent)",
-                }}
-              >
-                {b.src}
-              </p>
+            <div key={b.fig} data-anim="" style={{ background: "var(--color-surface)", padding: "clamp(26px,3.4vw,46px) clamp(18px,2.4vw,34px)", borderRadius: 28, border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-sm)", display: "flex", flexDirection: "column" }}>
+              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(34px,3.8vw,54px)", lineHeight: 1, letterSpacing: "-0.04em", margin: 0, fontVariantNumeric: "tabular-nums" }}>{b.fig}</p>
+              <p style={{ fontSize: 14.5, lineHeight: "23px", margin: "16px 0 22px", flex: 1, maxWidth: "30ch", ...bodyMuted }}>{b.claim}</p>
+              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 10, lineHeight: "16px", letterSpacing: "0.1em", textTransform: "uppercase", margin: 0, paddingTop: 12, borderTop: "1px solid var(--color-divider)", color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>{b.src}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* 01 — the response gap, then the same enquiry answered twice */}
-      <div style={{ ...shell, paddingTop: "clamp(34px,4.4vw,58px)" }}>
-        <ResponseGap />
-      </div>
-
-      {/* { Vantriq's advantage } — the phone in front of the tile band */}
-      <div style={shell}>
-        <section style={{ padding: "clamp(38px,4.8vw,64px) 0 clamp(16px,2.2vw,28px)" }}>
-          <SplitHeader kicker={<>{"{ Vantriq\u2019s advantage }"}</>}>
-            <h2 data-anim="rise" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px", maxWidth: "20ch" }}>
-              The growth engine for local business.
-            </h2>
-            <p data-anim="rise" style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 32px", maxWidth: "50ch", ...bodyMuted }}>
-              One agent, plugged into your channels and your calendar, answering every hour you are closed. Below: a
-              real exchange replayed at the speed it actually runs.
-            </p>
-            <AdvantageBand />
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit,minmax(min(272px,100%),1fr))",
-                gap: "28px clamp(24px,4vw,64px)",
-                marginTop: "clamp(32px,4vw,56px)",
-              }}
-            >
-              {[
-                { title: "Trained on real conversations", body: "Configured against your own message history, not a generic script with your logo on it." },
-                { title: "Modules in sync", body: "Booking, catalogue and qualification share one memory of the customer, so nothing is asked twice." },
-                { title: "Connected to your whole stack", body: "It acts inside your calendar, CRM and inventory rather than keeping a second copy of the truth." },
-              ].map((item) => (
-                <div key={item.title} data-anim="rise" className="why-block">
-                  <h3 style={{ fontSize: 21, lineHeight: 1.15, letterSpacing: "-0.02em", margin: "0 0 12px" }}>{item.title}</h3>
-                  <p style={{ fontSize: 15.5, lineHeight: "27px", margin: 0, maxWidth: "44ch", ...bodyMuted }}>{item.body}</p>
-                </div>
-              ))}
-            </div>
-          </SplitHeader>
-        </section>
-      </div>
-
-      {/* scroll-pinned three-step stage */}
-        <div data-pin="" style={{ position: "relative", height: "320vh", borderTop: "1px solid var(--color-divider)", background: "var(--color-bg)" }}>
-          <div style={{ position: "sticky", top: 0, height: "100vh", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-            <div style={{ maxWidth: 1280, width: "100%", margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(24px,4vw,44px)" }}>
-                <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)" }}>
-                  02 — What it does
-                </span>
-                <span style={{ flex: 1, height: 1, background: "var(--color-divider)" }} />
-                <span data-pin-count="" style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.14em" }}>
-                  01 / 03
-                </span>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(300px,100%),1fr))", gap: "clamp(24px,5vw,72px)", alignItems: "center" }}>
-                <div style={{ position: "relative", minHeight: "min(46vh,340px)" }}>
-                  {STEPS.map((step) => (
-                    <div key={step.n} data-pin-panel="" style={{ position: "absolute", inset: 0 }}>
-                      <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(64px,12vw,150px)", lineHeight: 0.86, letterSpacing: "-0.05em", margin: 0, color: "var(--color-accent)" }}>
-                        {step.n}
-                      </p>
-                      <h2 style={{ fontSize: "clamp(30px,4.4vw,58px)", lineHeight: 1, letterSpacing: "-0.03em", margin: "12px 0 18px" }}>{step.title}</h2>
-                      <p style={{ fontSize: 17, lineHeight: "29px", margin: 0, maxWidth: "44ch", ...bodyMuted }}>{step.body}</p>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: "grid", background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
-                  {STEPS.map((step) => (
-                    <div
-                      key={step.n}
-                      data-pin-row=""
-                      style={{ padding: "22px 24px", display: "flex", alignItems: "baseline", gap: 18, borderBottom: "1px solid var(--color-divider)", transition: "background-color .35s ease, color .35s ease" }}
-                    >
-                      <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.12em" }}>{step.n}</span>
-                      <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(20px,2.4vw,30px)", letterSpacing: "-0.02em" }}>{step.title}</span>
-                    </div>
-                  ))}
-                  <div style={{ padding: "18px 24px" }}>
-                    <span data-pin-rail="" style={{ display: "block", height: 4, background: "var(--color-accent)", transformOrigin: "left", transform: "scaleX(0.04)" }} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 03 — the ten agent modules */}
-        <div style={{ ...shell, padding: "clamp(34px,4.4vw,58px) clamp(20px,5vw,64px) clamp(18px,2.4vw,30px)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(20px,3vw,32px)" }}>
-            <span data-anim="rise" className="kicker-pill">03 — The agents</span>
-            <span data-anim="rule" style={{ flex: 1, height: 1, background: "var(--color-divider)" }} />
-          </div>
-          <h2 data-anim="rise" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: 0, maxWidth: "24ch" }}>
-            One brain, ten jobs. Switch on the ones your day actually needs — the rest stay quiet until you want them.
-          </h2>
-        </div>
-
-        <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)" }}>
-          <div
-            style={{
-              maxWidth: 1280,
-              margin: "0 auto",
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit,minmax(min(272px,100%),1fr))",
-              gap: 18,
-              padding: "clamp(22px,3vw,40px) clamp(20px,5vw,64px)",
-            }}
-          >
-            {AGENTS.map((a) => (
-              <div
-                key={a.n}
-                data-anim="rise"
-                className="cell-hover-5"
-                style={{ padding: "clamp(24px,3vw,38px) clamp(20px,2.5vw,34px)", display: "flex", flexDirection: "column" }}
-              >
-                <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", color: "var(--color-accent)", margin: "0 0 18px" }}>
-                  {a.n}
-                </p>
-                <h3 style={{ fontSize: 23, lineHeight: 1.05, letterSpacing: "-0.025em", margin: "0 0 12px" }}>{a.name} Agent</h3>
-                <p style={{ fontSize: 14.5, lineHeight: "25px", margin: "0 0 22px", flex: 1, ...bodyMuted }}>{a.body}</p>
-                <p
-                  style={{
-                    fontFamily: "var(--font-heading)",
-                    fontWeight: 800,
-                    fontSize: 11,
-                    letterSpacing: "0.1em",
-                    textTransform: "uppercase",
-                    margin: 0,
-                    paddingTop: 14,
-                    borderTop: "1px solid var(--color-divider)",
-                    color: "var(--color-accent)",
-                  }}
-                >
-                  {a.metric}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* { The workspace } — a full-width ruled band, so all three cards sit
-            on one row. Inside a split header the content column is only 9/12
-            of the page and the third card wrapped underneath. */}
-        <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)" }}>
-          <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(36px,4.6vw,62px) clamp(20px,5vw,64px)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(20px,3vw,32px)" }}>
-              <span data-anim="rise" className="kicker-pill">{"{ The workspace }"}</span>
-              <span data-anim="rule" style={{ flex: 1, height: 1, background: "var(--color-divider)" }} />
-            </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit,minmax(min(320px,100%),1fr))",
-                gap: "20px clamp(24px,4vw,56px)",
-                marginBottom: "clamp(26px,3.4vw,44px)",
-              }}
-            >
-              <h2 data-anim="rise" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: 0, maxWidth: "22ch" }}>
-                For work that is bigger than one inbox.
-              </h2>
-              <p data-anim="rise" style={{ fontSize: 16, lineHeight: "28px", margin: 0, maxWidth: "46ch", ...bodyMuted }}>
-                Switch on the modules you need, watch one thread carry a customer to a booking, and read the week in a
-                minute.
+      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(34px,4.4vw,58px) clamp(20px,5vw,64px) 0" }}>
+        <Kicker label="01 — The response gap" />
+        <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 clamp(28px,4vw,44px)", maxWidth: "26ch" }}>
+          Few businesses lose the sale on price. They lose it in the hours nobody answered.
+        </h2>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(320px,100%),1fr))", gap: 18 }}>
+          <div data-anim="" style={{ background: "var(--color-text)", color: "var(--color-bg)", borderRadius: 36, padding: "clamp(28px,3.6vw,48px) clamp(22px,3vw,42px)", display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "clamp(24px,4vw,40px)", minHeight: "clamp(300px,30vw,380px)" }}>
+            <div>
+              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", margin: 0, color: "var(--color-accent-400)" }}>Unanswered · live</p>
+              <GapClock />
+              <p style={{ fontSize: 15, lineHeight: "25px", margin: "18px 0 0", maxWidth: "38ch", color: "color-mix(in srgb, var(--color-bg) 72%, transparent)" }}>
+                This clock started when you scrolled here. It stands in for the message that arrived while the shop was shut.
               </p>
             </div>
-            <WorkspaceCards />
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 32px", borderTop: "1px solid color-mix(in srgb, var(--color-bg) 30%, transparent)", paddingTop: 16, fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+              <span>Industry average first reply — 42 hrs</span>
+              <span style={{ color: "var(--color-accent-400)" }}>Your agent — 1.2 s</span>
+            </div>
           </div>
-        </section>
-
-        {/* 04 — the horizontally pinned five-step rail */}
-        <StepRail />
-
-        {/* 05 — what it plugs into */}
-        <div style={{ ...shell, padding: "clamp(34px,4.4vw,60px) clamp(20px,5vw,64px) clamp(18px,2.4vw,30px)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: "clamp(20px,3vw,32px)" }}>
-            <span data-anim="rise" className="kicker-pill">05 — What it plugs into</span>
-            <span data-anim="rule" style={{ flex: 1, height: 1, background: "var(--color-divider)" }} />
+          <div style={{ display: "grid", gap: 18 }}>
+            <div data-anim="" style={{ background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: 28, padding: "clamp(24px,3vw,38px) clamp(20px,2.6vw,36px)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(30px,3.4vw,48px)", lineHeight: 1, letterSpacing: "-0.04em", margin: 0 }}>23%</p>
+              <p style={{ fontSize: 14.5, lineHeight: "24px", margin: "12px 0 14px", maxWidth: "34ch", ...bodyMuted }}>Of audited firms never replied to the enquiry at all. Not late — never.</p>
+              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 10, lineHeight: "16px", letterSpacing: "0.1em", textTransform: "uppercase", margin: 0, color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>Harvard Business Review, 2011 · 2,241 firms</p>
+            </div>
+            <div data-anim="" style={{ background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: 28, padding: "clamp(24px,3vw,38px) clamp(20px,2.6vw,36px)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(30px,3.4vw,48px)", lineHeight: 1, letterSpacing: "-0.04em", margin: 0 }}>83%</p>
+              <p style={{ fontSize: 14.5, lineHeight: "24px", margin: "12px 0 14px", maxWidth: "34ch", ...bodyMuted }}>Of customers expect to engage immediately when they contact a business.</p>
+              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 10, lineHeight: "16px", letterSpacing: "0.1em", textTransform: "uppercase", margin: 0, color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>Salesforce</p>
+            </div>
           </div>
-          <h2 data-anim="rise" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: 0, maxWidth: "24ch" }}>
-            It acts inside the tools you already pay for.
-          </h2>
         </div>
+        <p data-anim="" style={{ fontSize: 12, lineHeight: "20px", margin: "16px 0 0", maxWidth: "74ch", color: "color-mix(in srgb, var(--color-text) 55%, transparent)" }}>
+          Every figure on this page is a published third-party benchmark for messaging and lead response, cited where it appears. None of them are VantriqAI client results.
+        </p>
 
-        <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)" }}>
-          <div
-            style={{
-              maxWidth: 1280,
-              margin: "0 auto",
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit,minmax(min(272px,100%),1fr))",
-              gap: 18,
-              padding: "clamp(22px,3vw,40px) clamp(20px,5vw,64px)",
-            }}
-          >
-            {INTEGRATIONS.map((g) => (
-              <div
-                key={g.group}
-                data-anim="rise"
-                className="cell-hover"
-                style={{ padding: "clamp(24px,3vw,36px) clamp(20px,2.5vw,32px)" }}
-              >
-                <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)", margin: "0 0 18px" }}>
-                  {g.group}
-                </p>
-                <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10 }}>
-                  {g.items.map((it) => (
-                    <li key={it} style={{ fontSize: 15, lineHeight: "24px", borderTop: "1px solid var(--color-divider)", paddingTop: 10 }}>
-                      {it}
-                    </li>
-                  ))}
-                </ul>
+        <div style={{ margin: "clamp(48px,7vw,90px) 0 clamp(20px,3vw,32px)" }}>
+          <Kicker label="Same message, two businesses" marginBottom="0" />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(300px,100%),1fr))", gap: 18 }}>
+          <div data-anim="" style={{ background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: 28, boxShadow: "var(--shadow-sm)", padding: "clamp(26px,3.2vw,42px) clamp(22px,2.8vw,38px)" }}>
+            <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", margin: "0 0 6px", color: "color-mix(in srgb, var(--color-text) 55%, transparent)" }}>Without an agent</p>
+            <h3 style={{ fontSize: 22, lineHeight: 1.1, letterSpacing: "-0.025em", margin: "0 0 20px" }}>The thread nobody saw</h3>
+            {MISSED.map((r) => (
+              <div key={r.t + r.text} style={{ display: "flex", gap: 18, alignItems: "baseline", borderTop: "1px solid var(--color-divider)", padding: "13px 0" }}>
+                <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.06em", flex: "none", width: 44, fontVariantNumeric: "tabular-nums", color: "color-mix(in srgb, var(--color-text) 55%, transparent)" }}>{r.t}</span>
+                <span style={{ fontSize: 15, lineHeight: "24px" }}>{r.text}</span>
               </div>
             ))}
+            <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(24px,2.6vw,34px)", lineHeight: 1, letterSpacing: "-0.03em", margin: "24px 0 8px", borderTop: "1px solid var(--color-text)", paddingTop: 20 }}>12 h 07 m</p>
+            <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 10, lineHeight: "16px", letterSpacing: "0.1em", textTransform: "uppercase", margin: 0, color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>To first reply — the average across 1,000 companies is 12 h 10 m · SuperOffice</p>
           </div>
-        </section>
-
-        {/* industries marquee */}
-        <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)", padding: "clamp(28px,4vw,48px) 0", overflow: "hidden" }}>
-          <p
-            data-anim="rise"
-            style={{
-              maxWidth: 1280,
-              margin: "0 auto 22px",
-              padding: "0 clamp(20px,5vw,64px)",
-              fontFamily: "var(--font-heading)",
-              fontWeight: 800,
-              fontSize: 12,
-              letterSpacing: "0.14em",
-              textTransform: "uppercase",
-              color: "var(--color-accent)",
-            }}
-          >
-            06 — Where it applies
-          </p>
-          <div style={{ display: "flex", width: "max-content", animation: "marquee 40s linear infinite" }}>
-            <MarqueeTrack />
-            <MarqueeTrack ariaHidden />
+          <div data-anim="" style={{ background: "var(--color-accent-100)", border: "1px solid var(--color-accent-200)", borderRadius: 28, boxShadow: "var(--shadow-sm)", padding: "clamp(26px,3.2vw,42px) clamp(22px,2.8vw,38px)" }}>
+            <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", margin: "0 0 6px", color: "var(--color-accent-700)" }}>With the agent</p>
+            <h3 style={{ fontSize: 22, lineHeight: 1.1, letterSpacing: "-0.025em", margin: "0 0 20px" }}>The same thread, answered</h3>
+            {ANSWERED.map((r) => (
+              <div key={r.t + r.text} style={{ display: "flex", gap: 18, alignItems: "baseline", borderTop: "1px solid var(--color-divider)", padding: "13px 0" }}>
+                <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.06em", flex: "none", width: 44, fontVariantNumeric: "tabular-nums", color: "var(--color-accent-700)" }}>{r.t}</span>
+                <span style={{ fontSize: 15, lineHeight: "24px" }}>{r.text}</span>
+              </div>
+            ))}
+            <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(24px,2.6vw,34px)", lineHeight: 1, letterSpacing: "-0.03em", margin: "24px 0 8px", borderTop: "1px solid var(--color-accent)", paddingTop: 20, color: "var(--color-accent-700)" }}>3 m</p>
+            <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 10, lineHeight: "16px", letterSpacing: "0.1em", textTransform: "uppercase", margin: 0, color: "color-mix(in srgb, var(--color-text) 55%, transparent)" }}>Message to booked — inside the five-minute window where qualification odds run 21× higher · MIT / InsideSales.com</p>
           </div>
-        </section>
+        </div>
+      </div>
 
-      <div style={shell}>
-        <section style={{ padding: "clamp(56px,8vw,96px) 0" }}>
-          <SplitHeader
-            kicker={
-              <>
-                07 — Why <BrandName inkColor="var(--color-text)" />
-              </>
-            }
-          >
-            <h2 data-anim="rise" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 44px", maxWidth: "22ch" }}>
-              A local partner, not a faceless subscription
-            </h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(280px,100%),1fr))", gap: "36px clamp(24px,4vw,64px)" }}>
-              {WHY.map((item) => (
-                <div key={item.title} data-anim="rise" className="why-block">
-                  <h3 style={{ fontSize: 21, lineHeight: 1.15, letterSpacing: "-0.02em", margin: "0 0 12px" }}>{item.title}</h3>
-                  <p style={{ fontSize: 15.5, lineHeight: "27px", margin: 0, maxWidth: "44ch", ...bodyMuted }}>{item.body}</p>
+      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" }}>
+        <section style={{ padding: "clamp(38px,4.8vw,64px) 0 clamp(16px,2.2vw,28px)" }}>
+          <div className="stack-mobile" style={{ position: "relative", zIndex: 1, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(240px,100%),1fr))", gap: "20px clamp(24px,5vw,72px)", borderTop: "1px solid var(--color-divider)", paddingTop: 22 }}>
+            <p data-anim="" style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)", margin: 0 }}>{"{ Vantriq's advantage }"}</p>
+            <div>
+              <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px", maxWidth: "20ch" }}>The growth engine for local business.</h2>
+              <p data-anim="" style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 32px", maxWidth: "50ch", ...bodyMuted }}>One agent, plugged into your channels and your calendar, answering every hour you are closed. Below: a real exchange replayed at the speed it actually runs.</p>
+              <div data-anim="" style={{ position: "relative", display: "grid", justifyItems: "center", alignContent: "center", minHeight: "clamp(400px,42vw,520px)" }}>
+                <TileBand />
+                <ConversationDemo />
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(228px,100%),1fr))", gap: "0 clamp(24px,4vw,56px)", marginTop: "clamp(28px,4vw,44px)" }}>
+                  <div style={{ borderTop: "1px solid var(--color-divider)", padding: "16px 0" }}>
+                    <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "color-mix(in srgb, var(--color-text) 62%, transparent)", margin: "0 0 8px" }}>Checked stock</p>
+                    <p style={{ fontSize: 15, lineHeight: "25px", margin: 0 }}>Against live inventory, not a canned answer.</p>
+                  </div>
+                  <div style={{ borderTop: "1px solid var(--color-divider)", padding: "16px 0" }}>
+                    <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "color-mix(in srgb, var(--color-text) 62%, transparent)", margin: "0 0 8px" }}>Held the item</p>
+                    <p style={{ fontSize: 15, lineHeight: "25px", margin: 0 }}>A real action in your system, logged to the lead.</p>
+                  </div>
+                  <div style={{ borderTop: "1px solid var(--color-divider)", padding: "16px 0" }}>
+                    <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "color-mix(in srgb, var(--color-text) 62%, transparent)", margin: "0 0 8px" }}>Booked the visit</p>
+                    <p style={{ fontSize: 15, lineHeight: "25px", margin: 0 }}>Into the calendar, with the reminder scheduled.</p>
+                  </div>
+                  <ReplayButton />
                 </div>
-              ))}
+              </div>
             </div>
-          </SplitHeader>
+          </div>
         </section>
       </div>
 
-      <CtaBand
-        heading="Let's talk."
+      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px) clamp(28px,3.6vw,46px)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(280px,100%),1fr))", gap: "36px clamp(24px,4vw,64px)" }}>
+          <div data-anim="" style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 18 }}>
+            <h3 style={{ fontSize: 21, lineHeight: 1.15, letterSpacing: "-0.02em", margin: "0 0 12px" }}>Trained on real conversations</h3>
+            <p style={{ fontSize: 15.5, lineHeight: "27px", margin: 0, maxWidth: "44ch", ...bodyMuted }}>Vantriq is built on thousands of genuine customer threads — retail, clinics, schools, agencies — so it knows the questions that repeat and the answers that close.</p>
+          </div>
+          <div data-anim="" style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 18 }}>
+            <h3 style={{ fontSize: 21, lineHeight: 1.15, letterSpacing: "-0.02em", margin: "0 0 12px" }}>Modules in sync</h3>
+            <p style={{ fontSize: 15.5, lineHeight: "27px", margin: 0, maxWidth: "44ch", ...bodyMuted }}>Reception, booking, catalogue and follow-up run as one brain. What one module learns in a thread, the next one uses two messages later.</p>
+          </div>
+          <div data-anim="" style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 18 }}>
+            <h3 style={{ fontSize: 21, lineHeight: 1.15, letterSpacing: "-0.02em", margin: "0 0 12px" }}>Connected to your whole stack</h3>
+            <p style={{ fontSize: 15.5, lineHeight: "27px", margin: 0, maxWidth: "44ch", ...bodyMuted }}>WhatsApp, Instagram, your website, Google Calendar, your CRM and your payment links — wired up during onboarding, not months later.</p>
+          </div>
+        </div>
+      </div>
+
+      <PinnedSteps steps={STEPS} />
+
+      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(12px,2vw,22px) clamp(20px,5vw,64px) clamp(18px,2.4vw,30px)" }}>
+        <Kicker label="03 — The agents" />
+        <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: 0, maxWidth: "24ch" }}>
+          One brain, ten jobs. Switch on the ones your day actually needs — the rest stay quiet until you want them.
+        </h2>
+      </div>
+
+      <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)" }}>
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(22px,3vw,40px) clamp(20px,5vw,64px)", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(272px,100%),1fr))", gap: 18 }}>
+          {AGENTS.map((a) => (
+            <div key={a.n} data-anim="" className="card" style={{ padding: "clamp(24px,3vw,38px) clamp(20px,2.5vw,34px)", display: "flex", flexDirection: "column" }}>
+              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", color: "var(--color-accent)", margin: "0 0 18px" }}>{a.n}</p>
+              <h3 style={{ fontSize: 23, lineHeight: 1.05, letterSpacing: "-0.025em", margin: "0 0 12px" }}>{a.name} Agent</h3>
+              <p style={{ fontSize: 14.5, lineHeight: "25px", margin: "0 0 22px", flex: 1, ...bodyMuted }}>{a.body}</p>
+              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", margin: 0, paddingTop: 14, borderTop: "1px solid var(--color-divider)", color: "var(--color-accent)" }}>{a.metric}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)" }}>
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(36px,4.6vw,62px) clamp(20px,5vw,64px)" }}>
+          <Kicker label="{ The workspace }" />
+          <div className="stack-mobile" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(320px,100%),1fr))", gap: "20px clamp(24px,4vw,56px)", alignItems: "end", marginBottom: "clamp(32px,4vw,52px)" }}>
+            <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: 0, maxWidth: "22ch" }}>For work that is bigger than one inbox.</h2>
+            <p data-anim="" style={{ fontSize: 16, lineHeight: "28px", margin: 0, maxWidth: "46ch", ...bodyMuted }}>Switch on the modules you need, watch one thread carry a customer to a booking, and read the week in a minute.</p>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(288px,100%),1fr))", gap: "clamp(20px,2.6vw,32px)", alignItems: "stretch" }}>
+            <div data-anim="" style={{ display: "flex", flexDirection: "column", background: "var(--color-neutral-100)", border: "1px solid var(--color-divider)", borderRadius: 30, padding: "clamp(22px,2.4vw,30px) clamp(26px,3vw,38px)", gap: "clamp(16px,1.8vw,24px)" }}>
+              <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 15, marginTop: "auto", order: 2 }}>
+                <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11.5, letterSpacing: "0.14em", color: "var(--color-accent)", margin: "0 0 9px" }}>01</p>
+                <h3 style={{ fontSize: 20, lineHeight: 1.16, letterSpacing: "-0.02em", margin: "0 0 9px" }}>Organised by default</h3>
+                <p style={{ fontSize: 15, lineHeight: "26px", margin: 0, color: "color-mix(in srgb, var(--color-text) 76%, transparent)" }}>Every branch gets its own thread, its own modules and its own numbers. Nothing bleeds between locations.</p>
+              </div>
+            </div>
+            <div data-anim="" style={{ display: "flex", flexDirection: "column", background: "var(--color-neutral-100)", border: "1px solid var(--color-divider)", borderRadius: 30, padding: "clamp(22px,2.4vw,30px) clamp(26px,3vw,38px)", gap: "clamp(16px,1.8vw,24px)" }}>
+              <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 15, marginTop: "auto" }}>
+                <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11.5, letterSpacing: "0.14em", color: "var(--color-accent)", margin: "0 0 9px" }}>02</p>
+                <h3 style={{ fontSize: 20, lineHeight: 1.16, letterSpacing: "-0.02em", margin: "0 0 9px" }}>One agent, running the show</h3>
+                <p style={{ fontSize: 15, lineHeight: "26px", margin: 0, color: "color-mix(in srgb, var(--color-text) 76%, transparent)" }}>It all happens in a single conversation. Vantriq delegates between modules and keeps the thread moving to the booking.</p>
+              </div>
+            </div>
+            <div data-anim="" style={{ display: "flex", flexDirection: "column", background: "var(--color-neutral-100)", border: "1px solid var(--color-divider)", borderRadius: 30, padding: "clamp(22px,2.4vw,30px) clamp(26px,3vw,38px)", gap: "clamp(16px,1.8vw,24px)" }}>
+              <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 15, marginTop: "auto" }}>
+                <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11.5, letterSpacing: "0.14em", color: "var(--color-accent)", margin: "0 0 9px" }}>03</p>
+                <h3 style={{ fontSize: 20, lineHeight: 1.16, letterSpacing: "-0.02em", margin: "0 0 9px" }}>Your growth, in full view</h3>
+                <p style={{ fontSize: 15, lineHeight: "26px", margin: 0, color: "color-mix(in srgb, var(--color-text) 76%, transparent)" }}>Reply times, booked visits, recovered leads and what is still open — one weekly view you can read in a minute.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <PinnedRail steps={JSTEPS} />
+
+      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(12px,2vw,22px) clamp(20px,5vw,64px) clamp(18px,2.4vw,30px)" }}>
+        <Kicker label="05 — What it plugs into" />
+        <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: 0, maxWidth: "24ch" }}>It acts inside the tools you already pay for.</h2>
+      </div>
+
+      <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)" }}>
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(22px,3vw,40px) clamp(20px,5vw,64px)", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(240px,100%),1fr))", gap: 18 }}>
+          {INTEGRATIONS.map((g) => (
+            <div key={g.group} data-anim="" className="card" style={{ padding: "clamp(24px,3vw,38px) clamp(20px,2.5vw,32px)" }}>
+              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)", margin: "0 0 16px" }}>{g.group}</p>
+              <div style={{ display: "grid", gap: 0 }}>
+                {g.items.map((item) => (
+                  <span key={item} style={{ display: "block", borderTop: "1px solid var(--color-divider)", padding: "12px 0", fontSize: 15, lineHeight: "22px" }}>{item}</span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)", padding: "clamp(28px,4vw,48px) 0", overflow: "hidden" }}>
+        <p data-anim="" style={{ maxWidth: 1280, margin: "0 auto 22px", padding: "0 clamp(20px,5vw,64px)" }}>
+          <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--color-accent-700)", background: "var(--color-accent-100)", borderRadius: 999, padding: "7px 14px", display: "inline-block" }}>
+            05 — Where it applies
+          </span>
+        </p>
+        <Marquee duration={34}>
+          <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+            {MARQUEE_ITEMS.map((item) => (
+              <span key={item} style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(26px,3.6vw,50px)", letterSpacing: "-0.03em", padding: "0 26px", whiteSpace: "nowrap" }}>
+                {item}
+                <span style={{ color: "var(--color-accent)", paddingLeft: 26 }}>/</span>
+              </span>
+            ))}
+          </div>
+        </Marquee>
+      </section>
+
+      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" }}>
+        <section style={{ padding: "clamp(40px,5vw,68px) 0" }}>
+          <div className="stack-mobile" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(240px,100%),1fr))", gap: "20px clamp(24px,5vw,72px)", borderTop: "1px solid var(--color-divider)", paddingTop: 22 }}>
+            <p data-anim="" style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)", margin: 0 }}>
+              07 — Why Vantriq<span style={{ color: "var(--color-accent)" }}>AI</span>
+            </p>
+            <div>
+              <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 44px", maxWidth: "22ch" }}>A local partner, not a faceless subscription</h2>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(280px,100%),1fr))", gap: "36px clamp(24px,4vw,64px)" }} data-stagger="">
+                {WHY.map((w) => (
+                  <div key={w.title} data-anim="" style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 18 }}>
+                    <h3 style={{ fontSize: 21, lineHeight: 1.15, letterSpacing: "-0.02em", margin: "0 0 12px" }}>{w.title}</h3>
+                    <p style={{ fontSize: 15.5, lineHeight: "27px", margin: 0, maxWidth: "44ch", ...bodyMuted }}>{w.body}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <PosterCTA
+        headline="Let's talk."
         body="Send us a message and see the agent answer. A discovery call maps your customer workflow before anything is built."
         primaryLabel="Message us on WhatsApp"
         secondaryLabel="Request a quote"
         secondaryHref="/pricing"
       />
-
-      <Footer showLocation={false} />
     </>
   );
 }

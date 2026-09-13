@@ -14,9 +14,6 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // The Claude Design handoff bundle (prototype source, not app code).
     "project/**",
-    // Vendored third-party bundles: minified upstream code we do not author
-    // and cannot fix, so linting it only produces noise.
-    "public/vendor/**",
   ]),
 ]);
 
