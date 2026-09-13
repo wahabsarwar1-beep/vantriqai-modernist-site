@@ -17,7 +17,7 @@ export default function CustomCursor() {
       dot.style.opacity = "1";
       dot.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0) translate(-50%,-50%)`;
       const target = e.target as HTMLElement;
-      const interactive = target.closest?.("a, button, [role='button'], [data-tilt]");
+      const interactive = target.closest?.("a, button, [role='button'], [data-tilt], summary");
       if (interactive) {
         dot.style.width = "34px";
         dot.style.height = "34px";

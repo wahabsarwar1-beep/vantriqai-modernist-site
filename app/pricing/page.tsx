@@ -125,7 +125,7 @@ export default function Pricing() {
               <div style={{ display: "grid", maxWidth: 900 }}>
                 {FAQS.map((f) => (
                   <details key={f.n} data-anim="" style={{ borderTop: "1px solid var(--color-divider)", padding: "20px 0" }}>
-                    <summary style={{ display: "flex", gap: 16, alignItems: "baseline", fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 19, lineHeight: 1.35, letterSpacing: "-0.02em", cursor: "pointer" }}>
+                    <summary style={{ display: "flex", gap: 16, alignItems: "baseline", fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 19, lineHeight: 1.35, letterSpacing: "-0.02em" }}>
                       <span style={{ flex: "none", fontSize: 12, letterSpacing: "0.1em", fontVariantNumeric: "tabular-nums", color: "color-mix(in srgb, var(--color-text) 45%, transparent)" }}>{f.n}</span>
                       <span data-chev="" style={{ color: "var(--color-accent)", fontSize: 16, flex: "none" }}>+</span>
                       {f.q}

@@ -143,7 +143,10 @@ function brandifyHeader() {
  *  pure-CSS pseudo-element the way the icon square is. */
 function injectLauncherLabel() {
   const toggle = document.querySelector<HTMLElement>(".chat-window-toggle");
-  if (!toggle || toggle.querySelector(".chat-toggle-label")) return;
+  if (!toggle) return;
+  // CustomCursor shows a text label for any element carrying this attribute.
+  if (!toggle.hasAttribute("data-cursor-label")) toggle.setAttribute("data-cursor-label", "Chat with us");
+  if (toggle.querySelector(".chat-toggle-label")) return;
   const label = document.createElement("span");
   label.className = "chat-toggle-label";
   label.append(brandFragment("Ask Vantriq", ""));
