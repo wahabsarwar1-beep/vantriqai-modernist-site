@@ -561,3 +561,164 @@ create index if not exists idx_clients_service_status on clients(service_status)
 alter table settings add column if not exists overage_policy text not null default 'serve'
   check (overage_policy in ('serve','grace','block'));
 alter table settings add column if not exists overage_grace_pct int not null default 120;
+
+-- =====================================================================
+-- v7 — real accounting: withholding tax, a payments ledger, per-client
+--      agents, and VantriqAI as its own (internal) customer
+--
+-- Five things, and they lean on each other:
+--
+--   1. AIT (advance income tax) alongside GST. GST is ADDED to the bill;
+--      AIT is WITHHELD FROM it — the client pays the net and deposits the
+--      AIT with FBR on our behalf, handing back a challan. So an invoice
+--      now carries two different kinds of tax that move in opposite
+--      directions, and `net_payable` is what the client actually transfers.
+--      Getting this backwards overstates cash and understates the tax
+--      credit, so the columns are named for the direction they move.
+--
+--   2. invoice_lines, so an invoice can carry Description / Qty / Unit
+--      price / Amount rather than one opaque figure.
+--
+--   3. payments — the receipts ledger. An invoice's status stops being a
+--      field someone types and becomes a fact derived from what has
+--      actually been received against it.
+--
+--   4. client_agents — one company, many agents. A client can run a
+--      WhatsApp agent, an Instagram agent and a website assistant at once,
+--      each with its own external_ref, each metered separately.
+--
+--   5. clients.is_internal — VantriqAI is a client of itself. Its agents
+--      are metered and invoiced exactly like anyone's, but the money is an
+--      internal transfer: financials treat an internal client's billing as
+--      COST, never revenue, so running our own agents shows up where it
+--      belongs rather than inflating the top line.
+-- =====================================================================
+
+-- --- 1. Withholding tax -----------------------------------------------
+-- tax_rate / tax_amount keep their meaning: GST, added to the bill.
+-- These are the withholding side, subtracted from it.
+alter table invoices add column if not exists ait_rate numeric not null default 0;
+alter table invoices add column if not exists ait_amount numeric not null default 0;
+-- What the client actually transfers: amount + GST - AIT.
+alter table invoices add column if not exists net_payable numeric;
+update invoices set net_payable = coalesce(total_amount, amount) where net_payable is null;
+
+alter table settings add column if not exists default_ait_rate numeric not null default 0;
+-- The seller block on the invoice. Ours, not the client's.
+alter table settings add column if not exists seller_ntn text default '';
+alter table settings add column if not exists seller_strn text default '';
+alter table settings add column if not exists seller_address text default '';
+alter table settings add column if not exists seller_email text default '';
+
+-- A client may be exempt from withholding (an exemption certificate), which
+-- is a different thing from a 0% rate that happens to be zero today.
+alter table clients add column if not exists ait_rate numeric;
+alter table clients add column if not exists ait_exempt boolean not null default false;
+
+-- --- 2. Invoice line items --------------------------------------------
+create table if not exists invoice_lines (
+  id uuid primary key default gen_random_uuid(),
+  invoice_id uuid not null references invoices(id) on delete cascade,
+  position int not null default 0,
+  description text not null default '',
+  detail text default '',              -- the smaller second line, e.g. a period
+  qty numeric not null default 1,
+  unit_price numeric not null default 0,
+  amount numeric not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_invoice_lines_invoice on invoice_lines(invoice_id, position);
+
+-- --- 3. Payments ledger -----------------------------------------------
+create table if not exists payments (
+  id uuid primary key default gen_random_uuid(),
+  invoice_id uuid not null references invoices(id) on delete cascade,
+  client_id uuid references clients(id) on delete cascade,
+  amount numeric not null,
+  kind text not null default 'receipt'
+    check (kind in ('receipt','ait_challan','write_off','credit_note')),
+  method text default '',              -- bank transfer, cheque, cash, card
+  reference text default '',           -- transaction id, cheque no, challan no
+  received_date date not null default current_date,
+  notes text default '',
+  recorded_by text default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_payments_invoice on payments(invoice_id);
+create index if not exists idx_payments_client on payments(client_id, received_date);
+
+-- --- 4. Agents and automations per client ------------------------------
+create table if not exists client_agents (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  name text not null,
+  kind text not null default 'whatsapp'
+    check (kind in ('whatsapp','instagram','facebook','website','voice','email','automation','other')),
+  external_ref text,                   -- the number/domain/handle usage arrives under
+  status text not null default 'active' check (status in ('active','paused','retired')),
+  notes text default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+-- One external_ref cannot belong to two agents, or usage could be attributed
+-- to either. Nulls are allowed and do not collide.
+create unique index if not exists idx_client_agents_ref on client_agents(external_ref)
+  where external_ref is not null;
+create index if not exists idx_client_agents_client on client_agents(client_id);
+
+-- Usage can now say which agent it came from. Null means "the client's
+-- default agent", which is how every event recorded before v7 reads.
+alter table usage_events add column if not exists agent_id uuid references client_agents(id) on delete set null;
+create index if not exists idx_usage_agent on usage_events(agent_id, occurred_at);
+
+-- --- 5. VantriqAI as its own customer ----------------------------------
+alter table clients add column if not exists is_internal boolean not null default false;
+create index if not exists idx_clients_internal on clients(is_internal) where is_internal = true;
+
+-- --- 6. Invoice status becomes a derived fact --------------------------
+-- 'partial' is what a ledger makes possible: something has been received,
+-- but not all of it. 'void' is an invoice cancelled before payment — kept,
+-- because the number was issued and the series must not gain a hole.
+alter table invoices drop constraint if exists invoices_status_check;
+alter table invoices add constraint invoices_status_check
+  check (status in ('pending','partial','paid','overdue','void'));
+
+-- --- 7. Opening balances and the internal-cost switch ------------------
+-- The Balance Sheet is derived from the invoice, payment and expense
+-- records rather than from a general ledger, so it needs one anchor: the
+-- cash the business started with on the day it started keeping these
+-- records. Equity opens at the same figure, which is what makes the sheet
+-- balance when nothing else has happened yet.
+alter table settings add column if not exists opening_cash numeric not null default 0;
+alter table settings add column if not exists opening_cash_date date;
+-- The P&L line VantriqAI's own agent usage lands on.
+alter table settings add column if not exists internal_cost_label text not null default 'Internal AI usage (own agents)';
+
+-- --- 8. Recurring expenses can end --------------------------------------
+-- Without this a cancelled subscription accrues forever and every past
+-- month's P&L is wrong the moment you delete the row.
+alter table expenses add column if not exists end_date date;
+alter table expenses add column if not exists vendor_id uuid references vendors(id) on delete set null;
+
+-- --- 9. Tax remittances -------------------------------------------------
+-- GST collected is a liability until it is paid to FBR; AIT withheld is an
+-- asset until it is set against a tax bill. Both need somewhere to be
+-- cleared, or the Balance Sheet grows a liability and an asset that never
+-- go away.
+create table if not exists tax_remittances (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null check (kind in ('gst_paid','ait_claimed')),
+  amount numeric not null,
+  period text default '',              -- e.g. 'Sep 2026' or 'FY 2026-27'
+  reference text default '',           -- CPR / challan number
+  paid_date date not null default current_date,
+  notes text default '',
+  recorded_by text default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_tax_remittances_date on tax_remittances(paid_date);
+
+-- --- 10. Keep the new tables' updated_at fresh -------------------------
+drop trigger if exists trg_client_agents_updated on client_agents;
+create trigger trg_client_agents_updated before update on client_agents
+  for each row execute function touch_updated_at();

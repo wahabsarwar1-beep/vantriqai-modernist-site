@@ -13,70 +13,144 @@
   }
 
   function taxInvoiceHTML(d) {
-    const money = (n) => `${d.currency} ${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    const row = (k, v) => (v ? `<div><span style="color:#6C7885;">${esc(k)}:</span> ${esc(v)}</div>` : '');
+    const cur = d.currency || 'PKR';
+    const money = (n) => `${cur} ${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const qty = (n) => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
+    const line = (v) => (v ? `<div>${esc(v)}</div>` : '');
+    const labelled = (k, v) => (v ? `<div>${esc(k)} ${esc(v)}</div>` : '');
+    const t = d.totals || {};
+
+    // 'Sep 16, 2026' reads unambiguously wherever the invoice is opened, which
+    // a numeric date does not.
+    const day = (iso) => {
+      if (!iso) return '';
+      const dt = new Date(String(iso).slice(0, 10) + 'T00:00:00Z');
+      if (isNaN(dt)) return String(iso);
+      return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+    };
+
+    const outstanding = d.amount_due !== undefined && d.amount_due !== null
+      ? Number(d.amount_due)
+      : Number(t.net_payable !== undefined ? t.net_payable : t.total_payable || 0);
+    const settled = outstanding <= 0.009;
+
+    // The headline. Either what is still owed and when, or that it is settled.
+    const headline = settled
+      ? `${money(t.net_payable !== undefined ? t.net_payable : t.total_payable || 0)} paid`
+      : `${money(outstanding)} due ${day(d.due_date) || 'on receipt'}`;
 
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(d.invoice_number || 'Invoice')}</title>
 <style>
-  body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#22272E;margin:0;padding:36px;font-size:13px;}
-  h1{font-size:19px;margin:0 0 2px;}
-  .head{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;border-bottom:2px solid #22272E;padding-bottom:14px;margin-bottom:18px;}
-  .parties{display:flex;gap:36px;margin-bottom:22px;}
-  .parties > div{flex:1;}
-  .label{font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:#6C7885;margin-bottom:5px;}
-  table{width:100%;border-collapse:collapse;margin-bottom:16px;}
-  th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:#6C7885;border-bottom:1px solid #D9D3C7;padding:7px 0;}
-  td{padding:11px 0;border-bottom:1px solid #EFEAE0;vertical-align:top;}
-  .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
-  .totals{margin-left:auto;width:300px;}
-  .totals div{display:flex;justify-content:space-between;padding:5px 0;}
-  .totals .grand{border-top:2px solid #22272E;margin-top:6px;padding-top:9px;font-weight:700;font-size:15px;}
-  .foot{margin-top:30px;font-size:11px;color:#6C7885;border-top:1px solid #EFEAE0;padding-top:12px;}
+  :root{ --ink:#1A1A18; --muted:#6B6B66; --rule:#E3E0D8; }
+  *{box-sizing:border-box;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+    color:var(--ink);margin:0;padding:48px 52px;font-size:12.5px;line-height:1.5;
+    max-width:840px;-webkit-font-smoothing:antialiased;
+  }
+  .brand{font-size:17px;font-weight:700;letter-spacing:-.2px;margin-bottom:2px;}
+  .muted{color:var(--muted);}
+  .doc-title{font-size:22px;font-weight:700;letter-spacing:-.3px;margin:0 0 18px;}
+  .meta{display:flex;flex-direction:column;gap:3px;margin-bottom:26px;}
+  .meta .r{display:flex;max-width:360px;}
+  .meta .k{color:var(--muted);width:130px;flex:0 0 130px;}
+  .meta .v{font-weight:600;}
+  .headline{font-size:20px;font-weight:700;letter-spacing:-.3px;margin:26px 0 22px;}
+  .parties{display:flex;gap:48px;margin-bottom:30px;}
+  .parties > div{flex:1;min-width:0;}
+  .label{font-size:11px;font-weight:700;margin-bottom:5px;}
+  table{width:100%;border-collapse:collapse;}
+  th{
+    text-align:left;font-size:11px;font-weight:600;color:var(--muted);
+    border-bottom:1px solid var(--ink);padding:0 0 7px;
+  }
+  td{padding:11px 0;border-bottom:1px solid var(--rule);vertical-align:top;}
+  th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;padding-left:16px;}
+  .desc{font-weight:600;}
+  .detail{color:var(--muted);font-size:11.5px;margin-top:2px;}
+  .totals{margin-left:auto;width:360px;margin-top:2px;}
+  .totals .r{display:flex;justify-content:space-between;gap:16px;padding:7px 0;border-bottom:1px solid var(--rule);}
+  .totals .r > :last-child{white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .totals .r.plain{border-bottom:none;}
+  .totals .r.rule{border-bottom:1px solid var(--ink);}
+  .totals .r strong{font-weight:700;}
+  .totals .due{font-size:15px;font-weight:700;padding-top:10px;border-bottom:none;}
+  .note{margin-top:26px;font-size:11.5px;color:var(--muted);border-left:2px solid var(--rule);padding-left:12px;}
+  .foot{margin-top:34px;font-size:11px;color:var(--muted);border-top:1px solid var(--rule);padding-top:12px;}
   @media print{ body{padding:0;} .noprint{display:none;} }
+  @media (max-width:640px){ body{padding:24px 18px;} .parties{flex-direction:column;gap:22px;} .totals{width:100%;} }
 </style></head><body>
-<div class="head">
-  <div>
-    <h1>${esc(d.seller.name)}</h1>
-    <div style="color:#6C7885;font-size:12px;">${esc(d.seller.address)}</div>
-    ${row('NTN', d.seller.ntn)}${row('STRN', d.seller.strn)}
-  </div>
-  <div style="text-align:right;">
-    <div style="font-size:16px;font-weight:700;">${esc(d.document_title)}</div>
-    <div style="font-family:ui-monospace,Menlo,monospace;margin-top:4px;">${esc(d.invoice_number)}</div>
-    <div style="color:#6C7885;margin-top:4px;">Issued ${esc(d.issued_date)}</div>
-    ${d.due_date ? `<div style="color:#6C7885;">Due ${esc(d.due_date)}</div>` : ''}
-  </div>
+
+<div class="brand">${esc(d.seller.name)}</div>
+<div class="muted" style="margin-bottom:26px;">${esc(d.seller.address || '')}</div>
+
+<h1 class="doc-title">${esc(d.document_title || 'Invoice')}</h1>
+
+<div class="meta">
+  <div class="r"><div class="k">Invoice number</div><div class="v">${esc(d.invoice_number || '—')}</div></div>
+  <div class="r"><div class="k">Date of issue</div><div class="v">${esc(day(d.issued_date))}</div></div>
+  ${d.due_date ? `<div class="r"><div class="k">Date due</div><div class="v">${esc(day(d.due_date))}</div></div>` : ''}
 </div>
+
+<div class="headline">${esc(headline)}</div>
+
 <div class="parties">
   <div>
-    <div class="label">Billed to</div>
-    <div style="font-weight:600;">${esc(d.buyer.company)}</div>
-    <div>${esc(d.buyer.contact_name)}</div>
-    <div style="white-space:pre-line;">${esc(d.buyer.address)}</div>
-    ${row('NTN', d.buyer.ntn)}${row('STRN', d.buyer.strn)}${row('Email', d.buyer.email)}
+    <div class="label">${esc(d.seller.name)}</div>
+    ${line(d.seller.address)}
+    ${labelled('NTN', d.seller.ntn)}
+    ${labelled('STRN', d.seller.strn)}
+    ${line(d.seller.email)}
   </div>
   <div>
-    <div class="label">Status</div>
-    <div style="text-transform:capitalize;font-weight:600;">${esc(d.status)}</div>
+    <div class="label">Bill to</div>
+    ${line(d.buyer.company)}
+    ${line(d.buyer.contact_name)}
+    <div style="white-space:pre-line;">${esc(d.buyer.address || '')}</div>
+    ${labelled('NTN', d.buyer.ntn)}
+    ${labelled('STRN', d.buyer.strn)}
+    ${line(d.buyer.email)}
   </div>
 </div>
+
 <table>
-  <thead><tr><th>Description</th><th class="num">Excl. tax</th><th class="num">Sales tax</th><th class="num">Amount</th></tr></thead>
-  <tbody>${d.lines.map((l) => `<tr>
-    <td>${esc(l.description)}</td>
-    <td class="num">${money(l.amount_excluding_tax)}</td>
-    <td class="num">${l.tax_rate ? `${money(l.tax_amount)} <span style="color:#6C7885;">(${esc(l.tax_rate)}%)</span>` : '—'}</td>
-    <td class="num">${money(l.total)}</td>
+  <thead>
+    <tr>
+      <th>Description</th>
+      <th class="num">Qty</th>
+      <th class="num">Unit price</th>
+      <th class="num">Amount</th>
+    </tr>
+  </thead>
+  <tbody>${(d.lines || []).map((l) => `<tr>
+    <td>
+      <div class="desc">${esc(l.description)}</div>
+      ${l.detail ? `<div class="detail">${esc(l.detail)}</div>` : ''}
+    </td>
+    <td class="num">${qty(l.qty !== undefined ? l.qty : 1)}</td>
+    <td class="num">${money(l.unit_price !== undefined ? l.unit_price : l.amount_excluding_tax)}</td>
+    <td class="num">${money(l.amount !== undefined ? l.amount : l.amount_excluding_tax)}</td>
   </tr>`).join('')}</tbody>
 </table>
+
 <div class="totals">
-  <div><span>Amount excluding sales tax</span><span>${money(d.totals.amount_excluding_tax)}</span></div>
-  <div><span>Sales tax${d.totals.tax_rate ? ` @ ${esc(d.totals.tax_rate)}%` : ''}</span><span>${money(d.totals.tax_amount)}</span></div>
-  <div class="grand"><span>Total payable</span><span>${money(d.totals.total_payable)}</span></div>
+  <div class="r"><span>Subtotal</span><span>${money(t.subtotal !== undefined ? t.subtotal : t.amount_excluding_tax)}</span></div>
+  <div class="r"><span>Sales tax (GST)${t.tax_rate ? ` &mdash; ${esc(t.tax_rate)}%` : ''}</span><span>${money(t.tax_amount)}</span></div>
+  <div class="r rule"><strong>Total</strong><strong>${money(t.total !== undefined ? t.total : (Number(t.amount_excluding_tax || 0) + Number(t.tax_amount || 0)))}</strong></div>
+  ${Number(t.ait_amount || 0) > 0 ? `
+  <div class="r"><span>Less advance income tax${t.ait_rate ? ` @ ${esc(t.ait_rate)}%` : ''} <span class="muted">withheld</span></span><span>&minus;${money(t.ait_amount)}</span></div>` : ''}
+  <div class="r rule"><strong>Net payable</strong><strong>${money(t.net_payable !== undefined ? t.net_payable : t.total_payable)}</strong></div>
+  ${d.settlement && Number(d.settlement.received || 0) > 0
+    ? `<div class="r"><span>Received</span><span>&minus;${money(d.settlement.received)}</span></div>` : ''}
+  <div class="r due"><span>Amount due</span><span>${money(outstanding)}</span></div>
 </div>
-${d.notes ? `<div class="foot">${esc(d.notes)}</div>` : ''}
-<div class="foot">This is a computer-generated ${esc(String(d.document_title).toLowerCase())} and is valid without a signature.</div>
-<div class="noprint" style="margin-top:22px;"><button onclick="window.print()" style="padding:9px 16px;font-size:13px;cursor:pointer;">Print</button></div>
+
+${d.ait_note ? `<div class="note">${esc(d.ait_note)}</div>` : ''}
+${d.notes ? `<div class="note">${esc(d.notes)}</div>` : ''}
+<div class="foot">This is a computer-generated ${esc(String(d.document_title || 'invoice').toLowerCase())} and is valid without a signature.</div>
+<div class="noprint" style="margin-top:22px;">
+  <button onclick="window.print()" style="padding:9px 16px;font-size:13px;cursor:pointer;border-radius:7px;border:1px solid #D9D3C7;background:#fff;">Print</button>
+</div>
 </body></html>`;
   }
 

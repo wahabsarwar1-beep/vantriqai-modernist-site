@@ -20,13 +20,24 @@ const { periodOf } = require('./quota');
  * never lose service because a lookup failed — see the caller, which also
  * fails open.
  */
-async function serviceStatusFor({ external_ref, client_id }) {
-  const { rows } = await db.query(
+async function serviceStatusFor({ external_ref, client_id, agent_ref }) {
+  // The reference n8n holds may name the client or one of its agents. A
+  // client running a WhatsApp agent and an Instagram agent asks under two
+  // different refs, and both have to resolve to the same account — quota and
+  // suspension belong to the client, not to any one agent.
+  let { rows } = await db.query(
     client_id
       ? `select * from clients where id = $1`
       : `select * from clients where external_ref = $1`,
     [client_id || external_ref]
   );
+  if (!rows[0] && (agent_ref || external_ref)) {
+    rows = (await db.query(
+      `select c.* from client_agents a join clients c on c.id = a.client_id
+        where a.external_ref = $1`,
+      [agent_ref || external_ref]
+    )).rows;
+  }
   const client = rows[0];
   if (!client) {
     return {

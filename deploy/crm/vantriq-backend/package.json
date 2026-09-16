@@ -9,7 +9,8 @@
     "dev": "node --watch src/index.js",
     "migrate": "node src/utils/migrate.js",
     "create-key": "node src/utils/createKey.js",
-    "create-user": "node src/utils/createUser.js"
+    "create-user": "node src/utils/createUser.js",
+    "seed-internal": "node src/utils/seedInternal.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

@@ -21,6 +21,10 @@ const packageRequestsRoutes = require('./routes/packageRequests');
 const { router: authRoutes } = require('./routes/auth');
 const teamRoutes = require('./routes/team');
 const quotaRoutes = require('./routes/quota');
+const paymentsRoutes = require('./routes/payments');
+const agentsRoutes = require('./routes/agents');
+const accountingRoutes = require('./routes/accounting');
+const exportRoutes = require('./routes/exportBase');
 
 const app = express();
 
@@ -61,12 +65,22 @@ app.use('/api/webhooks', requireScope('webhook'), usageRoutes);
 app.use('/api/products', requireScope('automation'), productsRoutes);
 app.use('/api/clients', requireScope('automation'), clientsRoutes);
 app.use('/api/invoices', requireScope('automation'), invoicesRoutes);
+// A client's AI agents and automations. An automation may add one — that is
+// how an n8n onboarding flow registers the agent it just deployed.
+app.use('/api/agents', requireScope('automation'), agentsRoutes);
 app.use('/api/reps', requireScope('admin'), repsRoutes);
 app.use('/api/package-requests', requireScope('staff'), packageRequestsRoutes);
 app.use('/api/expenses', requireScope('admin'), expensesRoutes);
 app.use('/api/dashboard', requireScope('staff'), dashboardRoutes);
 app.use('/api/quota', requireScope('staff'), quotaRoutes);
 app.use('/api/financials', requireScope('admin'), financialsRoutes);
+// The receipts ledger. Staff record what came in; they do not see the books.
+app.use('/api/payments', requireScope('staff'), paymentsRoutes);
+// P&L, income statement, balance sheet and the FBR position — admin only,
+// same as the rest of the financials.
+app.use('/api/accounting', requireScope('admin'), accountingRoutes);
+// The whole base as a spreadsheet. Admin only: it contains everything.
+app.use('/api/export', requireScope('admin'), exportRoutes);
 app.use('/api/settings', requireScope('admin'), settingsRoutes);
 app.use('/api/team', requireScope('admin'), teamRoutes);
 

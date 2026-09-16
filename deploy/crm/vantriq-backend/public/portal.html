@@ -21,6 +21,12 @@ body{font-family:'Inter',sans-serif;background:var(--paper);color:var(--text);-w
 h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;}
 .mono{font-family:'JetBrains Mono',monospace;}
 button{font-family:'Inter',sans-serif;cursor:pointer;}
+/* Anything clickable shows the hand, not the text I-beam. A div-based tab
+   with the default cursor reads as "select this text", not "press this". */
+.tab,.nav-item,.kcard,.close-x,.linkish,[onclick]{cursor:pointer;}
+input,textarea,[contenteditable]{cursor:auto;}
+select,input[type=checkbox],input[type=radio]{cursor:pointer;}
+button:disabled{cursor:not-allowed;opacity:.55;}
 
 #app{max-width:720px;margin:0 auto;padding:0 0 60px;}
 .topbar{
@@ -619,7 +625,7 @@ function renderInvoices(){
         ${invs.map(inv=>`
         <tr class="row-click" onclick="openInvoiceId='${inv.id}';renderInvoiceModal()">
           <td style="padding-left:16px;"><div style="font-weight:600;">${esc(inv.type_label)}</div><div style="font-size:11.5px;color:var(--muted);">${esc(inv.invoice_number||inv.period||fmtDate(inv.issued_date))}</div></td>
-          <td class="mono">${fmtMoney(inv.total_amount!=null?inv.total_amount:inv.amount)}</td>
+          <td class="mono">${fmtMoney(inv.net_payable!=null?inv.net_payable:(inv.total_amount!=null?inv.total_amount:inv.amount))}</td>
           <td style="padding-right:16px;"><span class="pill ${invoiceStatusClass(inv.status)}"><span class="pill-dot"></span>${inv.status}</span></td>
         </tr>`).join('')}
       </tbody>
@@ -666,12 +672,19 @@ function renderInvoiceModal(){
         <h3 style="margin:0;">${esc(inv.type_label)}</h3>
         <button class="close-x" onclick="openInvoiceId=null;renderInvoiceModal()">✕</button>
       </div>
-      <div class="kv" style="font-size:22px;padding:6px 0 16px;border:none;"><strong>${fmtMoney(inv.total_amount!=null?inv.total_amount:inv.amount)}</strong>
+      <div class="kv" style="font-size:22px;padding:6px 0 16px;border:none;"><strong>${fmtMoney(inv.net_payable!=null?inv.net_payable:(inv.total_amount!=null?inv.total_amount:inv.amount))}</strong>
         <span class="pill ${invoiceStatusClass(inv.status)}"><span class="pill-dot"></span>${inv.status}</span>
       </div>
       ${inv.invoice_number ? `<div class="kv"><span class="k">Invoice number</span><span class="v mono">${esc(inv.invoice_number)}</span></div>` : ''}
-      <div class="kv"><span class="k">Amount excluding tax</span><span class="v mono">${fmtMoney(inv.amount)}</span></div>
-      <div class="kv"><span class="k">Sales tax${inv.tax_rate?` @ ${inv.tax_rate}%`:''}</span><span class="v mono">${fmtMoney(inv.tax_amount||0)}</span></div>
+      <div class="kv"><span class="k">Subtotal</span><span class="v mono">${fmtMoney(inv.amount)}</span></div>
+      <div class="kv"><span class="k">Sales tax (GST)${inv.tax_rate?` @ ${inv.tax_rate}%`:''}</span><span class="v mono">+ ${fmtMoney(inv.tax_amount||0)}</span></div>
+      <div class="kv"><span class="k">Total</span><span class="v mono">${fmtMoney(inv.total_amount!=null?inv.total_amount:inv.amount)}</span></div>
+      ${inv.ait_amount ? `
+      <div class="kv"><span class="k">Less advance income tax withheld${inv.ait_rate?` @ ${inv.ait_rate}%`:''}</span><span class="v mono">− ${fmtMoney(inv.ait_amount)}</span></div>
+      <div class="kv"><span class="k"><strong>Net payable</strong></span><span class="v mono"><strong>${fmtMoney(inv.net_payable)}</strong></span></div>
+      <div style="background:#F7F5F0;border-radius:8px;padding:9px 11px;font-size:11.5px;color:var(--muted);margin:8px 0;">
+        Please transfer the net payable and deposit the withheld advance income tax against our NTN under section 153, then send us the CPR/challan.
+      </div>` : ''}
       <div class="kv"><span class="k">Period</span><span class="v">${esc(inv.period||'—')}</span></div>
       <div class="kv"><span class="k">Issued</span><span class="v">${fmtDate(inv.issued_date)}</span></div>
       ${inv.due_date ? `<div class="kv"><span class="k">Due</span><span class="v">${fmtDate(inv.due_date)}</span></div>` : ''}

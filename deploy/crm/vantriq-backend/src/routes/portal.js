@@ -219,7 +219,13 @@ router.get('/invoices/:invoiceId/tax-invoice', async (req, res) => {
     getSettings(),
   ]);
   if (!rows[0]) return res.status(404).json({ error: 'Invoice not found' });
-  res.json(buildTaxInvoice(rows[0], req.portalClient, settings));
+  // The customer's copy carries the same lines and the same settlement the CRM
+  // shows, so "what do I still owe on this" reads identically on both sides.
+  const [{ rows: lines }, { rows: pays }] = await Promise.all([
+    db.query(`select * from invoice_lines where invoice_id = $1 order by position`, [rows[0].id]),
+    db.query(`select * from payments where invoice_id = $1 order by received_date, created_at`, [rows[0].id]),
+  ]);
+  res.json(buildTaxInvoice(rows[0], req.portalClient, settings, lines, pays));
 });
 
 function formatInvoice(inv) {
@@ -234,6 +240,11 @@ function formatInvoice(inv) {
     tax_rate: +inv.tax_rate || 0,
     tax_amount: +inv.tax_amount || 0,
     total_amount: total,
+    // Withholding. The customer needs to see it because they are the one who
+    // deducts it and sends the challan back.
+    ait_rate: +inv.ait_rate || 0,
+    ait_amount: +inv.ait_amount || 0,
+    net_payable: inv.net_payable != null ? +inv.net_payable : total,
     period: inv.period, status: inv.status,
     issued_date: inv.issued_date, due_date: inv.due_date,
     overage_sessions: inv.overage_sessions,
