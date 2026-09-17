@@ -60,43 +60,57 @@ command -v docker >/dev/null || die "docker is not on PATH."
 [ "$(docker inspect -f '{{.State.Running}}' "$APP_CONTAINER" 2>/dev/null)" = "true" ] \
   || warn "Container '$APP_CONTAINER' is not running yet — it will be built."
 
-# `docker compose build` takes a SERVICE name; `docker exec` takes a
-# CONTAINER name. Different namespaces, and on this stack they differ:
-# docker-compose.yml pins container_name to crm_app while calling the service
-# something else. Assuming they matched stopped two apply runs at "no such
-# service: crm_app", and reading com.docker.compose.service off the container
-# did not help either — it came back empty.
+# Which compose project owns crm_app?
 #
-# So: enumerate the services compose actually knows about and find the one
-# whose container IS crm_app. That uses nothing but what has already been
-# shown to work here, and it cannot be fooled by a naming convention.
-APP_ID=$(docker inspect -f '{{.Id}}' "$APP_CONTAINER" 2>/dev/null || true)
-APP_SERVICE=""
-COMPOSE_SERVICES=$(docker compose config --services 2>/dev/null || true)
-for svc in $COMPOSE_SERVICES; do
-  sid=$(docker compose ps -aq "$svc" 2>/dev/null | head -1)
-  [ -n "$sid" ] || continue
-  sid=$(docker inspect -f '{{.Id}}' "$sid" 2>/dev/null || true)
-  if [ -n "$sid" ] && [ "$sid" = "$APP_ID" ]; then APP_SERVICE="$svc"; break; fi
-done
+# Not necessarily this one. On this server /root/app-stack defines
+# postgres_db, n8n_app, nginx_proxy and portal_app — and no crm_app. The
+# container is running all the same, so it comes from a second compose
+# project in its own directory. A compose-managed container records where it
+# came from, so ask it, and run compose THERE.
+lbl() { docker inspect -f "{{index .Config.Labels \"$1\"}}" "$APP_CONTAINER" 2>/dev/null || true; }
+APP_PROJECT_DIR=$(lbl com.docker.compose.project.working_dir)
+APP_SERVICE=$(lbl com.docker.compose.service)
 
-# Checked HERE, in the preflight, so a dry run catches it too. The previous
-# version only printed "would run: docker compose build crm_app" and left the
-# name untested until apply, which is precisely when it must not fail.
-if [ -z "$APP_SERVICE" ]; then
-  echo "    compose services here: $(echo $COMPOSE_SERVICES | tr '\n' ' ')"
-  echo "    containers they map to:"
-  for svc in $COMPOSE_SERVICES; do
-    sid=$(docker compose ps -aq "$svc" 2>/dev/null | head -1)
-    nm=$([ -n "$sid" ] && docker inspect -f '{{.Name}}' "$sid" 2>/dev/null | sed 's#^/##' || echo '(not created)')
-    echo "      $svc -> ${nm:-(not created)}"
-  done
-  die "No compose service in $STACK_DIR builds the container '$APP_CONTAINER'.
-     Pick one from the list above and re-run with APP_CONTAINER=<container>,
-     or with the service named directly if the container is not compose-managed."
+COMPOSE_DIR="$STACK_DIR"
+if [ -n "$APP_PROJECT_DIR" ] && [ "$APP_PROJECT_DIR" != "$STACK_DIR" ]; then
+  COMPOSE_DIR="$APP_PROJECT_DIR"
+  ok "$APP_CONTAINER is built from $COMPOSE_DIR, not $STACK_DIR"
 fi
-[ "$APP_SERVICE" = "$APP_CONTAINER" ] \
-  || ok "compose service for $APP_CONTAINER is '$APP_SERVICE'"
+# Every compose call for the API goes through here, so it always runs in the
+# directory that actually defines the service.
+compose() { ( cd "$COMPOSE_DIR" && docker compose "$@" ); }
+
+# Trust the label only if that directory really has such a service.
+if [ -n "$APP_SERVICE" ]; then
+  compose config --services 2>/dev/null | grep -qx "$APP_SERVICE" || APP_SERVICE=""
+fi
+
+# No usable label: match services to the container by id instead.
+if [ -z "$APP_SERVICE" ]; then
+  APP_ID=$(docker inspect -f '{{.Id}}' "$APP_CONTAINER" 2>/dev/null || true)
+  for svc in $(compose config --services 2>/dev/null); do
+    sid=$(compose ps -aq "$svc" 2>/dev/null | head -1)
+    [ -n "$sid" ] || continue
+    sid=$(docker inspect -f '{{.Id}}' "$sid" 2>/dev/null || true)
+    if [ -n "$sid" ] && [ "$sid" = "$APP_ID" ]; then APP_SERVICE="$svc"; break; fi
+  done
+fi
+
+# Checked HERE, in the preflight, so a dry run fails on it rather than an
+# apply. Two applies were spent learning that lesson.
+if [ -z "$APP_SERVICE" ]; then
+  echo "    $APP_CONTAINER labels:"
+  for k in com.docker.compose.project com.docker.compose.service \
+           com.docker.compose.project.working_dir com.docker.compose.project.config_files; do
+    echo "      $k = $(lbl "$k")"
+  done
+  echo "    services in $COMPOSE_DIR: $(compose config --services 2>/dev/null | tr '\n' ' ')"
+  die "Cannot find the compose service that builds '$APP_CONTAINER'.
+     If the labels above are empty the container was not created by compose
+     at all (docker run), and it must be rebuilt by hand. Otherwise re-run
+     with STACK_DIR set to the directory named above."
+fi
+ok "API service is '$APP_SERVICE' in $COMPOSE_DIR"
 # Deliberately does not name a database container: which one serves the CRM
 # is not known until the discovery below. Announcing a guess here is what made
 # the earlier version look like it had checked something it had not.
@@ -205,8 +219,8 @@ fi
 
 # ---------------------------------------------------------------- 4. rebuild
 bold "4. Rebuilding and restarting the API"
-run docker compose build "$APP_SERVICE"
-run docker compose up -d "$APP_SERVICE"
+run compose build "$APP_SERVICE"
+run compose up -d "$APP_SERVICE"
 
 if [ "$DRY" = 0 ]; then
   printf '  waiting for health'
