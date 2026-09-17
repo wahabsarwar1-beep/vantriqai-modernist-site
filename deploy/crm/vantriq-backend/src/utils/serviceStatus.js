@@ -20,13 +20,24 @@ const { periodOf } = require('./quota');
  * never lose service because a lookup failed — see the caller, which also
  * fails open.
  */
-async function serviceStatusFor({ external_ref, client_id }) {
-  const { rows } = await db.query(
+async function serviceStatusFor({ external_ref, client_id, agent_ref }) {
+  // The reference n8n holds may name the client or one of its agents. A
+  // client running a WhatsApp agent and an Instagram agent asks under two
+  // different refs, and both have to resolve to the same account — quota and
+  // suspension belong to the client, not to any one agent.
+  let { rows } = await db.query(
     client_id
       ? `select * from clients where id = $1`
       : `select * from clients where external_ref = $1`,
     [client_id || external_ref]
   );
+  if (!rows[0] && (agent_ref || external_ref)) {
+    rows = (await db.query(
+      `select c.* from client_agents a join clients c on c.id = a.client_id
+        where a.external_ref = $1`,
+      [agent_ref || external_ref]
+    )).rows;
+  }
   const client = rows[0];
   if (!client) {
     return {
@@ -57,16 +68,27 @@ async function serviceStatusFor({ external_ref, client_id }) {
     const prod = await db.query(`select * from products where id = $1`, [client.product_id]);
     eff = effectivePackage(client, prod.rows[0]);
   }
-  // No package means nothing to measure against, so nothing to stop.
-  if (!eff || !eff.quota) return { ...base, allow: true, reason: 'no_quota' };
-
+  // Bundles add to the allowance, so a client who topped up is measured
+  // against the larger figure — cutting them off at the package's quota when
+  // they have paid for more would be exactly the wrong answer.
   const period = periodOf();
+  const bundled = Number((await db.query(
+    `select coalesce(sum(qty * unit_quota), 0) as q from client_bundles
+      where client_id = $1 and status = 'active'
+        and starts_on <= ($2::date + interval '1 month' - interval '1 day')
+        and (ends_on is null or ends_on >= $2::date)`,
+    [client.id, period]
+  )).rows[0].q || 0);
+
+  // No package and no bundle means nothing to measure against, so nothing to stop.
+  const quota = (eff ? Number(eff.quota) : 0) + bundled;
+  if (!quota) return { ...base, allow: true, reason: 'no_quota' };
+
   const usage = await db.query(
     `select sessions from v_monthly_usage where client_id = $1 and period_month = $2::date`,
     [client.id, period]
   );
   const used = Number((usage.rows[0] && usage.rows[0].sessions) || 0);
-  const quota = Number(eff.quota);
   const ceiling = policy === 'block' ? quota
     : policy === 'grace' ? Math.floor(quota * (Number(settings.overage_grace_pct) || 120) / 100)
     : null;
@@ -75,6 +97,8 @@ async function serviceStatusFor({ external_ref, client_id }) {
     ...base,
     period_month: period,
     quota,
+    base_quota: eff ? Number(eff.quota) : 0,
+    bundled_quota: bundled,
     sessions_used: used,
     percent_used: Math.round((used / quota) * 100),
     policy,

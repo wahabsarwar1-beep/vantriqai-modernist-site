@@ -10,7 +10,8 @@
     "migrate": "node src/utils/migrate.js",
     "create-key": "node src/utils/createKey.js",
     "create-user": "node src/utils/createUser.js",
-    "test:webhooks": "node test/webhooks-lead.test.js"
+    "test:webhooks": "node test/webhooks-lead.test.js",
+    "seed-internal": "node src/utils/seedInternal.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

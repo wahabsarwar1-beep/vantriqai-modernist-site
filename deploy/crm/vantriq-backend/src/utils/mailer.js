@@ -5,9 +5,13 @@
  *   HOSTINGER_MAIL_TOKEN   API token from hPanel (Emails -> API tokens)
  *   HOSTINGER_MAILBOX_ID   the sending mailbox's resource id
  *
- * MAIL_FROM defaults to the support mailbox. If the token is missing the
- * send throws, and the caller decides what the user sees — we never silently
- * swallow a failure to deliver a login code.
+ * The sender is fixed: it is the mailbox HOSTINGER_MAILBOX_ID names, which is
+ * the one the token is authorised for. The API accepts no `from`, so there is
+ * no setting that changes who mail comes from — only MAIL_DISPLAY_NAME, the
+ * name shown beside the address.
+ *
+ * If the token is missing the send throws, and the caller decides what the
+ * user sees — we never silently swallow a failure to deliver a login code.
  */
 const API_BASE = process.env.HOSTINGER_MAIL_API || 'https://api.mail.hostinger.com';
 
@@ -19,16 +23,26 @@ async function sendMail({ to, subject, text, html }) {
   if (!mailConfigured()) {
     throw new Error('Email is not configured on the server (HOSTINGER_MAIL_TOKEN / HOSTINGER_MAILBOX_ID).');
   }
-  const from = process.env.MAIL_FROM || 'support@vantriqai.com';
   const url = `${API_BASE}/api/v1/mailboxes/${encodeURIComponent(process.env.HOSTINGER_MAILBOX_ID)}/send`;
 
+  // The API takes NO `from` field: the sender IS the mailbox the token is
+  // authorised for, named by HOSTINGER_MAILBOX_ID in the path. Sending a
+  // `from` was at best ignored and at worst a validation failure, and it gave
+  // the false impression that MAIL_FROM could change who the mail came from.
+  // What you CAN set is the display name beside the address.
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${process.env.HOSTINGER_MAIL_TOKEN}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ from, to: [to], subject, text, html }),
+    body: JSON.stringify({
+      to: [to],
+      subject,
+      text,
+      html,
+      displayName: process.env.MAIL_DISPLAY_NAME || 'Vantriq AI',
+    }),
   });
 
   if (!res.ok) {
@@ -36,6 +50,43 @@ async function sendMail({ to, subject, text, html }) {
     throw new Error(`Mail send failed (${res.status}): ${detail.slice(0, 300)}`);
   }
   return true;
+}
+
+/**
+ * Why email is not working, in words, without sending anything.
+ *
+ * Every send path fails soft by design — a failure is logged and the invoice
+ * or the reply still happens. Which is right, and also means a
+ * misconfiguration is quiet. This is the thing that makes it loud.
+ */
+function mailDiagnosis() {
+  const token = process.env.HOSTINGER_MAIL_TOKEN || '';
+  const mailbox = process.env.HOSTINGER_MAILBOX_ID || '';
+  const problems = [];
+
+  if (!token) {
+    problems.push('HOSTINGER_MAIL_TOKEN is not set on the server.');
+  } else if (/^(PASTE|CHANGE|REPLACE|xxx)/i.test(token)) {
+    problems.push(`HOSTINGER_MAIL_TOKEN is still the placeholder ("${token.slice(0, 12)}…"). Paste the real token.`);
+  } else if (token.length < 20) {
+    problems.push('HOSTINGER_MAIL_TOKEN looks too short to be a real token.');
+  }
+  if (!mailbox) {
+    problems.push('HOSTINGER_MAILBOX_ID is not set on the server.');
+  } else if (!/^AC[0-9a-f]{10,}$/i.test(mailbox)) {
+    problems.push(`HOSTINGER_MAILBOX_ID ("${mailbox}") does not look like a mailbox resource id — they start with "AC".`);
+  }
+
+  return {
+    configured: mailConfigured() && problems.length === 0,
+    token_set: !!token,
+    // Never return the token. Enough to tell two tokens apart, not enough to use.
+    token_fingerprint: token ? `${token.slice(0, 4)}…${token.slice(-4)} (${token.length} chars)` : null,
+    mailbox_id: mailbox || null,
+    api_base: API_BASE,
+    display_name: process.env.MAIL_DISPLAY_NAME || 'Vantriq AI',
+    problems,
+  };
 }
 
 function otpEmail(code, name) {
@@ -83,8 +134,91 @@ function resetEmail(url, name, minutes) {
   return { subject, text, html };
 }
 
+/**
+ * The invoice, as the customer receives it.
+ *
+ * Built from the same printable document the CRM and the portal render, so
+ * the figures in the email are the figures on the invoice — there is no second
+ * calculation here that could drift from the first.
+ *
+ * The tax ladder is spelled out because a Pakistani service invoice has two
+ * taxes moving in opposite directions, and "why is the transfer less than the
+ * total" is otherwise the first question every customer asks.
+ */
+function invoiceEmail(doc, portalUrl) {
+  const cur = doc.currency || 'PKR';
+  const money = (n) => `${cur} ${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const t = doc.totals || {};
+  const who = doc.buyer.contact_name || doc.buyer.company || 'there';
+  const withheld = Number(t.ait_amount || 0) > 0;
+
+  const subject = `${doc.seller.name} — invoice ${doc.invoice_number} for ${money(doc.amount_due)}`;
+
+  const lines = (doc.lines || [])
+    .map((l) => `  ${l.description}${l.detail ? ` (${l.detail})` : ''}  ${money(l.amount)}`)
+    .join('\n');
+
+  const text = [
+    `Hi ${who},`,
+    ``,
+    `Here is your invoice from ${doc.seller.name}.`,
+    ``,
+    `Invoice     ${doc.invoice_number}`,
+    `Issued      ${doc.issued_date}`,
+    doc.due_date ? `Due         ${doc.due_date}` : '',
+    ``,
+    lines,
+    ``,
+    `Subtotal    ${money(t.subtotal)}`,
+    Number(t.tax_amount || 0) > 0 ? `Sales tax   ${money(t.tax_amount)}${t.tax_rate ? ` (${t.tax_rate}%)` : ''}` : '',
+    `Total       ${money(t.total)}`,
+    withheld ? `Less AIT    -${money(t.ait_amount)}${t.ait_rate ? ` (${t.ait_rate}% withheld)` : ''}` : '',
+    `Net payable ${money(t.net_payable)}`,
+    ``,
+    withheld ? doc.ait_note : '',
+    withheld ? '' : '',
+    portalUrl ? `You can see this invoice, your usage and your account here: ${portalUrl}` : '',
+    ``,
+    `Thank you,`,
+    doc.seller.name,
+  ].filter((l) => l !== '').join('\n');
+
+  const row = (k, v, strong) =>
+    `<tr><td style="padding:5px 0;color:#555;">${escapeHtml(k)}</td>` +
+    `<td style="padding:5px 0;text-align:right;white-space:nowrap;${strong ? 'font-weight:700;' : ''}">${escapeHtml(v)}</td></tr>`;
+
+  const html = `
+    <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;color:#1A1A18;">
+      <p>Hi ${escapeHtml(who)},</p>
+      <p>Here is your invoice from ${escapeHtml(doc.seller.name)}.</p>
+      <p style="font-size:20px;font-weight:700;margin:18px 0 6px;">
+        ${escapeHtml(money(doc.amount_due))}${doc.due_date ? ` <span style="font-size:13px;font-weight:400;color:#555;">due ${escapeHtml(doc.due_date)}</span>` : ''}
+      </p>
+      <p style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#555;margin:0 0 16px;">${escapeHtml(doc.invoice_number)}</p>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;border-top:1px solid #E3E0D8;">
+        ${(doc.lines || []).map((l) => `<tr>
+          <td style="padding:8px 0;border-bottom:1px solid #F1EFE8;">${escapeHtml(l.description)}
+            ${l.detail ? `<div style="color:#6B6B66;font-size:11.5px;">${escapeHtml(l.detail)}</div>` : ''}</td>
+          <td style="padding:8px 0;border-bottom:1px solid #F1EFE8;text-align:right;white-space:nowrap;">${escapeHtml(money(l.amount))}</td>
+        </tr>`).join('')}
+      </table>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:10px;">
+        ${row('Subtotal', money(t.subtotal))}
+        ${Number(t.tax_amount || 0) > 0 ? row(`Sales tax${t.tax_rate ? ` (${t.tax_rate}%)` : ''}`, money(t.tax_amount)) : ''}
+        ${row('Total', money(t.total), true)}
+        ${withheld ? row(`Less advance income tax${t.ait_rate ? ` (${t.ait_rate}%)` : ''}`, `-${money(t.ait_amount)}`) : ''}
+        ${row('Net payable', money(t.net_payable), true)}
+      </table>
+      ${withheld ? `<p style="font-size:12px;color:#6B6B66;border-left:2px solid #E3E0D8;padding-left:10px;margin-top:18px;">${escapeHtml(doc.ait_note)}</p>` : ''}
+      ${portalUrl ? `<p style="margin-top:20px;"><a href="${escapeHtml(portalUrl)}" style="background:#12897A;color:#fff;padding:10px 16px;border-radius:7px;text-decoration:none;font-weight:600;font-size:13px;">View your account</a></p>` : ''}
+      <p style="color:#555;font-size:13px;margin-top:20px;">Thank you,<br>${escapeHtml(doc.seller.name)}</p>
+    </div>`;
+
+  return { subject, text, html };
+}
+
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
 
-module.exports = { sendMail, otpEmail, resetEmail, mailConfigured };
+module.exports = { sendMail, otpEmail, resetEmail, invoiceEmail, mailConfigured, mailDiagnosis };

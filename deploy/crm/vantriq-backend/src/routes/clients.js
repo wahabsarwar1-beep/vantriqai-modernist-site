@@ -11,7 +11,13 @@ const FIELDS = [
   'name','company','email','phone','external_ref','product_id','stage',
   'est_value','source','notes','join_date',
   // v4 — group structure and the tax details an FBR invoice has to carry.
-  'parent_client_id','ntn','strn','tax_rate','billing_address'
+  'parent_client_id','ntn','strn','tax_rate','billing_address',
+  // v7 — withholding. ait_rate null means "use the company default"; a client
+  // holding an exemption certificate is a separate fact from a 0% rate.
+  'ait_rate','ait_exempt',
+  // v7 — VantriqAI is a client of itself. An internal client is metered and
+  // invoiced like anyone, but its billing is cost, not revenue.
+  'is_internal',
 ];
 
 // Per-client package overrides. Only accepted when the client's package is

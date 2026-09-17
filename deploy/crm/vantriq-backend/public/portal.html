@@ -21,6 +21,12 @@ body{font-family:'Inter',sans-serif;background:var(--paper);color:var(--text);-w
 h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;}
 .mono{font-family:'JetBrains Mono',monospace;}
 button{font-family:'Inter',sans-serif;cursor:pointer;}
+/* Anything clickable shows the hand, not the text I-beam. A div-based tab
+   with the default cursor reads as "select this text", not "press this". */
+.tab,.nav-item,.kcard,.close-x,.linkish,[onclick]{cursor:pointer;}
+input,textarea,[contenteditable]{cursor:auto;}
+select,input[type=checkbox],input[type=radio]{cursor:pointer;}
+button:disabled{cursor:not-allowed;opacity:.55;}
 
 #app{max-width:720px;margin:0 auto;padding:0 0 60px;}
 .topbar{
@@ -39,8 +45,15 @@ button{font-family:'Inter',sans-serif;cursor:pointer;}
 .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;}
 .card h3{font-size:14px;margin:0 0 14px;font-weight:600;}
 
-.tabs{display:flex;gap:6px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:5px;margin-bottom:16px;box-shadow:0 8px 24px rgba(15,26,34,.08);}
-.tab{flex:1;text-align:center;padding:10px 6px;border-radius:10px;font-size:12.5px;font-weight:600;color:var(--muted);}
+/* Eight tabs will not fit across a phone. They scroll sideways rather than
+   wrapping, because a wrapped tab bar pushes the content down the page and
+   half a tab name on its own line reads as a mistake. */
+.tabs{display:flex;gap:6px;background:var(--card);border:1px solid var(--border);border-radius:14px;
+  padding:5px;margin-bottom:16px;box-shadow:0 8px 24px rgba(15,26,34,.08);
+  overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+.tabs::-webkit-scrollbar{display:none;}
+.tab{flex:0 0 auto;text-align:center;padding:10px 12px;border-radius:10px;font-size:12.5px;
+  font-weight:600;color:var(--muted);white-space:nowrap;}
 .tab.active{background:var(--teal);color:#fff;}
 
 .pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11.5px;font-weight:600;}
@@ -82,6 +95,18 @@ tr.row-click:active{background:#FAF8F3;}
 .btn-primary{background:var(--teal);color:#fff;}
 .btn-ghost{background:#F0EEE7;color:var(--text);}
 .btn-block{width:100%;justify-content:center;}
+.tab-n{display:inline-block;min-width:17px;padding:0 5px;border-radius:20px;background:#E3DFD4;
+  color:var(--muted);font-size:10.5px;font-weight:700;font-family:'JetBrains Mono',monospace;line-height:17px;text-align:center;}
+.tab.active .tab-n{background:var(--teal-light);color:var(--teal-dark);}
+.tab-n-live{background:var(--teal);color:#fff;}
+.tab.active .tab-n-live{background:var(--teal);color:#fff;}
+.field{margin-bottom:13px;}
+.field label{display:block;font-size:11.5px;color:var(--muted);font-weight:600;margin-bottom:4px;}
+.field input,.field select{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;
+  font-size:13.5px;font-family:inherit;background:#FCFBF9;box-sizing:border-box;}
+.field input:focus,.field select:focus{outline:2px solid var(--teal);outline-offset:0;border-color:transparent;}
+.bundle-row{border:1px solid var(--border);border-radius:10px;padding:13px;margin-bottom:10px;}
+.bundle-row.mine{border-color:var(--teal);background:var(--teal-light);}
 
 .modal-overlay{position:fixed;inset:0;background:rgba(15,26,34,.5);display:flex;align-items:flex-end;justify-content:center;z-index:100;}
 .modal{background:var(--card);border-radius:20px 20px 0 0;width:100%;max-width:720px;padding:24px 20px 28px;max-height:80vh;overflow-y:auto;}
@@ -103,6 +128,7 @@ tr.row-click:active{background:#FAF8F3;}
 const CURRENCY = 'PKR';
 function fmtMoney(n){ if(n===null||n===undefined||isNaN(n)) n=0; const neg=n<0; n=Math.abs(Math.round(n)); return (neg?'-':'')+CURRENCY+' '+n.toLocaleString('en-US'); }
 function fmtNum(n){ return Math.round(n||0).toLocaleString('en-US'); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
 function fmtDate(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }
 function fmtMonth(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('en-US',{month:'short',year:'numeric'}); }
 function esc(s){ return (s==null?'':s+'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -113,7 +139,10 @@ const SESSION_KEY = 'vantriq_portal_session';
 let SESSION = '';
 try { SESSION = localStorage.getItem(SESSION_KEY) || ''; } catch(e) { SESSION = ''; }
 
-let data = { account:null, usage:null, invoices:[], ledger:null, packages:null, activity:null };
+let data = { account:null, usage:null, invoices:[], ledger:null, packages:null, activity:null,
+  agents:null, bundles:null, quotes:null };
+let bundleBusy = false;
+let passwordBusy = false;
 let activityMonth = '';   // '' = current month
 let activityPage = 1;
 let activityBusy = false;
@@ -133,6 +162,9 @@ async function api(path, opts){
     ...(opts||{}),
     headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SESSION, ...((opts||{}).headers||{}) },
   });
+  // Only a genuine 401 means the session has gone. Anything else — a refused
+  // action, a bad value in the body — must surface its own message, or a
+  // mistyped password would look exactly like being signed out.
   if(res.status === 401){ setSession(''); const e = new Error('SESSION_EXPIRED'); e.expired = true; throw e; }
   const json = await res.json().catch(()=>({}));
   if(!res.ok) throw new Error(json.error || 'Something went wrong');
@@ -146,16 +178,34 @@ function stagePill(stage){
   const [cls,label] = map[stage] || ['pill-pending', stage];
   return `<span class="pill ${cls}"><span class="pill-dot"></span>${label}</span>`;
 }
-function invoiceStatusClass(s){ return {paid:'pill-paid',pending:'pill-pending',overdue:'pill-overdue'}[s]||'pill-pending'; }
+function invoiceStatusClass(s){ return {paid:'pill-paid',partial:'pill-pending',pending:'pill-pending',overdue:'pill-overdue',void:'pill-pending'}[s]||'pill-pending'; }
+
+/** Re-pulls the parts of the account that a change here affects. */
+async function refreshBilling(){
+  const [account, bundles, usage, invoices] = await Promise.all([
+    api('/account'), api('/bundles'), api('/usage'), api('/invoices'),
+  ]);
+  Object.assign(data, { account, bundles, usage, invoices });
+}
+function toast(msg, warn){
+  const el = document.createElement('div');
+  el.textContent = msg;
+  el.style.cssText = `position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:300;
+    background:${warn?'#8F3527':'#16242E'};color:#fff;padding:11px 16px;border-radius:10px;
+    font-size:13px;max-width:90vw;box-shadow:0 6px 24px rgba(0,0,0,.2);`;
+  document.body.appendChild(el);
+  setTimeout(()=>{ el.style.transition='opacity .3s'; el.style.opacity='0'; setTimeout(()=>el.remove(),300); }, 3400);
+}
 
 async function boot(){
   if(!SESSION){ renderLogin(); return; }
   document.getElementById('app').innerHTML = `<div class="center-screen"><span class="loading-dot"></span>&nbsp; Loading your account…</div>`;
   try{
-    const [account, usage, invoices, ledger, packages] = await Promise.all([
+    const [account, usage, invoices, ledger, packages, agents, bundles, quotes] = await Promise.all([
       api('/account'), api('/usage'), api('/invoices'), api('/ledger'), api('/packages'),
+      api('/agents'), api('/bundles'), api('/quotes'),
     ]);
-    data = { account, usage, invoices, ledger, packages, activity: null };
+    data = { account, usage, invoices, ledger, packages, agents, bundles, quotes, activity: null };
     render();
   }catch(e){
     if(e.expired){ renderLogin('Your session has ended. Please sign in again.'); return; }
@@ -242,7 +292,8 @@ async function doForgotPassword(){
 async function doLogout(){
   try{ await fetch('/api/portal/logout', { method:'POST', headers:{'Authorization':'Bearer '+SESSION} }); }catch(e){}
   setSession('');
-  data = { account:null, usage:null, invoices:[], ledger:null, packages:null };
+  data = { account:null, usage:null, invoices:[], ledger:null, packages:null,
+    agents:null, bundles:null, quotes:null, activity:null };
   currentTab = 'overview';
   renderLogin('You have been signed out.');
 }
@@ -280,11 +331,14 @@ function render(){
     <div class="content">
       <div class="tabs">
         <div class="tab ${currentTab==='overview'?'active':''}" onclick="setTab('overview')">Overview</div>
+        <div class="tab ${currentTab==='agents'?'active':''}" onclick="setTab('agents')">My agents${data.agents&&data.agents.length?` <span class="tab-n">${data.agents.length}</span>`:''}</div>
         <div class="tab ${currentTab==='usage'?'active':''}" onclick="setTab('usage')">Usage</div>
         <div class="tab ${currentTab==='activity'?'active':''}" onclick="setTab('activity')">Activity</div>
         <div class="tab ${currentTab==='invoices'?'active':''}" onclick="setTab('invoices')">Invoices</div>
         <div class="tab ${currentTab==='ledger'?'active':''}" onclick="setTab('ledger')">Statement</div>
-        <div class="tab ${currentTab==='packages'?'active':''}" onclick="setTab('packages')">Packages</div>
+        <div class="tab ${currentTab==='packages'?'active':''}" onclick="setTab('packages')">Packages &amp; bundles</div>
+        ${data.quotes&&data.quotes.length?`<div class="tab ${currentTab==='quotes'?'active':''}" onclick="setTab('quotes')">Quotes${data.quotes.some(q=>q.status==='sent')?` <span class="tab-n tab-n-live">${data.quotes.filter(q=>q.status==='sent').length}</span>`:''}</div>`:''}
+        <div class="tab ${currentTab==='security'?'active':''}" onclick="setTab('security')">Security</div>
       </div>
       <div id="tab-content">${renderTab()}</div>
       <div class="footer-note">
@@ -312,6 +366,9 @@ function tabBody(){
   if(currentTab==='ledger') return renderLedger();
   if(currentTab==='activity') return renderActivity();
   if(currentTab==='packages') return renderPackages();
+  if(currentTab==='agents') return renderAgents();
+  if(currentTab==='quotes') return renderQuotes();
+  if(currentTab==='security') return renderSecurity();
   return '';
 }
 
@@ -493,22 +550,23 @@ function renderPackages(){
   if(!pk) return `<div class="empty">Packages are unavailable right now.</div>`;
   const pending = pk.pending_request;
   return `
+  ${renderBundleSection()}
+
   ${pending ? `
   <div class="card" style="background:var(--amber-light);border-color:#F0D9A8;">
     <div style="font-size:13px;color:#63430B;">
       <strong>Change requested.</strong> You have asked to move to <strong>${esc(pending.product_name)}</strong>.
       Vantriq AI is reviewing it — nothing on your account changes until it is approved.
     </div>
-  </div>` : `
-  <div class="card">
-    <div style="font-size:13px;color:var(--muted);">
-      Choose a package below to request a change. Nothing changes and nothing is billed
-      until Vantriq AI approves the request.
-    </div>
-  </div>`}
+  </div>` : ''}
 
   <div class="card">
-    <h3>Available packages</h3>
+    <h3 style="margin-top:0;">Change your package</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:0;">
+      Moving to a different tier changes what you pay every month from here on, so it comes to us
+      first. Nothing changes and nothing is billed until we have approved it. If you only need more
+      conversations, a bundle above is instant.
+    </p>
     ${pk.packages.map(p=>{
       const current = p.id === pk.current_product_id;
       return `
@@ -535,6 +593,148 @@ function renderPackages(){
       <a class="wa-link" href="https://wa.me/923006789807" target="_blank" rel="noopener">talk to us</a>.
     </p>
   </div>`;
+}
+
+/**
+ * Bundles: buying more of what you already have.
+ *
+ * Moving tier is a conversation — it changes what somebody pays every month
+ * from here on, and a package request waits for us to approve it. Adding a
+ * bundle is not: it is more of the service already running, so it takes
+ * effect the moment the customer presses the button, and what it costs is on
+ * the screen before they do.
+ */
+function renderBundleSection(){
+  const b = data.bundles;
+  if(!b) return '';
+  const cur = b.currency || 'PKR';
+  const money = (n)=>`${cur} ${Math.round(Number(n||0)).toLocaleString('en-US')}`;
+  const mine = b.bundles || [];
+  const monthly = mine.filter(x=>x.recurring && x.status==='active')
+    .reduce((s,x)=>s+Number(x.qty)*Number(x.unit_retainer),0);
+
+  return `
+  <div class="card">
+    <h3 style="margin-top:0;">Add-on bundles</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:0;">
+      Need more conversations than your package includes? Add a bundle. It takes effect straight away,
+      adds to your allowance from today, and appears on your next monthly invoice as its own line —
+      no approval to wait for.
+    </p>
+
+    ${mine.length ? `
+      <div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:14px;padding:11px 13px;background:#F7F5F0;border-radius:9px;">
+        <div><div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;">Added allowance</div>
+          <div class="mono" style="font-weight:700;font-size:16px;">+${fmtNum(b.added_quota)}</div>
+          <div style="font-size:11px;color:var(--muted);">conversations a month</div></div>
+        <div><div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;">Added cost</div>
+          <div class="mono" style="font-weight:700;font-size:16px;">${money(monthly)}</div>
+          <div style="font-size:11px;color:var(--muted);">a month</div></div>
+      </div>
+      ${mine.map(x=>`
+        <div class="bundle-row mine">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+            <div>
+              <div style="font-weight:700;">${x.qty>1?`${x.qty} × `:''}${esc(x.name)}</div>
+              <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">
+                +${fmtNum(Number(x.qty)*Number(x.unit_quota))} conversations${x.agent_name?` · on your ${esc(x.agent_name)}`:' · across your account'}
+                ${x.ends_on?` · ends ${fmtDate(x.ends_on)}`:''}
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <div class="mono" style="font-weight:700;">${money(Number(x.qty)*Number(x.unit_retainer))}<span style="font-size:11px;color:var(--muted);font-weight:400;">${x.recurring?'/mo':' once'}</span></div>
+              ${x.added_by==='customer' && !x.ends_on
+                ? `<button class="btn btn-ghost" style="margin-top:6px;padding:5px 10px;font-size:11.5px;" onclick="endBundle('${x.id}')">End it</button>`
+                : x.ends_on ? `<div style="font-size:11px;color:var(--muted);margin-top:6px;">Ending</div>` : ''}
+            </div>
+          </div>
+        </div>`).join('')}
+    ` : `<div style="font-size:12.5px;color:var(--muted);margin-bottom:14px;">You have no bundles on your account.</div>`}
+
+    <h4 style="font-size:13px;margin:18px 0 8px;">Add one now</h4>
+    ${(b.available||[]).map(p=>`
+      <div class="bundle-row">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+          <div>
+            <div style="font-weight:700;">${esc(p.name)} bundle</div>
+            <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">
+              +${fmtNum(p.quota)} conversations a month · ${money(p.overage_rate)} a conversation beyond that
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div class="mono" style="font-weight:700;font-size:15px;">${money(p.retainer)}<span style="font-size:11px;color:var(--muted);font-weight:400;">/mo</span></div>
+            <div style="font-size:11px;color:var(--teal-dark);font-weight:600;">no setup fee</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:flex-end;margin-top:11px;flex-wrap:wrap;">
+          <div class="field" style="margin:0;width:78px;">
+            <label style="font-size:11px;">How many</label>
+            <input id="bq_${p.id}" type="number" min="1" max="20" value="1">
+          </div>
+          ${(b.agents||[]).length ? `
+          <div class="field" style="margin:0;flex:1;min-width:150px;">
+            <label style="font-size:11px;">For which agent</label>
+            <select id="ba_${p.id}">
+              <option value="">All my agents</option>
+              ${b.agents.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('')}
+            </select>
+          </div>` : ''}
+          <button class="btn btn-primary" ${bundleBusy?'disabled':''} onclick="addBundle('${p.id}','${esc(p.name).replace(/'/g,"\\'")}')">
+            ${bundleBusy?'Adding…':'Add this bundle'}
+          </button>
+        </div>
+      </div>`).join('')}
+    <p style="font-size:11.5px;color:var(--muted);margin:6px 0 0;">
+      A bundle you add yourself carries no setup fee — you are buying more of a service already running for you.
+    </p>
+  </div>`;
+}
+
+async function addBundle(productId, name){
+  const qty = parseInt(((document.getElementById('bq_'+productId)||{}).value)||'1',10) || 1;
+  const agentSel = document.getElementById('ba_'+productId);
+  const agentId = agentSel ? agentSel.value : '';
+  const agentName = agentSel && agentSel.value ? agentSel.options[agentSel.selectedIndex].text : null;
+  const b = data.bundles;
+  const p = (b.available||[]).find(x=>x.id===productId);
+  const cur = b.currency || 'PKR';
+  const cost = `${cur} ${Math.round(Number(p.retainer)*qty).toLocaleString('en-US')}`;
+  const quota = Math.round(Number(p.quota)*qty).toLocaleString('en-US');
+
+  if(!confirm(
+    `Add ${qty} × ${name} bundle${agentName?` for your ${agentName}`:''}?
+
+` +
+    `This adds ${quota} conversations a month to your allowance from today, and ${cost} a month to your bill.
+` +
+    `It will appear on your next monthly invoice. You can end it yourself at any time.`
+  )) return;
+
+  bundleBusy = true; render();
+  try{
+    const r = await api('/bundles', {
+      method:'POST',
+      body: JSON.stringify({ product_id: productId, qty, agent_id: agentId || undefined }),
+    });
+    await refreshBilling();
+    data.agents = await api('/agents');
+    bundleBusy = false; render();
+    toast(r.message || 'Bundle added.');
+  }catch(e){
+    bundleBusy = false; render();
+    if(e.expired){ renderLogin('Your session has ended. Please sign in again.'); return; }
+    toast(e.message || 'Could not add that bundle.', true);
+  }
+}
+
+async function endBundle(id){
+  if(!confirm('End this bundle?\n\nThe month you have already been billed for runs to the end, and it will not be billed again after that.')) return;
+  try{
+    const r = await api(`/bundles/${id}`, { method:'DELETE' });
+    await refreshBilling();
+    render();
+    toast(r.message || 'That bundle will not renew.');
+  }catch(e){ toast(e.message || 'Could not end that bundle.', true); }
 }
 
 async function requestPackage(productId, name){
@@ -619,7 +819,7 @@ function renderInvoices(){
         ${invs.map(inv=>`
         <tr class="row-click" onclick="openInvoiceId='${inv.id}';renderInvoiceModal()">
           <td style="padding-left:16px;"><div style="font-weight:600;">${esc(inv.type_label)}</div><div style="font-size:11.5px;color:var(--muted);">${esc(inv.invoice_number||inv.period||fmtDate(inv.issued_date))}</div></td>
-          <td class="mono">${fmtMoney(inv.total_amount!=null?inv.total_amount:inv.amount)}</td>
+          <td class="mono">${fmtMoney(inv.net_payable!=null?inv.net_payable:(inv.total_amount!=null?inv.total_amount:inv.amount))}</td>
           <td style="padding-right:16px;"><span class="pill ${invoiceStatusClass(inv.status)}"><span class="pill-dot"></span>${inv.status}</span></td>
         </tr>`).join('')}
       </tbody>
@@ -653,6 +853,243 @@ function renderLedger(){
   `;
 }
 
+
+/* ---------------------------- My agents ---------------------------- */
+/**
+ * Every agent running under this company. A customer with a WhatsApp agent,
+ * an Instagram agent and a website assistant has three things working for
+ * them, and should see three things — not one account and a number.
+ */
+const AGENT_KIND_LABEL = {
+  whatsapp:'WhatsApp', instagram:'Instagram', facebook:'Facebook', website:'Website chat',
+  voice:'Voice', email:'Email', automation:'Automation', other:'Other',
+};
+const AGENT_KIND_ICON = {
+  whatsapp:'💬', instagram:'📷', facebook:'👍', website:'🌐',
+  voice:'📞', email:'✉️', automation:'⚙️', other:'🤖',
+};
+
+function renderAgents(){
+  const agents = data.agents || [];
+  if(!agents.length){
+    return `<div class="card"><div class="empty">
+      No agents are set up on your account yet. Once we switch one on it will appear here with its own numbers.
+    </div></div>`;
+  }
+  const talking = agents.filter(a=>a.kind!=='automation');
+  const working = agents.filter(a=>a.kind==='automation');
+  const totalSessions = agents.reduce((s,a)=>s+(+a.sessions_this_month||0),0);
+  const totalMessages = agents.reduce((s,a)=>s+(+a.messages_this_month||0),0);
+
+  const card = (a)=>`
+    <div class="card" style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+        <div style="display:flex;gap:10px;align-items:flex-start;min-width:0;">
+          <div style="font-size:21px;line-height:1.1;">${AGENT_KIND_ICON[a.kind]||'🤖'}</div>
+          <div>
+            <div style="font-weight:700;font-size:14.5px;">${esc(a.name)}</div>
+            <div style="font-size:12px;color:var(--muted);">${esc(AGENT_KIND_LABEL[a.kind]||a.kind)}${a.dedicated_quota?` · ${fmtNum(a.dedicated_quota)} conversations of its own`:''}</div>
+          </div>
+        </div>
+        <span class="pill ${a.status==='active'?'pill-active':'pill-pending'}" style="flex-shrink:0;white-space:nowrap;"><span class="pill-dot"></span>${a.status==='active'?'Running':'Paused'}</span>
+      </div>
+      <div style="display:flex;gap:22px;margin-top:12px;padding-top:11px;border-top:1px solid var(--border);">
+        <div><div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;">This month</div>
+          <div class="mono" style="font-weight:700;font-size:15px;">${fmtNum(a.sessions_this_month)}</div>
+          <div style="font-size:11px;color:var(--muted);">conversations</div></div>
+        <div><div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;">Messages</div>
+          <div class="mono" style="font-weight:700;font-size:15px;">${fmtNum(a.messages_this_month)}</div>
+          <div style="font-size:11px;color:var(--muted);">handled</div></div>
+        <div><div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;">Last active</div>
+          <div style="font-weight:600;font-size:13px;margin-top:3px;">${a.last_seen_at?fmtDate(a.last_seen_at):'—'}</div></div>
+      </div>
+    </div>`;
+
+  return `
+  <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);">
+    <div class="stat-card"><div class="label">Agents</div><div class="value">${agents.length}</div></div>
+    <div class="stat-card"><div class="label">Conversations</div><div class="value">${fmtNum(totalSessions)}</div></div>
+    <div class="stat-card"><div class="label">Messages</div><div class="value">${fmtNum(totalMessages)}</div></div>
+  </div>
+  <p style="font-size:11.5px;color:var(--muted);margin:-8px 0 14px;">This month, across every agent.</p>
+  ${talking.length?`<h3 style="font-size:14px;margin:18px 0 10px;">Talking to your customers</h3>${talking.map(card).join('')}`:''}
+  ${working.length?`<h3 style="font-size:14px;margin:22px 0 10px;">Working in the background</h3>${working.map(card).join('')}`:''}
+  <p class="footer-note" style="text-align:left;margin-top:14px;">
+    All of these share your account's allowance unless one has conversations of its own from a bundle.
+    Want another agent on a channel you're not using yet? Message us and we'll set it up.
+  </p>`;
+}
+
+/* ---------------------------- Quotes ---------------------------- */
+function renderQuotes(){
+  const quotes = data.quotes || [];
+  if(!quotes.length) return `<div class="card"><div class="empty">No quotes right now.</div></div>`;
+  const cur = (data.bundles && data.bundles.currency) || 'PKR';
+  const money = (n)=>`${cur} ${Math.round(Number(n||0)).toLocaleString('en-US')}`;
+  const pill = { sent:['pill-pending','Awaiting your decision'], accepted:['pill-active','Accepted'],
+    declined:['pill-pending','Declined'], expired:['pill-pending','Expired'], cancelled:['pill-pending','Withdrawn'] };
+
+  return quotes.map(q=>{
+    const [cls,label] = pill[q.status] || ['pill-pending', q.status];
+    const open = q.status === 'sent';
+    const expired = q.valid_until && q.valid_until < todayISO();
+    return `
+    <div class="card" style="margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+        <div>
+          <div style="font-weight:700;font-size:15px;">${esc(q.title||'Quotation')}</div>
+          <div class="mono" style="font-size:11.5px;color:var(--muted);">${esc(q.quote_number||'')}${q.valid_until?` · valid until ${fmtDate(q.valid_until)}`:''}</div>
+        </div>
+        <span class="pill ${cls}"><span class="pill-dot"></span>${label}</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;margin-top:12px;font-size:13px;">
+        ${(q.lines||[]).map(l=>`<tr>
+          <td style="padding:6px 0;border-bottom:1px solid var(--border);">
+            ${esc(l.description)}${l.detail?`<div style="font-size:11.5px;color:var(--muted);">${esc(l.detail)}</div>`:''}
+          </td>
+          <td class="mono" style="padding:6px 0;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap;">
+            ${Number(l.qty)>1?`${Number(l.qty)} × `:''}${money(l.unit_price)}
+          </td>
+        </tr>`).join('')}
+      </table>
+      <div style="display:flex;justify-content:space-between;margin-top:10px;font-weight:700;font-size:15px;">
+        <span>Total</span><span class="mono">${money(q.total)}</span>
+      </div>
+      ${Number(q.tax_amount)>0?`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);">
+        <span>Includes sales tax at ${q.tax_rate}%</span><span class="mono">${money(q.tax_amount)}</span></div>`:''}
+      ${q.notes?`<p style="font-size:12.5px;color:var(--muted);margin:12px 0 0;white-space:pre-line;">${esc(q.notes)}</p>`:''}
+      ${open && !expired ? `
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <button class="btn btn-primary" onclick="acceptQuote('${q.id}')">Accept this quote</button>
+        <button class="btn btn-ghost" onclick="declineQuote('${q.id}')">Not right now</button>
+        <button class="btn btn-ghost" onclick="printQuote('${q.id}')">Print</button>
+      </div>
+      <p style="font-size:11.5px;color:var(--muted);margin:10px 0 0;">
+        Accepting raises an invoice for this amount and applies anything it describes to your account.
+      </p>` : `
+      <div style="margin-top:12px;"><button class="btn btn-ghost" onclick="printQuote('${q.id}')">Print</button></div>
+      ${expired && open ? `<p style="font-size:12px;color:#8F3527;margin:10px 0 0;">This quote has expired — ask us for a fresh one.</p>`:''}`}
+    </div>`;
+  }).join('');
+}
+
+async function acceptQuote(id){
+  if(!confirm('Accept this quote? We will raise an invoice for it and apply what it describes to your account.')) return;
+  try{
+    const r = await api(`/quotes/${id}/accept`, { method:'POST' });
+    data.quotes = await api('/quotes');
+    await refreshBilling();
+    render();
+    toast(r.message || 'Accepted, thank you.');
+  }catch(e){ toast(e.message || 'Could not accept that quote.', true); }
+}
+async function declineQuote(id){
+  if(!confirm('Let us know you are not going ahead with this one?')) return;
+  try{
+    await api(`/quotes/${id}/decline`, { method:'POST' });
+    data.quotes = await api('/quotes');
+    render();
+    toast('Thanks for letting us know.');
+  }catch(e){ toast(e.message || 'Could not update that quote.', true); }
+}
+async function printQuote(id){
+  const r = await openTaxInvoice(()=>api(`/quotes/${id}/document`));
+  if(!r.ok) toast(r.error, true);
+}
+
+/* ---------------------------- Security ---------------------------- */
+/**
+ * Changing your own password, without having to ask anybody.
+ *
+ * The current password is required, so somebody who finds a signed-in laptop
+ * cannot lock the real owner out of their own account. Every other device is
+ * signed out, and a note goes to the address on the account.
+ */
+function renderSecurity(){
+  const a = data.account || {};
+  return `
+  <div class="card">
+    <h3 style="margin-top:0;font-size:15px;">Change your password</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:0;">
+      You can change this yourself, whenever you like. We will email
+      <strong>${esc(a.email||'the address on your account')}</strong> to confirm it, and every other
+      signed-in device will be signed out.
+    </p>
+    <div class="field">
+      <label>Current password</label>
+      <input id="pw_current" type="password" autocomplete="current-password">
+    </div>
+    <div class="field">
+      <label>New password</label>
+      <input id="pw_new" type="password" autocomplete="new-password" oninput="checkPasswordStrength()">
+      <div id="pw_hint" style="font-size:11.5px;color:var(--muted);margin-top:5px;">At least 10 characters. A short phrase you will remember beats a short jumble you will not.</div>
+    </div>
+    <div class="field">
+      <label>New password again</label>
+      <input id="pw_again" type="password" autocomplete="new-password" onkeydown="if(event.key==='Enter')changePassword()">
+    </div>
+    <div id="pw_msg" style="display:none;"></div>
+    <button class="btn btn-primary btn-block" id="pw_btn" onclick="changePassword()" ${passwordBusy?'disabled':''}>
+      ${passwordBusy?'Changing…':'Change my password'}
+    </button>
+  </div>
+
+  <div class="card" style="margin-top:14px;">
+    <h3 style="margin-top:0;font-size:15px;">Forgotten it instead?</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;">
+      Sign out and choose "Forgot your password?" on the sign-in screen. We will email a
+      single-use link to ${esc(a.email||'the address on your account')} — the address only we can change,
+      so nobody can redirect it.
+    </p>
+    <button class="btn btn-ghost" onclick="doLogout()">Sign out</button>
+  </div>`;
+}
+
+function checkPasswordStrength(){
+  const v = (document.getElementById('pw_new')||{}).value || '';
+  const hint = document.getElementById('pw_hint');
+  if(!hint) return;
+  if(!v){ hint.textContent = 'At least 10 characters. A short phrase you will remember beats a short jumble you will not.'; hint.style.color='var(--muted)'; return; }
+  if(v.length < 10){ hint.textContent = `${10-v.length} more character${10-v.length===1?'':'s'} to go.`; hint.style.color='#8F3527'; return; }
+  const varied = /[a-z]/.test(v) && /[A-Z0-9]/.test(v);
+  hint.textContent = v.length >= 16 ? 'Strong.' : varied ? 'Good.' : 'Fine — a little longer would be better still.';
+  hint.style.color = 'var(--teal-dark)';
+}
+
+async function changePassword(){
+  const msg = document.getElementById('pw_msg');
+  const show = (m, ok)=>{
+    msg.style.display='block'; msg.style.padding='9px 11px'; msg.style.borderRadius='8px';
+    msg.style.fontSize='12.5px'; msg.style.marginBottom='12px';
+    msg.style.background = ok ? 'var(--teal-light)' : 'var(--red-light)';
+    msg.style.color = ok ? 'var(--teal-dark)' : '#8F3527';
+    msg.textContent = m;
+  };
+  const current = (document.getElementById('pw_current')||{}).value || '';
+  const next = (document.getElementById('pw_new')||{}).value || '';
+  const again = (document.getElementById('pw_again')||{}).value || '';
+
+  if(!current || !next){ show('Fill in your current password and the new one.'); return; }
+  if(next !== again){ show('The two new passwords do not match.'); return; }
+  if(next.length < 10){ show('Your new password needs to be at least 10 characters.'); return; }
+
+  passwordBusy = true;
+  const btn = document.getElementById('pw_btn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Changing…'; }
+  try{
+    const r = await api('/change-password', {
+      method:'POST', body: JSON.stringify({ current_password: current, new_password: next }),
+    });
+    passwordBusy = false;
+    render();
+    toast(r.message || 'Your password has been changed.');
+  }catch(e){
+    passwordBusy = false;
+    if(btn){ btn.disabled = false; btn.textContent = 'Change my password'; }
+    show(e.message || 'Could not change your password.');
+  }
+}
+
 function renderInvoiceModal(){
   let root = document.getElementById('invoice-modal-root');
   if(!root){ root = document.createElement('div'); root.id='invoice-modal-root'; document.body.appendChild(root); }
@@ -666,12 +1103,19 @@ function renderInvoiceModal(){
         <h3 style="margin:0;">${esc(inv.type_label)}</h3>
         <button class="close-x" onclick="openInvoiceId=null;renderInvoiceModal()">✕</button>
       </div>
-      <div class="kv" style="font-size:22px;padding:6px 0 16px;border:none;"><strong>${fmtMoney(inv.total_amount!=null?inv.total_amount:inv.amount)}</strong>
+      <div class="kv" style="font-size:22px;padding:6px 0 16px;border:none;"><strong>${fmtMoney(inv.net_payable!=null?inv.net_payable:(inv.total_amount!=null?inv.total_amount:inv.amount))}</strong>
         <span class="pill ${invoiceStatusClass(inv.status)}"><span class="pill-dot"></span>${inv.status}</span>
       </div>
       ${inv.invoice_number ? `<div class="kv"><span class="k">Invoice number</span><span class="v mono">${esc(inv.invoice_number)}</span></div>` : ''}
-      <div class="kv"><span class="k">Amount excluding tax</span><span class="v mono">${fmtMoney(inv.amount)}</span></div>
-      <div class="kv"><span class="k">Sales tax${inv.tax_rate?` @ ${inv.tax_rate}%`:''}</span><span class="v mono">${fmtMoney(inv.tax_amount||0)}</span></div>
+      <div class="kv"><span class="k">Subtotal</span><span class="v mono">${fmtMoney(inv.amount)}</span></div>
+      <div class="kv"><span class="k">Sales tax (GST)${inv.tax_rate?` @ ${inv.tax_rate}%`:''}</span><span class="v mono">+ ${fmtMoney(inv.tax_amount||0)}</span></div>
+      <div class="kv"><span class="k">Total</span><span class="v mono">${fmtMoney(inv.total_amount!=null?inv.total_amount:inv.amount)}</span></div>
+      ${inv.ait_amount ? `
+      <div class="kv"><span class="k">Less advance income tax withheld${inv.ait_rate?` @ ${inv.ait_rate}%`:''}</span><span class="v mono">− ${fmtMoney(inv.ait_amount)}</span></div>
+      <div class="kv"><span class="k"><strong>Net payable</strong></span><span class="v mono"><strong>${fmtMoney(inv.net_payable)}</strong></span></div>
+      <div style="background:#F7F5F0;border-radius:8px;padding:9px 11px;font-size:11.5px;color:var(--muted);margin:8px 0;">
+        Please transfer the net payable and deposit the withheld advance income tax against our NTN under section 153, then send us the CPR/challan.
+      </div>` : ''}
       <div class="kv"><span class="k">Period</span><span class="v">${esc(inv.period||'—')}</span></div>
       <div class="kv"><span class="k">Issued</span><span class="v">${fmtDate(inv.issued_date)}</span></div>
       ${inv.due_date ? `<div class="kv"><span class="k">Due</span><span class="v">${fmtDate(inv.due_date)}</span></div>` : ''}

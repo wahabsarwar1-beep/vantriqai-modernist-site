@@ -35,9 +35,18 @@ const j=async r=>{ try{return await r.json()}catch{return null} };
   r=await mv(client.id,'proposal','skip'); ok(r.status===409,'skipping a stage blocked (409)','got '+r.status);
   r=await mv(client.id,'contacted','Called, keen'); ok(r.status===200,'forward one step with comment (200)','got '+r.status);
   r=await mv(client.id,'lead','undo'); ok(r.status===409,'moving backward blocked (409)','got '+r.status);
-  for(const [s,c] of [['proposal','Sent proposal'],['negotiation','Discussing terms'],['active','Signed']]) {
+  for(const [s,c] of [['proposal','Sent proposal'],['negotiation','Discussing terms']]) {
     r=await mv(client.id,s,c); if(r.status!==200) ok(false,'advance to '+s,'got '+r.status+' '+JSON.stringify(await j(r)));
   }
+  // v7 onwards, going live raises the first invoice in the same request, so
+  // the tax identity has to be on the record before the stage can move. This
+  // fixture predates that gate, which is why it supplies the details here.
+  r=await mv(client.id,'active','Signed');
+  ok(r.status===400 && /cannot go live without/.test(((await j(r))||{}).error||''),'going live without tax details blocked (400)','got '+r.status);
+  r=await A(`/api/clients/${client.id}`,{method:'PUT',body:JSON.stringify({ntn:'1234567-8',billing_address:'12 Mall Road, Lahore'})});
+  ok(r.status===200,'tax details accepted (200)','got '+r.status+' '+JSON.stringify(await j(r)));
+  r=await mv(client.id,'active','Signed');
+  ok(r.status===200,'advance to active (200)','got '+r.status+' '+JSON.stringify(await j(r)));
   const after=await j(await A(`/api/clients/${client.id}`));
   ok(after.stage==='active','advanced through to active','stage='+after.stage);
   ok(!!after.join_date,'join_date stamped on active','join_date='+after.join_date);

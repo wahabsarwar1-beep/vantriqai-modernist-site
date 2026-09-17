@@ -21,6 +21,13 @@ const packageRequestsRoutes = require('./routes/packageRequests');
 const { router: authRoutes } = require('./routes/auth');
 const teamRoutes = require('./routes/team');
 const quotaRoutes = require('./routes/quota');
+const paymentsRoutes = require('./routes/payments');
+const agentsRoutes = require('./routes/agents');
+const accountingRoutes = require('./routes/accounting');
+const exportRoutes = require('./routes/exportBase');
+const subscriptionRoutes = require('./routes/subscriptions');
+const quotesRoutes = require('./routes/quotes');
+const billingOpsRoutes = require('./routes/billingOps');
 
 const app = express();
 
@@ -61,12 +68,32 @@ app.use('/api/webhooks', requireScope('webhook'), usageRoutes);
 app.use('/api/products', requireScope('automation'), productsRoutes);
 app.use('/api/clients', requireScope('automation'), clientsRoutes);
 app.use('/api/invoices', requireScope('automation'), invoicesRoutes);
+// A client's AI agents and automations. An automation may add one — that is
+// how an n8n onboarding flow registers the agent it just deployed.
+app.use('/api/agents', requireScope('automation'), agentsRoutes);
+// Bundles and scheduled package changes. An automation may add a bundle —
+// that is how an n8n flow acts on an upsell the customer agreed to.
+app.use('/api/subscriptions', requireScope('automation'), subscriptionRoutes);
+// Quotes sit with the rest of the sales work, so staff can raise one.
+app.use('/api/quotes', requireScope('staff'), quotesRoutes);
 app.use('/api/reps', requireScope('admin'), repsRoutes);
 app.use('/api/package-requests', requireScope('staff'), packageRequestsRoutes);
 app.use('/api/expenses', requireScope('admin'), expensesRoutes);
 app.use('/api/dashboard', requireScope('staff'), dashboardRoutes);
 app.use('/api/quota', requireScope('staff'), quotaRoutes);
 app.use('/api/financials', requireScope('admin'), financialsRoutes);
+// The receipts ledger. Staff record what came in; they do not see the books.
+app.use('/api/payments', requireScope('staff'), paymentsRoutes);
+// P&L, income statement, balance sheet and the FBR position — admin only,
+// same as the rest of the financials.
+app.use('/api/accounting', requireScope('admin'), accountingRoutes);
+// The whole base as a spreadsheet. Admin only: it contains everything.
+app.use('/api/export', requireScope('admin'), exportRoutes);
+// The things that RUN: the monthly billing run, the chase schedule, the
+// automation rules and the bank statement coming back in. An automation key
+// reaches these on purpose — the monthly run and the daily chase are meant to
+// be fired by n8n on a schedule, not by a person remembering.
+app.use('/api/billing', requireScope('automation'), billingOpsRoutes);
 app.use('/api/settings', requireScope('admin'), settingsRoutes);
 app.use('/api/team', requireScope('admin'), teamRoutes);
 

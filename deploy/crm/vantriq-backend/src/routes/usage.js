@@ -14,8 +14,10 @@ const router = express.Router();
  *
  * Body:
  * {
- *   "external_ref": "923001234567",      // required unless client_id given — the client's WhatsApp number or configured ref
+ *   "external_ref": "923001234567",      // required unless client_id given — the client's ref, or one of its agents' refs
  *   "client_id": "uuid",                 // alternative to external_ref, if n8n already knows Vantriq's internal client id
+ *   "agent_ref": "instagram:@khantraders", // optional — which of the client's agents handled this
+ *   "agent_id": "uuid",                  // alternative to agent_ref
  *   "session_id": "923009998888-2026-08-16", // required — one id per 24h conversation window
  *   "channel": "whatsapp",               // whatsapp | web | voice | instagram
  *   "ai_model": "claude-sonnet-4-6",
@@ -31,26 +33,68 @@ const router = express.Router();
  */
 router.post('/usage', async (req, res) => {
   const body = req.body || {};
-  const { external_ref, client_id, session_id, channel, ai_model,
+  const { external_ref, client_id, agent_ref, agent_id, session_id, channel, ai_model,
     input_tokens, output_tokens, messages_count, occurred_at } = body;
 
   if (!session_id) return res.status(400).json({ error: 'session_id is required' });
-  if (!external_ref && !client_id) return res.status(400).json({ error: 'external_ref or client_id is required' });
+  if (!external_ref && !client_id && !agent_ref && !agent_id) {
+    return res.status(400).json({ error: 'external_ref, client_id, agent_ref or agent_id is required' });
+  }
 
-  let resolvedClientId = client_id;
+  // Who sent this, and which of their agents?
+  //
+  // A client can run several agents, so a ref can identify either the client
+  // or one of its agents. Agent refs are looked up first when one was named
+  // explicitly; otherwise external_ref is tried against clients (which is
+  // what every pre-v7 caller means by it) and then against agents, so an
+  // existing n8n flow keeps working unchanged while a new one can point
+  // straight at an agent.
+  let resolvedClientId = client_id || null;
+  let resolvedAgentId = null;
+
+  if (agent_id || agent_ref) {
+    const { rows } = agent_id
+      ? await db.query(`select id, client_id from client_agents where id = $1`, [agent_id])
+      : await db.query(`select id, client_id from client_agents where external_ref = $1`, [String(agent_ref).trim()]);
+    if (!rows[0]) {
+      return res.status(404).json({ error: `No agent found for "${agent_id || agent_ref}". Add it to the client in the CRM first.` });
+    }
+    resolvedAgentId = rows[0].id;
+    resolvedClientId = resolvedClientId || rows[0].client_id;
+  }
+
   if (!resolvedClientId) {
     const { rows } = await db.query(`select id from clients where external_ref = $1`, [external_ref]);
-    if (!rows[0]) {
-      return res.status(404).json({ error: `No client found with external_ref "${external_ref}". Set it on the client record first.` });
+    if (rows[0]) {
+      resolvedClientId = rows[0].id;
+    } else {
+      const { rows: byAgent } = await db.query(
+        `select id, client_id from client_agents where external_ref = $1`, [external_ref]
+      );
+      if (!byAgent[0]) {
+        return res.status(404).json({ error: `No client or agent found with external_ref "${external_ref}". Set it on the client record first.` });
+      }
+      resolvedAgentId = resolvedAgentId || byAgent[0].id;
+      resolvedClientId = byAgent[0].client_id;
     }
-    resolvedClientId = rows[0].id;
+  }
+
+  // A channel was already being sent; when the event names an agent, the
+  // agent's kind is the better answer and overrides a caller that left the
+  // default in place.
+  let resolvedChannel = channel || 'whatsapp';
+  if (resolvedAgentId && !channel) {
+    const { rows: kindRows } = await db.query(`select kind from client_agents where id = $1`, [resolvedAgentId]);
+    if (kindRows[0] && kindRows[0].kind !== 'automation' && kindRows[0].kind !== 'other') {
+      resolvedChannel = kindRows[0].kind;
+    }
   }
 
   const { rows: inserted } = await db.query(
-    `insert into usage_events (client_id, session_id, channel, ai_model, input_tokens, output_tokens, messages_count, occurred_at, raw_payload)
-     values ($1,$2,$3,$4,$5,$6,$7, coalesce($8, now()), $9) returning id`,
+    `insert into usage_events (client_id, agent_id, session_id, channel, ai_model, input_tokens, output_tokens, messages_count, occurred_at, raw_payload)
+     values ($1,$2,$3,$4,$5,$6,$7,$8, coalesce($9, now()), $10) returning id`,
     [
-      resolvedClientId, session_id, channel || 'whatsapp', ai_model || '',
+      resolvedClientId, resolvedAgentId, session_id, resolvedChannel, ai_model || '',
       input_tokens || 0, output_tokens || 0, messages_count || 1,
       occurred_at || null, JSON.stringify(body),
     ]
@@ -80,6 +124,7 @@ router.post('/usage', async (req, res) => {
   res.status(201).json({
     event_id: inserted[0].id,
     client_id: resolvedClientId,
+    agent_id: resolvedAgentId,
     month_to_date: usageRows[0] || { sessions: 0, messages: 0, input_tokens: 0, output_tokens: 0 },
     quota,
   });
@@ -105,12 +150,12 @@ router.post('/usage', async (req, res) => {
  * off the air. The error is logged for us, not surfaced to the caller.
  */
 router.get('/service-status', async (req, res) => {
-  const { external_ref, client_id } = req.query;
-  if (!external_ref && !client_id) {
-    return res.status(400).json({ error: 'external_ref or client_id is required' });
+  const { external_ref, client_id, agent_ref } = req.query;
+  if (!external_ref && !client_id && !agent_ref) {
+    return res.status(400).json({ error: 'external_ref, client_id or agent_ref is required' });
   }
   try {
-    res.json(await serviceStatusFor({ external_ref, client_id }));
+    res.json(await serviceStatusFor({ external_ref, client_id, agent_ref }));
   } catch (err) {
     console.error('service-status check failed, allowing', err);
     res.json({ allow: true, reason: 'check_failed', detail: 'The status check failed, so service continues.' });
@@ -249,7 +294,15 @@ async function notifyNewLead(client, channel) {
   // semicolon, so that is what people paste in. Accepting only commas turns
   // the whole list into one malformed address and every send fails — and it
   // fails quietly, which is the worst way for a lead alert to break.
-  const recipients = (configured || process.env.LEAD_NOTIFY_EMAIL || process.env.MAIL_FROM || '')
+  // TEAM_NOTIFY_EMAIL is where the rest of the app sends internal alerts, so
+  // it belongs in this chain. MAIL_FROM stays at the end because installs
+  // predating its removal may still have it set, and losing a lead alert to
+  // a rename would be a silent regression.
+  const recipients = (configured
+    || process.env.LEAD_NOTIFY_EMAIL
+    || process.env.TEAM_NOTIFY_EMAIL
+    || process.env.MAIL_FROM
+    || '')
     .split(/[,;]/).map((s) => s.trim()).filter(Boolean);
   if (!recipients.length) return;
 

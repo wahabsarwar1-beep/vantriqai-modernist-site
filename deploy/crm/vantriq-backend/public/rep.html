@@ -19,6 +19,12 @@ body{font-family:'Inter',sans-serif;background:var(--paper);color:var(--text);-w
 h1,h2,h3{font-family:'Space Grotesk',sans-serif;}
 .mono{font-family:'JetBrains Mono',monospace;}
 button{font-family:'Inter',sans-serif;cursor:pointer;}
+/* Anything clickable shows the hand, not the text I-beam. A div-based tab
+   with the default cursor reads as "select this text", not "press this". */
+.tab,.nav-item,.kcard,.close-x,.linkish,[onclick]{cursor:pointer;}
+input,textarea,[contenteditable]{cursor:auto;}
+select,input[type=checkbox],input[type=radio]{cursor:pointer;}
+button:disabled{cursor:not-allowed;opacity:.55;}
 
 #app{min-height:100vh;}
 .topbar{background:var(--ink);color:#fff;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;}
@@ -42,6 +48,14 @@ button{font-family:'Inter',sans-serif;cursor:pointer;}
 .btn-ghost{background:#F0EEE7;color:var(--text);}
 .btn-sm{padding:7px 12px;font-size:12px;}
 
+.stage-tabs{display:flex;gap:6px;overflow-x:auto;padding:5px;margin-bottom:16px;background:#EDEAE1;border:1px solid var(--border);border-radius:12px;}
+.stage-tab{flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:9px 14px;border-radius:8px;font-size:12.5px;font-weight:700;color:var(--muted);background:transparent;border:none;white-space:nowrap;font-family:'Inter',sans-serif;}
+.stage-tab:hover{background:#E3DFD4;color:var(--text);}
+.stage-tab.active{background:var(--ink);color:#fff;}
+.stage-tab .n{font-family:'JetBrains Mono';font-size:11px;font-weight:600;padding:1px 6px;border-radius:20px;background:rgba(0,0,0,.07);color:inherit;}
+.stage-tab.active .n{background:rgba(255,255,255,.18);}
+.stage-tab.is-won.active{background:var(--teal-dark);}
+.stage-tab.is-lost.active{background:#8F3527;}
 .kanban{display:flex;gap:14px;overflow-x:auto;padding-bottom:10px;}
 .kanban-col{flex:0 0 250px;background:#F0EEE6;border-radius:12px;padding:10px;}
 .kanban-col-head{display:flex;justify-content:space-between;align-items:center;padding:4px 6px 10px;}
@@ -123,6 +137,46 @@ let leads = [], summary = null, products = [];
 let openModal = null;
 let connectError = '';
 
+/* The bar across the top of the pipeline. "All stages" keeps the board;
+   pressing any one stage shows just that stage as a list. */
+let repStage = 'all';
+function setRepStage(id){ repStage = id; render(); window.scrollTo(0,0); }
+const REP_TABS = [
+  {id:'all',   label:'All my leads',  match:()=>true},
+  ...STAGES.map(s=>({id:s.id, label:s.label, match:l=>(l.salesStage||'qualification')===s.id})),
+  {id:'won',   label:'Won',  match:l=>l.closeOutcome==='won',  tone:'is-won'},
+  {id:'lost',  label:'Lost', match:l=>l.closeOutcome==='lost', tone:'is-lost'},
+];
+function repStageBar(){
+  return `<div class="stage-tabs">
+    ${REP_TABS.map(t=>`<button class="stage-tab ${t.tone||''} ${repStage===t.id?'active':''}" onclick="setRepStage('${t.id}')">${esc(t.label)}<span class="n">${leads.filter(t.match).length}</span></button>`).join('')}
+  </div>`;
+}
+function repStageList(tab){
+  const rows = leads.filter(tab.match).sort((a,b)=>(b.estValue||0)-(a.estValue||0));
+  if(!rows.length) return `<div class="card" style="text-align:center;padding:36px;color:var(--muted);">Nothing in ${esc(tab.label)} right now.</div>`;
+  return `<div class="card" style="padding:8px 4px;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr>
+        <th style="text-align:left;padding:8px 16px;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">Company</th>
+        <th style="text-align:left;padding:8px 12px;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">Contact</th>
+        <th style="text-align:left;padding:8px 12px;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">Package</th>
+        <th style="text-align:left;padding:8px 12px;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">Stage</th>
+        <th style="text-align:right;padding:8px 16px;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">Value</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(l=>`<tr class="row-click" onclick="openModal={type:'lead',id:'${l.id}'};renderModal()" style="cursor:pointer;">
+          <td style="padding:11px 16px;border-top:1px solid #EFEDE6;"><strong>${esc(l.company)}</strong></td>
+          <td style="padding:11px 12px;border-top:1px solid #EFEDE6;">${esc(l.name)}</td>
+          <td style="padding:11px 12px;border-top:1px solid #EFEDE6;"><span class="tag">${l.productName?esc(l.productName):'—'}</span></td>
+          <td style="padding:11px 12px;border-top:1px solid #EFEDE6;">${esc(stageLabel(l.salesStage||'qualification'))}${l.closeOutcome?` · <span class="pill ${l.closeOutcome==='won'?'pill-won':'pill-lost'}"><span class="pill-dot"></span>${esc(l.closeOutcome)}</span>`:''}</td>
+          <td class="mono" style="padding:11px 16px;border-top:1px solid #EFEDE6;text-align:right;font-weight:700;">${fmtMoney(l.estValue)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
 function sidebarPulseSVG(){ return `<svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M1 10h3l2-6 3 12 2.5-9 1.5 4h6" stroke="#8FD9CC" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`; }
 
 function renderConnectScreen(){
@@ -195,6 +249,8 @@ function render(){
         </div>
       </div>
 
+      ${repStageBar()}
+      ${repStage!=='all' ? repStageList(REP_TABS.find(t=>t.id===repStage)) : `
       <div class="kanban">
         ${STAGES.map(s=>{
           const items = leads.filter(l=>(l.salesStage||'qualification')===s.id);
@@ -213,8 +269,8 @@ function render(){
             `).join('') || `<div style="padding:14px 4px;color:var(--muted-2);font-size:12px;">No leads here yet</div>`}
           </div>`;
         }).join('')}
-      </div>
-      <p class="footnote">You can only see and edit leads you've created. Move a lead to Closure and mark it Won or Lost to complete it.</p>
+      </div>`}
+      <p class="footnote">Press a stage above to see just that stage. You can only see and edit leads you've created. Move a lead to Closure and mark it Won or Lost to complete it.</p>
     </div>
   `;
   renderModal();

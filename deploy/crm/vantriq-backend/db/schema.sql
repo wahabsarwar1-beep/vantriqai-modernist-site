@@ -587,6 +587,431 @@ create index if not exists idx_conv_client on conversation_messages(client_id, c
 create index if not exists idx_conv_session on conversation_messages(session_id, created_at asc);
 create index if not exists idx_conv_ref on conversation_messages(external_ref, created_at desc);
 
--- Where new-lead notifications go. Comma-separated; blank falls back to
--- MAIL_FROM so a fresh install still reaches somebody.
+-- Where new-lead notifications go. Comma- or semicolon-separated; blank
+-- falls back to LEAD_NOTIFY_EMAIL, then TEAM_NOTIFY_EMAIL, so a fresh
+-- install still reaches somebody.
 alter table settings add column if not exists lead_notify_emails text not null default '';
+
+-- =====================================================================
+-- v7 — real accounting: withholding tax, a payments ledger, per-client
+--      agents, and VantriqAI as its own (internal) customer
+--
+-- Five things, and they lean on each other:
+--
+--   1. AIT (advance income tax) alongside GST. GST is ADDED to the bill;
+--      AIT is WITHHELD FROM it — the client pays the net and deposits the
+--      AIT with FBR on our behalf, handing back a challan. So an invoice
+--      now carries two different kinds of tax that move in opposite
+--      directions, and `net_payable` is what the client actually transfers.
+--      Getting this backwards overstates cash and understates the tax
+--      credit, so the columns are named for the direction they move.
+--
+--   2. invoice_lines, so an invoice can carry Description / Qty / Unit
+--      price / Amount rather than one opaque figure.
+--
+--   3. payments — the receipts ledger. An invoice's status stops being a
+--      field someone types and becomes a fact derived from what has
+--      actually been received against it.
+--
+--   4. client_agents — one company, many agents. A client can run a
+--      WhatsApp agent, an Instagram agent and a website assistant at once,
+--      each with its own external_ref, each metered separately.
+--
+--   5. clients.is_internal — VantriqAI is a client of itself. Its agents
+--      are metered and invoiced exactly like anyone's, but the money is an
+--      internal transfer: financials treat an internal client's billing as
+--      COST, never revenue, so running our own agents shows up where it
+--      belongs rather than inflating the top line.
+-- =====================================================================
+
+-- --- 1. Withholding tax -----------------------------------------------
+-- tax_rate / tax_amount keep their meaning: GST, added to the bill.
+-- These are the withholding side, subtracted from it.
+alter table invoices add column if not exists ait_rate numeric not null default 0;
+alter table invoices add column if not exists ait_amount numeric not null default 0;
+-- What the client actually transfers: amount + GST - AIT.
+alter table invoices add column if not exists net_payable numeric;
+update invoices set net_payable = coalesce(total_amount, amount) where net_payable is null;
+
+alter table settings add column if not exists default_ait_rate numeric not null default 0;
+-- The seller block on the invoice. Ours, not the client's.
+alter table settings add column if not exists seller_ntn text default '';
+alter table settings add column if not exists seller_strn text default '';
+alter table settings add column if not exists seller_address text default '';
+alter table settings add column if not exists seller_email text default '';
+
+-- A client may be exempt from withholding (an exemption certificate), which
+-- is a different thing from a 0% rate that happens to be zero today.
+alter table clients add column if not exists ait_rate numeric;
+alter table clients add column if not exists ait_exempt boolean not null default false;
+
+-- --- 2. Invoice line items --------------------------------------------
+create table if not exists invoice_lines (
+  id uuid primary key default gen_random_uuid(),
+  invoice_id uuid not null references invoices(id) on delete cascade,
+  position int not null default 0,
+  description text not null default '',
+  detail text default '',              -- the smaller second line, e.g. a period
+  qty numeric not null default 1,
+  unit_price numeric not null default 0,
+  amount numeric not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_invoice_lines_invoice on invoice_lines(invoice_id, position);
+
+-- --- 3. Payments ledger -----------------------------------------------
+create table if not exists payments (
+  id uuid primary key default gen_random_uuid(),
+  invoice_id uuid not null references invoices(id) on delete cascade,
+  client_id uuid references clients(id) on delete cascade,
+  amount numeric not null,
+  kind text not null default 'receipt'
+    check (kind in ('receipt','ait_challan','write_off','credit_note')),
+  method text default '',              -- bank transfer, cheque, cash, card
+  reference text default '',           -- transaction id, cheque no, challan no
+  received_date date not null default current_date,
+  notes text default '',
+  recorded_by text default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_payments_invoice on payments(invoice_id);
+create index if not exists idx_payments_client on payments(client_id, received_date);
+
+-- --- 4. Agents and automations per client ------------------------------
+create table if not exists client_agents (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  name text not null,
+  kind text not null default 'whatsapp'
+    check (kind in ('whatsapp','instagram','facebook','website','voice','email','automation','other')),
+  external_ref text,                   -- the number/domain/handle usage arrives under
+  status text not null default 'active' check (status in ('active','paused','retired')),
+  notes text default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+-- One external_ref cannot belong to two agents, or usage could be attributed
+-- to either. Nulls are allowed and do not collide.
+create unique index if not exists idx_client_agents_ref on client_agents(external_ref)
+  where external_ref is not null;
+create index if not exists idx_client_agents_client on client_agents(client_id);
+
+-- Usage can now say which agent it came from. Null means "the client's
+-- default agent", which is how every event recorded before v7 reads.
+alter table usage_events add column if not exists agent_id uuid references client_agents(id) on delete set null;
+create index if not exists idx_usage_agent on usage_events(agent_id, occurred_at);
+
+-- --- 5. VantriqAI as its own customer ----------------------------------
+alter table clients add column if not exists is_internal boolean not null default false;
+create index if not exists idx_clients_internal on clients(is_internal) where is_internal = true;
+
+-- --- 6. Invoice status becomes a derived fact --------------------------
+-- 'partial' is what a ledger makes possible: something has been received,
+-- but not all of it. 'void' is an invoice cancelled before payment — kept,
+-- because the number was issued and the series must not gain a hole.
+alter table invoices drop constraint if exists invoices_status_check;
+alter table invoices add constraint invoices_status_check
+  check (status in ('pending','partial','paid','overdue','void'));
+
+-- --- 7. Opening balances and the internal-cost switch ------------------
+-- The Balance Sheet is derived from the invoice, payment and expense
+-- records rather than from a general ledger, so it needs one anchor: the
+-- cash the business started with on the day it started keeping these
+-- records. Equity opens at the same figure, which is what makes the sheet
+-- balance when nothing else has happened yet.
+alter table settings add column if not exists opening_cash numeric not null default 0;
+alter table settings add column if not exists opening_cash_date date;
+-- The P&L line VantriqAI's own agent usage lands on.
+alter table settings add column if not exists internal_cost_label text not null default 'Internal AI usage (own agents)';
+
+-- --- 8. Recurring expenses can end --------------------------------------
+-- Without this a cancelled subscription accrues forever and every past
+-- month's P&L is wrong the moment you delete the row.
+alter table expenses add column if not exists end_date date;
+alter table expenses add column if not exists vendor_id uuid references vendors(id) on delete set null;
+
+-- --- 9. Tax remittances -------------------------------------------------
+-- GST collected is a liability until it is paid to FBR; AIT withheld is an
+-- asset until it is set against a tax bill. Both need somewhere to be
+-- cleared, or the Balance Sheet grows a liability and an asset that never
+-- go away.
+create table if not exists tax_remittances (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null check (kind in ('gst_paid','ait_claimed')),
+  amount numeric not null,
+  period text default '',              -- e.g. 'Sep 2026' or 'FY 2026-27'
+  reference text default '',           -- CPR / challan number
+  paid_date date not null default current_date,
+  notes text default '',
+  recorded_by text default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_tax_remittances_date on tax_remittances(paid_date);
+
+-- --- 10. Keep the new tables' updated_at fresh -------------------------
+drop trigger if exists trg_client_agents_updated on client_agents;
+create trigger trg_client_agents_updated before update on client_agents
+  for each row execute function touch_updated_at();
+
+-- =====================================================================
+-- v8 — subscriptions the way a billing system means it: bundles, quotes,
+--      scheduled changes, metered rates, dunning and reconciliation
+--
+-- Seven things:
+--
+--   1. client_bundles — a package added ALONGSIDE the one a client is on,
+--      rather than replacing it. When a package runs its course, or a
+--      customer simply wants more, another is attached: its quota adds to
+--      their allowance and its retainer adds to the same monthly invoice
+--      as its own line. A bundle can be pinned to one agent, which is how
+--      "the Instagram agent needs its own allowance" is expressed.
+--
+--   2. subscription_phases — a package change dated in the future. The
+--      monthly run applies it on the day it falls due, so "move them up a
+--      tier from January" is recorded once and then happens.
+--
+--   3. quotes / quote_lines — an estimate before anything is billed. The
+--      customer accepts it in their portal and it becomes an invoice, and
+--      where it names a package, a subscription change too.
+--
+--   4. usage_rates — metered billing beyond one price per session. A
+--      negotiated contract can price messages, or tokens, or automation
+--      runs, per client or per agent, with its own included allowance.
+--
+--   5. dunning_steps / invoice_reminders — what happens as a due date
+--      approaches and passes. There is no card to retry in this business:
+--      invoices are settled by bank transfer, so the equivalent of a
+--      smart retry is an escalating schedule of reminders that ends in
+--      suspension, and a log so nothing is ever sent twice.
+--
+--   6. automations — rules on top of that: when an invoice goes N days
+--      overdue, or a client crosses quota, or a bundle is about to end,
+--      do this.
+--
+--   7. bank_credits — the statement lines coming in, matched to invoices
+--      automatically where the reference or the amount says who they are,
+--      and left for a person where it does not.
+-- =====================================================================
+
+-- --- 1. Bundles --------------------------------------------------------
+-- A bundle snapshots its price and quota at the moment it is added, the
+-- same way an invoice does: re-pricing the catalogue later must not
+-- silently re-price someone's existing bundle.
+create table if not exists client_bundles (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  agent_id uuid references client_agents(id) on delete set null,
+  product_id uuid references products(id) on delete set null,
+  name text not null,
+  qty int not null default 1 check (qty > 0),
+  unit_setup_fee numeric not null default 0,
+  unit_retainer numeric not null default 0,
+  unit_quota int not null default 0,
+  overage_rate numeric not null default 0,
+  recurring boolean not null default true,   -- false = a one-off top-up
+  status text not null default 'active' check (status in ('scheduled','active','ended','cancelled')),
+  starts_on date not null default current_date,
+  ends_on date,
+  added_by text not null default 'admin' check (added_by in ('admin','customer','automation')),
+  setup_billed boolean not null default false,
+  note text default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_bundles_client on client_bundles(client_id, status);
+create index if not exists idx_bundles_agent on client_bundles(agent_id);
+
+drop trigger if exists trg_bundles_updated on client_bundles;
+create trigger trg_bundles_updated before update on client_bundles
+  for each row execute function touch_updated_at();
+
+-- Bundle lines have to be traceable from the invoice they were billed on,
+-- or a customer querying their bill has nothing to point at.
+alter table invoice_lines add column if not exists bundle_id uuid references client_bundles(id) on delete set null;
+alter table invoice_lines add column if not exists agent_id uuid references client_agents(id) on delete set null;
+alter table invoice_lines add column if not exists kind text not null default 'other'
+  check (kind in ('retainer','setup','bundle','bundle_setup','overage','addon','discount','other'));
+
+-- --- 2. Scheduled subscription changes ---------------------------------
+create table if not exists subscription_phases (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  product_id uuid not null references products(id) on delete cascade,
+  effective_on date not null,
+  note text default '',
+  status text not null default 'scheduled' check (status in ('scheduled','applied','cancelled')),
+  applied_at timestamptz,
+  created_by text default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_phases_due on subscription_phases(status, effective_on);
+create index if not exists idx_phases_client on subscription_phases(client_id, effective_on);
+
+-- --- 3. Quotes ---------------------------------------------------------
+create sequence if not exists quote_number_seq start 1;
+
+create table if not exists quotes (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  quote_number text unique,
+  title text default '',
+  status text not null default 'draft'
+    check (status in ('draft','sent','accepted','declined','expired','cancelled')),
+  valid_until date,
+  subtotal numeric not null default 0,
+  tax_rate numeric not null default 0,
+  tax_amount numeric not null default 0,
+  total numeric not null default 0,
+  -- A quote may propose a package move, a bundle, or neither.
+  product_id uuid references products(id) on delete set null,
+  bundle_product_id uuid references products(id) on delete set null,
+  notes text default '',
+  terms text default '',
+  sent_at timestamptz,
+  decided_at timestamptz,
+  invoice_id uuid references invoices(id) on delete set null,
+  created_by text default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_quotes_client on quotes(client_id, created_at desc);
+create index if not exists idx_quotes_status on quotes(status, valid_until);
+
+create table if not exists quote_lines (
+  id uuid primary key default gen_random_uuid(),
+  quote_id uuid not null references quotes(id) on delete cascade,
+  position int not null default 0,
+  description text not null default '',
+  detail text default '',
+  qty numeric not null default 1,
+  unit_price numeric not null default 0,
+  amount numeric not null default 0
+);
+create index if not exists idx_quote_lines on quote_lines(quote_id, position);
+
+drop trigger if exists trg_quotes_updated on quotes;
+create trigger trg_quotes_updated before update on quotes
+  for each row execute function touch_updated_at();
+
+-- --- 4. Metered rates --------------------------------------------------
+-- The most specific rate wins: an agent's beats a client's, a client's
+-- beats a package's, a package's beats the built-in per-session overage.
+create table if not exists usage_rates (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid references clients(id) on delete cascade,
+  agent_id uuid references client_agents(id) on delete cascade,
+  product_id uuid references products(id) on delete cascade,
+  metric text not null check (metric in ('session','message','input_token','output_token','automation_run')),
+  unit_rate numeric not null default 0,
+  included_units numeric not null default 0,
+  unit_size numeric not null default 1,      -- e.g. 1000 to price per 1k tokens
+  label text default '',
+  effective_from date not null default current_date,
+  effective_to date,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_usage_rates_client on usage_rates(client_id, metric);
+create index if not exists idx_usage_rates_agent on usage_rates(agent_id, metric);
+
+-- --- 5. Dunning --------------------------------------------------------
+-- offset_days is relative to the due date: negative is before it.
+create table if not exists dunning_steps (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  offset_days int not null,
+  action text not null default 'email' check (action in ('email','flag','suspend')),
+  subject text default '',
+  body text default '',
+  active boolean not null default true,
+  position int not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_dunning_active on dunning_steps(active, offset_days);
+
+create table if not exists invoice_reminders (
+  id uuid primary key default gen_random_uuid(),
+  invoice_id uuid not null references invoices(id) on delete cascade,
+  step_id uuid references dunning_steps(id) on delete set null,
+  action text not null,
+  channel text default 'email',
+  outcome text not null default 'sent' check (outcome in ('sent','failed','skipped')),
+  detail text default '',
+  sent_at timestamptz not null default now()
+);
+-- One step fires once per invoice, ever. This is the whole reason the log
+-- exists: a daily run must not re-send yesterday's reminder.
+create unique index if not exists idx_reminder_once on invoice_reminders(invoice_id, step_id)
+  where step_id is not null;
+create index if not exists idx_reminders_invoice on invoice_reminders(invoice_id, sent_at desc);
+
+alter table settings add column if not exists dunning_enabled boolean not null default false;
+alter table settings add column if not exists dunning_suspend_after_days int not null default 30;
+
+-- --- 6. Automations ----------------------------------------------------
+create table if not exists automations (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  trigger text not null
+    check (trigger in ('invoice_overdue','quota_exceeded','bundle_ending','subscription_renewal')),
+  threshold_days int not null default 0,     -- days overdue, or days before an end date
+  threshold_pct int not null default 100,    -- for quota_exceeded
+  action text not null check (action in ('email_customer','notify_team','suspend_service','flag_review','offer_upgrade')),
+  params jsonb not null default '{}'::jsonb,
+  active boolean not null default true,
+  last_run_at timestamptz,
+  run_count int not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_automations_active on automations(active, trigger);
+
+drop trigger if exists trg_automations_updated on automations;
+create trigger trg_automations_updated before update on automations
+  for each row execute function touch_updated_at();
+
+-- What an automation actually did, so a rule that misfires can be traced.
+create table if not exists automation_runs (
+  id uuid primary key default gen_random_uuid(),
+  automation_id uuid not null references automations(id) on delete cascade,
+  client_id uuid references clients(id) on delete cascade,
+  invoice_id uuid references invoices(id) on delete set null,
+  outcome text not null default 'done',
+  detail text default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_automation_runs on automation_runs(automation_id, created_at desc);
+-- An automation fires once per client per trigger occurrence, not once a day.
+create unique index if not exists idx_automation_once
+  on automation_runs(automation_id, client_id, invoice_id)
+  where invoice_id is not null;
+
+-- --- 7. Bank credits ---------------------------------------------------
+create table if not exists bank_credits (
+  id uuid primary key default gen_random_uuid(),
+  received_date date not null default current_date,
+  amount numeric not null,
+  reference text default '',
+  payer text default '',
+  bank_ref text,                              -- the bank's own unique id for the line
+  status text not null default 'unmatched'
+    check (status in ('unmatched','matched','ignored')),
+  matched_invoice_id uuid references invoices(id) on delete set null,
+  matched_payment_id uuid references payments(id) on delete set null,
+  match_confidence text default '',           -- how it was matched, in words
+  raw jsonb,
+  created_at timestamptz not null default now()
+);
+-- Importing the same statement twice must not double-credit anybody.
+create unique index if not exists idx_bank_credits_ref on bank_credits(bank_ref)
+  where bank_ref is not null;
+create index if not exists idx_bank_credits_status on bank_credits(status, received_date desc);
+
+-- --- 11. Sending the invoice, not just raising it -----------------------
+-- The monthly run created invoices silently: a customer's first word of one
+-- was a dunning reminder days later, chasing a bill nobody had sent them.
+-- With this on, the run emails each invoice as it raises it.
+--
+-- It defaults to TRUE because an unsent invoice is the bug, not the safe
+-- state. Nothing reaches anyone until the run is executed for real, and the
+-- run's dry run names every recipient before it does.
+alter table settings add column if not exists email_invoices boolean not null default true;
