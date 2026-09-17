@@ -59,6 +59,18 @@ command -v docker >/dev/null || die "docker is not on PATH."
   || die "Container '$DB_CONTAINER' is not running."
 [ "$(docker inspect -f '{{.State.Running}}' "$APP_CONTAINER" 2>/dev/null)" = "true" ] \
   || warn "Container '$APP_CONTAINER' is not running yet — it will be built."
+
+# `docker compose build` takes a SERVICE name; docker exec takes a CONTAINER
+# name. They are different things and on this stack they differ: the service
+# is whatever docker-compose.yml calls it, while container_name pins the
+# container to crm_app. Assuming they matched is what stopped the first
+# apply at "no such service: crm_app". A compose-managed container records
+# its own service in a label, so ask it rather than assume.
+APP_SERVICE=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.service"}}' \
+  "$APP_CONTAINER" 2>/dev/null || true)
+[ -n "$APP_SERVICE" ] || APP_SERVICE="$APP_CONTAINER"
+[ "$APP_SERVICE" = "$APP_CONTAINER" ] \
+  || ok "compose service for $APP_CONTAINER is '$APP_SERVICE'"
 # Deliberately does not name a database container: which one serves the CRM
 # is not known until the discovery below. Announcing a guess here is what made
 # the earlier version look like it had checked something it had not.
@@ -167,8 +179,8 @@ fi
 
 # ---------------------------------------------------------------- 4. rebuild
 bold "4. Rebuilding and restarting the API"
-run docker compose build "$APP_CONTAINER"
-run docker compose up -d "$APP_CONTAINER"
+run docker compose build "$APP_SERVICE"
+run docker compose up -d "$APP_SERVICE"
 
 if [ "$DRY" = 0 ]; then
   printf '  waiting for health'
@@ -178,9 +190,9 @@ if [ "$DRY" = 0 ]; then
     fi
     printf '.'; sleep 2
     [ "$i" = 45 ] && { printf '\n'; docker logs --tail 40 "$APP_CONTAINER"; die "API did not come up. Logs above. Roll back with:
-     docker compose down $APP_CONTAINER
+     docker compose down $APP_SERVICE
      rm -rf vantriq-backend && mv vantriq-backend.bak-$STAMP vantriq-backend
-     docker compose up -d --build $APP_CONTAINER"; }
+     docker compose up -d --build $APP_SERVICE"; }
   done
 fi
 
