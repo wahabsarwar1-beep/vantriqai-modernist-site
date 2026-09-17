@@ -4,6 +4,7 @@ const {
   createInvoice, getSettings, monthLabel, buildTaxInvoice,
   settlementOf, derivedStatus,
 } = require('../utils/billing');
+const { sendInvoice, previewInvoiceSend, deliveryHistory } = require('../utils/invoiceDelivery');
 const { blockAutomation } = require('../middleware/auth');
 const router = express.Router();
 
@@ -193,6 +194,31 @@ router.get('/:id/tax-invoice', async (req, res) => {
     db.query(`select * from payments where invoice_id = $1 order by received_date, created_at`, [inv.id]),
   ]);
   res.json(buildTaxInvoice(inv, inv, settings, lines, pays));
+});
+
+/**
+ * POST /api/invoices/:id/send — email this invoice to the customer.
+ *
+ * The monthly run does this automatically as it raises each invoice; this is
+ * for the ones raised by hand, and for resending after a bounce. An invoice
+ * already emailed is skipped unless `force` is passed, so a stray double-click
+ * does not send a customer their bill twice.
+ *
+ * `?preview=true` reports what would happen without sending.
+ */
+router.post('/:id/send', async (req, res) => {
+  if (String(req.query.preview) === 'true') {
+    return res.json(await previewInvoiceSend(req.params.id));
+  }
+  const result = await sendInvoice(req.params.id, { force: !!(req.body || {}).force });
+  // A refusal to send is a 200 with an outcome, not an error: the caller asked
+  // what happened, and "skipped, no email address" is a complete answer.
+  res.json(result);
+});
+
+/** What has been emailed about this invoice, and when. */
+router.get('/:id/delivery', async (req, res) => {
+  res.json(await deliveryHistory(req.params.id));
 });
 
 router.delete('/:id', blockAutomation, async (req, res) => {

@@ -975,3 +975,13 @@ create table if not exists bank_credits (
 create unique index if not exists idx_bank_credits_ref on bank_credits(bank_ref)
   where bank_ref is not null;
 create index if not exists idx_bank_credits_status on bank_credits(status, received_date desc);
+
+-- --- 11. Sending the invoice, not just raising it -----------------------
+-- The monthly run created invoices silently: a customer's first word of one
+-- was a dunning reminder days later, chasing a bill nobody had sent them.
+-- With this on, the run emails each invoice as it raises it.
+--
+-- It defaults to TRUE because an unsent invoice is the bug, not the safe
+-- state. Nothing reaches anyone until the run is executed for real, and the
+-- run's dry run names every recipient before it does.
+alter table settings add column if not exists email_invoices boolean not null default true;

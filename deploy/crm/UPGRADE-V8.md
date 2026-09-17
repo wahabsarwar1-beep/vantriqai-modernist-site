@@ -39,12 +39,38 @@ failure that would otherwise leave you worse off than doing nothing.
 Override the defaults with environment variables if your stack differs:
 `STACK_DIR`, `APP_CONTAINER`, `DB_CONTAINER`, `DB_NAME`, `DB_USER`.
 
+### Or let CI do it
+
+`.github/workflows/deploy-crm.yml` runs the same script over SSH. Add three
+repository secrets (Settings → Secrets and variables → Actions):
+
+| secret | value |
+|---|---|
+| `VPS_HOST` | `76.13.193.8` |
+| `VPS_USER` | `root` |
+| `VPS_SSH_KEY` | a **new** private key, not the one you use from your laptop |
+
+```bash
+ssh-keygen -t ed25519 -C "github-actions-deploy" -f deploy_key
+ssh-copy-id -i deploy_key.pub root@76.13.193.8
+# paste the contents of deploy_key as VPS_SSH_KEY, then delete both files
+```
+
+Then Actions → **Deploy CRM** → Run workflow. It **defaults to a dry run** —
+you have to pick `apply` to change anything, so a mis-click costs a log and
+nothing else. It builds the bundle from the commit being deployed rather than
+trusting the committed zip, pins the host key, refuses to run two deploys at
+once, and checks `/api/health` afterwards.
+
+Optional secrets: `VPS_PORT` (default 22), `STACK_DIR` (default
+`/root/app-stack`).
+
 ### The long way, by hand
 
 ```bash
 cd /root/app-stack
 docker exec postgres_db pg_dump -U postgres vantriq > pre-v8.sql   # do not skip
-sha256sum vantriq-backend-v8.zip      # eab0194fdc6ef04ddda3556be5654f9981e16ce1d9a580fdeae0f86e902d2c5d
+sha256sum vantriq-backend-v8.zip      # 289ee7c0c8b261b622f9806579da8dca37dcdab80a6e07760f2992c05b04e675
 unzip -o vantriq-backend-v8.zip -d vantriq-backend
 docker compose build crm_app && docker compose up -d crm_app
 docker exec crm_app npm run migrate
@@ -171,6 +197,36 @@ customer accepts it in their portal, and *that* is when the invoice is raised
 from its own lines and any package move or bundle it describes is applied.
 An accepted quote is frozen.
 
+### The invoice actually reaches the customer
+
+The monthly run used to raise invoices silently — a customer's first word of
+one was a dunning reminder days later, chasing a bill nobody had sent them.
+
+Now the run emails each invoice as it raises it: the line items, the full tax
+ladder (Subtotal → + GST → Total → less AIT withheld → Net payable), the s.153
+note asking for the challan, and a link to their portal. The email is built
+from the **same** printable document the CRM and the portal render, so what
+they read in their inbox cannot drift from the invoice itself.
+
+Three things it will not do:
+
+- **Never emails an internal invoice.** Billing ourselves is a transfer.
+- **Never sends the same invoice twice.** Every send is logged; the run and the
+  manual button both check first. Pass `force` to deliberately resend.
+- **Never lets a mail failure undo an invoice.** The invoice is the record, the
+  email is a courtesy. A failed send is logged against the invoice for someone
+  to retry — it does not roll anything back.
+
+This is **on by default**, because an unsent invoice is the bug, not the safe
+state. Nothing reaches anyone until you run the billing for real, and the dry
+run names every recipient first. Switch it off in Billing Automation → Monthly
+run if you would rather send bills by hand.
+
+Sending one by hand: open any invoice → **Email it to …**, or
+`POST /api/invoices/:id/send` (`?preview=true` to see what would happen).
+**What has been sent** on the same panel shows the full history — the invoice
+itself and every chase — in one list.
+
 ### Chasing, and why there are no "smart retries"
 
 There is no card to retry — invoices here are settled by bank transfer. The
@@ -276,13 +332,22 @@ If the WhatsApp business number changes, set `VANTRIQ_WHATSAPP_NUMBER` before
 seeding. A mismatch fails silently: the reply still goes out, the usage row
 just never lands.
 
-### Two WhatsApp workflows are active, and only one is live
+### The duplicate WhatsApp workflow has been retired
 
 `VantriqAI - WhatsApp Sales Agent (Text + Voice)` receives Meta's traffic and
-now carries the usage node. `Vantriq Assistant - WhatsApp AI Sales Consultant`
-has **never executed** — Meta is not pointed at its webhook — yet it is the one
-holding the service gate, lead capture and transcript saving. Decide which one
-you want and retire the other; running both invites fixing the wrong one.
+carries the usage node. `Vantriq Assistant - WhatsApp AI Sales Consultant` had
+**never executed once** — Meta was not pointed at its webhook — so it has been
+unpublished and **archived**, not hard-deleted: n8n keeps it recoverable from
+the archive if you ever want what was in it.
+
+Worth knowing what went with it, because the live workflow does **not** have
+these: the **CRM service gate** (ask before answering, so a suspended or
+over-quota client stops being served), **lead capture** into the CRM pipeline,
+and **transcript saving**. Only usage reporting was carried across. Say the
+word and I will port the gate and lead capture into the live one.
+
+A third, `VantriqAI - WhatsApp Sales Agent2`, is inactive with no triggers and
+was left alone.
 
 ---
 

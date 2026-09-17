@@ -505,7 +505,8 @@ async function loadState(){
       ntn:'', strn:'', address:'', default_tax_rate:0, invoice_prefix:'VAI', payment_terms_days:7,
       overage_policy:'serve', overage_grace_pct:120,
       default_ait_rate:0, seller_ntn:'', seller_strn:'', seller_address:'', seller_email:'',
-      opening_cash:0, opening_cash_date:null, internal_cost_label:'Internal AI usage (own agents)' }),
+      opening_cash:0, opening_cash_date:null, internal_cost_label:'Internal AI usage (own agents)',
+      email_invoices:true, dunning_enabled:false }),
     API.get('/api/dashboard'),
     adminOnly('/api/reps', []),
     API.get('/api/package-requests?status=pending'),
@@ -529,6 +530,8 @@ async function loadState(){
       openingCash:settings.opening_cash!=null?+settings.opening_cash:0,
       openingCashDate:settings.opening_cash_date||'',
       internalCostLabel:settings.internal_cost_label||'Internal AI usage (own agents)',
+      emailInvoices:settings.email_invoices!==false,
+      dunningEnabled:!!settings.dunning_enabled,
       defaultTaxRate:settings.default_tax_rate!=null?+settings.default_tax_rate:0,
       invoicePrefix:settings.invoice_prefix||'VAI',
       overagePolicy:settings.overage_policy||'serve',
@@ -647,6 +650,7 @@ function iconCheck(size){ return icon('<path d="M20 6L9 17l-5-5"/>', size); }
 function iconBot(){ return icon('<rect x="4" y="8" width="16" height="11" rx="2.5"/><path d="M12 4v4"/><circle cx="9" cy="13.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="13.5" r="1.1" fill="currentColor" stroke="none"/><path d="M2 12v3M22 12v3"/>'); }
 function iconWallet(){ return icon('<path d="M3 7a2 2 0 012-2h12a2 2 0 012 2"/><rect x="2" y="7" width="20" height="13" rx="2.5"/><path d="M17 13h2"/>'); }
 function iconLedger(){ return icon('<path d="M5 3h12a2 2 0 012 2v16l-3-2-3 2-3-2-3 2V5a2 2 0 012-2z"/><path d="M9 8h6M9 12h6M9 16h3"/>'); }
+function iconMail(size){ return icon('<rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M3 6.5l9 6 9-6"/>', size); }
 function iconQuote(){ return icon('<path d="M6 3h9l5 5v13a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M15 3v5h5"/><path d="M9 13h6M9 17h4"/>'); }
 function iconBolt(){ return icon('<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'); }
 function iconInbox(size){ return icon('<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/>', size); }
@@ -2636,6 +2640,19 @@ function opsRunHTML(){
       on the 1st of each month with an automation key and it looks after itself.
     </p>
     <div class="field" style="max-width:220px;"><label>Month</label><input id="run_month" type="month" value="${month.slice(0,7)}"></div>
+
+    <div style="display:flex;align-items:flex-start;gap:10px;padding:11px 13px;background:${state.company.emailInvoices?'var(--teal-light)':'#F7F5F0'};border:1px solid ${state.company.emailInvoices?'#BFDED7':'var(--border)'};border-radius:9px;margin-bottom:14px;">
+      <div style="flex:1;font-size:12.5px;color:${state.company.emailInvoices?'var(--teal-dark)':'var(--muted)'};">
+        <strong>${state.company.emailInvoices?'Invoices are emailed as they are raised.':'Invoices are NOT being emailed.'}</strong>
+        ${state.company.emailInvoices
+          ? ' Each customer gets their invoice — the figures, the tax breakdown and what to transfer — the moment the run creates it. Internal invoices are never sent.'
+          : ' The run will create invoices silently, and the first thing a customer hears will be a chase for a bill they were never sent.'}
+      </div>
+      <button class="btn ${state.company.emailInvoices?'btn-ghost':'btn-primary'} btn-sm" style="flex-shrink:0;" onclick="toggleInvoiceEmails(${!state.company.emailInvoices})">
+        ${state.company.emailInvoices?'Switch off':'Switch on'}
+      </button>
+    </div>
+
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
       <button class="btn btn-ghost" onclick="runMonthly(true)">Show me what it would do</button>
       <button class="btn btn-primary" onclick="runMonthly(false)">Run it for real</button>
@@ -2649,14 +2666,20 @@ function opsRunHTML(){
   </div>`:''}
   <div class="table-wrap" style="margin-bottom:14px;">
     <table>
-      <thead><tr><th>Client</th><th>Invoice</th><th>Amount</th><th>What is on it</th></tr></thead>
+      <thead><tr><th>Client</th><th>Invoice</th><th>Amount</th><th>Emailed</th><th>What is on it</th></tr></thead>
       <tbody>
-      ${last.invoices.map(i=>`<tr>
+      ${last.invoices.map(i=>{
+        const d = i.delivery || {};
+        const cls = d.outcome==='sent' ? 'pill-paid' : d.outcome==='would_send' ? 'pill-proposal'
+          : d.outcome==='failed' ? 'pill-overdue' : 'pill-pending';
+        return `<tr>
         <td><strong>${esc(i.client)}</strong></td>
         <td class="mono" style="font-size:11.5px;">${esc(i.invoice_number||'— would be raised —')}</td>
         <td class="mono"><strong>${fmtMoney(i.amount)}</strong></td>
+        <td>${d.outcome?`<span class="pill ${cls}"><span class="pill-dot"></span>${esc(d.outcome.replace('_',' '))}</span>
+          ${d.detail?`<div style="font-size:11px;color:var(--muted);">${esc(d.detail)}</div>`:''}`:'—'}</td>
         <td style="font-size:12px;color:var(--muted);">${(i.lines||[]).map(l=>esc(l.description)).join(' · ')||'—'}</td>
-      </tr>`).join('') || `<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--muted);">Nobody to bill.</td></tr>`}
+      </tr>`;}).join('') || `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Nobody to bill.</td></tr>`}
       </tbody>
     </table>
   </div>
@@ -2664,6 +2687,15 @@ function opsRunHTML(){
     ${last.skipped.map(s=>`<div class="detail-row"><span class="k">${esc(s.client)}</span><span class="v">${esc(s.reason)}${s.invoice?` (${esc(s.invoice)})`:''}</span></div>`).join('')}
   </div>`:''}
   `:''}`;
+}
+
+async function toggleInvoiceEmails(on){
+  if(!on && !confirm('Stop emailing invoices?\n\nThe run will still create them, but customers will not be told. The first thing they hear will be a chase for a bill they were never sent.')) return;
+  try{
+    applySettings(await API.put('/api/settings', { email_invoices: on }));
+    render();
+    showToast(on ? 'Invoices will be emailed as they are raised' : 'Invoice emails are off');
+  }catch(e){ showToast(e.message||'Could not change it','warn'); }
 }
 
 async function runMonthly(dry){
@@ -2757,7 +2789,9 @@ function opsChaseHTML(){
       ${d.recent.slice(0,25).map(rr=>`<tr>
         <td>${fmtDate(rr.sent_at)}</td><td>${esc(rr.company)}</td>
         <td class="mono" style="font-size:11.5px;">${esc(rr.invoice_number||'')}</td>
-        <td>${esc(rr.action)}</td>
+        <td>${rr.action==='invoice_issued'
+          ? 'The invoice itself'
+          : esc(rr.step_name || rr.action)}</td>
         <td><span class="pill ${rr.outcome==='failed'?'pill-overdue':rr.outcome==='skipped'?'pill-pending':'pill-paid'}"><span class="pill-dot"></span>${esc(rr.outcome)}</span>${rr.detail?`<div style="font-size:11px;color:var(--muted);">${esc(rr.detail)}</div>`:''}</td>
       </tr>`).join('')}
       </tbody>
@@ -3352,6 +3386,8 @@ function applySettings(updated){
     openingCash:updated.opening_cash!=null?+updated.opening_cash:0,
     openingCashDate:updated.opening_cash_date||'',
     internalCostLabel:updated.internal_cost_label||'Internal AI usage (own agents)',
+    emailInvoices:updated.email_invoices!==false,
+    dunningEnabled:!!updated.dunning_enabled,
     defaultTaxRate:updated.default_tax_rate!=null?+updated.default_tax_rate:0,
     invoicePrefix:updated.invoice_prefix||'VAI',
     overagePolicy:updated.overage_policy||'serve',
@@ -4299,12 +4335,72 @@ function invoicePanelHTML(id){
       <button class="btn btn-sm ${inv.status==='overdue'?'btn-primary':'btn-ghost'}" onclick="setInvoiceStatus('${inv.id}','overdue')">Overdue</button>
       <button class="btn btn-sm ${inv.status==='void'?'btn-primary':'btn-ghost'}" onclick="setInvoiceStatus('${inv.id}','void')">Void</button>
     </div>
+    <div class="divider"></div>
+    <h4 style="font-size:13px;">Sending it</h4>
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+      ${c&&c.isInternal
+        ? `<span style="font-size:12.5px;color:var(--muted);">Internal account — invoices are never emailed.</span>`
+        : `<button class="btn btn-primary btn-sm" onclick="emailInvoice('${inv.id}')">${iconMail(13)} Email it to ${esc(c?c.company:'the customer')}</button>
+           <button class="btn btn-ghost btn-sm" onclick="loadDelivery('${inv.id}')">What has been sent</button>`}
+    </div>
+    <div id="inv-delivery-${inv.id}" style="margin-top:10px;"></div>
+
     <div style="margin-top:20px;display:flex;gap:8px;">
       <button class="btn btn-primary btn-sm" onclick="printTaxInvoice('${inv.id}')">${iconReceipt().replace('width="17"','width="13"').replace('height="17"','height="13"')} Print tax invoice</button>
       <button class="btn btn-ghost btn-sm" onclick="downloadInvoice('${inv.id}')">${iconDownload(13)} Download</button>
       <button class="btn btn-danger-ghost btn-sm" onclick="deleteInvoice('${inv.id}')">${iconTrash(13)} Delete</button>
     </div>
   </div>`;
+}
+
+/**
+ * Emails one invoice to the customer.
+ *
+ * The API answers with an outcome rather than an error when it declines —
+ * "no email address on the client record" is a complete answer, not a failure
+ * — so this reports what actually happened instead of a bare success.
+ */
+async function emailInvoice(id){
+  const prev = await API.post(`/api/invoices/${id}/send?preview=true`, {});
+  if(prev.outcome === 'skipped' && !/already emailed/i.test(prev.detail||'')){
+    showToast(prev.detail || 'It would not send', 'warn');
+    return;
+  }
+  const again = /already emailed/i.test(prev.detail||'');
+  if(!confirm(again
+    ? 'This invoice has already been emailed. Send it again?'
+    : `${prev.detail}\n\nSend it now?`)) return;
+  try{
+    const r = await API.post(`/api/invoices/${id}/send`, { force: again });
+    showToast(r.detail || r.outcome, r.outcome === 'sent' ? undefined : 'warn');
+    loadDelivery(id);
+  }catch(e){ showToast(e.message || 'Could not send it', 'warn'); }
+}
+
+/** What has been emailed about this invoice, and when. */
+async function loadDelivery(id){
+  const host = document.getElementById(`inv-delivery-${id}`);
+  if(!host) return;
+  if(host.dataset.open==='1'){ host.innerHTML=''; host.dataset.open='0'; return; }
+  host.dataset.open='1';
+  host.innerHTML = `<div style="color:var(--muted);font-size:12.5px;">Loading…</div>`;
+  try{
+    const rows = await API.get(`/api/invoices/${id}/delivery`);
+    if(!rows.length){
+      host.innerHTML = `<div style="color:var(--muted);font-size:12.5px;">Nothing has been sent about this invoice yet.</div>`;
+      return;
+    }
+    const LABEL = { invoice_issued:'The invoice itself', email:'Chase', suspend:'Service paused', flag:'Flagged' };
+    host.innerHTML = `<table class="stmt">
+      ${rows.map(r=>`<tr>
+        <td>${esc(LABEL[r.action]||r.action)}${r.step_name?` · ${esc(r.step_name)}`:''}
+          <div style="font-size:11.5px;color:var(--muted);">${fmtDate(r.sent_at)}${r.detail?` · ${esc(r.detail)}`:''}</div></td>
+        <td class="amt"><span class="pill ${r.outcome==='sent'?'pill-paid':r.outcome==='failed'?'pill-overdue':'pill-pending'}"><span class="pill-dot"></span>${esc(r.outcome)}</span></td>
+      </tr>`).join('')}
+    </table>`;
+  }catch(e){
+    host.innerHTML = `<div style="color:var(--red);font-size:12.5px;">${esc(e.message||'Could not load it')}</div>`;
+  }
 }
 
 /** Pulls one invoice's lines and its ledger and shows them under the panel. */

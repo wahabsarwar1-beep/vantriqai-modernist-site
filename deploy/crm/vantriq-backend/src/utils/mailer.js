@@ -83,8 +83,91 @@ function resetEmail(url, name, minutes) {
   return { subject, text, html };
 }
 
+/**
+ * The invoice, as the customer receives it.
+ *
+ * Built from the same printable document the CRM and the portal render, so
+ * the figures in the email are the figures on the invoice — there is no second
+ * calculation here that could drift from the first.
+ *
+ * The tax ladder is spelled out because a Pakistani service invoice has two
+ * taxes moving in opposite directions, and "why is the transfer less than the
+ * total" is otherwise the first question every customer asks.
+ */
+function invoiceEmail(doc, portalUrl) {
+  const cur = doc.currency || 'PKR';
+  const money = (n) => `${cur} ${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const t = doc.totals || {};
+  const who = doc.buyer.contact_name || doc.buyer.company || 'there';
+  const withheld = Number(t.ait_amount || 0) > 0;
+
+  const subject = `${doc.seller.name} — invoice ${doc.invoice_number} for ${money(doc.amount_due)}`;
+
+  const lines = (doc.lines || [])
+    .map((l) => `  ${l.description}${l.detail ? ` (${l.detail})` : ''}  ${money(l.amount)}`)
+    .join('\n');
+
+  const text = [
+    `Hi ${who},`,
+    ``,
+    `Here is your invoice from ${doc.seller.name}.`,
+    ``,
+    `Invoice     ${doc.invoice_number}`,
+    `Issued      ${doc.issued_date}`,
+    doc.due_date ? `Due         ${doc.due_date}` : '',
+    ``,
+    lines,
+    ``,
+    `Subtotal    ${money(t.subtotal)}`,
+    Number(t.tax_amount || 0) > 0 ? `Sales tax   ${money(t.tax_amount)}${t.tax_rate ? ` (${t.tax_rate}%)` : ''}` : '',
+    `Total       ${money(t.total)}`,
+    withheld ? `Less AIT    -${money(t.ait_amount)}${t.ait_rate ? ` (${t.ait_rate}% withheld)` : ''}` : '',
+    `Net payable ${money(t.net_payable)}`,
+    ``,
+    withheld ? doc.ait_note : '',
+    withheld ? '' : '',
+    portalUrl ? `You can see this invoice, your usage and your account here: ${portalUrl}` : '',
+    ``,
+    `Thank you,`,
+    doc.seller.name,
+  ].filter((l) => l !== '').join('\n');
+
+  const row = (k, v, strong) =>
+    `<tr><td style="padding:5px 0;color:#555;">${escapeHtml(k)}</td>` +
+    `<td style="padding:5px 0;text-align:right;white-space:nowrap;${strong ? 'font-weight:700;' : ''}">${escapeHtml(v)}</td></tr>`;
+
+  const html = `
+    <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;color:#1A1A18;">
+      <p>Hi ${escapeHtml(who)},</p>
+      <p>Here is your invoice from ${escapeHtml(doc.seller.name)}.</p>
+      <p style="font-size:20px;font-weight:700;margin:18px 0 6px;">
+        ${escapeHtml(money(doc.amount_due))}${doc.due_date ? ` <span style="font-size:13px;font-weight:400;color:#555;">due ${escapeHtml(doc.due_date)}</span>` : ''}
+      </p>
+      <p style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#555;margin:0 0 16px;">${escapeHtml(doc.invoice_number)}</p>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;border-top:1px solid #E3E0D8;">
+        ${(doc.lines || []).map((l) => `<tr>
+          <td style="padding:8px 0;border-bottom:1px solid #F1EFE8;">${escapeHtml(l.description)}
+            ${l.detail ? `<div style="color:#6B6B66;font-size:11.5px;">${escapeHtml(l.detail)}</div>` : ''}</td>
+          <td style="padding:8px 0;border-bottom:1px solid #F1EFE8;text-align:right;white-space:nowrap;">${escapeHtml(money(l.amount))}</td>
+        </tr>`).join('')}
+      </table>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:10px;">
+        ${row('Subtotal', money(t.subtotal))}
+        ${Number(t.tax_amount || 0) > 0 ? row(`Sales tax${t.tax_rate ? ` (${t.tax_rate}%)` : ''}`, money(t.tax_amount)) : ''}
+        ${row('Total', money(t.total), true)}
+        ${withheld ? row(`Less advance income tax${t.ait_rate ? ` (${t.ait_rate}%)` : ''}`, `-${money(t.ait_amount)}`) : ''}
+        ${row('Net payable', money(t.net_payable), true)}
+      </table>
+      ${withheld ? `<p style="font-size:12px;color:#6B6B66;border-left:2px solid #E3E0D8;padding-left:10px;margin-top:18px;">${escapeHtml(doc.ait_note)}</p>` : ''}
+      ${portalUrl ? `<p style="margin-top:20px;"><a href="${escapeHtml(portalUrl)}" style="background:#12897A;color:#fff;padding:10px 16px;border-radius:7px;text-decoration:none;font-weight:600;font-size:13px;">View your account</a></p>` : ''}
+      <p style="color:#555;font-size:13px;margin-top:20px;">Thank you,<br>${escapeHtml(doc.seller.name)}</p>
+    </div>`;
+
+  return { subject, text, html };
+}
+
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
 
-module.exports = { sendMail, otpEmail, resetEmail, mailConfigured };
+module.exports = { sendMail, otpEmail, resetEmail, invoiceEmail, mailConfigured };

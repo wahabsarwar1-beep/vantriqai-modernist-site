@@ -93,8 +93,14 @@ async function runDunning({ onDate, dryRun } = {}) {
       byInvoice.get(p.invoice_id).push(p);
     }
   }
+  // Only chase rows. invoice_reminders also holds 'invoice_issued' rows — the
+  // invoice being emailed when it was raised — and those carry a null step_id.
+  // They could never collide with a step's uuid, but saying so in the query
+  // beats leaving it to be re-derived by whoever reads this next.
   const { rows: alreadySent } = ids.length
-    ? await db.query(`select invoice_id, step_id from invoice_reminders where invoice_id = any($1::uuid[])`, [ids])
+    ? await db.query(
+        `select invoice_id, step_id from invoice_reminders
+          where invoice_id = any($1::uuid[]) and step_id is not null`, [ids])
     : { rows: [] };
   const sent = new Set(alreadySent.map((r) => `${r.invoice_id}:${r.step_id}`));
 

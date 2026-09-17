@@ -16,6 +16,8 @@ const FIELDS = [
   // one anchor the derived Balance Sheet needs.
   'default_ait_rate', 'seller_ntn', 'seller_strn', 'seller_address', 'seller_email',
   'opening_cash', 'opening_cash_date', 'internal_cost_label',
+  // Whether the monthly run emails each invoice as it raises it.
+  'email_invoices', 'dunning_enabled',
 ];
 
 const OVERAGE_POLICIES = ['serve', 'grace', 'block'];

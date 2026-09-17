@@ -1,6 +1,7 @@
 const db = require('../db');
 const { effectivePackage } = require('./pkg');
-const { ROUND, createInvoice, monthLabel } = require('./billing');
+const { ROUND, createInvoice, monthLabel, getSettings } = require('./billing');
+const { sendInvoice, previewInvoiceSend } = require('./invoiceDelivery');
 
 /**
  * Subscriptions: what a client is on, what they have added to it, and what
@@ -346,6 +347,11 @@ async function runMonthlyBilling({ month, dryRun, clientId } = {}) {
     clientId ? [clientId] : []
   );
 
+  const settings = await getSettings();
+  // An unsent invoice is the bug, not the safe state — so this is on unless
+  // switched off. A dry run still reports every recipient without sending.
+  const emailInvoices = settings.email_invoices !== false;
+
   const raised = [];
   const skipped = [];
   for (const client of clients) {
@@ -362,7 +368,18 @@ async function runMonthlyBilling({ month, dryRun, clientId } = {}) {
     if (!bill) { skipped.push({ client: client.company, reason: 'nothing to bill' }); continue; }
 
     if (dryRun) {
-      raised.push({ client: client.company, client_id: client.id, period, amount: bill.amount, lines: bill.lines });
+      raised.push({
+        client: client.company, client_id: client.id, period,
+        amount: bill.amount, lines: bill.lines,
+        // Who would receive it, worked out the same way the real send does.
+        delivery: emailInvoices
+          ? (client.is_internal
+              ? { outcome: 'skipped', detail: 'Internal account — not sent.' }
+              : !client.email
+                ? { outcome: 'skipped', detail: 'No email address on the client record.' }
+                : { outcome: 'would_send', detail: `Would email ${client.email}.` })
+          : { outcome: 'skipped', detail: 'Invoice emails are switched off in Settings.' },
+      });
       continue;
     }
     const invoice = await createInvoice(client, {
@@ -379,9 +396,17 @@ async function runMonthlyBilling({ month, dryRun, clientId } = {}) {
         await db.query(`update client_bundles set setup_billed = true where id = $1`, [l.bundle_id]);
       }
     }
+    // Send it. This must never undo the invoice: sendInvoice returns an
+    // outcome rather than throwing, and a failure is logged against the
+    // invoice for someone to retry by hand.
+    const delivery = emailInvoices
+      ? await sendInvoice(invoice.id, { settings })
+      : { outcome: 'skipped', detail: 'Invoice emails are switched off in Settings.' };
+
     raised.push({
       client: client.company, client_id: client.id, period,
       invoice_id: invoice.id, invoice_number: invoice.invoice_number, amount: bill.amount,
+      delivery,
     });
   }
 
@@ -389,6 +414,8 @@ async function runMonthlyBilling({ month, dryRun, clientId } = {}) {
     period, month: m, dry_run: !!dryRun,
     invoices: raised, skipped,
     phases_applied: phases, bundles_ended: expired,
+    emailed: raised.filter((r) => r.delivery && r.delivery.outcome === 'sent').length,
+    email_invoices: emailInvoices,
   };
 }
 
