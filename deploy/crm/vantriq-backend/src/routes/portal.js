@@ -1,13 +1,14 @@
 const express = require('express');
 const crypto = require('crypto');
 const db = require('../db');
-const { verifyPassword } = require('../utils/password');
+const { verifyPassword, hashPassword } = require('../utils/password');
 const { sendMail, resetEmail, mailConfigured } = require('../utils/mailer');
 const { issueReset, redeemReset, RESET_MINUTES } = require('../utils/resets');
 const { quotaStatus } = require('../utils/quota');
 const { buildTaxInvoice, getSettings } = require('../utils/billing');
 const { requirePortalSession } = require('../middleware/portalAuth');
 const { effectivePackage } = require('../utils/pkg');
+const { acceptQuote, buildQuoteDocument } = require('./quotes');
 
 const router = express.Router();
 
@@ -445,6 +446,316 @@ router.post('/subscribe', async (req, res) => {
     id: rows[0].id, status: rows[0].status, product_name: prod[0].name,
     message: 'Thanks — your request has been sent to Vantriq AI for review. Nothing changes on your account until it is approved.',
   });
+});
+
+/* ---------------------------- Change your own password ---------------------------- */
+/**
+ * A signed-in customer changing their own password.
+ *
+ * The current password is required, so a borrowed laptop with a live session
+ * cannot be used to lock the real owner out. Every other session for this
+ * client is dropped, which is what makes changing a password useful after
+ * someone else has seen it. A note goes to the address on their record — not
+ * to an address they can supply, because that is exactly how an attacker
+ * would hide the change from them.
+ */
+router.post('/change-password', async (req, res) => {
+  const client = req.portalClient;
+  const current = String((req.body || {}).current_password || '');
+  const next = String((req.body || {}).new_password || '');
+
+  if (!current || !next) return res.status(400).json({ error: 'Enter your current password and the new one.' });
+  if (next.length < 10) return res.status(400).json({ error: 'Your new password needs to be at least 10 characters.' });
+  if (next === current) return res.status(400).json({ error: 'That is the password you already have.' });
+
+  const { rows } = await db.query(`select portal_password_hash from clients where id = $1`, [client.id]);
+  if (!rows[0] || !verifyPassword(current, rows[0].portal_password_hash)) {
+    // Deliberately 403, not 401. The session IS valid — it is the re-check of
+    // the current password that failed. A 401 here would look identical to an
+    // expired session to the browser, and sign the customer out for a typo.
+    return res.status(403).json({ error: 'That is not your current password.' });
+  }
+
+  await db.query(
+    `update clients set portal_password_hash = $2, portal_password_set_at = now(),
+            portal_password_set_by = 'customer'
+      where id = $1`,
+    [client.id, hashPassword(next)]
+  );
+
+  // Every other session goes, including any an attacker was holding. The one
+  // making the change stays, so the customer is not thrown out of the page
+  // they are standing on.
+  const token = String(req.header('authorization') || '').replace(/^Bearer\s+/i, '');
+  await db.query(`delete from portal_sessions where client_id = $1 and token <> $2`, [client.id, token]);
+
+  if (client.email && mailConfigured()) {
+    try {
+      const settings = await getSettings();
+      await sendMail({
+        to: client.email,
+        subject: `Your ${settings.company_name || 'Vantriq AI'} portal password was changed`,
+        text: [
+          `Hi ${client.name || client.company},`,
+          ``,
+          `The password for your ${settings.company_name || 'Vantriq AI'} customer portal was just changed, and every other signed-in device has been signed out.`,
+          ``,
+          `If this was you, there is nothing to do.`,
+          `If it was not, reply to this email immediately — someone else has your password.`,
+        ].join('\n'),
+      });
+    } catch (err) {
+      // The password HAS been changed. Failing the request over an email that
+      // did not send would tell the customer the opposite of the truth.
+      console.error('Portal password-change notice failed to send', err);
+    }
+  }
+
+  res.json({ ok: true, message: 'Your password has been changed. Other devices have been signed out.' });
+});
+
+/* ---------------------------- Agents ---------------------------- */
+/**
+ * Every agent running under this company. A customer with a WhatsApp agent,
+ * an Instagram agent and a website assistant should see three things here,
+ * not one account and no detail.
+ *
+ * session_id is never exposed: it contains the end consumer's phone number,
+ * which belongs to our customer's customer and to nobody else.
+ */
+router.get('/agents', async (req, res) => {
+  const client = req.portalClient;
+  const month = new Date().toISOString().slice(0, 7) + '-01';
+  const { rows } = await db.query(
+    `select a.id, a.name, a.kind, a.status, a.created_at,
+            coalesce(u.sessions, 0) as sessions_this_month,
+            coalesce(u.messages, 0) as messages_this_month,
+            u.last_seen_at
+       from client_agents a
+       left join (
+         select agent_id,
+                count(distinct session_id) as sessions,
+                sum(messages_count) as messages,
+                max(occurred_at) as last_seen_at
+           from usage_events
+          where client_id = $1 and agent_id is not null
+            and occurred_at >= $2::date
+          group by agent_id
+       ) u on u.agent_id = a.id
+      where a.client_id = $1 and a.status <> 'retired'
+      order by a.kind, a.name`,
+    [client.id, month]
+  );
+  const { rows: bundles } = await db.query(
+    `select agent_id, sum(qty * unit_quota) as quota from client_bundles
+      where client_id = $1 and status = 'active' and agent_id is not null group by agent_id`,
+    [client.id]
+  );
+  const byAgent = new Map(bundles.map((b) => [b.agent_id, Number(b.quota)]));
+
+  res.json(rows.map((a) => ({
+    ...a,
+    sessions_this_month: Number(a.sessions_this_month),
+    messages_this_month: Number(a.messages_this_month),
+    dedicated_quota: byAgent.get(a.id) || 0,
+  })));
+});
+
+/* ---------------------------- Bundles ---------------------------- */
+/**
+ * What the customer has added on top of their package, and what they could.
+ *
+ * A bundle is deliberately self-serve where a package change is not. Moving
+ * tier changes what somebody is paying every month from here on and is worth
+ * a conversation; adding a bundle is buying more of what they already have,
+ * and making them wait for us to approve that helps nobody.
+ */
+router.get('/bundles', async (req, res) => {
+  const client = req.portalClient;
+  const [{ rows: mine }, { rows: available }, settings] = await Promise.all([
+    db.query(
+      `select b.id, b.name, b.qty, b.unit_retainer, b.unit_quota, b.overage_rate, b.recurring,
+              b.status, b.starts_on, b.ends_on, b.added_by, a.name as agent_name
+         from client_bundles b
+         left join client_agents a on a.id = b.agent_id
+        where b.client_id = $1 and b.status in ('active','scheduled')
+        order by b.starts_on desc`,
+      [client.id]
+    ),
+    db.query(
+      `select id, name, target_tier, setup_fee, retainer, quota, overage_rate, channels
+         from products where archived = false and is_standard = true
+        order by sort_order, created_at`
+    ),
+    getSettings(),
+  ]);
+
+  const { rows: agents } = await db.query(
+    `select id, name, kind from client_agents where client_id = $1 and status = 'active' order by kind, name`,
+    [client.id]
+  );
+
+  const addedQuota = mine.reduce((s, b) => s + Number(b.qty) * Number(b.unit_quota), 0);
+  const addedMonthly = mine
+    .filter((b) => b.recurring && b.status === 'active')
+    .reduce((s, b) => s + Number(b.qty) * Number(b.unit_retainer), 0);
+
+  res.json({
+    currency: settings.currency || 'PKR',
+    bundles: mine,
+    agents,
+    added_quota: addedQuota,
+    added_monthly: addedQuota ? Math.round(addedMonthly * 100) / 100 : Math.round(addedMonthly * 100) / 100,
+    available: available.map((p) => ({
+      id: p.id, name: p.name, target_tier: p.target_tier,
+      setup_fee: +p.setup_fee, retainer: +p.retainer, quota: +p.quota,
+      overage_rate: +p.overage_rate, channels: p.channels,
+    })),
+  });
+});
+
+/**
+ * The customer adding a bundle themselves. It takes effect now, it adds to
+ * their allowance from this moment, and it appears on the next monthly
+ * invoice as its own line — so what they will be charged is on the screen
+ * before they press the button, not discovered at month end.
+ */
+router.post('/bundles', async (req, res) => {
+  const client = req.portalClient;
+  const b = req.body || {};
+  if (client.service_status === 'suspended') {
+    return res.status(409).json({ error: 'Your service is paused. Please settle your account before adding to it.' });
+  }
+  if (!b.product_id) return res.status(400).json({ error: 'Pick a package to add.' });
+
+  const { rows: prod } = await db.query(
+    `select * from products where id = $1 and archived = false and is_standard = true`, [b.product_id]
+  );
+  if (!prod[0]) return res.status(404).json({ error: 'That package is not available as a bundle.' });
+
+  const qty = Math.max(1, Math.min(20, parseInt(b.qty, 10) || 1));
+  if (b.agent_id) {
+    const { rows: agent } = await db.query(
+      `select id from client_agents where id = $1 and client_id = $2`, [b.agent_id, client.id]
+    );
+    if (!agent[0]) return res.status(400).json({ error: 'That is not one of your agents.' });
+  }
+
+  const eff = effectivePackage(client, prod[0]);
+  // A customer-added bundle carries no setup fee: they are buying more of a
+  // service already set up for them, and charging to switch it on again
+  // would be a fee for nothing.
+  const { rows } = await db.query(
+    `insert into client_bundles
+       (client_id, agent_id, product_id, name, qty, unit_setup_fee, unit_retainer, unit_quota,
+        overage_rate, recurring, status, starts_on, added_by, setup_billed, note)
+     values ($1,$2,$3,$4,$5,0,$6,$7,$8,true,'active',current_date,'customer',true,$9)
+     returning *`,
+    [
+      client.id, b.agent_id || null, prod[0].id, `${eff.name} bundle`, qty,
+      eff.retainer, eff.quota, eff.overage_rate,
+      String(b.note || '').slice(0, 300),
+    ]
+  );
+
+  await db.query(
+    `insert into client_stage_history (client_id, from_stage, to_stage, comment)
+     values ($1, $2, $2, $3)`,
+    [client.id, client.stage,
+      `Customer added ${qty}× ${eff.name} bundle from their portal — +${(eff.quota * qty).toLocaleString('en-US')} conversations, +${(eff.retainer * qty).toLocaleString('en-US')} per month.`]
+  );
+
+  res.status(201).json({
+    bundle: rows[0],
+    message: `Added. Your allowance is up by ${(eff.quota * qty).toLocaleString('en-US')} conversations from today, and this will appear on your next monthly invoice.`,
+  });
+});
+
+/** Ending a bundle. It runs to the end of the month already paid for. */
+router.delete('/bundles/:id', async (req, res) => {
+  const client = req.portalClient;
+  const { rows } = await db.query(
+    `select * from client_bundles where id = $1 and client_id = $2`, [req.params.id, client.id]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'That bundle is not on your account.' });
+  if (rows[0].added_by !== 'customer') {
+    return res.status(409).json({ error: 'This bundle was arranged with us — get in touch and we will sort it out.' });
+  }
+  // The month has been billed, so it runs to the end of it.
+  const endOfMonth = new Date();
+  const ends = new Date(Date.UTC(endOfMonth.getUTCFullYear(), endOfMonth.getUTCMonth() + 1, 0))
+    .toISOString().slice(0, 10);
+  const { rows: updated } = await db.query(
+    `update client_bundles set ends_on = $2 where id = $1 returning *`, [rows[0].id, ends]
+  );
+  res.json({
+    bundle: updated[0],
+    message: `This bundle will run until ${ends} — the month is already covered — and will not be billed again after that.`,
+  });
+});
+
+/* ---------------------------- Quotes ---------------------------- */
+/** Quotes we have sent this customer, and the ones they have decided on. */
+router.get('/quotes', async (req, res) => {
+  const { rows } = await db.query(
+    `select q.id, q.quote_number, q.title, q.status, q.valid_until, q.subtotal,
+            q.tax_rate, q.tax_amount, q.total, q.notes, q.terms, q.sent_at, q.decided_at,
+            q.invoice_id, p.name as product_name, bp.name as bundle_product_name
+       from quotes q
+       left join products p on p.id = q.product_id
+       left join products bp on bp.id = q.bundle_product_id
+      where q.client_id = $1 and q.status <> 'draft'
+      order by q.created_at desc`,
+    [req.portalClient.id]
+  );
+  const ids = rows.map((r) => r.id);
+  const { rows: lines } = ids.length
+    ? await db.query(`select * from quote_lines where quote_id = any($1::uuid[]) order by position`, [ids])
+    : { rows: [] };
+  const byQuote = new Map();
+  for (const l of lines) {
+    if (!byQuote.has(l.quote_id)) byQuote.set(l.quote_id, []);
+    byQuote.get(l.quote_id).push(l);
+  }
+  res.json(rows.map((q) => ({ ...q, lines: byQuote.get(q.id) || [] })));
+});
+
+/** The printable quotation, same document the CRM produces. */
+router.get('/quotes/:id/document', async (req, res) => {
+  const { rows } = await db.query(
+    `select id from quotes where id = $1 and client_id = $2 and status <> 'draft'`,
+    [req.params.id, req.portalClient.id]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Quote not found' });
+  const doc = await buildQuoteDocument(req.params.id);
+  if (!doc) return res.status(404).json({ error: 'Quote not found' });
+  res.json(doc);
+});
+
+/** The customer accepting their own quote — this is what makes it real. */
+router.post('/quotes/:id/accept', async (req, res) => {
+  const { rows } = await db.query(
+    `select id from quotes where id = $1 and client_id = $2 and status = 'sent'`,
+    [req.params.id, req.portalClient.id]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'That quote is not open for acceptance.' });
+  const result = await acceptQuote(req.params.id, { acceptedBy: req.portalClient.company });
+  if (result.error) return res.status(result.status).json({ error: result.error });
+  res.status(201).json({
+    quote: result.quote,
+    invoice: { id: result.invoice.id, invoice_number: result.invoice.invoice_number, net_payable: result.invoice.net_payable },
+    message: `Thank you — invoice ${result.invoice.invoice_number} has been raised${result.applied.length ? `, and we have ${result.applied.join(' and ')}` : ''}.`,
+  });
+});
+
+router.post('/quotes/:id/decline', async (req, res) => {
+  const { rows } = await db.query(
+    `update quotes set status='declined', decided_at=now()
+      where id = $1 and client_id = $2 and status = 'sent' returning id, status`,
+    [req.params.id, req.portalClient.id]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'That quote is not open.' });
+  res.json({ ...rows[0], message: 'Thanks for letting us know.' });
 });
 
 module.exports = router;

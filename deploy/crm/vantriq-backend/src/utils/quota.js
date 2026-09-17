@@ -35,12 +35,26 @@ async function quotaStatus(clientId, month) {
     eff = effectivePackage(client, prod[0]);
   }
 
+  // Bundles add to the allowance. A client who bought a top-up has not gone
+  // over their quota until they have gone past the top-up as well, so the
+  // figure every warning and every overage line is measured against is the
+  // package's quota plus whatever the live bundles add.
+  const { rows: bundleRows } = await db.query(
+    `select qty, unit_quota, name from client_bundles
+      where client_id = $1 and status = 'active'
+        and starts_on <= ($2::date + interval '1 month' - interval '1 day')
+        and (ends_on is null or ends_on >= $2::date)`,
+    [clientId, period]
+  );
+  const bundled = bundleRows.reduce((s, b) => s + Number(b.qty) * Number(b.unit_quota || 0), 0);
+
   const { rows: usage } = await db.query(
     `select sessions, messages from v_monthly_usage where client_id = $1 and period_month = $2::date`,
     [clientId, period]
   );
   const sessions = Number((usage[0] && usage[0].sessions) || 0);
-  const quota = eff ? Number(eff.quota) : null;
+  const baseQuota = eff ? Number(eff.quota) : null;
+  const quota = baseQuota == null ? (bundled || null) : baseQuota + bundled;
   const overageRate = eff ? Number(eff.overage_rate) : null;
 
   const over = quota ? Math.max(0, sessions - quota) : 0;
@@ -48,6 +62,9 @@ async function quotaStatus(clientId, month) {
     period_month: period,
     package_name: eff ? eff.name : null,
     quota,
+    base_quota: baseQuota,
+    bundled_quota: bundled,
+    bundles: bundleRows.map((b) => ({ name: b.name, qty: Number(b.qty), quota: Number(b.unit_quota) })),
     sessions_used: sessions,
     sessions_remaining: quota != null ? Math.max(0, quota - sessions) : null,
     percent_used: quota ? Math.round((sessions / quota) * 100) : null,

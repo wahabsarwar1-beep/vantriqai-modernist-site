@@ -599,6 +599,7 @@ const NAV = [
     {id:'clients', label:'Clients', icon:iconUsers},
     {id:'agents', label:'Agents & Automations', icon:iconBot},
     {id:'billing', label:'Billing & Invoices', icon:iconReceipt},
+    {id:'quotes', label:'Quotes', icon:iconQuote},
     {id:'ledger', label:'Payments & Ledger', icon:iconWallet},
     {id:'quota', label:'Quota & Overage', icon:iconChart},
     {id:'requests', label:'Package Requests', icon:iconBox},
@@ -609,6 +610,7 @@ const NAV = [
     {id:'procurement', label:'Procurement', icon:iconTruck, adminOnly:true},
     {id:'financials', label:'Financials', icon:iconChart, adminOnly:true},
     {id:'accounting', label:'Accounts & Statements', icon:iconLedger, adminOnly:true},
+    {id:'ops', label:'Billing Automation', icon:iconBolt, adminOnly:true},
   ]},
   {group:'', items:[
     {id:'team', label:'Team', icon:iconUsers, adminOnly:true},
@@ -645,6 +647,8 @@ function iconCheck(size){ return icon('<path d="M20 6L9 17l-5-5"/>', size); }
 function iconBot(){ return icon('<rect x="4" y="8" width="16" height="11" rx="2.5"/><path d="M12 4v4"/><circle cx="9" cy="13.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="13.5" r="1.1" fill="currentColor" stroke="none"/><path d="M2 12v3M22 12v3"/>'); }
 function iconWallet(){ return icon('<path d="M3 7a2 2 0 012-2h12a2 2 0 012 2"/><rect x="2" y="7" width="20" height="13" rx="2.5"/><path d="M17 13h2"/>'); }
 function iconLedger(){ return icon('<path d="M5 3h12a2 2 0 012 2v16l-3-2-3 2-3-2-3 2V5a2 2 0 012-2z"/><path d="M9 8h6M9 12h6M9 16h3"/>'); }
+function iconQuote(){ return icon('<path d="M6 3h9l5 5v13a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M15 3v5h5"/><path d="M9 13h6M9 17h4"/>'); }
+function iconBolt(){ return icon('<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'); }
 function iconInbox(size){ return icon('<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/>', size); }
 
 /* ---------------------------- Derived data helpers ---------------------------- */
@@ -747,6 +751,8 @@ const VIEW_TITLES = {
   procurement:['Procurement','Vendors, tools, and purchase orders behind delivery'],
   financials:['Financials','Contribution margin and forward projection, from live data'],
   accounting:['Accounts & Statements','P&L, income statement and balance sheet, from the invoices and the ledger'],
+  quotes:['Quotes','An estimate before anything is billed — the customer accepts it in their portal'],
+  ops:['Billing Automation','The monthly run, the chase schedule, the rules and the bank statement coming back in'],
   agents:['Agents & Automations','Every AI agent and automation running, and who it belongs to'],
   ledger:['Payments & Ledger','What has been received, what is outstanding, and how old it is'],
   settings:['Settings','Company details and data controls'],
@@ -776,6 +782,8 @@ function topbarAction(){
   if(currentView==='agents') return `<button class="btn btn-primary" onclick="openModal={type:'agent'};render()">${iconPlus(15)} Add agent</button>`;
   if(currentView==='ledger') return `<button class="btn btn-primary" onclick="openModal={type:'payment'};render()">${iconPlus(15)} Record payment</button>`;
   if(currentView==='accounting') return `<button class="btn btn-ghost" onclick="downloadWorkbook()">${iconDownload(15)} Download Excel</button>`;
+  if(currentView==='quotes') return `<button class="btn btn-primary" onclick="quoteLines=[];openModal={type:'quote'};render()">${iconPlus(15)} New quote</button>`;
+  if(currentView==='ops') return `<button class="btn btn-ghost" onclick="opsData=null;loadOps()">Refresh</button>`;
   return '';
 }
 
@@ -793,6 +801,8 @@ function renderView(){
     case 'procurement': return renderProcurement();
     case 'financials': return renderFinancials();
     case 'accounting': return renderAccounting();
+    case 'quotes': return renderQuotes();
+    case 'ops': return renderOps();
     case 'agents': return renderAgents();
     case 'ledger': return renderLedger();
     case 'settings': return renderSettings();
@@ -2314,6 +2324,889 @@ async function downloadWorkbook(){
   }catch(e){ showToast(e.message||'Could not build the workbook','warn'); }
 }
 
+
+/* ============================== QUOTES ============================== */
+/**
+ * An estimate before anything is billed. A quote consumes no invoice number
+ * and touches no account; accepting it is the moment it becomes real — the
+ * invoice is raised from its own lines, and anything it proposes is applied.
+ */
+let quotesData = null;
+let quoteFilter = 'open';
+
+async function loadQuotes(){
+  try{ quotesData = await API.get('/api/quotes'); render(); }
+  catch(e){ quotesData = {error: e.message||'Could not load quotes'}; render(); }
+}
+
+const QUOTE_TABS = [
+  {id:'open',     label:'Open',     match:q=>['draft','sent'].includes(q.status)},
+  {id:'draft',    label:'Drafts',   match:q=>q.status==='draft'},
+  {id:'sent',     label:'Sent',     match:q=>q.status==='sent'},
+  {id:'accepted', label:'Accepted', match:q=>q.status==='accepted', tone:'is-won'},
+  {id:'declined', label:'Declined', match:q=>['declined','expired','cancelled'].includes(q.status), tone:'is-lost'},
+  {id:'all',      label:'All',      match:()=>true},
+];
+const QUOTE_PILL = { draft:'pill-pending', sent:'pill-proposal', accepted:'pill-paid',
+  declined:'pill-lost', expired:'pill-lost', cancelled:'pill-lost' };
+
+function renderQuotes(){
+  if(quotesData===null) return `<div class="card" style="text-align:center;padding:40px;color:var(--muted);">Loading quotes…</div>`;
+  if(quotesData.error) return `<div class="card" style="padding:24px;color:var(--red);">${esc(quotesData.error)}</div>`;
+
+  const all = quotesData;
+  const tab = QUOTE_TABS.find(t=>t.id===quoteFilter) || QUOTE_TABS[0];
+  const rows = all.filter(tab.match).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  const openValue = all.filter(q=>q.status==='sent').reduce((s,q)=>s+Number(q.total),0);
+  const wonValue = all.filter(q=>q.status==='accepted').reduce((s,q)=>s+Number(q.total),0);
+  const decided = all.filter(q=>['accepted','declined','expired'].includes(q.status));
+  const winRate = decided.length ? Math.round(all.filter(q=>q.status==='accepted').length/decided.length*100) : null;
+  const today = todayISO();
+
+  return `
+  <div class="grid kpi-row" style="margin-bottom:20px;">
+    <div class="card kpi"><div class="label">Out with customers</div><div class="value mono" style="font-size:19px;">${fmtMoney(openValue)}</div><div class="delta">${all.filter(q=>q.status==='sent').length} awaiting a decision</div></div>
+    <div class="card kpi"><div class="label">Accepted</div><div class="value mono" style="font-size:19px;color:var(--teal-dark);">${fmtMoney(wonValue)}</div></div>
+    <div class="card kpi"><div class="label">Acceptance rate</div><div class="value">${winRate!=null?winRate+'%':'—'}</div><div class="delta">${decided.length} decided</div></div>
+    <div class="card kpi"><div class="label">Quotes raised</div><div class="value">${all.length}</div></div>
+  </div>
+
+  <div class="stage-tabs">
+    ${QUOTE_TABS.map(t=>`<button class="stage-tab ${t.tone||''} ${quoteFilter===t.id?'active':''}" onclick="quoteFilter='${t.id}';render()">${esc(t.label)}<span class="n">${all.filter(t.match).length}</span></button>`).join('')}
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Quote #</th><th>Client</th><th>For</th><th>Total</th><th>Valid until</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      ${rows.map(q=>{
+        const stale = q.valid_until && q.valid_until < today && ['draft','sent'].includes(q.status);
+        return `<tr class="row-click" onclick="openQuote('${q.id}')">
+          <td class="mono" style="font-size:11.5px;">${esc(q.quote_number||'—')}</td>
+          <td><strong>${esc(q.company)}</strong></td>
+          <td>${esc(q.title||q.product_name||'—')}</td>
+          <td class="mono"><strong>${fmtMoney(q.total)}</strong></td>
+          <td style="${stale?'color:var(--red);font-weight:700;':''}">${q.valid_until?fmtDate(q.valid_until):'—'}${stale?' (expired)':''}</td>
+          <td><span class="pill ${QUOTE_PILL[q.status]||'pill-pending'}"><span class="pill-dot"></span>${q.status}</span></td>
+          <td>${iconArrowRight(14)}</td>
+        </tr>`;
+      }).join('') || `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted);">No quotes in this filter.</td></tr>`}
+      </tbody>
+    </table>
+  </div>
+  <div id="quote-detail" style="margin-top:18px;"></div>
+  `;
+}
+
+async function openQuote(id){
+  const host = document.getElementById('quote-detail');
+  if(!host) return;
+  host.innerHTML = `<div class="card" style="color:var(--muted);">Loading…</div>`;
+  try{
+    const q = await API.get(`/api/quotes/${id}`);
+    const open = ['draft','sent'].includes(q.status);
+    host.innerHTML = `
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+          <div>
+            <h3 style="margin:0;font-size:15px;">${esc(q.title||'Quotation')} · <span class="mono" style="font-size:12.5px;color:var(--muted);">${esc(q.quote_number||'')}</span></h3>
+            <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">
+              ${esc(q.company)}${q.valid_until?` · valid until ${fmtDate(q.valid_until)}`:''}
+              ${q.product_name?` · proposes moving to ${esc(q.product_name)}`:''}
+              ${q.bundle_product_name?` · adds a ${esc(q.bundle_product_name)} bundle`:''}
+            </div>
+          </div>
+          <span class="pill ${QUOTE_PILL[q.status]||'pill-pending'}"><span class="pill-dot"></span>${q.status}</span>
+        </div>
+        <table class="stmt" style="margin-top:12px;">
+          ${q.lines.map(l=>`<tr>
+            <td>${esc(l.description)}${l.detail?`<div style="font-size:11.5px;color:var(--muted);">${esc(l.detail)}</div>`:''}</td>
+            <td class="amt" style="color:var(--muted);">${Number(l.qty)} × ${fmtMoney(l.unit_price)}</td>
+            <td class="amt">${fmtMoney(l.amount)}</td>
+          </tr>`).join('')}
+          <tr class="sub"><td colspan="2">Subtotal</td><td class="amt">${fmtMoney(q.subtotal)}</td></tr>
+          ${Number(q.tax_amount)>0?`<tr><td colspan="2">Sales tax @ ${q.tax_rate}%</td><td class="amt">${fmtMoney(q.tax_amount)}</td></tr>`:''}
+          <tr class="tot"><td colspan="2">Total</td><td class="amt">${fmtMoney(q.total)}</td></tr>
+        </table>
+        ${q.notes?`<p style="font-size:12.5px;color:var(--muted);margin:12px 0 0;white-space:pre-line;">${esc(q.notes)}</p>`:''}
+        <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+          ${q.status==='draft'?`<button class="btn btn-primary btn-sm" onclick="sendQuote('${q.id}')">Send it to the customer</button>`:''}
+          ${open?`<button class="btn btn-ghost btn-sm" onclick="acceptQuoteAdmin('${q.id}')">${iconCheck(13)} Accept on their behalf</button>`:''}
+          ${open?`<button class="btn btn-ghost btn-sm" onclick="declineQuoteAdmin('${q.id}')">Mark declined</button>`:''}
+          <button class="btn btn-ghost btn-sm" onclick="printQuote('${q.id}')">${iconReceipt().replace('width="17"','width="13"').replace('height="17"','height="13"')} Print</button>
+          ${q.status!=='accepted'?`<button class="btn btn-danger-ghost btn-sm" onclick="deleteQuote('${q.id}')">${iconTrash(13)} Delete</button>`:''}
+        </div>
+        ${q.status==='sent'?`<p class="footnote" style="margin-top:10px;">This is in the customer's portal now — they can accept it themselves.</p>`:''}
+        ${q.invoice_id?`<p class="footnote" style="margin-top:10px;">Accepted — <a href="#" onclick="event.preventDefault();navigate('billing');setTimeout(()=>{openPanel={type:'invoice',id:'${q.invoice_id}'};render();},100)">see the invoice it raised</a>.</p>`:''}
+      </div>`;
+  }catch(e){
+    host.innerHTML = `<div class="card" style="color:var(--red);">${esc(e.message||'Could not load that quote')}</div>`;
+  }
+}
+
+async function sendQuote(id){
+  try{ await API.post(`/api/quotes/${id}/send`); quotesData=null; await loadQuotes(); openQuote(id); showToast('Sent — it is in their portal now'); }
+  catch(e){ showToast(e.message||'Could not send it','warn'); }
+}
+async function acceptQuoteAdmin(id){
+  if(!confirm('Accept this quote on the customer\'s behalf?\n\nThis raises an invoice for it and applies anything it proposes to their account.')) return;
+  try{
+    const r = await API.post(`/api/quotes/${id}/accept`);
+    quotesData=null; ledgerData=null; accountingData=null;
+    state.invoices = (await API.get('/api/invoices')).map(invoiceFromApi);
+    state.clients = (await API.get('/api/clients')).map(clientFromApi);
+    await loadQuotes(); openQuote(id);
+    showToast(`Invoice ${r.invoice.invoice_number} raised`);
+  }catch(e){ showToast(e.message||'Could not accept it','warn'); }
+}
+async function declineQuoteAdmin(id){
+  try{ await API.post(`/api/quotes/${id}/decline`); quotesData=null; await loadQuotes(); openQuote(id); }
+  catch(e){ showToast(e.message||'Could not update it','warn'); }
+}
+async function deleteQuote(id){
+  if(!confirm('Delete this quote?')) return;
+  try{
+    await API.del(`/api/quotes/${id}`);
+    quotesData=null; await loadQuotes();
+    const host=document.getElementById('quote-detail'); if(host) host.innerHTML='';
+  }catch(e){ showToast(e.message||'Could not delete it','warn'); }
+}
+async function printQuote(id){
+  const r = await openTaxInvoice(()=>API.get(`/api/quotes/${id}/document`));
+  if(!r.ok) showToast(r.error,'warn');
+}
+
+/* ---------------------------- Quote modal ---------------------------- */
+let quoteLines = [];
+function quoteModalHTML(){
+  if(!quoteLines.length) quoteLines = [{description:'', qty:1, unit_price:0}];
+  const valid = new Date(); valid.setDate(valid.getDate()+14);
+  return `
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-head">
+      <h3>New quote</h3>
+      <button class="close-x" onclick="quoteLines=[];closeModal()">${iconX(18)}</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Client *</label>
+        <select id="qt_client">
+          ${state.clients.filter(c=>!c.isInternal).sort((a,b)=>a.company.localeCompare(b.company))
+            .map(c=>`<option value="${c.id}">${esc(c.company)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>What it is for</label><input id="qt_title" placeholder="e.g. Moving up to Scale"></div>
+        <div class="field"><label>Valid until</label><input id="qt_valid" type="date" value="${valid.toISOString().slice(0,10)}"></div>
+      </div>
+      <div class="field">
+        <label>Price a package (fills the lines in for you)</label>
+        <select id="qt_product" onchange="quotePriceFromPackage()">
+          <option value="">— type the lines myself —</option>
+          ${state.products.filter(p=>!p.archived).map(p=>`<option value="${p.id}" data-retainer="${p.retainer}" data-setup="${p.setupFee}" data-quota="${p.quota}">${esc(p.name)}</option>`).join('')}
+        </select>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">Choosing one also proposes the move — accepting the quote puts them on it.</div>
+      </div>
+
+      <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin:14px 0 6px;">Lines</label>
+      <div id="qt_lines">${quoteLinesHTML()}</div>
+      <button class="btn btn-ghost btn-sm" onclick="addQuoteLine()">${iconPlus(13)} Add a line</button>
+
+      <div class="field" style="margin-top:14px;"><label>Notes for the customer</label><textarea id="qt_notes" rows="2"></textarea></div>
+      <div id="qt_total" style="background:#F7F5F0;border-radius:8px;padding:10px 12px;font-size:13px;font-weight:700;display:flex;justify-content:space-between;">
+        <span>Subtotal</span><span class="mono" id="qt_total_v">${fmtMoney(0)}</span>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="quoteLines=[];closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveQuote()">Create the quote</button>
+    </div>
+  </div>`;
+}
+function quoteLinesHTML(){
+  return quoteLines.map((l,i)=>`
+    <div style="display:flex;gap:6px;align-items:flex-end;margin-bottom:7px;">
+      <div class="field" style="flex:1;margin:0;"><input placeholder="What it is" value="${esc(l.description||'')}" oninput="quoteLines[${i}].description=this.value"></div>
+      <div class="field" style="width:64px;margin:0;"><input type="number" min="1" value="${l.qty||1}" oninput="quoteLines[${i}].qty=parseFloat(this.value)||1;quoteRecalc()"></div>
+      <div class="field" style="width:104px;margin:0;"><input type="number" step="0.01" value="${l.unit_price||0}" oninput="quoteLines[${i}].unit_price=parseFloat(this.value)||0;quoteRecalc()"></div>
+      <button class="btn btn-danger-ghost btn-icon" onclick="quoteLines.splice(${i},1);document.getElementById('qt_lines').innerHTML=quoteLinesHTML();quoteRecalc()">${iconTrash(13)}</button>
+    </div>`).join('');
+}
+function addQuoteLine(){
+  quoteLines.push({description:'', qty:1, unit_price:0});
+  document.getElementById('qt_lines').innerHTML = quoteLinesHTML();
+}
+function quoteRecalc(){
+  const total = quoteLines.reduce((s,l)=>s+(Number(l.qty)||1)*(Number(l.unit_price)||0),0);
+  const el = document.getElementById('qt_total_v');
+  if(el) el.textContent = fmtMoney(total);
+}
+function quotePriceFromPackage(){
+  const opt = document.getElementById('qt_product').selectedOptions[0];
+  if(!opt || !opt.value) return;
+  quoteLines = [];
+  if(Number(opt.dataset.setup) > 0){
+    quoteLines.push({description:`${opt.text} — setup and onboarding`, qty:1, unit_price:Number(opt.dataset.setup)});
+  }
+  quoteLines.push({description:`${opt.text} — monthly retainer`, qty:1, unit_price:Number(opt.dataset.retainer)});
+  document.getElementById('qt_lines').innerHTML = quoteLinesHTML();
+  if(!document.getElementById('qt_title').value) document.getElementById('qt_title').value = `Moving to ${opt.text}`;
+  quoteRecalc();
+}
+async function saveQuote(){
+  const v = id => (document.getElementById(id)||{}).value;
+  const lines = quoteLines.filter(l=>l.description && l.description.trim());
+  if(!lines.length){ showToast('A quote needs at least one line','warn'); return; }
+  try{
+    const q = await API.post('/api/quotes', {
+      client_id: v('qt_client'),
+      title: v('qt_title').trim(),
+      valid_until: v('qt_valid') || null,
+      product_id: v('qt_product') || undefined,
+      notes: v('qt_notes').trim(),
+      lines,
+    });
+    quoteLines = []; closeModal();
+    quotesData = null; await loadQuotes();
+    openQuote(q.id);
+    showToast(`Quote ${q.quote_number} created`);
+  }catch(e){ showToast(e.message||'Could not create the quote','warn'); }
+}
+
+/* ============================== BILLING AUTOMATION ============================== */
+/**
+ * The things that run rather than the things you look at: the monthly billing
+ * run, the chase schedule, the rules on top of it, the rate cards, and the
+ * bank statement coming back in.
+ *
+ * Every one of them can be asked what it would do before it does it.
+ */
+let opsData = null;
+let opsTab = 'run';
+
+async function loadOps(){
+  try{
+    const [dunning, automations, credits, rates] = await Promise.all([
+      API.get('/api/billing/dunning'),
+      API.get('/api/billing/automations'),
+      API.get('/api/billing/bank-credits'),
+      API.get('/api/billing/rates'),
+    ]);
+    opsData = { dunning, automations, credits, rates, lastRun: (opsData&&opsData.lastRun)||null };
+    render();
+  }catch(e){ opsData = {error: e.message||'Could not load billing operations'}; render(); }
+}
+
+const OPS_TABS = [
+  {id:'run',   label:'Monthly run'},
+  {id:'chase', label:'Chase schedule'},
+  {id:'rules', label:'Automations'},
+  {id:'bank',  label:'Bank matching'},
+  {id:'rates', label:'Metered rates'},
+];
+
+function renderOps(){
+  if(opsData===null) return `<div class="card" style="text-align:center;padding:40px;color:var(--muted);">Loading…</div>`;
+  if(opsData.error) return `<div class="card" style="padding:24px;color:var(--red);">${esc(opsData.error)}</div>`;
+  const tabs = `<div class="stage-tabs">
+    ${OPS_TABS.map(t=>`<button class="stage-tab ${opsTab===t.id?'active':''}" onclick="opsTab='${t.id}';render()">${esc(t.label)}</button>`).join('')}
+  </div>`;
+  if(opsTab==='run')   return tabs + opsRunHTML();
+  if(opsTab==='chase') return tabs + opsChaseHTML();
+  if(opsTab==='rules') return tabs + opsRulesHTML();
+  if(opsTab==='bank')  return tabs + opsBankHTML();
+  if(opsTab==='rates') return tabs + opsRatesHTML();
+  return tabs;
+}
+
+function opsRunHTML(){
+  const last = opsData.lastRun;
+  const month = todayISO().slice(0,7) + '-01';
+  return `
+  <div class="card" style="max-width:720px;">
+    <h3 style="margin-top:0;font-size:14.5px;">The monthly billing run</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:0;">
+      Bills every active client for the month in one go: their package, every bundle on their account,
+      and whatever ran past the allowance — one invoice each, with a line for each thing. It applies
+      any scheduled package change that has come due first, and ends the bundles whose term has run out.
+    </p>
+    <p style="font-size:12.5px;color:var(--muted);">
+      Running it twice cannot double-bill anybody: a client who already has a retainer invoice for the
+      period is skipped. Point n8n at <span class="mono" style="font-size:11.5px;">POST /api/billing/run-monthly</span>
+      on the 1st of each month with an automation key and it looks after itself.
+    </p>
+    <div class="field" style="max-width:220px;"><label>Month</label><input id="run_month" type="month" value="${month.slice(0,7)}"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-ghost" onclick="runMonthly(true)">Show me what it would do</button>
+      <button class="btn btn-primary" onclick="runMonthly(false)">Run it for real</button>
+    </div>
+  </div>
+  ${last ? `
+  <div class="section-title"><h2>${last.dry_run?'What it would do':'What it did'}</h2><div class="hint">${esc(last.period||'')}</div></div>
+  ${last.phases_applied && last.phases_applied.length?`<div class="card" style="margin-bottom:12px;background:var(--teal-light);border-color:#BFDED7;">
+    <strong style="font-size:13px;">Package changes applied:</strong>
+    <div style="font-size:12.5px;margin-top:4px;">${last.phases_applied.map(ph=>`${esc(ph.product)} from ${fmtDate(ph.effective_on)}`).join(' · ')}</div>
+  </div>`:''}
+  <div class="table-wrap" style="margin-bottom:14px;">
+    <table>
+      <thead><tr><th>Client</th><th>Invoice</th><th>Amount</th><th>What is on it</th></tr></thead>
+      <tbody>
+      ${last.invoices.map(i=>`<tr>
+        <td><strong>${esc(i.client)}</strong></td>
+        <td class="mono" style="font-size:11.5px;">${esc(i.invoice_number||'— would be raised —')}</td>
+        <td class="mono"><strong>${fmtMoney(i.amount)}</strong></td>
+        <td style="font-size:12px;color:var(--muted);">${(i.lines||[]).map(l=>esc(l.description)).join(' · ')||'—'}</td>
+      </tr>`).join('') || `<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--muted);">Nobody to bill.</td></tr>`}
+      </tbody>
+    </table>
+  </div>
+  ${last.skipped.length?`<div class="card"><strong style="font-size:13px;">Skipped</strong>
+    ${last.skipped.map(s=>`<div class="detail-row"><span class="k">${esc(s.client)}</span><span class="v">${esc(s.reason)}${s.invoice?` (${esc(s.invoice)})`:''}</span></div>`).join('')}
+  </div>`:''}
+  `:''}`;
+}
+
+async function runMonthly(dry){
+  const m = (document.getElementById('run_month')||{}).value;
+  const month = m ? m + '-01' : undefined;
+  if(!dry && !confirm(`Raise real invoices for ${m||'this month'}?\n\nEvery active client gets one. Anybody already billed for the period is skipped.`)) return;
+  showToast(dry ? 'Working it out…' : 'Billing…');
+  try{
+    const r = await API.post('/api/billing/run-monthly', { month, dry_run: dry });
+    opsData.lastRun = r;
+    if(!dry){
+      state.invoices = (await API.get('/api/invoices')).map(invoiceFromApi);
+      ledgerData = null; accountingData = null;
+    }
+    render();
+    showToast(dry
+      ? `${r.invoices.length} invoice${r.invoices.length===1?'':'s'} would be raised`
+      : `${r.invoices.length} invoice${r.invoices.length===1?'':'s'} raised`);
+  }catch(e){ showToast(e.message||'The run failed','warn'); }
+}
+
+function opsChaseHTML(){
+  const d = opsData.dunning;
+  const steps = d.steps || [];
+  return `
+  <div class="card" style="max-width:760px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+      <div>
+        <h3 style="margin-top:0;font-size:14.5px;">Chasing an unpaid invoice</h3>
+        <p style="font-size:12.5px;color:var(--muted);margin:0;max-width:520px;">
+          There is no card to retry here — invoices are settled by bank transfer. So the equivalent of a
+          payment processor's smart retry is this: an escalating schedule of reminders around the due
+          date that ends, if nothing arrives, in the service being paused. Each step fires
+          <strong>once per invoice, ever</strong>, so the daily run can be left alone.
+        </p>
+      </div>
+      <span class="pill ${d.enabled?'pill-active':'pill-pending'}"><span class="pill-dot"></span>${d.enabled?'On':'Off'}</span>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+      <button class="btn ${d.enabled?'btn-ghost':'btn-primary'}" onclick="toggleDunning(${!d.enabled})">${d.enabled?'Switch it off':'Switch it on'}</button>
+      <button class="btn btn-ghost" onclick="runDunning(true)">Show me what it would send</button>
+      <button class="btn btn-ghost" onclick="runDunning(false)" ${d.enabled?'':'disabled'}>Run today's chase</button>
+      ${steps.length?'':`<button class="btn btn-primary" onclick="installDunningDefaults()">Install a sensible schedule</button>`}
+    </div>
+  </div>
+
+  <div class="section-title"><h2>The schedule</h2><div class="hint">Days are relative to the due date — a negative number is before it</div></div>
+  <div class="table-wrap" style="margin-bottom:14px;">
+    <table>
+      <thead><tr><th>When</th><th>Step</th><th>What happens</th><th>Subject</th><th>On</th><th></th></tr></thead>
+      <tbody>
+      ${steps.map(st=>`<tr>
+        <td class="mono"><strong>${st.offset_days===0?'Due date':st.offset_days<0?`${Math.abs(st.offset_days)}d before`:`${st.offset_days}d after`}</strong></td>
+        <td>${esc(st.name)}</td>
+        <td><span class="pill ${st.action==='suspend'?'pill-overdue':st.action==='flag'?'pill-contacted':'pill-proposal'}"><span class="pill-dot"></span>${st.action}</span></td>
+        <td style="font-size:12px;color:var(--muted);max-width:280px;">${esc(st.subject||'—')}</td>
+        <td><input type="checkbox" ${st.active?'checked':''} onchange="toggleStep('${st.id}',this.checked)"></td>
+        <td><button class="btn btn-danger-ghost btn-icon" onclick="deleteStep('${st.id}')">${iconTrash(13)}</button></td>
+      </tr>`).join('') || `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">No steps yet.</td></tr>`}
+      </tbody>
+    </table>
+  </div>
+  <button class="btn btn-ghost btn-sm" onclick="openModal={type:'dunningStep'};render()">${iconPlus(13)} Add a step</button>
+  <p class="footnote">You can use <span class="mono">{{name}}</span>, <span class="mono">{{invoice_number}}</span>, <span class="mono">{{amount}}</span>, <span class="mono">{{due_date}}</span>, <span class="mono">{{days_overdue}}</span> and <span class="mono">{{company}}</span> in a subject or body.</p>
+
+  ${opsData.chasePreview ? `
+  <div class="section-title"><h2>${opsData.chasePreview.dry_run?'What it would send':'What it sent'}</h2></div>
+  <div class="table-wrap" style="margin-bottom:14px;">
+    <table>
+      <thead><tr><th>Client</th><th>Invoice</th><th>Step</th><th>Days overdue</th><th>To</th><th>Subject</th><th>Outcome</th></tr></thead>
+      <tbody>
+      ${opsData.chasePreview.actions.map(a=>`<tr>
+        <td><strong>${esc(a.client)}</strong></td>
+        <td class="mono" style="font-size:11.5px;">${esc(a.invoice_number||'')}</td>
+        <td>${esc(a.step)}</td>
+        <td class="mono">${a.days_overdue}</td>
+        <td style="font-size:12px;">${esc(a.to||'—')}</td>
+        <td style="font-size:12px;color:var(--muted);max-width:300px;">${esc(a.subject||a.action)}</td>
+        <td><span class="pill ${a.outcome==='failed'?'pill-overdue':a.outcome==='skipped'?'pill-pending':'pill-paid'}"><span class="pill-dot"></span>${esc(a.outcome)}</span>${a.detail?`<div style="font-size:11px;color:var(--muted);">${esc(a.detail)}</div>`:''}</td>
+      </tr>`).join('') || `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Nothing to chase — every invoice is either settled or not yet due.</td></tr>`}
+      </tbody>
+    </table>
+  </div>`:''}
+
+  ${(d.recent||[]).length?`
+  <div class="section-title"><h2>Already sent</h2><div class="hint">Nothing here is ever sent a second time</div></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>When</th><th>Client</th><th>Invoice</th><th>Action</th><th>Outcome</th></tr></thead>
+      <tbody>
+      ${d.recent.slice(0,25).map(rr=>`<tr>
+        <td>${fmtDate(rr.sent_at)}</td><td>${esc(rr.company)}</td>
+        <td class="mono" style="font-size:11.5px;">${esc(rr.invoice_number||'')}</td>
+        <td>${esc(rr.action)}</td>
+        <td><span class="pill ${rr.outcome==='failed'?'pill-overdue':rr.outcome==='skipped'?'pill-pending':'pill-paid'}"><span class="pill-dot"></span>${esc(rr.outcome)}</span>${rr.detail?`<div style="font-size:11px;color:var(--muted);">${esc(rr.detail)}</div>`:''}</td>
+      </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`:''}
+  `;
+}
+
+async function toggleDunning(on){
+  try{ applySettings(await API.put('/api/settings', { dunning_enabled: on })); opsData=null; await loadOps(); showToast(on?'Chasing is on':'Chasing is off'); }
+  catch(e){ showToast(e.message||'Could not change it','warn'); }
+}
+async function installDunningDefaults(){
+  try{ await API.post('/api/billing/dunning/defaults'); opsData=null; await loadOps(); showToast('Schedule installed'); }
+  catch(e){ showToast(e.message||'Could not install it','warn'); }
+}
+async function toggleStep(id, active){
+  try{ await API.patch(`/api/billing/dunning/steps/${id}`, { active }); }
+  catch(e){ showToast(e.message||'Could not update the step','warn'); }
+}
+async function deleteStep(id){
+  if(!confirm('Delete this step?')) return;
+  try{ await API.del(`/api/billing/dunning/steps/${id}`); opsData=null; await loadOps(); }
+  catch(e){ showToast(e.message||'Could not delete it','warn'); }
+}
+async function runDunning(dry){
+  if(!dry && !confirm('Run today\'s chase for real?\n\nThis sends the emails and applies any suspension the schedule calls for.')) return;
+  showToast(dry?'Working it out…':'Running…');
+  try{
+    const r = await API.post('/api/billing/run-dunning', { dry_run: dry });
+    if(r.ran === false){ showToast(r.reason, 'warn'); return; }
+    opsData.chasePreview = r;
+    if(!dry){ const d = await API.get('/api/billing/dunning'); opsData.dunning = d; }
+    render();
+    showToast(`${r.actions.length} ${dry?'would be sent':'sent'}`);
+  }catch(e){ showToast(e.message||'The chase failed','warn'); }
+}
+
+function opsRulesHTML(){
+  const a = opsData.automations;
+  const TRIGGER_LABEL = { invoice_overdue:'An invoice goes overdue', quota_exceeded:'A client goes past their quota',
+    bundle_ending:'A bundle is about to end', subscription_renewal:'A scheduled package change is coming up' };
+  const ACTION_LABEL = { email_customer:'Email the customer', notify_team:'Tell the team', suspend_service:'Pause their service',
+    flag_review:'Flag it for review', offer_upgrade:'Flag it as an upgrade conversation' };
+  return `
+  <div class="card" style="max-width:720px;">
+    <h3 style="margin-top:0;font-size:14.5px;">Rules</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin:0;">
+      When something happens on an account, do something about it. Each rule fires once per client per
+      occurrence — not once a day — so a rule you leave on will not hound anybody.
+    </p>
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="openModal={type:'automation'};render()">${iconPlus(14)} New rule</button>
+      <button class="btn btn-ghost" onclick="runAutomations(true)">Show me what would fire</button>
+      <button class="btn btn-ghost" onclick="runAutomations(false)">Run the rules now</button>
+    </div>
+  </div>
+
+  <div class="section-title"><h2>Your rules</h2></div>
+  <div class="table-wrap" style="margin-bottom:14px;">
+    <table>
+      <thead><tr><th>Rule</th><th>When</th><th>Then</th><th>Fired</th><th>Last run</th><th>On</th><th></th></tr></thead>
+      <tbody>
+      ${(a.automations||[]).map(r=>`<tr>
+        <td><strong>${esc(r.name)}</strong></td>
+        <td>${esc(TRIGGER_LABEL[r.trigger]||r.trigger)}${r.trigger==='invoice_overdue'?` by ${r.threshold_days} days`:''}${r.trigger==='quota_exceeded'?` (${r.threshold_pct}%)`:''}${['bundle_ending','subscription_renewal'].includes(r.trigger)?` within ${r.threshold_days} days`:''}</td>
+        <td><span class="tag">${esc(ACTION_LABEL[r.action]||r.action)}</span></td>
+        <td class="mono">${r.run_count}</td>
+        <td>${r.last_run_at?fmtDate(r.last_run_at):'—'}</td>
+        <td><input type="checkbox" ${r.active?'checked':''} onchange="toggleAutomation('${r.id}',this.checked)"></td>
+        <td><button class="btn btn-danger-ghost btn-icon" onclick="deleteAutomation('${r.id}')">${iconTrash(13)}</button></td>
+      </tr>`).join('') || `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">No rules yet.</td></tr>`}
+      </tbody>
+    </table>
+  </div>
+
+  ${opsData.rulePreview?`
+  <div class="section-title"><h2>${opsData.rulePreview.dry_run?'What would fire':'What fired'}</h2></div>
+  <div class="table-wrap" style="margin-bottom:14px;">
+    <table>
+      <thead><tr><th>Rule</th><th>Client</th><th>Invoice</th><th>Action</th><th>Outcome</th></tr></thead>
+      <tbody>
+      ${opsData.rulePreview.fired.map(f=>`<tr>
+        <td>${esc(f.automation)}</td><td><strong>${esc(f.client)}</strong></td>
+        <td class="mono" style="font-size:11.5px;">${esc(f.invoice_number||'—')}</td>
+        <td>${esc(ACTION_LABEL[f.action]||f.action)}</td>
+        <td><span class="pill ${f.outcome==='failed'?'pill-overdue':f.outcome==='skipped'?'pill-pending':'pill-paid'}"><span class="pill-dot"></span>${esc(f.outcome)}</span>${f.detail?`<div style="font-size:11px;color:var(--muted);">${esc(f.detail)}</div>`:''}</td>
+      </tr>`).join('') || `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Nothing matches any rule right now.</td></tr>`}
+      </tbody>
+    </table>
+  </div>`:''}
+
+  ${(a.recent||[]).length?`
+  <div class="section-title"><h2>History</h2></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>When</th><th>Rule</th><th>Client</th><th>Outcome</th></tr></thead>
+      <tbody>
+      ${a.recent.slice(0,25).map(rr=>`<tr>
+        <td>${fmtDate(rr.created_at)}</td><td>${esc(rr.automation_name)}</td>
+        <td>${esc(rr.company||'—')}</td>
+        <td><span class="pill ${rr.outcome==='failed'?'pill-overdue':'pill-paid'}"><span class="pill-dot"></span>${esc(rr.outcome)}</span>${rr.detail?`<div style="font-size:11px;color:var(--muted);">${esc(rr.detail)}</div>`:''}</td>
+      </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`:''}
+  `;
+}
+
+async function toggleAutomation(id, active){
+  try{ await API.patch(`/api/billing/automations/${id}`, { active }); }
+  catch(e){ showToast(e.message||'Could not update the rule','warn'); }
+}
+async function deleteAutomation(id){
+  if(!confirm('Delete this rule?')) return;
+  try{ await API.del(`/api/billing/automations/${id}`); opsData=null; await loadOps(); }
+  catch(e){ showToast(e.message||'Could not delete it','warn'); }
+}
+async function runAutomations(dry){
+  if(!dry && !confirm('Run the rules for real?\n\nAnything that matches will have its action carried out.')) return;
+  try{
+    const r = await API.post('/api/billing/run-automations', { dry_run: dry });
+    opsData.rulePreview = r;
+    if(!dry){ opsData.automations = await API.get('/api/billing/automations'); state.clients = (await API.get('/api/clients')).map(clientFromApi); }
+    render();
+    showToast(`${r.fired.length} ${dry?'would fire':'fired'}`);
+  }catch(e){ showToast(e.message||'Could not run the rules','warn'); }
+}
+
+function opsBankHTML(){
+  const credits = opsData.credits || [];
+  const unmatched = credits.filter(c=>c.status==='unmatched');
+  return `
+  <div class="card" style="max-width:760px;">
+    <h3 style="margin-top:0;font-size:14.5px;">Matching money to invoices</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:0;">
+      Paste the credit lines off your bank statement and they are matched to invoices automatically, in
+      order of how sure it can be: the invoice number in the reference first, then an amount that fits
+      exactly one open invoice, then the payer's name plus the amount. <strong>Anything ambiguous is
+      left alone.</strong> A wrong automatic match tells a customer they have paid when they have not,
+      and hides a real debt — so it does not guess.
+    </p>
+    <div class="field">
+      <label>Statement lines — one per row: date, amount, reference, payer</label>
+      <textarea id="bank_paste" rows="6" placeholder="2026-09-14, 37450, VAI-2026-000123, KHAN TRADERS&#10;2026-09-15, 90000, transfer, ACME PVT LTD"></textarea>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">Comma or tab separated. Reference and payer are optional but they are what makes the matching work.</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="importBank(true)">Import and match</button>
+      <button class="btn btn-ghost" onclick="importBank(false)">Import without matching</button>
+    </div>
+  </div>
+
+  ${unmatched.length?`
+  <div class="section-title"><h2>Needs a decision</h2><div class="hint">${unmatched.length} line${unmatched.length===1?'':'s'} the rules would not commit to</div></div>
+  <div class="table-wrap" style="margin-bottom:14px;">
+    <table>
+      <thead><tr><th>Date</th><th>Amount</th><th>Reference</th><th>Payer</th><th>Could be</th><th></th></tr></thead>
+      <tbody>
+      ${unmatched.map(c=>`<tr>
+        <td>${fmtDate(c.received_date)}</td>
+        <td class="mono"><strong>${fmtMoney(c.amount)}</strong></td>
+        <td class="mono" style="font-size:11.5px;">${esc(c.reference||'—')}</td>
+        <td>${esc(c.payer||'—')}</td>
+        <td>
+          ${(c.candidates||[]).length?`<select id="bc_${c.id}" style="padding:5px 8px;border:1px solid var(--border);border-radius:7px;font-size:12px;">
+            ${c.candidates.map(k=>`<option value="${k.id}">${esc(k.invoice_number)} · ${esc(k.company)} · ${fmtMoney(k.balance)}</option>`).join('')}
+          </select>`:`<span style="color:var(--muted);font-size:12px;">nothing outstanding at this amount</span>`}
+        </td>
+        <td style="white-space:nowrap;">
+          ${(c.candidates||[]).length?`<button class="btn btn-primary btn-sm" onclick="matchCredit('${c.id}')">Match</button>`:''}
+          <button class="btn btn-ghost btn-sm" onclick="ignoreCredit('${c.id}')">Set aside</button>
+        </td>
+      </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`:''}
+
+  <div class="section-title"><h2>Everything imported</h2></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Date</th><th>Amount</th><th>Reference</th><th>Payer</th><th>Status</th><th>Matched to</th><th>Why</th></tr></thead>
+      <tbody>
+      ${credits.map(c=>`<tr>
+        <td>${fmtDate(c.received_date)}</td>
+        <td class="mono">${fmtMoney(c.amount)}</td>
+        <td class="mono" style="font-size:11.5px;">${esc(c.reference||'—')}</td>
+        <td>${esc(c.payer||'—')}</td>
+        <td><span class="pill ${c.status==='matched'?'pill-paid':c.status==='ignored'?'pill-pending':'pill-contacted'}"><span class="pill-dot"></span>${esc(c.status)}</span></td>
+        <td class="mono" style="font-size:11.5px;">${esc(c.invoice_number||'—')}${c.company?`<div style="font-family:'Inter';font-size:11px;color:var(--muted);">${esc(c.company)}</div>`:''}</td>
+        <td style="font-size:11.5px;color:var(--muted);max-width:280px;">${esc(c.match_confidence||'—')}</td>
+      </tr>`).join('') || `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Nothing imported yet.</td></tr>`}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+/** Turns pasted statement text into credit rows. */
+function parseStatement(text){
+  return String(text||'').split('\n').map(line=>line.trim()).filter(Boolean).map(line=>{
+    const parts = line.split(/\t|,(?![^(]*\))/).map(x=>x.trim());
+    const [date, amount, reference, payer] = parts;
+    const n = parseFloat(String(amount||'').replace(/[^0-9.\-]/g,''));
+    if(!(n > 0)) return null;
+    return {
+      received_date: /^\d{4}-\d{2}-\d{2}/.test(date||'') ? date.slice(0,10) : todayISO(),
+      amount: n, reference: reference||'', payer: payer||'',
+      bank_ref: `${date||''}|${n}|${reference||''}|${payer||''}`.slice(0,200),
+    };
+  }).filter(Boolean);
+}
+async function importBank(autoPost){
+  const text = (document.getElementById('bank_paste')||{}).value;
+  const credits = parseStatement(text);
+  if(!credits.length){ showToast('Nothing there to import — check the format','warn'); return; }
+  try{
+    const r = await API.post('/api/billing/bank-import', { credits, auto_post: autoPost });
+    opsData = null; await loadOps();
+    const box = document.getElementById('bank_paste'); if(box) box.value = '';
+    showToast(`${r.imported} imported · ${r.matched} matched · ${r.unmatched} for review${r.duplicates?` · ${r.duplicates} already seen`:''}`);
+    state.invoices = (await API.get('/api/invoices')).map(invoiceFromApi);
+    ledgerData = null; accountingData = null;
+  }catch(e){ showToast(e.message||'Could not import that','warn'); }
+}
+async function matchCredit(id){
+  const sel = document.getElementById(`bc_${id}`);
+  if(!sel) return;
+  try{
+    await API.post(`/api/billing/bank-credits/${id}/match`, { invoice_id: sel.value });
+    opsData = null; await loadOps();
+    state.invoices = (await API.get('/api/invoices')).map(invoiceFromApi);
+    ledgerData = null; accountingData = null;
+    showToast('Matched and posted');
+  }catch(e){ showToast(e.message||'Could not match it','warn'); }
+}
+async function ignoreCredit(id){
+  try{ await API.post(`/api/billing/bank-credits/${id}/ignore`); opsData=null; await loadOps(); }
+  catch(e){ showToast(e.message||'Could not set it aside','warn'); }
+}
+
+function opsRatesHTML(){
+  const rates = opsData.rates || [];
+  const METRIC_LABEL = { session:'Conversations', message:'Messages', input_token:'Input tokens',
+    output_token:'Output tokens', automation_run:'Automation runs' };
+  return `
+  <div class="card" style="max-width:720px;">
+    <h3 style="margin-top:0;font-size:14.5px;">Metered rates</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:0;">
+      Out of the box every tier charges one figure per conversation over quota. A rate card prices
+      something else instead — messages, tokens, automation runs — which is what a negotiated contract
+      usually needs. The most specific one wins: an agent's beats a client's, a client's beats a
+      package's, and a package's beats the tier's built-in overage.
+    </p>
+    <button class="btn btn-primary" onclick="openModal={type:'rate'};render()">${iconPlus(14)} New rate card</button>
+  </div>
+  <div class="section-title"><h2>Rate cards</h2></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Applies to</th><th>Metric</th><th>Rate</th><th>Per</th><th>Included</th><th>From</th><th></th></tr></thead>
+      <tbody>
+      ${rates.map(r=>`<tr>
+        <td><strong>${esc(r.agent_name || r.company || r.product_name || '—')}</strong>
+          <div style="font-size:11px;color:var(--muted);">${r.agent_name?'one agent':r.company?'one client':'a package'}</div></td>
+        <td>${esc(METRIC_LABEL[r.metric]||r.metric)}</td>
+        <td class="mono">${fmtMoney(r.unit_rate)}</td>
+        <td class="mono">${Number(r.unit_size)>1?fmtNum(r.unit_size):'1'}</td>
+        <td class="mono">${fmtNum(r.included_units)}</td>
+        <td>${fmtDate(r.effective_from)}</td>
+        <td><button class="btn btn-danger-ghost btn-icon" onclick="deleteRate('${r.id}')">${iconTrash(13)}</button></td>
+      </tr>`).join('') || `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">No rate cards — every client is on their tier's overage rate.</td></tr>`}
+      </tbody>
+    </table>
+  </div>`;
+}
+async function deleteRate(id){
+  if(!confirm('Delete this rate card? The client goes back to their tier\'s overage rate.')) return;
+  try{ await API.del(`/api/billing/rates/${id}`); opsData=null; await loadOps(); }
+  catch(e){ showToast(e.message||'Could not delete it','warn'); }
+}
+
+/* ---------------------------- Ops modals ---------------------------- */
+function dunningStepModalHTML(){
+  return `
+  <div class="modal">
+    <div class="modal-head"><h3>Add a chase step</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
+    <div class="modal-body">
+      <div class="field-row">
+        <div class="field"><label>Name</label><input id="ds_name" placeholder="e.g. Second chase"></div>
+        <div class="field"><label>Days from the due date</label><input id="ds_offset" type="number" value="7">
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">Negative is before the due date.</div></div>
+      </div>
+      <div class="field">
+        <label>What happens</label>
+        <select id="ds_action" onchange="document.getElementById('ds_mail').style.display=this.value==='email'?'block':'none'">
+          <option value="email">Email the customer</option>
+          <option value="flag">Flag it, quietly</option>
+          <option value="suspend">Pause their service</option>
+        </select>
+      </div>
+      <div id="ds_mail">
+        <div class="field"><label>Subject</label><input id="ds_subject" value="Invoice {{invoice_number}} is now overdue"></div>
+        <div class="field"><label>Body</label><textarea id="ds_body" rows="5">Hi {{name}},
+
+Invoice {{invoice_number}} for {{amount}} was due on {{due_date}} and we have not seen it yet.
+
+If there is a problem with the invoice, tell us and we will put it right.
+
+{{company}}</textarea></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveDunningStep()">Add the step</button>
+    </div>
+  </div>`;
+}
+async function saveDunningStep(){
+  const v = id => (document.getElementById(id)||{}).value;
+  if(!v('ds_name').trim()){ showToast('Give the step a name','warn'); return; }
+  try{
+    await API.post('/api/billing/dunning/steps', {
+      name: v('ds_name').trim(), offset_days: parseInt(v('ds_offset'),10)||0,
+      action: v('ds_action'), subject: v('ds_subject'), body: v('ds_body'),
+    });
+    closeModal(); opsData=null; await loadOps(); showToast('Step added');
+  }catch(e){ showToast(e.message||'Could not add the step','warn'); }
+}
+
+function automationModalHTML(){
+  return `
+  <div class="modal">
+    <div class="modal-head"><h3>New rule</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Name</label><input id="au_name" placeholder="e.g. Pause anyone 45 days overdue"></div>
+      <div class="field">
+        <label>When</label>
+        <select id="au_trigger" onchange="automationTriggerChanged()">
+          <option value="invoice_overdue">An invoice goes overdue</option>
+          <option value="quota_exceeded">A client goes past their quota</option>
+          <option value="bundle_ending">A bundle is about to end</option>
+          <option value="subscription_renewal">A scheduled package change is coming up</option>
+        </select>
+      </div>
+      <div class="field" id="au_days_f"><label>By how many days</label><input id="au_days" type="number" value="14"></div>
+      <div class="field" id="au_pct_f" style="display:none;"><label>At what percentage of quota</label><input id="au_pct" type="number" value="100"></div>
+      <div class="field">
+        <label>Then</label>
+        <select id="au_action" onchange="document.getElementById('au_mail').style.display=this.value==='email_customer'?'block':'none'">
+          <option value="flag_review">Flag it for review</option>
+          <option value="email_customer">Email the customer</option>
+          <option value="notify_team">Tell the team</option>
+          <option value="offer_upgrade">Flag it as an upgrade conversation</option>
+          <option value="suspend_service">Pause their service</option>
+        </select>
+      </div>
+      <div id="au_mail" style="display:none;">
+        <div class="field"><label>Subject</label><input id="au_subject" value="A note about your account"></div>
+        <div class="field"><label>Body</label><textarea id="au_body" rows="4">Hi {{name}},
+
+We wanted to let you know about your account.
+
+{{company}}</textarea></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveAutomation()">Create the rule</button>
+    </div>
+  </div>`;
+}
+function automationTriggerChanged(){
+  const t = document.getElementById('au_trigger').value;
+  document.getElementById('au_days_f').style.display = t==='quota_exceeded' ? 'none' : 'block';
+  document.getElementById('au_pct_f').style.display = t==='quota_exceeded' ? 'block' : 'none';
+}
+async function saveAutomation(){
+  const v = id => (document.getElementById(id)||{}).value;
+  if(!v('au_name').trim()){ showToast('Give the rule a name','warn'); return; }
+  try{
+    await API.post('/api/billing/automations', {
+      name: v('au_name').trim(), trigger: v('au_trigger'),
+      threshold_days: parseInt(v('au_days'),10)||0, threshold_pct: parseInt(v('au_pct'),10)||100,
+      action: v('au_action'),
+      params: v('au_action')==='email_customer' ? { subject: v('au_subject'), body: v('au_body') } : {},
+    });
+    closeModal(); opsData=null; await loadOps(); showToast('Rule created');
+  }catch(e){ showToast(e.message||'Could not create the rule','warn'); }
+}
+
+function rateModalHTML(){
+  return `
+  <div class="modal">
+    <div class="modal-head"><h3>New rate card</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Applies to</label>
+        <select id="rt_client">
+          <option value="">— a package, not one client —</option>
+          ${state.clients.sort((a,b)=>a.company.localeCompare(b.company)).map(c=>`<option value="${c.id}">${esc(c.company)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field">
+        <label>Or a package</label>
+        <select id="rt_product">
+          <option value="">—</option>
+          ${state.products.filter(p=>!p.archived).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field">
+        <label>What is being metered</label>
+        <select id="rt_metric">
+          <option value="session">Conversations</option>
+          <option value="message">Messages</option>
+          <option value="input_token">Input tokens</option>
+          <option value="output_token">Output tokens</option>
+          <option value="automation_run">Automation runs</option>
+        </select>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Rate</label><input id="rt_rate" type="number" step="0.0001" value="0"></div>
+        <div class="field"><label>Per how many units</label><input id="rt_size" type="number" value="1">
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">1000 to price per thousand tokens.</div></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Included each month</label><input id="rt_incl" type="number" value="0"></div>
+        <div class="field"><label>From</label><input id="rt_from" type="date" value="${todayISO()}"></div>
+      </div>
+      <div class="field"><label>How it should read on the invoice</label><input id="rt_label" placeholder="e.g. Messages beyond the bundle"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveRate()">Create it</button>
+    </div>
+  </div>`;
+}
+async function saveRate(){
+  const v = id => (document.getElementById(id)||{}).value;
+  if(!v('rt_client') && !v('rt_product')){ showToast('Pick a client or a package for this rate','warn'); return; }
+  try{
+    await API.post('/api/billing/rates', {
+      client_id: v('rt_client')||undefined, product_id: v('rt_product')||undefined,
+      metric: v('rt_metric'), unit_rate: parseFloat(v('rt_rate'))||0,
+      included_units: parseFloat(v('rt_incl'))||0, unit_size: parseFloat(v('rt_size'))||1,
+      label: v('rt_label').trim(), effective_from: v('rt_from')||undefined,
+    });
+    closeModal(); opsData=null; await loadOps(); showToast('Rate card created');
+  }catch(e){ showToast(e.message||'Could not create it','warn'); }
+}
+
 /* ============================== SETTINGS ============================== */
 function renderSettings(){
   return `
@@ -2578,8 +3471,15 @@ function renderModal(){
   else if(openModal.type==='agent') html = agentModalHTML(openModal.id);
   else if(openModal.type==='payment') html = paymentModalHTML(openModal.invoiceId);
   else if(openModal.type==='remittance') html = remittanceModalHTML();
+  else if(openModal.type==='bundle') html = bundleModalHTML(openModal.clientId);
+  else if(openModal.type==='phase') html = phaseModalHTML(openModal.clientId);
+  else if(openModal.type==='quote') html = quoteModalHTML();
+  else if(openModal.type==='dunningStep') html = dunningStepModalHTML();
+  else if(openModal.type==='automation') html = automationModalHTML();
+  else if(openModal.type==='rate') html = rateModalHTML();
   root.innerHTML = `<div class="modal-overlay" onmousedown="if(event.target===this){openModal=null;render();}">${html}</div>`;
   if(openModal.type==='invoice') requestAnimationFrame(prefillInvoiceAmount);
+  if(openModal.type==='bundle') requestAnimationFrame(bundleProductChanged);
 }
 function closeModal(){ openModal=null; render(); }
 
@@ -3273,6 +4173,15 @@ function clientPanelHTML(id){
       <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px;"><span class="k">Session usage this month <span style="color:var(--teal-dark);">● live</span></span><span>${fmtNum(c.sessionsUsedThisMonth||0)} / ${p?fmtNum(p.quota):0}</span></div>
       <div class="progress-track"><div class="progress-fill ${usagePct>=100?'danger':usagePct>=80?'warn':''}" style="width:${usagePct}%"></div></div>
     </div>`:''}
+    <div class="divider"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <h4 style="font-size:13px;margin:0;">Subscription</h4>
+      <button class="btn btn-ghost btn-sm" onclick="loadClientSubscription('${c.id}')">Load</button>
+    </div>
+    <div id="sub-${c.id}" style="margin-top:10px;font-size:12.5px;color:var(--muted);">
+      Bundles, the real allowance and any scheduled package change.
+    </div>
+
     <div class="field" style="margin-top:14px;"><label>Notes</label><div style="font-size:13px;color:var(--text);background:#FAF8F3;padding:10px 12px;border-radius:8px;">${esc(c.notes)||'—'}</div></div>
 
     ${subAccountsOf(c.id).length?`
@@ -3703,6 +4612,255 @@ async function saveRemittance(){
   }catch(e){ showToast(e.message||'Could not record the remittance','warn'); }
 }
 
+
+/* ---------------------- Subscription on the client panel ---------------------- */
+/**
+ * A client's package is their subscription; bundles sit on top of it. This
+ * pulls the whole picture — the real allowance, what each bundle adds, and
+ * any package change already dated in the future.
+ */
+async function loadClientSubscription(clientId){
+  const host = document.getElementById(`sub-${clientId}`);
+  if(!host) return;
+  host.innerHTML = `<span style="color:var(--muted);">Loading…</span>`;
+  try{
+    const s = await API.get(`/api/subscriptions/${clientId}`);
+    const bundles = s.bundles || [];
+    const phases = s.scheduled_changes || [];
+    host.innerHTML = `
+      <div class="detail-row"><span class="k">Package allowance</span><span class="v mono">${fmtNum(s.allowance.base)}</span></div>
+      ${s.allowance.bundled?`<div class="detail-row"><span class="k">From bundles</span><span class="v mono" style="color:var(--teal-dark);">+${fmtNum(s.allowance.bundled)}</span></div>`:''}
+      <div class="detail-row"><strong>Conversations included</strong><span class="v mono"><strong>${fmtNum(s.allowance.total)}</strong></span></div>
+      <div class="detail-row"><span class="k">Billed monthly</span><span class="v mono">${fmtMoney(s.monthly_retainer)}</span></div>
+
+      <h4 style="font-size:12.5px;margin:14px 0 6px;">Bundles</h4>
+      ${bundles.length ? bundles.map(b=>`
+        <div style="border:1px solid var(--border);border-radius:9px;padding:9px 11px;margin-bottom:7px;">
+          <div style="display:flex;justify-content:space-between;gap:8px;">
+            <div>
+              <div style="font-weight:700;font-size:12.5px;">${b.qty>1?`${b.qty} × `:''}${esc(b.name)}</div>
+              <div style="font-size:11px;color:var(--muted);">
+                +${fmtNum(Number(b.qty)*Number(b.unit_quota))} conversations${b.agent_name?` · ${esc(b.agent_name)}`:''}
+                · ${b.added_by==='customer'?'added by the customer':'arranged by us'}
+                ${b.ends_on?` · ends ${fmtDate(b.ends_on)}`:''}
+              </div>
+            </div>
+            <div style="text-align:right;white-space:nowrap;">
+              <div class="mono" style="font-weight:700;font-size:12.5px;">${fmtMoney(Number(b.qty)*Number(b.unit_retainer))}</div>
+              <button class="btn btn-danger-ghost btn-sm" style="margin-top:4px;padding:3px 8px;font-size:11px;"
+                onclick="endBundle('${b.id}','${clientId}')">End</button>
+            </div>
+          </div>
+        </div>`).join('')
+        : `<div style="color:var(--muted);font-size:12.5px;">No bundles on this account.</div>`}
+
+      ${phases.length?`
+        <h4 style="font-size:12.5px;margin:14px 0 6px;">Scheduled changes</h4>
+        ${phases.map(ph=>`
+          <div class="detail-row">
+            <span class="k">${fmtDate(ph.effective_on)} → ${esc(ph.product_name)}${ph.note?`<div style="font-size:11px;">${esc(ph.note)}</div>`:''}</span>
+            <span class="v"><button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px;" onclick="cancelPhase('${ph.id}','${clientId}')">Cancel</button></span>
+          </div>`).join('')}`:''}
+
+      <div style="display:flex;gap:7px;margin-top:12px;flex-wrap:wrap;">
+        <button class="btn btn-primary btn-sm" onclick="openModal={type:'bundle',clientId:'${clientId}'};render()">${iconPlus(13)} Add a bundle</button>
+        <button class="btn btn-ghost btn-sm" onclick="openModal={type:'phase',clientId:'${clientId}'};render()">Schedule a package change</button>
+        <button class="btn btn-ghost btn-sm" onclick="previewBill('${clientId}')">Preview next bill</button>
+      </div>
+      <div id="billpreview-${clientId}" style="margin-top:10px;"></div>`;
+  }catch(e){
+    host.innerHTML = `<span style="color:var(--red);">${esc(e.message||'Could not load the subscription')}</span>`;
+  }
+}
+
+async function endBundle(bundleId, clientId){
+  if(!confirm('End this bundle? It stops counting towards the allowance and stops being billed. Its history stays on the invoices it appeared on.')) return;
+  try{
+    await API.del(`/api/subscriptions/bundles/${bundleId}`);
+    await loadClientSubscription(clientId);
+    showToast('Bundle ended');
+  }catch(e){ showToast(e.message||'Could not end the bundle','warn'); }
+}
+async function cancelPhase(phaseId, clientId){
+  try{
+    await API.del(`/api/subscriptions/phases/${phaseId}`);
+    await loadClientSubscription(clientId);
+    showToast('Scheduled change cancelled');
+  }catch(e){ showToast(e.message||'Could not cancel it','warn'); }
+}
+
+/** What this client would be billed this month, without billing them. */
+async function previewBill(clientId){
+  const host = document.getElementById(`billpreview-${clientId}`);
+  if(!host) return;
+  host.innerHTML = `<span style="color:var(--muted);font-size:12.5px;">Working it out…</span>`;
+  try{
+    const b = await API.get(`/api/subscriptions/${clientId}/preview`);
+    if(!b.lines || !b.lines.length){
+      host.innerHTML = `<div style="color:var(--muted);font-size:12.5px;">Nothing to bill this month.</div>`;
+      return;
+    }
+    host.innerHTML = `
+      <div style="background:#F7F5F0;border:1px solid var(--border);border-radius:9px;padding:10px 12px;">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;margin-bottom:6px;">Next bill — ${esc(b.period||'')}</div>
+        <table class="stmt">
+          ${b.lines.map(l=>`<tr>
+            <td>${esc(l.description)}${l.detail?`<div style="font-size:11px;color:var(--muted);">${esc(l.detail)}</div>`:''}</td>
+            <td class="amt">${fmtMoney(l.amount)}</td>
+          </tr>`).join('')}
+          <tr class="sub"><td>Before tax</td><td class="amt">${fmtMoney(b.amount)}</td></tr>
+        </table>
+      </div>`;
+  }catch(e){
+    host.innerHTML = `<span style="color:var(--red);font-size:12.5px;">${esc(e.message||'Could not build the preview')}</span>`;
+  }
+}
+
+/* ---------------------------- Bundle modal ---------------------------- */
+function bundleModalHTML(clientId){
+  const c = state.clients.find(x=>x.id===clientId);
+  const agents = (agentsData && !agentsData.error) ? agentsData.filter(a=>a.client_id===clientId) : [];
+  return `
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Add a bundle for ${esc(c?c.company:'')}</h3>
+      <button class="close-x" onclick="closeModal()">${iconX(18)}</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12.5px;color:var(--muted);margin-top:0;">
+        A bundle sits <strong>alongside</strong> their package rather than replacing it. Its quota adds to
+        their allowance and its retainer adds to the same monthly invoice, as its own line. The price is
+        copied from the catalogue now, so re-pricing a tier later will not re-price this bundle.
+      </p>
+      <div class="field">
+        <label>Based on which package</label>
+        <select id="bn_product" onchange="bundleProductChanged()">
+          <option value="">— custom, priced by hand —</option>
+          ${state.products.filter(p=>!p.archived).map(p=>`<option value="${p.id}" data-retainer="${p.retainer}" data-quota="${p.quota}" data-setup="${p.setupFee}" data-over="${p.overageRate}">${esc(p.name)} — ${fmtMoney(p.retainer)}/mo, ${fmtNum(p.quota)} conversations</option>`).join('')}
+        </select>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>How many</label><input id="bn_qty" type="number" min="1" value="1" onchange="bundleProductChanged()"></div>
+        <div class="field">
+          <label>For which agent</label>
+          <select id="bn_agent">
+            <option value="">The whole account</option>
+            ${agents.map(a=>`<option value="${a.id}">${esc(a.name)} (${esc(a.kind)})</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="field"><label>Name on the invoice</label><input id="bn_name" placeholder="e.g. Instagram top-up"></div>
+      <div class="field-row">
+        <div class="field"><label>Monthly retainer, each</label><input id="bn_retainer" type="number" step="0.01" value="0"></div>
+        <div class="field"><label>Conversations added, each</label><input id="bn_quota" type="number" value="0"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>One-off setup fee, each</label><input id="bn_setup" type="number" step="0.01" value="0"></div>
+        <div class="field"><label>Overage rate</label><input id="bn_over" type="number" step="0.01" value="0"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Starts</label><input id="bn_start" type="date" value="${todayISO()}"></div>
+        <div class="field"><label>Ends (optional)</label><input id="bn_end" type="date"></div>
+      </div>
+      <div class="field">
+        <label>Billing</label>
+        <select id="bn_recurring">
+          <option value="true">Every month, until it ends</option>
+          <option value="false">Once only — a top-up for this month</option>
+        </select>
+      </div>
+      <div id="bn_summary" style="background:#F7F5F0;border-radius:8px;padding:10px 12px;font-size:12.5px;color:var(--muted);"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveBundle('${clientId}')">Add the bundle</button>
+    </div>
+  </div>`;
+}
+function bundleProductChanged(){
+  const sel = document.getElementById('bn_product');
+  const opt = sel.selectedOptions[0];
+  const qty = parseInt((document.getElementById('bn_qty')||{}).value,10) || 1;
+  if(opt && opt.value){
+    document.getElementById('bn_retainer').value = opt.dataset.retainer;
+    document.getElementById('bn_quota').value = opt.dataset.quota;
+    document.getElementById('bn_setup').value = opt.dataset.setup;
+    document.getElementById('bn_over').value = opt.dataset.over;
+    if(!document.getElementById('bn_name').value) document.getElementById('bn_name').value = opt.text.split(' — ')[0] + ' bundle';
+  }
+  const r = parseFloat((document.getElementById('bn_retainer')||{}).value) || 0;
+  const q = parseFloat((document.getElementById('bn_quota')||{}).value) || 0;
+  const su = parseFloat((document.getElementById('bn_setup')||{}).value) || 0;
+  const box = document.getElementById('bn_summary');
+  if(box) box.innerHTML = `Adds <strong>${fmtNum(q*qty)}</strong> conversations and <strong>${fmtMoney(r*qty)}</strong> a month${su?`, plus <strong>${fmtMoney(su*qty)}</strong> once`:''}.`;
+}
+async function saveBundle(clientId){
+  const v = id => (document.getElementById(id)||{}).value;
+  const body = {
+    client_id: clientId,
+    product_id: v('bn_product') || undefined,
+    agent_id: v('bn_agent') || undefined,
+    name: v('bn_name').trim() || undefined,
+    qty: parseInt(v('bn_qty'),10) || 1,
+    unit_retainer: parseFloat(v('bn_retainer')) || 0,
+    unit_quota: parseInt(v('bn_quota'),10) || 0,
+    unit_setup_fee: parseFloat(v('bn_setup')) || 0,
+    overage_rate: parseFloat(v('bn_over')) || 0,
+    starts_on: v('bn_start') || undefined,
+    ends_on: v('bn_end') || undefined,
+    recurring: v('bn_recurring') !== 'false',
+  };
+  if(!body.product_id && !body.name){ showToast('Give the bundle a name, or base it on a package','warn'); return; }
+  try{
+    await API.post('/api/subscriptions/bundles', body);
+    closeModal();
+    await loadClientSubscription(clientId);
+    showToast('Bundle added');
+  }catch(e){ showToast(e.message||'Could not add the bundle','warn'); }
+}
+
+/* ---------------------------- Scheduled change modal ---------------------------- */
+function phaseModalHTML(clientId){
+  const c = state.clients.find(x=>x.id===clientId);
+  const soon = new Date(); soon.setMonth(soon.getMonth()+1); soon.setDate(1);
+  return `
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Schedule a package change</h3>
+      <button class="close-x" onclick="closeModal()">${iconX(18)}</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12.5px;color:var(--muted);margin-top:0;">
+        Records the change once; the monthly billing run applies it on the day it falls due and bills
+        ${esc(c?c.company:'them')} on the new tier from that month. Nothing changes before then.
+      </p>
+      <div class="field">
+        <label>Move to</label>
+        <select id="ph_product">
+          ${state.products.filter(p=>!p.archived).map(p=>`<option value="${p.id}" ${c&&c.productId===p.id?'disabled':''}>${esc(p.name)} — ${fmtMoney(p.retainer)}/mo${c&&c.productId===p.id?' (current)':''}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field"><label>Effective from</label><input id="ph_date" type="date" value="${soon.toISOString().slice(0,10)}"></div>
+      <div class="field"><label>Why</label><input id="ph_note" placeholder="e.g. Agreed in the quarterly review"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="savePhase('${clientId}')">Schedule it</button>
+    </div>
+  </div>`;
+}
+async function savePhase(clientId){
+  const v = id => (document.getElementById(id)||{}).value;
+  try{
+    await API.post(`/api/subscriptions/${clientId}/phases`, {
+      product_id: v('ph_product'), effective_on: v('ph_date'), note: v('ph_note').trim(),
+    });
+    closeModal();
+    await loadClientSubscription(clientId);
+    showToast('Change scheduled');
+  }catch(e){ showToast(e.message||'Could not schedule it','warn'); }
+}
+
 /* ============================== Hooks after render ============================== */
 function attachPostRenderHooks(){
   if(currentView==='dashboard'){
@@ -3717,6 +4875,8 @@ function attachPostRenderHooks(){
     else requestAnimationFrame(drawAccountingChart);
   }
   if(currentView==='settings') refreshInternalAccountCard();
+  if(currentView==='quotes' && quotesData===null) loadQuotes();
+  if(currentView==='ops' && opsData===null) loadOps();
 }
 
 /* ============================== Sign in ============================== */

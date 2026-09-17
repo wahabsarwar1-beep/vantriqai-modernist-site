@@ -71,6 +71,8 @@ router.get('/crm.xlsx', async (req, res) => {
     settings, clients, agents, products, invoices, lines, payments, expenses,
     vendors, pos, remittances, usageMonthly, usageByAgent, quotaEvents,
     stageHistory, reps, packageRequests,
+    bundles, quotes, quoteLines, phases, rates, dunningSteps, reminders,
+    automations, automationRuns, bankCredits,
   ] = await Promise.all([
     q(`select * from settings where id = 1`).then((r) => r[0] || {}),
     q(`select c.*, p.name as package_name, parent.company as parent_company
@@ -116,6 +118,42 @@ router.get('/crm.xlsx', async (req, res) => {
     q(`select r.*, c.company, p.name as package_name from package_requests r
          join clients c on c.id = r.client_id join products p on p.id = r.product_id
         order by r.created_at desc`),
+    // v8 — subscriptions, quotes, chasing and reconciliation.
+    q(`select b.*, c.company, a.name as agent_name, p.name as product_name
+         from client_bundles b
+         join clients c on c.id = b.client_id
+         left join client_agents a on a.id = b.agent_id
+         left join products p on p.id = b.product_id
+        order by c.company, b.starts_on`),
+    q(`select qq.*, c.company, p.name as product_name from quotes qq
+         join clients c on c.id = qq.client_id
+         left join products p on p.id = qq.product_id
+        order by qq.created_at`),
+    q(`select l.*, qq.quote_number from quote_lines l join quotes qq on qq.id = l.quote_id
+        order by qq.quote_number, l.position`),
+    q(`select ph.*, c.company, p.name as product_name from subscription_phases ph
+         join clients c on c.id = ph.client_id join products p on p.id = ph.product_id
+        order by ph.effective_on`),
+    q(`select r.*, c.company, a.name as agent_name, p.name as product_name from usage_rates r
+         left join clients c on c.id = r.client_id
+         left join client_agents a on a.id = r.agent_id
+         left join products p on p.id = r.product_id
+        order by r.metric`),
+    q(`select * from dunning_steps order by offset_days, position`),
+    q(`select r.*, i.invoice_number, c.company, s.name as step_name from invoice_reminders r
+         join invoices i on i.id = r.invoice_id
+         join clients c on c.id = i.client_id
+         left join dunning_steps s on s.id = r.step_id
+        order by r.sent_at desc`),
+    q(`select * from automations order by created_at`),
+    q(`select r.*, a.name as automation_name, c.company from automation_runs r
+         join automations a on a.id = r.automation_id
+         left join clients c on c.id = r.client_id
+        order by r.created_at desc`),
+    q(`select b.*, i.invoice_number, c.company from bank_credits b
+         left join invoices i on i.id = b.matched_invoice_id
+         left join clients c on c.id = i.client_id
+        order by b.received_date desc`),
   ]);
 
   // Settlement per invoice, for the Invoices sheet's outstanding column.
@@ -166,6 +204,9 @@ router.get('/crm.xlsx', async (req, res) => {
     ['— internal (VantriqAI itself)', clients.filter((c) => c.is_internal).length],
     ['Agents and automations', agents.length],
     ['Invoices in range', invoices.length],
+    ['Bundles on accounts', bundles.filter((b) => b.status === 'active').length],
+    ['Quotes raised', quotes.length],
+    ['— accepted', quotes.filter((q) => q.status === 'accepted').length],
     ['', ''],
     ['Revenue (excluding GST)', total.revenue.net],
     ['Cost of service', total.cost_of_service.total],
@@ -351,6 +392,88 @@ router.get('/crm.xlsx', async (req, res) => {
     col('Active', 'active'), col('Created', 'created_at', { date: true, width: 20 }),
     col('Last used', 'last_used_at', { date: true, width: 20 }),
   ], reps);
+
+  addSheet(wb, 'Bundles', [
+    col('Company', 'company', { width: 26 }), col('Bundle', 'name', { width: 24 }),
+    col('Based on', 'product_name', { width: 16 }), col('Agent', 'agent_name', { width: 22 }),
+    col('Qty', 'qty'),
+    col('Retainer each', 'unit_retainer', { money: true }),
+    col('Setup each', 'unit_setup_fee', { money: true }),
+    col('Conversations each', 'unit_quota'),
+    col('Overage rate', 'overage_rate', { money: true }),
+    col('Monthly total', 'monthly', { money: true, value: (r) => Number(r.qty) * Number(r.unit_retainer) }),
+    col('Conversations added', 'added', { value: (r) => Number(r.qty) * Number(r.unit_quota) }),
+    col('Recurring', 'recurring'), col('Status', 'status'),
+    col('Starts', 'starts_on', { date: true }), col('Ends', 'ends_on', { date: true }),
+    col('Added by', 'added_by'), col('Setup billed', 'setup_billed'),
+    col('Note', 'note', { width: 30 }),
+  ], bundles);
+
+  addSheet(wb, 'Quotes', [
+    col('Quote #', 'quote_number', { width: 20 }), col('Company', 'company', { width: 26 }),
+    col('For', 'title', { width: 28 }), col('Status', 'status'),
+    col('Subtotal', 'subtotal', { money: true }),
+    col('Tax %', 'tax_rate'), col('Tax', 'tax_amount', { money: true }),
+    col('Total', 'total', { money: true }),
+    col('Proposes package', 'product_name', { width: 18 }),
+    col('Valid until', 'valid_until', { date: true }),
+    col('Raised', 'created_at', { date: true, width: 20 }),
+    col('Sent', 'sent_at', { date: true, width: 20 }),
+    col('Decided', 'decided_at', { date: true, width: 20 }),
+    col('Notes', 'notes', { width: 34 }),
+  ], quotes);
+
+  addSheet(wb, 'Quote lines', [
+    col('Quote #', 'quote_number', { width: 20 }), col('#', 'position'),
+    col('Description', 'description', { width: 38 }), col('Detail', 'detail', { width: 28 }),
+    col('Qty', 'qty'), col('Unit price', 'unit_price', { money: true }), col('Amount', 'amount', { money: true }),
+  ], quoteLines);
+
+  addSheet(wb, 'Scheduled changes', [
+    col('Effective', 'effective_on', { date: true }), col('Company', 'company', { width: 26 }),
+    col('Moves to', 'product_name', { width: 18 }), col('Status', 'status'),
+    col('Applied', 'applied_at', { date: true, width: 20 }),
+    col('Set by', 'created_by', { width: 22 }), col('Note', 'note', { width: 30 }),
+  ], phases);
+
+  addSheet(wb, 'Metered rates', [
+    col('Client', 'company', { width: 24 }), col('Agent', 'agent_name', { width: 22 }),
+    col('Package', 'product_name', { width: 16 }), col('Metric', 'metric', { width: 16 }),
+    col('Rate', 'unit_rate', { money: true }), col('Per units', 'unit_size'),
+    col('Included', 'included_units'), col('Label', 'label', { width: 26 }),
+    col('From', 'effective_from', { date: true }), col('To', 'effective_to', { date: true }),
+  ], rates);
+
+  addSheet(wb, 'Chase schedule', [
+    col('Days from due', 'offset_days'), col('Step', 'name', { width: 24 }),
+    col('Action', 'action'), col('Active', 'active'),
+    col('Subject', 'subject', { width: 40 }), col('Body', 'body', { width: 60 }),
+  ], dunningSteps);
+
+  addSheet(wb, 'Reminders sent', [
+    col('Sent', 'sent_at', { date: true, width: 20 }), col('Company', 'company', { width: 26 }),
+    col('Invoice #', 'invoice_number', { width: 18 }), col('Step', 'step_name', { width: 22 }),
+    col('Action', 'action'), col('Outcome', 'outcome'), col('Detail', 'detail', { width: 40 }),
+  ], reminders);
+
+  addSheet(wb, 'Automations', [
+    col('Rule', 'name', { width: 28 }), col('Trigger', 'trigger', { width: 22 }),
+    col('Days', 'threshold_days'), col('Percent', 'threshold_pct'),
+    col('Action', 'action', { width: 20 }), col('Active', 'active'),
+    col('Times fired', 'run_count'), col('Last run', 'last_run_at', { date: true, width: 20 }),
+  ], automations);
+
+  addSheet(wb, 'Automation history', [
+    col('When', 'created_at', { date: true, width: 20 }), col('Rule', 'automation_name', { width: 26 }),
+    col('Company', 'company', { width: 24 }), col('Outcome', 'outcome'), col('Detail', 'detail', { width: 40 }),
+  ], automationRuns);
+
+  addSheet(wb, 'Bank credits', [
+    col('Received', 'received_date', { date: true }), col('Amount', 'amount', { money: true }),
+    col('Reference', 'reference', { width: 26 }), col('Payer', 'payer', { width: 24 }),
+    col('Status', 'status'), col('Matched to', 'invoice_number', { width: 18 }),
+    col('Company', 'company', { width: 24 }), col('Why', 'match_confidence', { width: 44 }),
+  ], bankCredits);
 
   addSheet(wb, 'Package requests', [
     col('Raised', 'created_at', { date: true, width: 20 }), col('Company', 'company', { width: 26 }),
