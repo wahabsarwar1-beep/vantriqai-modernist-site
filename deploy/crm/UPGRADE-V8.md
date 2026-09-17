@@ -13,7 +13,7 @@ applied twice to a clean database and twice over a v6 one with no errors.
 ```bash
 # on the VPS, in the folder holding docker-compose.yml
 curl -fsSL <url>/vantriq-backend-v8.zip -o vantriq-backend-v8.zip
-sha256sum vantriq-backend-v8.zip      # 2695b55df4d942f501629e3aba51da8e177916012ae88185d1c62549d301f4ac
+sha256sum vantriq-backend-v8.zip      # eab0194fdc6ef04ddda3556be5654f9981e16ce1d9a580fdeae0f86e902d2c5d
 unzip -o vantriq-backend-v8.zip -d vantriq-backend
 docker compose build api && docker compose up -d api
 docker compose exec api npm run migrate
@@ -203,6 +203,60 @@ stands.
 - The printed invoice was rebuilt: invoice number / date of issue / date due,
   a from and bill-to block, Description / Qty / Unit price / Amount, and the
   full tax ladder down to Amount due.
+
+---
+
+## 6a. What the metering actually measures
+
+Both live agents run OpenAI `gpt-4o-mini`. Until now their usage nodes posted
+`input_tokens: 0, output_tokens: 0`, so the CRM counted conversations and knew
+nothing about cost. That is fixed, with one honest caveat.
+
+**Tokens are estimated, not billed.** n8n does not expose the model sub-node's
+token counts to a downstream expression — verified, `$('OpenAI Chat Model')`
+throws *"No data found from `main` input"* — and the figure n8n itself holds is
+`tokenUsageEstimate`, flagged `estimated: true`, not OpenAI's billed usage. The
+agent node has no token-usage output either.
+
+So each usage post now sends a measured system-prompt baseline plus a
+script-aware count of the message and the reply (Urdu script is far denser per
+token than Latin, so the two are counted separately), and stamps
+`token_source: "estimate:baseline+length"` into the raw payload so nobody
+later mistakes it for a bill.
+
+Read it this way:
+
+| | where it comes from | what it is good for |
+|---|---|---|
+| **Token estimate** | the n8n usage post | **allocation** — which agent, which client, which channel is spending |
+| **Actual spend** | the OpenAI invoice | **the total** — enter it as a vendor expense |
+
+The estimate tells you how to split the bill. The bill tells you its size.
+Memory growth inside a long session is not modelled, so treat the input figure
+as a floor, and note that **Whisper transcription of WhatsApp voice notes is a
+real OpenAI cost that the chat-token estimate does not capture at all**.
+
+### The references have to match exactly
+
+`npm run seed-internal` creates two agents whose `external_ref` is exactly what
+the live workflows post:
+
+| agent | external_ref | posted by |
+|---|---|---|
+| Website assistant | `vantriqai.com` | the website workflow, a literal |
+| WhatsApp agent | `923411120049` | `metadata.display_phone_number` — the number the message **arrived on**, not the prospect's |
+
+If the WhatsApp business number changes, set `VANTRIQ_WHATSAPP_NUMBER` before
+seeding. A mismatch fails silently: the reply still goes out, the usage row
+just never lands.
+
+### Two WhatsApp workflows are active, and only one is live
+
+`VantriqAI - WhatsApp Sales Agent (Text + Voice)` receives Meta's traffic and
+now carries the usage node. `Vantriq Assistant - WhatsApp AI Sales Consultant`
+has **never executed** — Meta is not pointed at its webhook — yet it is the one
+holding the service gate, lead capture and transcript saving. Decide which one
+you want and retire the other; running both invites fixing the wrong one.
 
 ---
 

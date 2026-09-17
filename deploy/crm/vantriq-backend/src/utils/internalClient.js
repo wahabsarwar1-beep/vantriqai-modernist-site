@@ -24,9 +24,23 @@ const db = require('../db');
  * leaves what exists alone.
  */
 
+/**
+ * An agent's external_ref has to be EXACTLY what the n8n workflow posts, or
+ * the usage lands nowhere and fails silently. Both of these are the live
+ * values, taken from the workflows themselves rather than invented:
+ *
+ *   vantriqai.com    the website assistant posts this literal.
+ *   923411120049     the WhatsApp workflow posts
+ *                    metadata.display_phone_number — the number the message
+ *                    arrived ON, not the prospect's. Confirmed from a real
+ *                    delivery payload. Override with VANTRIQ_WHATSAPP_NUMBER
+ *                    if the business number ever changes.
+ */
+const WHATSAPP_NUMBER = process.env.VANTRIQ_WHATSAPP_NUMBER || '923411120049';
+
 const DEFAULT_AGENTS = [
-  { name: 'Website assistant', kind: 'website', external_ref: 'vantriqai.com', notes: 'Live chat on vantriqai.com — the n8n Shop AI workflow.' },
-  { name: 'WhatsApp agent', kind: 'whatsapp', external_ref: 'vantriqai-whatsapp', notes: 'Inbound WhatsApp Business enquiries.' },
+  { name: 'Website assistant', kind: 'website', external_ref: 'vantriqai.com', notes: 'Live chat on vantriqai.com — the n8n website assistant workflow.' },
+  { name: 'WhatsApp agent', kind: 'whatsapp', external_ref: WHATSAPP_NUMBER, notes: `Inbound WhatsApp Business enquiries on ${WHATSAPP_NUMBER}, text and voice.` },
 ];
 
 async function ensureInternalClient(opts = {}) {
