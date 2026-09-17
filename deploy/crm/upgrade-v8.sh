@@ -60,15 +60,41 @@ command -v docker >/dev/null || die "docker is not on PATH."
 [ "$(docker inspect -f '{{.State.Running}}' "$APP_CONTAINER" 2>/dev/null)" = "true" ] \
   || warn "Container '$APP_CONTAINER' is not running yet — it will be built."
 
-# `docker compose build` takes a SERVICE name; docker exec takes a CONTAINER
-# name. They are different things and on this stack they differ: the service
-# is whatever docker-compose.yml calls it, while container_name pins the
-# container to crm_app. Assuming they matched is what stopped the first
-# apply at "no such service: crm_app". A compose-managed container records
-# its own service in a label, so ask it rather than assume.
-APP_SERVICE=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.service"}}' \
-  "$APP_CONTAINER" 2>/dev/null || true)
-[ -n "$APP_SERVICE" ] || APP_SERVICE="$APP_CONTAINER"
+# `docker compose build` takes a SERVICE name; `docker exec` takes a
+# CONTAINER name. Different namespaces, and on this stack they differ:
+# docker-compose.yml pins container_name to crm_app while calling the service
+# something else. Assuming they matched stopped two apply runs at "no such
+# service: crm_app", and reading com.docker.compose.service off the container
+# did not help either — it came back empty.
+#
+# So: enumerate the services compose actually knows about and find the one
+# whose container IS crm_app. That uses nothing but what has already been
+# shown to work here, and it cannot be fooled by a naming convention.
+APP_ID=$(docker inspect -f '{{.Id}}' "$APP_CONTAINER" 2>/dev/null || true)
+APP_SERVICE=""
+COMPOSE_SERVICES=$(docker compose config --services 2>/dev/null || true)
+for svc in $COMPOSE_SERVICES; do
+  sid=$(docker compose ps -aq "$svc" 2>/dev/null | head -1)
+  [ -n "$sid" ] || continue
+  sid=$(docker inspect -f '{{.Id}}' "$sid" 2>/dev/null || true)
+  if [ -n "$sid" ] && [ "$sid" = "$APP_ID" ]; then APP_SERVICE="$svc"; break; fi
+done
+
+# Checked HERE, in the preflight, so a dry run catches it too. The previous
+# version only printed "would run: docker compose build crm_app" and left the
+# name untested until apply, which is precisely when it must not fail.
+if [ -z "$APP_SERVICE" ]; then
+  echo "    compose services here: $(echo $COMPOSE_SERVICES | tr '\n' ' ')"
+  echo "    containers they map to:"
+  for svc in $COMPOSE_SERVICES; do
+    sid=$(docker compose ps -aq "$svc" 2>/dev/null | head -1)
+    nm=$([ -n "$sid" ] && docker inspect -f '{{.Name}}' "$sid" 2>/dev/null | sed 's#^/##' || echo '(not created)')
+    echo "      $svc -> ${nm:-(not created)}"
+  done
+  die "No compose service in $STACK_DIR builds the container '$APP_CONTAINER'.
+     Pick one from the list above and re-run with APP_CONTAINER=<container>,
+     or with the service named directly if the container is not compose-managed."
+fi
 [ "$APP_SERVICE" = "$APP_CONTAINER" ] \
   || ok "compose service for $APP_CONTAINER is '$APP_SERVICE'"
 # Deliberately does not name a database container: which one serves the CRM
