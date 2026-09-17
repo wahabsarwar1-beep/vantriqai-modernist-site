@@ -5,9 +5,13 @@
  *   HOSTINGER_MAIL_TOKEN   API token from hPanel (Emails -> API tokens)
  *   HOSTINGER_MAILBOX_ID   the sending mailbox's resource id
  *
- * MAIL_FROM defaults to the support mailbox. If the token is missing the
- * send throws, and the caller decides what the user sees — we never silently
- * swallow a failure to deliver a login code.
+ * The sender is fixed: it is the mailbox HOSTINGER_MAILBOX_ID names, which is
+ * the one the token is authorised for. The API accepts no `from`, so there is
+ * no setting that changes who mail comes from — only MAIL_DISPLAY_NAME, the
+ * name shown beside the address.
+ *
+ * If the token is missing the send throws, and the caller decides what the
+ * user sees — we never silently swallow a failure to deliver a login code.
  */
 const API_BASE = process.env.HOSTINGER_MAIL_API || 'https://api.mail.hostinger.com';
 
@@ -19,16 +23,26 @@ async function sendMail({ to, subject, text, html }) {
   if (!mailConfigured()) {
     throw new Error('Email is not configured on the server (HOSTINGER_MAIL_TOKEN / HOSTINGER_MAILBOX_ID).');
   }
-  const from = process.env.MAIL_FROM || 'support@vantriqai.com';
   const url = `${API_BASE}/api/v1/mailboxes/${encodeURIComponent(process.env.HOSTINGER_MAILBOX_ID)}/send`;
 
+  // The API takes NO `from` field: the sender IS the mailbox the token is
+  // authorised for, named by HOSTINGER_MAILBOX_ID in the path. Sending a
+  // `from` was at best ignored and at worst a validation failure, and it gave
+  // the false impression that MAIL_FROM could change who the mail came from.
+  // What you CAN set is the display name beside the address.
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${process.env.HOSTINGER_MAIL_TOKEN}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ from, to: [to], subject, text, html }),
+    body: JSON.stringify({
+      to: [to],
+      subject,
+      text,
+      html,
+      displayName: process.env.MAIL_DISPLAY_NAME || 'Vantriq AI',
+    }),
   });
 
   if (!res.ok) {
@@ -36,6 +50,43 @@ async function sendMail({ to, subject, text, html }) {
     throw new Error(`Mail send failed (${res.status}): ${detail.slice(0, 300)}`);
   }
   return true;
+}
+
+/**
+ * Why email is not working, in words, without sending anything.
+ *
+ * Every send path fails soft by design — a failure is logged and the invoice
+ * or the reply still happens. Which is right, and also means a
+ * misconfiguration is quiet. This is the thing that makes it loud.
+ */
+function mailDiagnosis() {
+  const token = process.env.HOSTINGER_MAIL_TOKEN || '';
+  const mailbox = process.env.HOSTINGER_MAILBOX_ID || '';
+  const problems = [];
+
+  if (!token) {
+    problems.push('HOSTINGER_MAIL_TOKEN is not set on the server.');
+  } else if (/^(PASTE|CHANGE|REPLACE|xxx)/i.test(token)) {
+    problems.push(`HOSTINGER_MAIL_TOKEN is still the placeholder ("${token.slice(0, 12)}…"). Paste the real token.`);
+  } else if (token.length < 20) {
+    problems.push('HOSTINGER_MAIL_TOKEN looks too short to be a real token.');
+  }
+  if (!mailbox) {
+    problems.push('HOSTINGER_MAILBOX_ID is not set on the server.');
+  } else if (!/^AC[0-9a-f]{10,}$/i.test(mailbox)) {
+    problems.push(`HOSTINGER_MAILBOX_ID ("${mailbox}") does not look like a mailbox resource id — they start with "AC".`);
+  }
+
+  return {
+    configured: mailConfigured() && problems.length === 0,
+    token_set: !!token,
+    // Never return the token. Enough to tell two tokens apart, not enough to use.
+    token_fingerprint: token ? `${token.slice(0, 4)}…${token.slice(-4)} (${token.length} chars)` : null,
+    mailbox_id: mailbox || null,
+    api_base: API_BASE,
+    display_name: process.env.MAIL_DISPLAY_NAME || 'Vantriq AI',
+    problems,
+  };
 }
 
 function otpEmail(code, name) {
@@ -170,4 +221,4 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
 
-module.exports = { sendMail, otpEmail, resetEmail, invoiceEmail, mailConfigured };
+module.exports = { sendMail, otpEmail, resetEmail, invoiceEmail, mailConfigured, mailDiagnosis };

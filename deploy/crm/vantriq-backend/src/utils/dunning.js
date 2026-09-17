@@ -274,7 +274,10 @@ async function runAutomations({ dryRun } = {}) {
             detail = 'Service paused.';
           }
         } else if (rule.action === 'notify_team') {
-          const to = params.to || process.env.MAIL_FROM || 'support@vantriqai.com';
+          // Who on OUR side hears about it. Its own variable, because it is a
+          // different question from which mailbox the CRM sends from — and
+          // MAIL_FROM no longer exists, the sender being fixed by the token.
+          const to = params.to || process.env.TEAM_NOTIFY_EMAIL || 'support@vantriqai.com';
           if (!mailConfigured()) { outcome = 'skipped'; detail = 'Email is not configured.'; }
           else {
             await sendMail({

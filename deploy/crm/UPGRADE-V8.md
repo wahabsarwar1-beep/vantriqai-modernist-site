@@ -70,7 +70,7 @@ Optional secrets: `VPS_PORT` (default 22), `STACK_DIR` (default
 ```bash
 cd /root/app-stack
 docker exec postgres_db pg_dump -U postgres vantriq > pre-v8.sql   # do not skip
-sha256sum vantriq-backend-v8.zip      # 289ee7c0c8b261b622f9806579da8dca37dcdab80a6e07760f2992c05b04e675
+sha256sum vantriq-backend-v8.zip      # 90341101303272d5a84e333252c112257593e94819894635184b577bc287c5ad
 unzip -o vantriq-backend-v8.zip -d vantriq-backend
 docker compose build crm_app && docker compose up -d crm_app
 docker exec crm_app npm run migrate
@@ -351,16 +351,75 @@ was left alone.
 
 ---
 
+## 8. Making email work
+
+Invoices, payment chases, staff sign-in codes and password resets all go out
+through one path. Get this wrong and every one of them **fails quietly** — by
+design, so that a mail outage never blocks an invoice or a reply — which is
+exactly why it can stay broken for weeks without anyone noticing.
+
+### It is two environment variables, not an n8n credential
+
+The CRM talks to Hostinger's mail API directly from `src/utils/mailer.js`,
+which already sends `Authorization: Bearer <token>` correctly. There is nothing
+to configure in n8n: leads now go through the CRM, so no n8n node sends mail
+any more.
+
+What it needs is on the `crm_app` container:
+
+| variable | value |
+|---|---|
+| `HOSTINGER_MAIL_TOKEN` | the real token (currently the literal `PASTE_MAIL_TOKEN`) |
+| `HOSTINGER_MAILBOX_ID` | `AC639077da6944831097970eb520d3` — **verified correct** |
+| `MAIL_DISPLAY_NAME` | optional, defaults to `Vantriq AI` |
+
+### Two things worth knowing before you set it
+
+**The API has no `from` field.** The sender IS the mailbox the token is
+authorised for, named in the URL by `HOSTINGER_MAILBOX_ID`. `MAIL_FROM` never
+did anything and has been removed; what you *can* set is the display name
+beside the address.
+
+**`support@vantriqai.com` is the only mailbox on this order.** So mail sends as
+support@, whatever you would prefer. `sales@vantriqai.com` is not a mailbox
+here — if you want invoices to come from it, create it in hPanel, generate a
+token *for that mailbox*, and use its resource id instead.
+
+### Doing it
+
+1. hPanel → **Emails** → `support@vantriqai.com` → **API tokens** → generate
+   one. Copy it — it is shown once.
+2. Put it in `/root/app-stack/docker-compose.yml` under `crm_app:` →
+   `environment:` as `HOSTINGER_MAIL_TOKEN`.
+3. `docker compose up -d crm_app` — an environment change needs the container
+   recreated, not just restarted.
+4. In the CRM: **Settings → Email**. It tells you whether it is configured and,
+   if not, which variable is wrong. Then **Send a test email** to yourself.
+
+A green result means invoices and chases will reach customers. A red one
+carries the mail API's own words plus what to change:
+
+| what it says | what it means |
+|---|---|
+| `401` / `ERR_UNAUTHORIZED` | the token is wrong or revoked — generate a fresh one |
+| `403` / `ERR_FORBIDDEN` | valid token, wrong mailbox — check the mailbox id matches |
+| `404` | that mailbox id does not exist |
+
+The token is never echoed back. The page shows a fingerprint
+(`abcd…wxyz (48 chars)`) — enough to tell two tokens apart, not enough to use.
+
+> **Rotate the old token first.** It was pasted into a chat earlier in this
+> project's history, so treat it as compromised whatever else you do.
+
+---
+
 ## 7. Before you rely on it
 
 These are yours to do, and nothing below is done for you:
 
 1. **Rotate the two exposed secrets** — the webhook API key and the Hostinger
    mail token — and revoke the old ones.
-2. **Fix the mail credential** so dunning and password notices can send. The
-   Authorization template must be `Bearer <token>`, not the bare token.
-   Without it, reminders log as `skipped`, not `sent` — they are never
-   silently dropped.
+2. **Make email work** — see §8. Nothing about it is an n8n credential.
 3. **Move the Meta/WhatsApp token** out of the three n8n nodes holding it in
    plaintext and into a credential.
 4. **Set `ALLOW_API_KEY_LOGIN=false`** once staff accounts exist.

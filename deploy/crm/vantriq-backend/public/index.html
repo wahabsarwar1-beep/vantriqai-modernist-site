@@ -365,7 +365,10 @@ const API = {
     if(res.status===204) return null;
     let data=null;
     try{ data = await res.json(); }catch(e){ /* empty body */ }
-    if(!res.ok){ throw new ApiError((data&&data.error)||`Request failed (${res.status})`, res.status); }
+    // Carry the whole body on the error, not just its message: some endpoints
+    // answer a failure with a hint worth showing, and re-issuing the request
+    // to go and read it would repeat whatever it just did.
+    if(!res.ok){ throw new ApiError((data&&data.error)||`Request failed (${res.status})`, res.status, data); }
     return data;
   },
   get(path){ return this.req('GET', path); },
@@ -374,7 +377,7 @@ const API = {
   patch(path,body){ return this.req('PATCH', path, body); },
   del(path){ return this.req('DELETE', path); },
 };
-class ApiError extends Error{ constructor(msg,status){ super(msg); this.status=status; } }
+class ApiError extends Error{ constructor(msg,status,body){ super(msg); this.status=status; this.body=body||null; } }
 
 /* -------------------- Field-name mapping: API (snake_case) <-> UI (camelCase) -------------------- */
 const INVOICE_TYPE_TO_API = {'Setup fee':'setup_fee','Retainer':'retainer','Overage':'overage','Add-on / change request':'addon'};
@@ -3324,6 +3327,20 @@ function renderSettings(){
   </div>
 
   <div class="card" style="max-width:520px;margin-top:16px;">
+    <h3 style="margin-top:0;font-size:14.5px;">Email</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:0;">
+      Invoices, payment reminders, sign-in codes and password resets all go out through this.
+      Every one of them <strong>fails quietly</strong> if it is wrong — the invoice still stands, the
+      reminder is logged as skipped — so it is worth proving it works rather than assuming.
+    </p>
+    <div id="email-state" style="font-size:12.5px;margin-bottom:12px;color:var(--muted);">Checking…</div>
+    <div class="field"><label>Send a test to</label>
+      <input id="mailTestTo" type="email" placeholder="you@yourdomain.com" value="${esc((authUser&&authUser.email)||'')}"></div>
+    <button class="btn btn-primary" onclick="sendTestEmail()">Send a test email</button>
+    <div id="email-result" style="margin-top:10px;"></div>
+  </div>
+
+  <div class="card" style="max-width:520px;margin-top:16px;">
     <h3 style="margin-top:0;font-size:14.5px;">Our own account</h3>
     <p style="font-size:12.5px;color:var(--muted);margin-top:0;">
       The site assistant on vantriqai.com and the WhatsApp agent are real agents doing real work at real
@@ -3428,6 +3445,47 @@ async function saveAccountingSettings(){
     applySettings(await API.put('/api/settings', payload));
     accountingData = null; render(); showToast('Accounting settings saved');
   }catch(e){ showToast(e.message||'Could not save accounting settings','warn'); }
+}
+
+/** Says whether email is working, without sending anything. */
+async function refreshEmailCard(){
+  const host = document.getElementById('email-state');
+  if(!host) return;
+  try{
+    const d = await API.get('/api/settings/email');
+    host.innerHTML = d.configured
+      ? `<span class="pill pill-active"><span class="pill-dot"></span>Configured</span>
+         <div style="margin-top:6px;">Mailbox <span class="mono" style="font-size:11.5px;">${esc(d.mailbox_id||'—')}</span> ·
+         token ${esc(d.token_fingerprint||'—')} · sends as <strong>${esc(d.display_name)}</strong></div>
+         <div style="margin-top:4px;">Configured is not the same as working — send a test to be sure.</div>`
+      : `<span class="pill pill-overdue"><span class="pill-dot"></span>Not working</span>
+         <ul style="margin:6px 0 0;padding-left:18px;">${(d.problems||['Email is not configured.']).map(p=>`<li>${esc(p)}</li>`).join('')}</ul>
+         <div style="margin-top:6px;">These are environment variables on the <span class="mono">crm_app</span> container, not settings in this page.</div>`;
+  }catch(e){ host.textContent = e.message || 'Could not check the email configuration.'; }
+}
+
+async function sendTestEmail(){
+  const to = (document.getElementById('mailTestTo')||{}).value.trim();
+  const box = document.getElementById('email-result');
+  const show = (msg, ok)=>{
+    box.style.cssText = `padding:10px 12px;border-radius:8px;font-size:12.5px;margin-top:10px;background:${ok?'var(--teal-light)':'var(--red-light)'};color:${ok?'var(--teal-dark)':'#8F3527'};`;
+    box.innerHTML = msg;
+  };
+  if(!to){ show('Type an address to send the test to.'); return; }
+  show('Sending…', true);
+  try{
+    const r = await API.post('/api/settings/email/test', { to });
+    show(esc(r.message || 'Sent.'), true);
+    refreshEmailCard();
+  }catch(e){
+    // The API answers a failure with the mail provider's own wording plus a
+    // hint at what to change. Both come back on the error, so there is no need
+    // to ask again — asking again would try to send a second time.
+    const hint = e.body && e.body.hint;
+    show(`<strong>${esc(e.message || 'Could not send it')}</strong>` +
+      (hint ? `<div style="margin-top:6px;">${esc(hint)}</div>` : ''), false);
+    refreshEmailCard();
+  }
 }
 
 /** Reads the internal account's state into the Settings card. */
@@ -4970,7 +5028,7 @@ function attachPostRenderHooks(){
     if(accountingData===null) loadAccounting();
     else requestAnimationFrame(drawAccountingChart);
   }
-  if(currentView==='settings') refreshInternalAccountCard();
+  if(currentView==='settings'){ refreshInternalAccountCard(); refreshEmailCard(); }
   if(currentView==='quotes' && quotesData===null) loadQuotes();
   if(currentView==='ops' && opsData===null) loadOps();
 }

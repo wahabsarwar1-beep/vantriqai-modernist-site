@@ -27,7 +27,11 @@
       # Without a token nobody can finish signing in.
       HOSTINGER_MAIL_TOKEN: PASTE_MAIL_TOKEN
       HOSTINGER_MAILBOX_ID: AC639077da6944831097970eb520d3
-      MAIL_FROM: support@vantriqai.com
+      # The sender is the mailbox the token is for — the API has no `from`
+      # field. This only sets the name shown beside the address.
+      MAIL_DISPLAY_NAME: Vantriq AI
+      # Where 'tell the team' automations send. Not the sender address.
+      TEAM_NOTIFY_EMAIL: support@vantriqai.com
       COMPANY_EMAIL_DOMAIN: vantriqai.com
       # Break-glass admin API key. Set to "false" once everyone has an account.
       ALLOW_API_KEY_LOGIN: "true"

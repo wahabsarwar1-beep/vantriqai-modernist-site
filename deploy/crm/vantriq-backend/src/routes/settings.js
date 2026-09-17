@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { ensureInternalClient } = require('../utils/internalClient');
+const { sendMail, mailConfigured, mailDiagnosis } = require('../utils/mailer');
 const router = express.Router();
 
 // Company details, including the registration numbers and tax rate printed on
@@ -89,6 +90,84 @@ router.get('/internal-account', async (req, res) => {
 router.post('/internal-account', async (req, res) => {
   const result = await ensureInternalClient(req.body || {});
   res.status(result.created.length ? 201 : 200).json(result);
+});
+
+/* ---------------------------- Email ---------------------------- */
+/**
+ * GET /api/settings/email — is email working, and if not, why?
+ *
+ * Every send path in the CRM fails soft: a chase that cannot send is logged
+ * as skipped and the invoice still stands. That is the right behaviour and it
+ * is also why a broken mail token is silent for weeks. This says it out loud,
+ * without sending anything.
+ */
+router.get('/email', async (req, res) => {
+  res.json(mailDiagnosis());
+});
+
+/**
+ * POST /api/settings/email/test { to } — send one real email, and report
+ * exactly what the mail API said.
+ *
+ * The alternative way to test this is to raise a real invoice for a real
+ * customer, which is a poor way to find out your token is wrong.
+ */
+router.post('/email/test', async (req, res) => {
+  const to = String((req.body || {}).to || '').trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) {
+    return res.status(400).json({ error: 'Give an email address to send the test to.' });
+  }
+
+  const diagnosis = mailDiagnosis();
+  if (!diagnosis.configured) {
+    return res.status(409).json({
+      ok: false,
+      error: diagnosis.problems[0] || 'Email is not configured on the server.',
+      diagnosis,
+    });
+  }
+
+  const { rows } = await db.query(`select company_name from settings where id = 1`);
+  const company = (rows[0] && rows[0].company_name) || 'Vantriq AI';
+  const when = new Date().toISOString().replace('T', ' ').slice(0, 19);
+
+  try {
+    await sendMail({
+      to,
+      subject: `${company} — email is working`,
+      text: [
+        `This is a test from the ${company} CRM.`,
+        ``,
+        `If you are reading it, the mail token and mailbox id are right, and`,
+        `invoices and payment reminders will reach your customers.`,
+        ``,
+        `Sent ${when} UTC from mailbox ${diagnosis.mailbox_id}.`,
+      ].join('\n'),
+      html: `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:460px;">
+        <p>This is a test from the ${company} CRM.</p>
+        <p>If you are reading it, the mail token and mailbox id are right, and
+        invoices and payment reminders will reach your customers.</p>
+        <p style="color:#6B6B66;font-size:12px;">Sent ${when} UTC from mailbox ${diagnosis.mailbox_id}.</p>
+      </div>`,
+    });
+    res.json({ ok: true, sent_to: to, message: `Sent. Check ${to} — allow a minute, and look in spam.`, diagnosis });
+  } catch (err) {
+    // The mail API's own words, not a paraphrase: "ERR_UNAUTHORIZED" is the
+    // difference between a wrong token and a wrong mailbox id.
+    const detail = err.message || String(err);
+    res.status(502).json({
+      ok: false,
+      error: detail,
+      hint: /401|UNAUTHORIZED/i.test(detail)
+        ? 'The token was rejected. Generate a fresh one in hPanel → Emails → the mailbox → API tokens, and restart the container.'
+        : /403|FORBIDDEN/i.test(detail)
+          ? 'The token is valid but not for this mailbox. Check HOSTINGER_MAILBOX_ID matches the mailbox the token was made for.'
+          : /404/.test(detail)
+            ? 'That mailbox id does not exist. It should look like AC639077da…'
+            : 'The mail API refused it — the message above is its own wording.',
+      diagnosis,
+    });
+  }
 });
 
 module.exports = router;
