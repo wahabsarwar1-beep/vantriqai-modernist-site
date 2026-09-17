@@ -20,6 +20,11 @@ set -euo pipefail
 
 STACK_DIR="${STACK_DIR:-/root/app-stack}"
 APP_CONTAINER="${APP_CONTAINER:-crm_app}"
+# These are NOT guesses to fall back on — the database is discovered from the
+# app's own DATABASE_URL below. They exist only so an operator who knows
+# better can override that discovery, and this flag records that they did.
+DB_OVERRIDDEN=""
+[ -n "${DB_CONTAINER:-}${DB_NAME:-}${DB_USER:-}" ] && DB_OVERRIDDEN=1
 DB_CONTAINER="${DB_CONTAINER:-postgres_db}"
 DB_NAME="${DB_NAME:-vantriq}"
 DB_USER="${DB_USER:-postgres}"
@@ -54,7 +59,10 @@ command -v docker >/dev/null || die "docker is not on PATH."
   || die "Container '$DB_CONTAINER' is not running."
 [ "$(docker inspect -f '{{.State.Running}}' "$APP_CONTAINER" 2>/dev/null)" = "true" ] \
   || warn "Container '$APP_CONTAINER' is not running yet — it will be built."
-ok "stack at $STACK_DIR, database container $DB_CONTAINER"
+# Deliberately does not name a database container: which one serves the CRM
+# is not known until the discovery below. Announcing a guess here is what made
+# the earlier version look like it had checked something it had not.
+ok "stack at $STACK_DIR"
 
 [ -f "$ZIP" ] || die "Cannot find $ZIP. Copy it up first:
      scp deploy/crm/vantriq-backend-v8.zip root@<vps>:$STACK_DIR/"
@@ -64,48 +72,64 @@ echo "    sha256 $(sha256sum "$ZIP" | cut -c1-16)…"
 
 # Finding the database
 #
-# DB_NAME and DB_USER are defaults, and a compose file is free to name the
-# role and the database whatever it likes. Rather than guess twice and fail,
-# fall back to the two places on this machine that already KNOW the answer:
-# the postgres container's own POSTGRES_* variables, and the app container's
-# DATABASE_URL, which is by definition a working connection string.
-db_reachable() {
-  docker exec "$DB_CONTAINER" psql -U "$1" -d "$2" -c 'select 1' >/dev/null 2>&1
+# This has to be exactly right, because step 2 backs up whatever it finds. A
+# plausible wrong answer is worse than no answer: it produces a backup of
+# somebody else's data and calls the upgrade safe.
+#
+# So the ONLY authority is crm_app's own DATABASE_URL. That string is the
+# CRM's live connection by definition — user, database and the compose
+# service that serves it. The database container's POSTGRES_* variables are
+# NOT an authority: on this stack postgres_db is n8n's container and answers
+# POSTGRES_DB=n8n quite truthfully, which is how a first attempt at this
+# check cheerfully selected n8n's 131 tables for backup.
+#
+# Whatever is chosen, it must then prove it is the CRM's database.
+crm_schema_ok() { # container user db -> 0 if this is the CRM's database
+  local t n
+  t=$(docker exec "$1" psql -U "$2" -d "$3" -Atc \
+        "select to_regclass('public.clients') is not null" 2>/dev/null) || return 1
+  [ "$t" = "t" ] && return 0
+  # A brand-new install has no tables yet; that is legitimately the CRM's
+  # database awaiting its first migration. Anything else belongs elsewhere.
+  n=$(docker exec "$1" psql -U "$2" -d "$3" -Atc \
+        "select count(*) from information_schema.tables where table_schema='public'" 2>/dev/null) || return 1
+  [ "$n" = "0" ]
 }
 
-if ! db_reachable "$DB_USER" "$DB_NAME"; then
-  env_user=$(docker exec "$DB_CONTAINER" printenv POSTGRES_USER 2>/dev/null || true)
-  env_db=$(docker exec "$DB_CONTAINER" printenv POSTGRES_DB 2>/dev/null || true)
-  if [ -n "$env_user" ] && db_reachable "$env_user" "${env_db:-$DB_NAME}"; then
-    warn "defaults did not match; using the database container's own POSTGRES_* settings"
-    DB_USER="$env_user"; DB_NAME="${env_db:-$DB_NAME}"
-  else
-    url=$(docker exec "$APP_CONTAINER" printenv DATABASE_URL 2>/dev/null || true)
-    if [ -n "$url" ]; then
-      # postgresql://user:pass@host:5432/dbname?params — parsed with shell
-      # expansion rather than a regex, so a password containing punctuation
-      # cannot break it.
-      u=${url#*://}; u=${u%%@*}; u=${u%%:*}
-      d=${url%%\?*}; d=${d##*/}
-      if [ -n "$u" ] && [ -n "$d" ] && db_reachable "$u" "$d"; then
-        warn "defaults did not match; using the app's own DATABASE_URL"
-        DB_USER="$u"; DB_NAME="$d"
-      fi
-    fi
-  fi
+if [ -n "$DB_OVERRIDDEN" ]; then
+  warn "using the DB_CONTAINER/DB_USER/DB_NAME passed in, not the app" \
+       "connection string"
+else
+  url=$(docker exec "$APP_CONTAINER" printenv DATABASE_URL 2>/dev/null || true)
+  [ -n "$url" ] || die "$APP_CONTAINER has no DATABASE_URL, so there is no way to
+     know which database is the CRM's. Set DB_CONTAINER=... DB_USER=... DB_NAME=...
+     explicitly if you know them."
+
+  # postgresql://user:pass@host:5432/dbname?params — taken apart with shell
+  # expansion rather than a regex, so a password containing a colon or an @
+  # cannot break the parse.
+  u=${url#*://}; u=${u%%@*}; u=${u%%:*}
+  hp=${url#*://}; hp=${hp#*@}; host=${hp%%:*}; host=${host%%/*}
+  d=${url%%\?*}; d=${d##*/}
+
+  # The host is a compose service name; ask compose which container serves it.
+  cid=$(docker compose ps -q "$host" 2>/dev/null | head -1)
+  [ -n "$cid" ] || cid=$(docker inspect -f '{{.Id}}' "$host" 2>/dev/null || true)
+  [ -n "$cid" ] || die "The CRM points at database host '$host', but no container
+     of that name or compose service exists in $STACK_DIR."
+
+  DB_CONTAINER="$cid"; DB_USER="$u"; DB_NAME="$d"
+  ok "database taken from $APP_CONTAINER's DATABASE_URL — '$DB_NAME' on service '$host'"
 fi
 
-if ! db_reachable "$DB_USER" "$DB_NAME"; then
-  # Say what IS there, so this log diagnoses itself instead of sending
-  # somebody back to the server to go looking.
-  probe=$(docker exec "$DB_CONTAINER" printenv POSTGRES_USER 2>/dev/null || echo postgres)
-  echo "    databases present: $(docker exec "$DB_CONTAINER" psql -U "$probe" -Atc \
-    "select string_agg(datname, ', ' order by datname) from pg_database where not datistemplate" 2>&1 | head -1)"
-  echo "    roles present:     $(docker exec "$DB_CONTAINER" psql -U "$probe" -Atc \
-    "select string_agg(rolname, ', ' order by rolname) from pg_roles where rolcanlogin" 2>&1 | head -1)"
-  die "Cannot reach database '$DB_NAME' as user '$DB_USER' in $DB_CONTAINER.
-     Re-run with DB_USER=... DB_NAME=... set to one of the pairs above."
-fi
+docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -c 'select 1' >/dev/null 2>&1 \
+  || die "Cannot reach database '$DB_NAME' as user '$DB_USER'."
+
+crm_schema_ok "$DB_CONTAINER" "$DB_USER" "$DB_NAME" \
+  || die "Database '$DB_NAME' is reachable but is NOT the CRM's — it holds tables
+     but no 'clients' table. Refusing to back up or migrate somebody else's
+     data. Check $APP_CONTAINER's DATABASE_URL."
+
 BEFORE=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
   -c "select count(*) from information_schema.tables where table_schema='public'")
 ok "database '$DB_NAME' reachable — $BEFORE tables today"
@@ -204,7 +228,11 @@ else
 fi
 
 # ---------------------------------------------------------------- done
-bold "Done."
+if [ "$DRY" = 1 ]; then
+  bold "Dry run complete — nothing above was done."
+else
+  bold "Done."
+fi
 cat <<'NEXT'
   The CRM is on v8 and usage is being recorded. Nothing is charged or
   emailed yet — those are switches, and they are all still off.
