@@ -10,22 +10,48 @@ applied twice to a clean database and twice over a v6 one with no errors.
 
 ## 1. Deploy
 
+### The short way
+
+Copy two files up, then run one command:
+
 ```bash
-# on the VPS, in the folder holding docker-compose.yml
-curl -fsSL <url>/vantriq-backend-v8.zip -o vantriq-backend-v8.zip
+# from your own machine
+scp deploy/crm/vantriq-backend-v8.zip deploy/crm/upgrade-v8.sh root@76.13.193.8:/root/app-stack/
+
+# on the VPS
+cd /root/app-stack
+chmod +x upgrade-v8.sh
+./upgrade-v8.sh --dry-run      # read this first
+./upgrade-v8.sh
+```
+
+`upgrade-v8.sh` does the whole of this section: checks the stack, takes a
+**verified** database backup, keeps the old source, rebuilds, waits for health,
+migrates, seeds the internal account, and runs the verification below —
+stopping at the first thing that does not look right, and printing the rollback
+if it does.
+
+It refuses to continue on a backup that is empty or truncated, which is the one
+failure that would otherwise leave you worse off than doing nothing.
+
+`--dry-run` prints every command without running any of them. Use it once.
+
+Override the defaults with environment variables if your stack differs:
+`STACK_DIR`, `APP_CONTAINER`, `DB_CONTAINER`, `DB_NAME`, `DB_USER`.
+
+### The long way, by hand
+
+```bash
+cd /root/app-stack
+docker exec postgres_db pg_dump -U postgres vantriq > pre-v8.sql   # do not skip
 sha256sum vantriq-backend-v8.zip      # eab0194fdc6ef04ddda3556be5654f9981e16ce1d9a580fdeae0f86e902d2c5d
 unzip -o vantriq-backend-v8.zip -d vantriq-backend
-docker compose build api && docker compose up -d api
-docker compose exec api npm run migrate
+docker compose build crm_app && docker compose up -d crm_app
+docker exec crm_app npm run migrate
+docker exec crm_app npm run seed-internal
 ```
 
-Then, once:
-
-```bash
-docker compose exec api npm run seed-internal
-```
-
-That creates **VantriqAI's own account** — see §4.
+That last line creates **VantriqAI's own account** — see §4.
 
 ### Verify
 
