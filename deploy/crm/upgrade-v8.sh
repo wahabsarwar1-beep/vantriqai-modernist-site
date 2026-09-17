@@ -111,6 +111,26 @@ if [ -z "$APP_SERVICE" ]; then
      with STACK_DIR set to the directory named above."
 fi
 ok "API service is '$APP_SERVICE' in $COMPOSE_DIR"
+
+# Where the new source has to land.
+#
+# Not "next to this script". The build happens in $COMPOSE_DIR, so the only
+# directory that matters is the build context compose gives that service —
+# unpacking anywhere else rebuilds the OLD source and reports success, which
+# is the worst outcome available here: a deploy that changes nothing and
+# says it worked. `docker compose config` resolves the context to an
+# absolute path, so ask it rather than assuming.
+SRC_DIR=$(compose config 2>/dev/null | awk -v svc="$APP_SERVICE" '
+  $0 ~ "^  " svc ":$" { inservice = 1; next }
+  inservice && /^  [a-zA-Z0-9_-]+:$/ { inservice = 0 }
+  inservice && $1 == "context:" { print $2; exit }
+')
+[ -n "$SRC_DIR" ] || die "Could not read the build context for service '$APP_SERVICE'
+     from $COMPOSE_DIR. Without it there is no way to know which directory to
+     unpack into, and unpacking into the wrong one would rebuild the old
+     source and call it a success."
+[ -d "$SRC_DIR" ] || die "Build context '$SRC_DIR' for '$APP_SERVICE' does not exist."
+ok "source goes to $SRC_DIR (the build context for '$APP_SERVICE')"
 # Deliberately does not name a database container: which one serves the CRM
 # is not known until the discovery below. Announcing a guess here is what made
 # the earlier version look like it had checked something it had not.
@@ -205,17 +225,19 @@ fi
 
 # ---------------------------------------------------------------- 3. unpack
 bold "3. Unpacking v8"
-if [ -d vantriq-backend ]; then
-  run cp -a vantriq-backend "vantriq-backend.bak-$STAMP"
-  ok "previous source kept at vantriq-backend.bak-$STAMP"
+BACKUP_SRC="$SRC_DIR.bak-$STAMP"
+if [ -d "$SRC_DIR" ]; then
+  run cp -a "$SRC_DIR" "$BACKUP_SRC"
+  ok "previous source kept at $BACKUP_SRC"
 fi
-run unzip -oq "$ZIP" -d vantriq-backend
-# The Dockerfile lives beside this script, not inside the zip.
-if [ -f Dockerfile ] && [ ! -f vantriq-backend/Dockerfile ]; then
-  run cp Dockerfile .dockerignore vantriq-backend/ 2>/dev/null || true
+# $ZIP is relative to STACK_DIR, where scp put it; $SRC_DIR is absolute.
+run unzip -oq "$PWD/$ZIP" -d "$SRC_DIR"
+# A Dockerfile living beside the compose file rather than in the zip.
+if [ -f "$COMPOSE_DIR/Dockerfile" ] && [ ! -f "$SRC_DIR/Dockerfile" ]; then
+  run cp "$COMPOSE_DIR/Dockerfile" "$COMPOSE_DIR/.dockerignore" "$SRC_DIR/" 2>/dev/null || true
 fi
-[ "$DRY" = 1 ] || [ -f vantriq-backend/package.json ] || die "Unpack did not produce vantriq-backend/package.json."
-[ "$DRY" = 1 ] || ok "source in place ($(grep -c 'create table' vantriq-backend/db/schema.sql) tables in schema.sql)"
+[ "$DRY" = 1 ] || [ -f "$SRC_DIR/package.json" ] || die "Unpack did not produce $SRC_DIR/package.json."
+[ "$DRY" = 1 ] || ok "source in place ($(grep -c 'create table' "$SRC_DIR/db/schema.sql") tables in schema.sql)"
 
 # ---------------------------------------------------------------- 4. rebuild
 bold "4. Rebuilding and restarting the API"
