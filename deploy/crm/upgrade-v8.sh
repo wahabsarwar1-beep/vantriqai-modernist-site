@@ -48,8 +48,12 @@ bold "1. Checking the stack"
 cd "$STACK_DIR" 2>/dev/null || die "No $STACK_DIR. Set STACK_DIR=... if the stack lives elsewhere."
 [ -f docker-compose.yml ] || die "No docker-compose.yml in $STACK_DIR."
 command -v docker >/dev/null || die "docker is not on PATH."
-docker inspect "$DB_CONTAINER"  >/dev/null 2>&1 || die "Container '$DB_CONTAINER' is not running."
-docker inspect "$APP_CONTAINER" >/dev/null 2>&1 || warn "Container '$APP_CONTAINER' is not running yet — it will be built."
+# `docker inspect` succeeds for a container that merely EXISTS, stopped ones
+# included, so it cannot answer "is it running". Ask for the state itself.
+[ "$(docker inspect -f '{{.State.Running}}' "$DB_CONTAINER" 2>/dev/null)" = "true" ] \
+  || die "Container '$DB_CONTAINER' is not running."
+[ "$(docker inspect -f '{{.State.Running}}' "$APP_CONTAINER" 2>/dev/null)" = "true" ] \
+  || warn "Container '$APP_CONTAINER' is not running yet — it will be built."
 ok "stack at $STACK_DIR, database container $DB_CONTAINER"
 
 [ -f "$ZIP" ] || die "Cannot find $ZIP. Copy it up first:
@@ -58,8 +62,50 @@ unzip -tq "$ZIP" >/dev/null 2>&1 || die "$ZIP is corrupt — re-copy it."
 ok "$ZIP is present and intact ($(du -h "$ZIP" | cut -f1))"
 echo "    sha256 $(sha256sum "$ZIP" | cut -c1-16)…"
 
-docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -c 'select 1' >/dev/null 2>&1 \
-  || die "Cannot reach database '$DB_NAME' in $DB_CONTAINER."
+# Finding the database
+#
+# DB_NAME and DB_USER are defaults, and a compose file is free to name the
+# role and the database whatever it likes. Rather than guess twice and fail,
+# fall back to the two places on this machine that already KNOW the answer:
+# the postgres container's own POSTGRES_* variables, and the app container's
+# DATABASE_URL, which is by definition a working connection string.
+db_reachable() {
+  docker exec "$DB_CONTAINER" psql -U "$1" -d "$2" -c 'select 1' >/dev/null 2>&1
+}
+
+if ! db_reachable "$DB_USER" "$DB_NAME"; then
+  env_user=$(docker exec "$DB_CONTAINER" printenv POSTGRES_USER 2>/dev/null || true)
+  env_db=$(docker exec "$DB_CONTAINER" printenv POSTGRES_DB 2>/dev/null || true)
+  if [ -n "$env_user" ] && db_reachable "$env_user" "${env_db:-$DB_NAME}"; then
+    warn "defaults did not match; using the database container's own POSTGRES_* settings"
+    DB_USER="$env_user"; DB_NAME="${env_db:-$DB_NAME}"
+  else
+    url=$(docker exec "$APP_CONTAINER" printenv DATABASE_URL 2>/dev/null || true)
+    if [ -n "$url" ]; then
+      # postgresql://user:pass@host:5432/dbname?params — parsed with shell
+      # expansion rather than a regex, so a password containing punctuation
+      # cannot break it.
+      u=${url#*://}; u=${u%%@*}; u=${u%%:*}
+      d=${url%%\?*}; d=${d##*/}
+      if [ -n "$u" ] && [ -n "$d" ] && db_reachable "$u" "$d"; then
+        warn "defaults did not match; using the app's own DATABASE_URL"
+        DB_USER="$u"; DB_NAME="$d"
+      fi
+    fi
+  fi
+fi
+
+if ! db_reachable "$DB_USER" "$DB_NAME"; then
+  # Say what IS there, so this log diagnoses itself instead of sending
+  # somebody back to the server to go looking.
+  probe=$(docker exec "$DB_CONTAINER" printenv POSTGRES_USER 2>/dev/null || echo postgres)
+  echo "    databases present: $(docker exec "$DB_CONTAINER" psql -U "$probe" -Atc \
+    "select string_agg(datname, ', ' order by datname) from pg_database where not datistemplate" 2>&1 | head -1)"
+  echo "    roles present:     $(docker exec "$DB_CONTAINER" psql -U "$probe" -Atc \
+    "select string_agg(rolname, ', ' order by rolname) from pg_roles where rolcanlogin" 2>&1 | head -1)"
+  die "Cannot reach database '$DB_NAME' as user '$DB_USER' in $DB_CONTAINER.
+     Re-run with DB_USER=... DB_NAME=... set to one of the pairs above."
+fi
 BEFORE=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
   -c "select count(*) from information_schema.tables where table_schema='public'")
 ok "database '$DB_NAME' reachable — $BEFORE tables today"
