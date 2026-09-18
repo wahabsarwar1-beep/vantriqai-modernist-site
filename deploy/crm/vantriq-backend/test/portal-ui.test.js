@@ -6,7 +6,7 @@ let pass=0, fail=0;
 const ok=(c,m,x='')=>{ c?pass++:fail++; console.log((c?'  PASS ':'  FAIL ')+m+(c?'':'  <<< '+x)); };
 
 (async()=>{
-  const browser = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell' });
+  const browser = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
   const page = await browser.newPage();
   const errs=[]; page.on('pageerror',e=>errs.push(String(e)));
   page.on('dialog', d=>d.accept());

@@ -8,12 +8,16 @@ let pass=0,fail=0;
 const ok=(c,m,x='')=>{c?pass++:fail++;console.log((c?'  PASS ':'  FAIL ')+m+(c?'':'  <<< '+x));};
 
 (async()=>{
-  const browser=await chromium.launch({executablePath:'/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell'});
+  const browser=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
   const page=await browser.newPage();
   const errs=[]; page.on('pageerror',e=>errs.push(String(e)));
   const dialogs=[]; page.on('dialog',async d=>{ dialogs.push({type:d.type(),msg:d.message()}); await d.accept('Moving forward after a good call'); });
 
   await page.goto(B, {waitUntil:'networkidle'});
+  // Sign-in asks for an email and password first; the API-key form is the
+  // deliberate break-glass route behind a link, not the landing screen.
+  await page.click('text=Emergency access with an API key');
+  await page.waitForTimeout(400);
   await page.fill('#conn_base', B); await page.fill('#conn_key', KEY);
   await page.click('button:has-text("Connect")'); await page.waitForTimeout(2500);
   ok(!(await page.locator('#conn_key').count()), 'connected to the CRM');
@@ -70,9 +74,17 @@ const ok=(c,m,x='')=>{c?pass++:fail++;console.log((c?'  PASS ':'  FAIL ')+m+(c?'
 
   // ---- Package requests
   await page.locator('.scrim').first().click(); await page.waitForTimeout(600);   // close the panel
-  await page.getByText('Package Requests',{exact:true}).first().click(); await page.waitForTimeout(1200);
+  await page.getByText('Package Requests',{exact:true}).first().click();
+  // The list is fetched after the view renders, so wait for the table rather
+  // than for a fixed delay — a fixed delay reads the page mid-load and the
+  // failure looks like a missing feature.
+  await page.waitForSelector('th:has-text("Requested")', { timeout: 15000 }).catch(()=>{});
+  await page.waitForTimeout(600);
   const rq = await page.locator('body').innerText();
-  ok(/Requested/.test(rq) && /Approve/.test(rq), 'pending portal request listed for the admin', rq.slice(0,200));
+  // Case-insensitive: column headings are uppercased in CSS, and innerText
+  // returns the transformed text, so /Requested/ never matches what is on
+  // screen even when the request is plainly listed.
+  ok(/requested/i.test(rq) && /approve/i.test(rq), 'pending portal request listed for the admin', rq.slice(0,200));
   ok(await page.locator('button:has-text("Approve")').count()>0, 'approve button present');
   await page.click('button:has-text("Approve")'); await page.waitForTimeout(2200);
   const after = await page.locator('body').innerText();

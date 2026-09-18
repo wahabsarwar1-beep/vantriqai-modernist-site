@@ -14,8 +14,22 @@
 
   function taxInvoiceHTML(d) {
     const cur = d.currency || 'PKR';
-    const money = (n) => `${cur} ${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    const qty = (n) => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
+    // Two decimal places is right for a rupee invoice and wrong for the
+    // internal one: it is priced per million tokens, so a real month's cost
+    // is a fraction of a cent and printing it to the cent prints zero against
+    // a bill that is genuinely owed.
+    const places = cur === 'USD' ? 6 : 2;
+    const money = (n) => {
+      const v = Number(n || 0);
+      const max = (cur === 'USD' && v !== 0 && Math.abs(v) < 1) ? places : 2;
+      return `${cur} ${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: max })}`;
+    };
+    // Quantities have the same problem from the other end: 2,700 tokens
+    // priced per million is a quantity of 0.0027, and "0 x 0.15" is not a
+    // line anybody can check.
+    const qty = (n) => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 6 });
+    // "Nothing left to pay" is half a minor unit of whatever this invoice is in.
+    const EPS = cur === 'USD' ? 0.0000009 : 0.009;
     const line = (v) => (v ? `<div>${esc(v)}</div>` : '');
     const labelled = (k, v) => (v ? `<div>${esc(k)} ${esc(v)}</div>` : '');
     const t = d.totals || {};
@@ -32,7 +46,7 @@
     const outstanding = d.amount_due !== undefined && d.amount_due !== null
       ? Number(d.amount_due)
       : Number(t.net_payable !== undefined ? t.net_payable : t.total_payable || 0);
-    const settled = outstanding <= 0.009;
+    const settled = outstanding <= EPS;
 
     // The headline. Either what is still owed and when, or that it is settled.
     const headline = settled
@@ -44,11 +58,14 @@
   :root{ --ink:#1A1A18; --muted:#6B6B66; --rule:#E3E0D8; }
   *{box-sizing:border-box;}
   body{
-    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+    font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
     color:var(--ink);margin:0;padding:48px 52px;font-size:12.5px;line-height:1.5;
     max-width:840px;-webkit-font-smoothing:antialiased;
   }
-  .brand{font-size:17px;font-weight:700;letter-spacing:-.2px;margin-bottom:2px;}
+  .brandbar{display:flex;align-items:center;gap:11px;margin-bottom:4px;}
+  .brandbar svg{display:block;flex:0 0 auto;}
+  .brand{font-size:17px;font-weight:700;letter-spacing:-.2px;}
+  .brand em{font-style:normal;color:#2f56d9;}
   .muted{color:var(--muted);}
   .doc-title{font-size:22px;font-weight:700;letter-spacing:-.3px;margin:0 0 18px;}
   .meta{display:flex;flex-direction:column;gap:3px;margin-bottom:26px;}
@@ -81,7 +98,14 @@
   @media (max-width:640px){ body{padding:24px 18px;} .parties{flex-direction:column;gap:22px;} .totals{width:100%;} }
 </style></head><body>
 
-<div class="brand">${esc(d.seller.name)}</div>
+<div class="brandbar">
+  <svg width="30" height="30" viewBox="0 0 100 100" aria-hidden="true">
+    <path d="M10 10 H90 V90 H10 Z M28 28 V72 H72 V28 Z" fill="#16151a" fill-rule="evenodd"/>
+    <rect x="10" y="28" width="28" height="10" fill="#2f56d9"/>
+    <rect x="28" y="10" width="10" height="28" fill="#2f56d9"/>
+  </svg>
+  <div class="brand">${esc(d.seller.name)}</div>
+</div>
 <div class="muted" style="margin-bottom:26px;">${esc(d.seller.address || '')}</div>
 
 <h1 class="doc-title">${esc(d.document_title || 'Invoice')}</h1>
@@ -149,7 +173,7 @@ ${d.ait_note ? `<div class="note">${esc(d.ait_note)}</div>` : ''}
 ${d.notes ? `<div class="note">${esc(d.notes)}</div>` : ''}
 <div class="foot">This is a computer-generated ${esc(String(d.document_title || 'invoice').toLowerCase())} and is valid without a signature.</div>
 <div class="noprint" style="margin-top:22px;">
-  <button onclick="window.print()" style="padding:9px 16px;font-size:13px;cursor:pointer;border-radius:7px;border:1px solid #D9D3C7;background:#fff;">Print</button>
+  <button onclick="window.print()" style="padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;border-radius:999px;border:none;background:#2f56d9;color:#fff;">Print</button>
 </div>
 </body></html>`;
   }

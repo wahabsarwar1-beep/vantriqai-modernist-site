@@ -4,23 +4,41 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vantriq AI — Account Portal</title>
+<link rel="icon" href="/brand/mark.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <script src="/invoice-print.js"></script>
 <style>
+/* The portal is the only part of the CRM a customer ever sees, so it is set
+   in the same palette and the same typefaces as vantriqai.com — the page
+   they arrived from. The variable names are the ones the rules below were
+   written against; only the values moved to the brand. */
 :root{
-  --ink:#0F1A22; --teal:#12897A; --teal-dark:#0B6357; --teal-light:#E3F1EE;
-  --amber:#DE9C34; --amber-light:#FBF0DD; --red:#BC4B3C; --red-light:#FBE8E4;
-  --paper:#F5F3ED; --card:#FFFFFF; --text:#161F27; --muted:#6C7885; --muted-2:#98A2AC;
-  --border:#E4E0D6; --radius:14px;
+  --ink:#16151a; --teal:#2f56d9; --teal-dark:#1f3a95; --teal-light:#e8ecfd;
+  --teal-300:#a9bbf7; --teal-400:#7f9bf2;
+  --amber:#c06b3a; --amber-light:#fbeee4; --red:#b4402f; --red-light:#fbe8e4;
+  --green:#2f7d5f; --green-light:#e4f2eb;
+  --paper:#fbf9f6; --card:#ffffff; --text:#16151a; --muted:#6b645b; --muted-2:#8d857a;
+  --border:#e7e2da; --border-2:#f0ece5;
+
+  --f-head:'Sora',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-body:'Manrope',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
+
+  --radius:16px; --radius-sm:11px; --radius-pill:999px;
+  --shadow-sm:0 1px 2px rgba(22,21,26,.04), 0 8px 20px -16px rgba(22,21,26,.10);
+  --shadow-md:0 1px 3px rgba(22,21,26,.04), 0 14px 32px -22px rgba(22,21,26,.14);
+  --shadow-lg:0 4px 10px rgba(22,21,26,.05), 0 28px 56px -30px rgba(22,21,26,.20);
 }
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
-body{font-family:'Inter',sans-serif;background:var(--paper);color:var(--text);-webkit-font-smoothing:antialiased;}
-h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;}
-.mono{font-family:'JetBrains Mono',monospace;}
-button{font-family:'Inter',sans-serif;cursor:pointer;}
+body{font-family:var(--f-body);background:var(--paper);color:var(--text);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+h1,h2,h3,.display{font-family:var(--f-head);letter-spacing:-.015em;}
+:focus-visible{outline:2px solid var(--teal);outline-offset:2px;border-radius:4px;}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums;}
+button{font-family:var(--f-body);cursor:pointer;}
 /* Anything clickable shows the hand, not the text I-beam. A div-based tab
    with the default cursor reads as "select this text", not "press this". */
 .tab,.nav-item,.kcard,.close-x,.linkish,[onclick]{cursor:pointer;}
@@ -35,10 +53,13 @@ button:disabled{cursor:not-allowed;opacity:.55;}
 }
 .topbar-inner{max-width:680px;margin:0 auto;}
 .brand-row{display:flex;align-items:center;gap:10px;}
-.brand-mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--teal),#0A4E45);display:flex;align-items:center;justify-content:center;}
-.brand-name{font-family:'Space Grotesk';font-weight:600;font-size:15px;}
+.brand-mark{width:32px;height:32px;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.brand-mark svg{display:block;}
+.brand-name{font-family:var(--f-head);font-weight:700;font-size:15.5px;letter-spacing:-.02em;}
+.brand-name em{font-style:normal;color:var(--teal);}
+.topbar .brand-name em{color:var(--teal-400);}
 .brand-sub{font-size:10.5px;color:#93A2AB;text-transform:uppercase;letter-spacing:.6px;margin-top:1px;}
-.company-name{font-family:'Space Grotesk';font-size:24px;font-weight:600;margin-top:20px;}
+.company-name{font-family:var(--f-head);font-size:26px;font-weight:700;margin-top:22px;letter-spacing:-.025em;}
 .status-row{display:flex;align-items:center;gap:8px;margin-top:8px;}
 
 .content{padding:0 20px;margin-top:-40px;}
@@ -75,7 +96,7 @@ button:disabled{cursor:not-allowed;opacity:.55;}
 .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;}
 .stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;}
 .stat-card .label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;}
-.stat-card .value{font-family:'Space Grotesk';font-size:22px;font-weight:600;margin-top:5px;}
+.stat-card .value{font-family:var(--f-head);font-size:23px;font-weight:700;margin-top:6px;letter-spacing:-.02em;}
 
 .progress-track{height:8px;background:#EEEBE2;border-radius:5px;overflow:hidden;margin-top:8px;}
 .progress-fill{height:100%;background:var(--teal);border-radius:5px;transition:width .3s;}
@@ -96,7 +117,7 @@ tr.row-click:active{background:#FAF8F3;}
 .btn-ghost{background:#F0EEE7;color:var(--text);}
 .btn-block{width:100%;justify-content:center;}
 .tab-n{display:inline-block;min-width:17px;padding:0 5px;border-radius:20px;background:#E3DFD4;
-  color:var(--muted);font-size:10.5px;font-weight:700;font-family:'JetBrains Mono',monospace;line-height:17px;text-align:center;}
+  color:var(--muted);font-size:10.5px;font-weight:700;font-family:var(--f-mono);line-height:17px;text-align:center;}
 .tab.active .tab-n{background:var(--teal-light);color:var(--teal-dark);}
 .tab-n-live{background:var(--teal);color:#fff;}
 .tab.active .tab-n-live{background:var(--teal);color:#fff;}
@@ -119,6 +140,116 @@ tr.row-click:active{background:#FAF8F3;}
 .center-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
 .loading-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--teal);animation:pulse 1.2s infinite;}
 @keyframes pulse{0%,100%{opacity:.3;}50%{opacity:1;}}
+
+/* ==================================================================== *
+ *  v9.2 — the portal, dressed as VantriqAI
+ *
+ *  This is the only screen a customer sees, and most of them see it on a
+ *  phone, so the changes here are about the two things that decide whether
+ *  it feels like a real product: the brand it is obviously part of, and
+ *  whether the important number is the one your eye lands on first.
+ * ==================================================================== */
+
+#app{max-width:760px;}
+
+/* ---------- Header ---------- */
+.topbar{
+  padding:24px 20px 64px;
+  border-radius:0 0 32px 32px;
+  background:
+    radial-gradient(620px 320px at 88% -30%, rgba(47,86,217,.42) 0%, transparent 64%),
+    var(--ink);
+}
+.brand-row{gap:12px;}
+.brand-sub{color:#8d857a;letter-spacing:.1em;font-weight:700;font-size:10px;}
+.status-row{margin-top:10px;}
+.content{margin-top:-44px;}
+
+/* ---------- Surfaces ---------- */
+.card,.stat-card{
+  border-radius:var(--radius);
+  box-shadow:var(--shadow-sm);
+  border-color:var(--border);
+}
+.card{padding:22px;margin-bottom:18px;}
+.card h3{font-family:var(--f-head);font-size:14.5px;font-weight:700;margin-bottom:16px;}
+
+.stat-card{padding:18px;}
+.stat-card .label{font-size:10.5px;letter-spacing:.08em;}
+
+/* ---------- Tabs ---------- */
+.tabs{
+  border-radius:var(--radius);padding:6px;box-shadow:var(--shadow-md);
+  border-color:var(--border);
+}
+.tab{border-radius:var(--radius-pill);padding:10px 15px;}
+.tab.active{background:var(--teal);color:#fff;}
+.tab-n{background:var(--border-2);border-radius:var(--radius-pill);}
+.tab.active .tab-n{background:rgba(255,255,255,.22);color:#fff;}
+.tab-n-live{background:var(--teal);color:#fff;}
+
+/* ---------- Pills ---------- */
+.pill{padding:4px 11px;font-size:11px;font-weight:700;letter-spacing:.02em;}
+.pill-active{background:rgba(255,255,255,.14);color:#fff;}
+.pill-active .pill-dot{background:var(--teal-400);}
+.pill-paid{background:var(--green-light);color:#1f5c45;}
+.pill-paid .pill-dot{background:var(--green);}
+.pill-pending{background:var(--border-2);color:var(--muted);}
+.pill-pending .pill-dot{background:var(--muted-2);}
+
+/* ---------- Rows and tables ---------- */
+.kv{border-bottom-color:var(--border-2);padding:11px 0;}
+.kv .k{color:var(--muted);}
+th{
+  font-size:10px;letter-spacing:.08em;padding:10px 10px;
+  background:var(--border-2);border-bottom:1px solid var(--border);
+}
+td{padding:13px 10px;border-bottom-color:var(--border-2);}
+tr.row-click:active{background:var(--teal-light);}
+/* An amount column reads down, so it is aligned and tabular. */
+td.amt,th.amt{text-align:right;font-variant-numeric:tabular-nums;}
+
+/* ---------- Buttons ---------- */
+.btn{
+  border-radius:var(--radius-pill);padding:11px 20px;font-weight:600;
+  transition:background .14s ease,box-shadow .14s ease,border-color .14s ease;
+}
+.btn-primary{background:var(--teal);box-shadow:var(--shadow-sm);}
+.btn-primary:hover{background:var(--teal-dark);box-shadow:var(--shadow-md);}
+.btn-ghost{background:var(--card);border:1px solid var(--border);color:var(--text);}
+.btn-ghost:hover{background:var(--teal-light);border-color:var(--teal-300);color:var(--teal-dark);}
+
+/* ---------- Forms ---------- */
+.field label{font-size:11.5px;letter-spacing:.02em;margin-bottom:6px;}
+.field input,.field select{
+  background:var(--card);border-radius:var(--radius-sm);padding:11px 13px;
+  transition:border-color .14s ease,box-shadow .14s ease;
+}
+.field input:focus,.field select:focus{
+  outline:none;border-color:var(--teal);box-shadow:0 0 0 4px var(--teal-light);
+}
+
+/* ---------- Progress ---------- */
+.progress-track{background:var(--border-2);border-radius:var(--radius-pill);}
+.progress-fill{background:var(--teal);border-radius:var(--radius-pill);}
+.progress-fill.warn{background:var(--amber);}
+
+/* ---------- Bundles, modal, footer ---------- */
+.bundle-row{border-radius:var(--radius-sm);padding:15px;}
+.bundle-row.mine{border-color:var(--teal);background:var(--teal-light);}
+.modal-overlay{background:rgba(22,21,26,.46);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);}
+.modal{border-radius:26px 26px 0 0;box-shadow:var(--shadow-lg);padding:26px 22px 30px;}
+.close-x{background:var(--border-2);width:32px;height:32px;}
+.empty{padding:52px 20px;line-height:1.6;}
+.wa-link{color:var(--teal-dark);}
+.wa-link:hover{color:var(--teal);}
+.loading-dot{background:var(--teal);}
+.center-screen .card{box-shadow:var(--shadow-lg);padding:30px 26px;}
+
+@media(min-width:760px){
+  .modal-overlay{align-items:center;}
+  .modal{border-radius:24px;max-width:640px;}
+}
 </style>
 </head>
 <body>
@@ -126,7 +257,40 @@ tr.row-click:active{background:#FAF8F3;}
 
 <script>
 const CURRENCY = 'PKR';
-function fmtMoney(n){ if(n===null||n===undefined||isNaN(n)) n=0; const neg=n<0; n=Math.abs(Math.round(n)); return (neg?'-':'')+CURRENCY+' '+n.toLocaleString('en-US'); }
+
+/**
+ * The VantriqAI mark, in the version that suits the ground it sits on: white
+ * for the dark account header, ink for the sign-in card on cream. Handing the
+ * reversed mark to a white card leaves nothing but the cobalt notch visible.
+ */
+function portalMark(onDark){
+  const frame = onDark ? '#fff' : '#16151a';
+  const notch = onDark ? '#7f9bf2' : '#2f56d9';
+  return `<svg width="26" height="26" viewBox="0 0 100 100" aria-hidden="true">
+    <path d="M10 10 H90 V90 H10 Z M28 28 V72 H72 V28 Z" fill="${frame}" fill-rule="evenodd"/>
+    <rect x="10" y="28" width="28" height="10" fill="${notch}"/>
+    <rect x="28" y="10" width="10" height="28" fill="${notch}"/>
+  </svg>`;
+}
+
+/** Money in the currency it was billed in. Customers are billed in rupees;
+ *  the currency argument exists so an invoice raised in anything else still
+ *  prints as itself rather than being silently relabelled. */
+function fmtMoney(n, currency){
+  if(n===null||n===undefined||isNaN(n)) n=0;
+  const cur = currency || CURRENCY;
+  const neg = n<0; n = Math.abs(+n);
+  if(cur === 'USD'){
+    const places = (n > 0 && n < 1) ? 6 : 2;
+    return (neg?'-':'')+'USD '+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:places});
+  }
+  // Rupees are shown whole — nobody quotes paisa — except when the whole
+  // figure would be zero and the real one is not. A cost of PKR 0.18 is small,
+  // but printing it as "PKR 0" is the same lie as printing a dollar bill as
+  // zero, and it is the reason this formatter exists.
+  if(n > 0 && n < 1) return (neg?'-':'')+cur+' '+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  return (neg?'-':'')+cur+' '+Math.round(n).toLocaleString('en-US');
+}
 function fmtNum(n){ return Math.round(n||0).toLocaleString('en-US'); }
 function todayISO(){ return new Date().toISOString().slice(0,10); }
 function fmtDate(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }
@@ -219,8 +383,8 @@ function renderLogin(msg){
   <div class="center-screen">
     <div class="card" style="max-width:380px;width:100%;">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-        <div class="brand-mark"><svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M1 10h3l2-6 3 12 2.5-9 1.5 4h6" stroke="#8FD9CC" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <div><div class="brand-name">Vantriq AI</div><div class="brand-sub">Account portal</div></div>
+        <div class="brand-mark">${portalMark()}</div>
+        <div><div class="brand-name">Vantriq<em>AI</em></div><div class="brand-sub">Account portal</div></div>
       </div>
       <h3 style="margin:0 0 4px;">Sign in</h3>
       <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">Use the username and password Vantriq AI gave you.</p>
@@ -315,9 +479,9 @@ function render(){
     <div class="topbar">
       <div class="topbar-inner">
         <div class="brand-row">
-          <div class="brand-mark"><svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M1 10h3l2-6 3 12 2.5-9 1.5 4h6" stroke="#8FD9CC" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="brand-mark">${portalMark(true)}</div>
           <div>
-            <div class="brand-name">Vantriq AI</div>
+            <div class="brand-name">Vantriq<em>AI</em></div>
             <div class="brand-sub">Account portal</div>
           </div>
         </div>
@@ -400,7 +564,7 @@ function renderOverview(){
     <div style="display:flex;justify-content:space-between;align-items:center;">
       <div>
         <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#8A5F17;font-weight:700;">Amount due</div>
-        <div style="font-family:'Space Grotesk';font-size:22px;font-weight:600;color:#63430B;margin-top:2px;">${fmtMoney(ledger.total_outstanding)}</div>
+        <div style="font-family:var(--f-head);font-size:22px;font-weight:600;color:var(--amber-dark,#94512b);margin-top:2px;">${fmtMoney(ledger.total_outstanding)}</div>
       </div>
       <button class="btn btn-primary" onclick="setTab('invoices')">View invoices</button>
     </div>
@@ -476,7 +640,7 @@ function renderActivity(){
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
       <div>
         <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;">Conversations this period</div>
-        <div style="font-family:'Space Grotesk';font-size:22px;font-weight:600;margin-top:2px;">${fmtNum(a.total_sessions)}</div>
+        <div style="font-family:var(--f-head);font-size:22px;font-weight:600;margin-top:2px;">${fmtNum(a.total_sessions)}</div>
       </div>
       <div>
         <label style="font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px;">Period</label>
@@ -573,11 +737,11 @@ function renderPackages(){
       <div style="border:1px solid ${current?'var(--teal)':'var(--border)'};background:${current?'var(--teal-light)':'transparent'};border-radius:10px;padding:14px;margin-bottom:10px;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
           <div>
-            <div style="font-family:'Space Grotesk';font-weight:600;font-size:15px;">${esc(p.name)}${current?' <span class="pill pill-active" style="margin-left:6px;">Your package</span>':''}</div>
+            <div style="font-family:var(--f-head);font-weight:600;font-size:15px;">${esc(p.name)}${current?' <span class="pill pill-active" style="margin-left:6px;">Your package</span>':''}</div>
             <div style="font-size:12px;color:var(--muted);margin-top:2px;">${esc(p.target_tier||'')}</div>
           </div>
           <div style="text-align:right;">
-            <div style="font-family:'Space Grotesk';font-size:17px;font-weight:600;">${fmtMoney(p.retainer)}<span style="font-size:12px;color:var(--muted);font-weight:400;">/mo</span></div>
+            <div style="font-family:var(--f-head);font-size:17px;font-weight:600;">${fmtMoney(p.retainer)}<span style="font-size:12px;color:var(--muted);font-weight:400;">/mo</span></div>
             <div style="font-size:11.5px;color:var(--muted);">${fmtMoney(p.setup_fee)} setup</div>
           </div>
         </div>
@@ -757,7 +921,7 @@ function renderUsage(){
   <div class="card">
     <h3>This month's usage</h3>
     <div style="display:flex;justify-content:space-between;align-items:baseline;">
-      <span style="font-family:'Space Grotesk';font-size:26px;font-weight:600;">${fmtNum(u.sessions_used)}</span>
+      <span style="font-family:var(--f-head);font-size:26px;font-weight:600;">${fmtNum(u.sessions_used)}</span>
       <span style="font-size:13px;color:var(--muted);">of ${u.quota?fmtNum(u.quota):'—'} sessions included</span>
     </div>
     <div class="progress-track"><div class="progress-fill ${barClass}" style="width:${pct}%"></div></div>
@@ -803,7 +967,7 @@ function drawUsageChart(){
   const hist = data.usage.history || [];
   usageChart = new Chart(el, {
     type:'bar',
-    data:{ labels: hist.map(h=>fmtMonth(h.period_month)), datasets:[{ data: hist.map(h=>h.sessions), backgroundColor:'#12897A', borderRadius:6, maxBarThickness:36 }] },
+    data:{ labels: hist.map(h=>fmtMonth(h.period_month)), datasets:[{ data: hist.map(h=>h.sessions), backgroundColor:'#2f56d9', borderRadius:6, maxBarThickness:36 }] },
     options:{ plugins:{legend:{display:false}}, scales:{ y:{ grid:{color:'#EFEDE6'} }, x:{ grid:{display:false} } } }
   });
 }

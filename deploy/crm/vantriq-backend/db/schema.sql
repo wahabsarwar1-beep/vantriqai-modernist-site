@@ -1086,3 +1086,68 @@ create index if not exists idx_clients_jurisdiction on clients(tax_jurisdiction)
 -- show what it was actually billed under.
 alter table invoices add column if not exists tax_jurisdiction text;
 alter table invoices add column if not exists seller_reg_no text not null default '';
+
+-- =====================================================================
+-- v9.1 — the internal account bills in dollars, at model cost
+--
+-- Customers are billed in PKR against a package. VantriqAI's own account
+-- is a different animal: it exists to put the real cost of running the
+-- agents somewhere visible, and that cost is an OpenAI bill denominated
+-- in USD and metered in tokens. Converting it to PKR inside the system
+-- would bake in a rate that was only true on one day; the conversion
+-- belongs at the moment the adjustment is actually settled.
+--
+-- So currency becomes per-client, and the invoice records the one it was
+-- raised in. Everything without a currency stays on the company default,
+-- which is PKR — no existing client changes.
+--
+-- Precision matters here in a way it does not for PKR. gpt-4o-mini is
+-- $0.15 per million input tokens: a month of light traffic is a fraction
+-- of a cent, and rounding to two places would record it as zero and drop
+-- the invoice entirely. USD amounts are therefore held to six places.
+-- =====================================================================
+
+alter table clients  add column if not exists currency text;
+alter table invoices add column if not exists currency text;
+
+-- Where the internal account's own invoice is sent. It is a real invoice
+-- and it should arrive like any other, rather than being the one nobody
+-- ever sees. Change it in Settings.
+alter table settings add column if not exists internal_invoice_email text not null default 'support@vantriqai.com';
+
+-- =====================================================================
+-- v9.2 — one set of books, two currencies
+--
+-- The internal invoice is raised in USD; every other figure in the
+-- financials is PKR. Adding one to the other gives a number that means
+-- nothing, so the conversion has to be recorded rather than assumed.
+--
+-- It is recorded the same way a tax rate is: stamped on the invoice at
+-- issue, never looked up again. The rate on the day the cost was incurred
+-- is the rate that cost was incurred at, and a later rate must not quietly
+-- restate a month that has already been reported.
+--
+--   usd_pkr_rate   what one dollar costs today, entered in Settings.
+--                  0 means "not set" — no rate is invented.
+--   fx_rate        the rate this invoice was converted at. 1 when the
+--                  invoice is already in the books' own currency.
+--   base_amount    the invoice's net value in the books' currency. NULL
+--                  when no rate was available, which the financials
+--                  report as an unconverted figure rather than dropping
+--                  or guessing it.
+-- =====================================================================
+
+alter table settings add column if not exists usd_pkr_rate numeric not null default 0;
+alter table invoices add column if not exists fx_rate numeric;
+alter table invoices add column if not exists base_amount numeric;
+
+-- Invoices raised before v9.2 are all PKR, so they convert at 1:1. Done
+-- once, guarded, so re-running this file never touches a stamped rate.
+update invoices set fx_rate = 1, base_amount = amount
+ where fx_rate is null and coalesce(currency, 'PKR') = 'PKR';
+
+-- Where our own monthly invoice is sent. It defaults to the one mailbox the
+-- Hostinger account actually has; an address with no mailbox behind it does
+-- not fail loudly, it just bounces somewhere nobody reads. Change it in
+-- Settings once another mailbox exists — nothing here overwrites a choice
+-- made there, so re-running this file never undoes it.

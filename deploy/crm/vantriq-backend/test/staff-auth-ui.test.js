@@ -17,7 +17,7 @@ async function login(page,email,pw){
 }
 
 (async()=>{
-  const br=await chromium.launch({executablePath:'/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell'});
+  const br=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
   const page=await br.newPage(); const errs=[]; page.on('pageerror',e=>errs.push(String(e)));
   page.on('dialog',d=>d.accept());
 

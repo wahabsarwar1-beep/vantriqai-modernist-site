@@ -5,7 +5,7 @@ const B='http://127.0.0.1:8099';
 let pass=0,fail=0;
 const ok=(c,m,x='')=>{c?pass++:fail++;console.log((c?'  PASS ':'  FAIL ')+m+(c?'':'  <<< '+x));};
 (async()=>{
-  const br=await chromium.launch({executablePath:'/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell'});
+  const br=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
   const page=await br.newPage(); const errs=[]; page.on('pageerror',e=>errs.push(String(e)));
   await page.goto(B+'/portal.html',{waitUntil:'networkidle'});
   await page.fill('#lg_user',U); await page.fill('#lg_pass',P);

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 100" role="img" aria-label="VantriqAI">
+  <path d="M10 10 H90 V90 H10 Z M28 28 V72 H72 V28 Z" fill="#16151a" fill-rule="evenodd"/>
+  <rect x="10" y="28" width="28" height="10" fill="#2f56d9"/>
+  <rect x="28" y="10" width="10" height="28" fill="#2f56d9"/>
+  <text x="104" y="50" font-family="Sora, Archivo, Helvetica, Arial, sans-serif" font-size="56" font-weight="700" letter-spacing="-1.7" dominant-baseline="central" fill="#16151a">Vantriq<tspan fill="#2f56d9">AI</tspan></text>
+</svg>

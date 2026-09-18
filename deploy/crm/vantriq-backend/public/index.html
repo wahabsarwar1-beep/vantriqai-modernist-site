@@ -4,44 +4,88 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vantriq Ops — CRM &amp; Revenue Console</title>
+<link rel="icon" href="/brand/mark.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Sora and Manrope are the typefaces vantriqai.com is set in. The console
+     reads as the same company as the website, rather than as a tool someone
+     bolted on beside it. -->
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <script src="/invoice-print.js"></script>
 <style>
+/* The console is set in VantriqAI's own palette — the cream ground, ink
+   text and cobalt accent from vantriqai.com, not a second scheme invented
+   for the back office. The variable NAMES are the ones the five thousand
+   lines below already use, so re-skinning is a change of values rather than
+   a rewrite of every rule that references them. */
 :root{
-  --ink:#0F1A22;
-  --ink-2:#16242E;
-  --ink-3:#1E3038;
-  --paper:#F5F3ED;
-  --card:#FFFFFF;
-  --teal:#12897A;
-  --teal-dark:#0B6357;
-  --teal-light:#E3F1EE;
-  --amber:#DE9C34;
-  --amber-light:#FBF0DD;
-  --red:#BC4B3C;
-  --red-light:#FBE8E4;
-  --blue:#3E6FA8;
-  --text:#161F27;
-  --muted:#6C7885;
-  --muted-2:#98A2AC;
-  --border:#E4E0D6;
-  --border-dark:#2A3E47;
-  --radius:10px;
+  --ink:#16151a;          /* sidebar ground — the wordmark's ink */
+  --ink-2:#221f2b;
+  --ink-3:#2d2a38;
+
+  --paper:#fbf9f6;        /* the website's warm cream */
+  --card:#ffffff;
+  --text:#16151a;
+  --muted:#6b645b;
+  --muted-2:#8d857a;
+  --border:#e7e2da;
+  --border-2:#f0ece5;
+  --border-dark:#332f3d;
+
+  /* Cobalt is the brand accent. 'teal' is kept as the variable name only
+     because the rules below are written against it; every value here is
+     --color-accent from the site's stylesheet. */
+  --teal:#2f56d9;
+  --teal-dark:#1f3a95;
+  --teal-light:#e8ecfd;
+  --teal-200:#cfd9fb;
+  --teal-300:#a9bbf7;
+  --teal-400:#7f9bf2;
+
+  /* Terracotta is the site's second accent; it carries 'needs attention'. */
+  --amber:#c06b3a;
+  --amber-light:#fbeee4;
+  --amber-dark:#94512b;
+
+  --red:#b4402f;
+  --red-light:#fbe8e4;
+  --blue:#2f56d9;
+  --green:#2f7d5f;
+  --green-light:#e4f2eb;
+
+  /* One place each typeface is named. A bare quoted family drops straight to
+     the browser's default serif when the webfont has not loaded — on a slow
+     connection the console would render in Times for a second. */
+  --f-head:'Sora',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-body:'Manrope',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
+
+  --radius:14px;
+  --radius-sm:10px;
+  --radius-lg:20px;
+  --radius-pill:999px;
+
+  --shadow-sm:0 1px 2px rgba(22,21,26,.04), 0 8px 20px -16px rgba(22,21,26,.10);
+  --shadow-md:0 1px 3px rgba(22,21,26,.04), 0 14px 32px -22px rgba(22,21,26,.14);
+  --shadow-lg:0 4px 10px rgba(22,21,26,.05), 0 28px 56px -30px rgba(22,21,26,.20);
 }
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
 body{
-  font-family:'Inter',sans-serif;
+  font-family:var(--f-body);
   background:var(--paper);
   color:var(--text);
   -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
 }
-h1,h2,h3,h4,.display{font-family:'Space Grotesk',sans-serif;}
-.mono{font-family:'JetBrains Mono',monospace;}
-button{font-family:'Inter',sans-serif;cursor:pointer;}
-::selection{background:var(--teal-light);}
+h1,h2,h3,h4,.display{font-family:var(--f-head);letter-spacing:-.015em;}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums;}
+button{font-family:var(--f-body);cursor:pointer;}
+::selection{background:var(--teal-200);color:var(--text);}
+/* Every interactive thing gets the same visible focus ring — a console is
+   used at speed and half of that is done from the keyboard. */
+:focus-visible{outline:2px solid var(--teal);outline-offset:2px;border-radius:4px;}
 
 /* Layout */
 #app{display:flex;min-height:100vh;}
@@ -55,12 +99,13 @@ button{font-family:'Inter',sans-serif;cursor:pointer;}
   display:flex;align-items:center;gap:10px;
 }
 .brand-mark{
-  width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--teal),#0A4E45);
-  display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;overflow:hidden;
+  width:34px;height:34px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
 }
-.brand-mark svg{position:relative;z-index:2;}
-.brand-name{font-family:'Space Grotesk';font-weight:600;font-size:15.5px;color:#fff;letter-spacing:.2px;}
-.brand-sub{font-size:10.5px;color:#7C8B94;margin-top:1px;letter-spacing:.5px;text-transform:uppercase;}
+.brand-mark svg{display:block;}
+.brand-name{font-family:var(--f-head);font-weight:700;font-size:16px;color:#fff;letter-spacing:-.02em;}
+.brand-name em{font-style:normal;color:var(--teal-400);}
+.brand-sub{font-size:10px;color:#8d857a;margin-top:2px;letter-spacing:.09em;text-transform:uppercase;font-weight:600;}
 .nav{padding:14px 10px;flex:1;}
 .nav-group-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#5D6C75;padding:14px 12px 6px;font-weight:600;}
 .nav-item{
@@ -77,7 +122,7 @@ button{font-family:'Inter',sans-serif;cursor:pointer;}
 .nav-item svg{flex-shrink:0;opacity:.85;}
 .nav-badge{
   margin-left:auto;font-size:10.5px;background:var(--ink-3);color:#9BADB6;
-  padding:1px 7px;border-radius:20px;font-family:'JetBrains Mono';
+  padding:1px 7px;border-radius:20px;font-family:var(--f-mono);
 }
 .sidebar-foot{padding:14px 20px;border-top:1px solid var(--border-dark);font-size:11px;color:#5D6C75;}
 
@@ -100,8 +145,8 @@ button{font-family:'Inter',sans-serif;cursor:pointer;}
 }
 .kpi{position:relative;overflow:hidden;}
 .kpi .label{font-size:11.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:600;}
-.kpi .value{font-family:'Space Grotesk';font-size:26px;font-weight:600;margin-top:6px;letter-spacing:-.3px;}
-.kpi .delta{font-size:11.5px;margin-top:6px;font-family:'JetBrains Mono';}
+.kpi .value{font-family:var(--f-head);font-size:26px;font-weight:600;margin-top:6px;letter-spacing:-.3px;}
+.kpi .delta{font-size:11.5px;margin-top:6px;font-family:var(--f-mono);}
 .delta.up{color:var(--teal-dark);}
 .delta.down{color:var(--red);}
 .section-title{display:flex;align-items:center;justify-content:space-between;margin:30px 0 12px;}
@@ -161,7 +206,7 @@ tr.row-click:hover td{background:#FBFAF7;}
 .kanban-col{flex:0 0 250px;background:#F0EEE6;border-radius:12px;padding:10px;min-height:200px;}
 .kanban-col-head{display:flex;align-items:center;justify-content:space-between;padding:4px 6px 10px;}
 .kanban-col-head .t{font-size:12.5px;font-weight:700;}
-.kanban-col-head .n{font-size:11px;color:var(--muted);font-family:'JetBrains Mono';}
+.kanban-col-head .n{font-size:11px;color:var(--muted);font-family:var(--f-mono);}
 .kcard{
   background:var(--card);border:1px solid var(--border);border-radius:9px;padding:11px 12px;
   margin-bottom:9px;cursor:grab;transition:box-shadow .15s,border-color .15s;
@@ -190,7 +235,7 @@ tr.row-click:hover td{background:#FBFAF7;}
 .field label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px;}
 .field input,.field select,.field textarea{
   width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;
-  font-family:'Inter';background:#FCFBF9;
+  font-family:var(--f-body);background:var(--card);
 }
 .field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--teal);outline-offset:0;border-color:transparent;}
 .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
@@ -203,11 +248,11 @@ tr.row-click:hover td{background:#FBFAF7;}
 .prod-card h3{margin:4px 0 2px;font-size:19px;}
 .prod-card .target{font-size:12px;color:var(--muted);margin-bottom:12px;}
 .prod-price{display:flex;align-items:baseline;gap:6px;margin-bottom:14px;}
-.prod-price .amt{font-family:'JetBrains Mono';font-size:20px;font-weight:600;}
+.prod-price .amt{font-family:var(--f-mono);font-size:20px;font-weight:600;}
 .prod-price .per{font-size:11.5px;color:var(--muted);}
 .prod-stat-row{display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-top:1px dashed var(--border);}
 .prod-stat-row .k{color:var(--muted);}
-.prod-stat-row .v{font-weight:600;font-family:'JetBrains Mono';}
+.prod-stat-row .v{font-weight:600;font-family:var(--f-mono);}
 .prod-actions{display:flex;gap:6px;margin-top:14px;}
 
 .empty{
@@ -263,7 +308,7 @@ button:disabled,.btn:disabled{cursor:not-allowed;opacity:.55;}
 .stage-tab:hover{background:#E3DFD4;color:var(--text);}
 .stage-tab.active{background:var(--ink);color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.18);}
 .stage-tab .n{
-  font-family:'JetBrains Mono';font-size:11px;font-weight:600;padding:1px 6px;border-radius:20px;
+  font-family:var(--f-mono);font-size:11px;font-weight:600;padding:1px 6px;border-radius:20px;
   background:rgba(0,0,0,.07);color:inherit;
 }
 .stage-tab.active .n{background:rgba(255,255,255,.18);}
@@ -273,7 +318,7 @@ button:disabled,.btn:disabled{cursor:not-allowed;opacity:.55;}
 /* Ledger / statement tables */
 .stmt{width:100%;border-collapse:collapse;font-size:13px;}
 .stmt td{padding:7px 0;border:none;}
-.stmt td.amt{text-align:right;font-family:'JetBrains Mono';white-space:nowrap;}
+.stmt td.amt{text-align:right;font-family:var(--f-mono);white-space:nowrap;}
 .stmt tr.sub td{border-top:1px solid var(--border);font-weight:700;padding-top:9px;}
 .stmt tr.tot td{border-top:2px solid var(--ink);font-weight:700;font-size:14.5px;padding-top:10px;}
 .stmt tr.head td{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;padding-top:14px;}
@@ -284,7 +329,7 @@ button:disabled,.btn:disabled{cursor:not-allowed;opacity:.55;}
 .agent-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px 14px;}
 .agent-card .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;}
 .agent-card .nm{font-size:14px;font-weight:700;margin-top:3px;}
-.agent-card .rf{font-family:'JetBrains Mono';font-size:11px;color:var(--muted);margin-top:4px;word-break:break-all;}
+.agent-card .rf{font-family:var(--f-mono);font-size:11px;color:var(--muted);margin-top:4px;word-break:break-all;}
 
 .progress-track{height:6px;background:#EEEBE2;border-radius:4px;overflow:hidden;}
 .progress-fill{height:100%;background:var(--teal);border-radius:4px;}
@@ -293,7 +338,7 @@ button:disabled,.btn:disabled{cursor:not-allowed;opacity:.55;}
 
 .stat-strip{display:flex;gap:22px;flex-wrap:wrap;padding:14px 18px;background:var(--ink);border-radius:12px;color:#fff;margin-bottom:6px;}
 .stat-strip .s-item .l{font-size:10.5px;color:#93A2AB;text-transform:uppercase;letter-spacing:.5px;}
-.stat-strip .s-item .v{font-family:'JetBrains Mono';font-size:17px;font-weight:600;margin-top:2px;}
+.stat-strip .s-item .v{font-family:var(--f-mono);font-size:17px;font-weight:600;margin-top:2px;}
 
 .hamburger{display:none;background:none;border:none;padding:6px;}
 @media(max-width:860px){
@@ -309,6 +354,250 @@ button:disabled,.btn:disabled{cursor:not-allowed;opacity:.55;}
 a.plain{color:var(--teal-dark);text-decoration:none;font-weight:600;}
 .footnote{font-size:11.5px;color:var(--muted-2);margin-top:10px;}
 .divider{height:1px;background:var(--border);margin:18px 0;}
+
+/* ==================================================================== *
+ *  v9.2 — the console, dressed as VantriqAI
+ *
+ *  Everything above is the working stylesheet the app was built against.
+ *  This layer sits after it and does three things:
+ *
+ *    1. retires the hard-coded greys and greens that predate the brand
+ *       palette (they were written before there was one),
+ *    2. gives the console the proportions of a modern CRM — quieter
+ *       chrome, more air, one clear accent, real empty and loading states,
+ *    3. keeps every class name the app already renders, so this is a
+ *       change of appearance and not a change of behaviour.
+ * ==================================================================== */
+
+/* ---------- Sidebar ---------- */
+.sidebar{
+  width:248px;
+  background:var(--ink);
+  border-right:1px solid rgba(255,255,255,.06);
+}
+.brand{
+  padding:20px 18px;
+  border-bottom:1px solid rgba(255,255,255,.07);
+  gap:12px;
+}
+.nav{padding:12px 12px 20px;}
+.nav-group-label{
+  font-size:9.5px;letter-spacing:.12em;color:#7a7268;
+  padding:16px 10px 6px;font-weight:700;
+}
+.nav-item{
+  border-radius:10px;padding:9px 11px;gap:11px;
+  font-size:13.5px;font-weight:500;color:#b5aea4;
+  transition:background .14s ease,color .14s ease;
+}
+.nav-item:hover{background:rgba(255,255,255,.05);color:#fff;}
+.nav-item.active{background:var(--teal);color:#fff;font-weight:600;}
+.nav-item.active svg{opacity:1;}
+/* The active row is the accent block itself, so the old edge marker would
+   only repeat what the fill already says. */
+.nav-item.active::before{display:none;}
+.nav-badge{
+  background:rgba(255,255,255,.08);color:#a9a196;
+  font-size:10.5px;padding:2px 8px;font-weight:600;
+}
+.nav-item.active .nav-badge{background:rgba(255,255,255,.22);color:#fff;}
+.sidebar-foot{
+  border-top:1px solid rgba(255,255,255,.07);
+  color:#6b645b;font-size:10.5px;letter-spacing:.02em;line-height:1.5;
+}
+.sidebar-foot a{
+  display:inline-block;margin:6px 0 2px;padding:5px 12px;
+  border:1px solid rgba(255,255,255,.14);border-radius:var(--radius-pill);
+  color:#cfc9c0;text-decoration:none;font-size:11px;font-weight:600;
+  transition:background .14s ease,color .14s ease,border-color .14s ease;
+}
+.sidebar-foot a:hover{background:rgba(255,255,255,.08);color:#fff;border-color:rgba(255,255,255,.28);}
+
+/* ---------- Top bar ---------- */
+.topbar{
+  background:rgba(251,249,246,.86);
+  backdrop-filter:saturate(180%) blur(12px);
+  -webkit-backdrop-filter:saturate(180%) blur(12px);
+  border-bottom:1px solid var(--border);
+  padding:15px 30px;
+}
+.topbar h1{font-size:20px;font-weight:700;letter-spacing:-.02em;}
+.topbar-sub{font-size:12.5px;color:var(--muted);}
+.content{padding:28px 30px 72px;max-width:1440px;}
+
+/* ---------- Surfaces ---------- */
+.card,.chart-card,.table-wrap,.prod-card,.agent-card{
+  border-radius:var(--radius);
+  border-color:var(--border);
+  box-shadow:var(--shadow-sm);
+}
+.card{padding:20px 22px;}
+.section-title{margin:34px 0 14px;}
+.section-title h2{font-size:16px;font-weight:700;}
+
+/* KPI tiles carry the numbers somebody opens the console to read, so they
+   get the largest type on the page and a hairline of accent to sit on. */
+.kpi{padding:18px 20px;}
+.kpi::after{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+  background:var(--teal);opacity:.9;
+}
+.kpi .label{font-size:11px;letter-spacing:.07em;color:var(--muted);}
+.kpi .value{font-size:29px;font-weight:700;letter-spacing:-.03em;margin-top:8px;}
+.kpi .delta{font-size:11.5px;}
+.delta.up{color:var(--green);}
+.delta.down{color:var(--red);}
+
+/* ---------- Buttons ---------- */
+.btn{
+  border-radius:var(--radius-pill);
+  padding:9px 18px;font-size:13px;font-weight:600;letter-spacing:.005em;
+  transition:background .14s ease,border-color .14s ease,box-shadow .14s ease,transform .06s ease;
+}
+.btn-primary{background:var(--teal);box-shadow:var(--shadow-sm);}
+.btn-primary:hover{background:var(--teal-dark);box-shadow:var(--shadow-md);}
+.btn-ghost{background:var(--card);border:1px solid var(--border);}
+.btn-ghost:hover{background:var(--teal-light);border-color:var(--teal-300);color:var(--teal-dark);}
+.btn-danger-ghost{border-color:#edd3cd;}
+.btn-sm{padding:6px 13px;font-size:12px;}
+.btn-icon{width:34px;height:34px;border-radius:var(--radius-pill);}
+
+/* ---------- Tables ---------- */
+.table-wrap{overflow:hidden;overflow-x:auto;}
+th{
+  font-size:10px;letter-spacing:.08em;color:var(--muted);
+  padding:11px 14px;background:var(--border-2);
+  border-bottom:1px solid var(--border);
+}
+td{padding:13px 14px;border-bottom:1px solid var(--border-2);}
+tr:last-child td{border-bottom:none;}
+tr.row-click:hover td{background:var(--teal-light);}
+/* Money reads down a column, so it is aligned and tabular everywhere. */
+td.amt,th.amt,td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
+
+/* ---------- Pills ---------- */
+.pill{padding:4px 11px;font-size:10.5px;letter-spacing:.02em;font-weight:700;}
+.pill-active,.pill-paid{background:var(--green-light);color:#1f5c45;}
+.pill-active .pill-dot,.pill-paid .pill-dot{background:var(--green);}
+.pill-proposal{background:var(--teal-light);color:var(--teal-dark);}
+.pill-proposal .pill-dot{background:var(--teal);}
+.pill-contacted{background:var(--amber-light);color:var(--amber-dark);}
+.pill-contacted .pill-dot{background:var(--amber);}
+.pill-lead,.pill-pending{background:var(--border-2);color:var(--muted);}
+.pill-lead .pill-dot,.pill-pending .pill-dot{background:var(--muted-2);}
+.tag{background:var(--border-2);border-radius:var(--radius-pill);padding:3px 10px;}
+
+/* ---------- Kanban ---------- */
+.kanban-col{background:var(--border-2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;}
+.kanban-col-head .n{color:var(--muted);}
+.kcard{border-radius:var(--radius-sm);padding:13px 14px;box-shadow:none;}
+.kcard:hover{box-shadow:var(--shadow-md);border-color:var(--teal-300);}
+.kanban-drop{outline-color:var(--teal);background:var(--teal-light);}
+
+/* ---------- Stage bar ---------- */
+.stage-tabs{background:var(--border-2);border-radius:var(--radius);padding:6px;}
+.stage-tab{border-radius:var(--radius-pill);padding:9px 16px;}
+.stage-tab:hover{background:var(--card);color:var(--text);}
+.stage-tab.active{background:var(--teal);color:#fff;box-shadow:var(--shadow-sm);}
+.stage-tab.is-won.active{background:var(--green);}
+.stage-tab.is-lost.active{background:var(--red);}
+
+/* ---------- Tabs ---------- */
+.tabs{gap:2px;}
+.tab{padding:10px 16px;border-bottom-width:2px;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--teal-dark);border-color:var(--teal);}
+
+/* ---------- Forms ---------- */
+.field label{font-size:11.5px;letter-spacing:.02em;color:var(--muted);margin-bottom:6px;}
+.field input,.field select,.field textarea{
+  font-family:var(--f-body);
+  background:var(--card);border-radius:var(--radius-sm);padding:10px 13px;
+  transition:border-color .14s ease,box-shadow .14s ease;
+}
+.field input:focus,.field select:focus,.field textarea:focus{
+  outline:none;border-color:var(--teal);box-shadow:0 0 0 4px var(--teal-light);
+}
+
+/* ---------- Modal ---------- */
+.modal-overlay{background:rgba(22,21,26,.44);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);}
+.modal{border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);}
+.modal-head{padding:20px 24px;}
+.modal-head h3{font-size:17px;font-weight:700;}
+.modal-body{padding:22px 24px;}
+.modal-foot{padding:16px 24px;background:var(--border-2);border-radius:0 0 var(--radius-lg) var(--radius-lg);}
+
+/* ---------- Detail panel ---------- */
+.detail-panel{width:460px;box-shadow:var(--shadow-lg);}
+.detail-head{padding:22px 24px;}
+.detail-row{border-bottom-color:var(--border-2);}
+.scrim{background:rgba(22,21,26,.38);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);}
+
+/* ---------- Statements ---------- */
+.stmt tr.tot td{border-top-color:var(--text);}
+.balance-ok{color:var(--green);}
+.stat-strip{
+  background:var(--ink);border-radius:var(--radius);padding:16px 22px;gap:28px;
+}
+.stat-strip .s-item .l{color:#8d857a;letter-spacing:.07em;}
+.stat-strip .s-item .v{font-size:18px;}
+
+/* ---------- Progress ---------- */
+.progress-track{background:var(--border-2);height:7px;border-radius:var(--radius-pill);}
+.progress-fill{background:var(--teal);border-radius:var(--radius-pill);transition:width .3s ease;}
+.progress-fill.warn{background:var(--amber);}
+
+/* ---------- Empty and loading ---------- */
+.empty{padding:64px 24px;}
+.empty .t{font-family:var(--f-head);font-size:15px;font-weight:600;}
+.empty .s{font-size:13px;max-width:380px;margin:6px auto 0;line-height:1.55;}
+.loading-dot{background:var(--teal);}
+
+/* ---------- Toasts ---------- */
+.toast{border-radius:var(--radius-pill);padding:12px 20px;box-shadow:var(--shadow-lg);}
+
+/* ---------- Product cards ---------- */
+.prod-card{padding:20px;border-radius:var(--radius);}
+.prod-card .tier-tag{color:var(--teal);letter-spacing:.09em;}
+.prod-card h3{font-size:20px;font-weight:700;}
+.prod-stat-row{border-top-color:var(--border-2);}
+
+/* ---------- Sign-in ---------- */
+/* The way in is the first thing anyone sees, so it carries the mark rather
+   than dropping straight into a pair of unlabelled fields. */
+.auth-screen{
+  flex:1;width:100%;min-height:100vh;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:18px;padding:24px;
+  background:
+    radial-gradient(900px 520px at 12% -10%, var(--teal-light) 0%, transparent 62%),
+    radial-gradient(760px 480px at 105% 108%, var(--amber-light) 0%, transparent 60%),
+    var(--paper);
+}
+.auth-card{
+  width:100%;max-width:404px;background:var(--card);
+  border:1px solid var(--border);border-radius:var(--radius-lg);
+  padding:32px 30px;box-shadow:var(--shadow-lg);
+}
+.auth-brand{display:flex;align-items:center;gap:13px;margin-bottom:24px;}
+.auth-wordmark{font-family:var(--f-head);font-weight:700;font-size:19px;letter-spacing:-.025em;}
+.auth-wordmark em{font-style:normal;color:var(--teal);}
+.auth-kicker{
+  font-size:10px;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--muted);font-weight:700;margin-top:3px;
+}
+.auth-error{
+  background:var(--red-light);color:#8f3527;padding:11px 14px;
+  border-radius:var(--radius-sm);font-size:12.5px;margin-bottom:16px;
+  border:1px solid #f0d5cf;
+}
+.auth-foot{font-size:11.5px;color:var(--muted-2);margin:0;}
+.auth-card .btn-primary{width:100%;justify-content:center;}
+
+@media(max-width:860px){
+  .content{padding:20px 16px 56px;}
+  .topbar{padding:13px 16px;}
+  .detail-panel{width:100%;}
+}
 </style>
 </head>
 <body>
@@ -456,6 +745,11 @@ function invoiceFromApi(i){
     amount:+i.amount, period:i.period, status:i.status, date:i.issued_date, overageSessions:i.overage_sessions||0,
     number:i.invoice_number||'', taxRate:+i.tax_rate||0, taxAmount:+i.tax_amount||0, total,
     isInternal:!!i.is_internal,
+    // The currency the invoice was RAISED in. Only the internal account is
+    // ever anything but PKR, and it is the whole point of that account that
+    // its figures are dollars.
+    currency:i.currency||CURRENCY, fxRate:i.fx_rate==null?null:+i.fx_rate,
+    baseAmount:i.base_amount==null?null:+i.base_amount,
     aitRate:+i.ait_rate||0, aitAmount:+i.ait_amount||0, netPayable:net,
     received:+st.received||0, outstanding:+st.balance||0, aitChallans:+st.ait_challans||0,
     writtenOff:+st.written_off||0, credited:+st.credited||0,
@@ -469,10 +763,30 @@ function poFromApi(p){ return { id:p.id, vendorId:p.vendor_id, item:p.item, amou
 
 function expenseFromApi(e){ return { id:e.id, label:e.label, category:e.category, amount:+e.amount, recurring:e.recurring, startDate:e.start_date, endDate:e.end_date||null }; }
 
-function fmtMoney(n){
+/**
+ * Money, in the currency it is actually in.
+ *
+ * Rupees are shown whole — nobody quotes paisa. Dollars are not: the
+ * internal account is priced per million tokens, so a real month's cost is a
+ * fraction of a cent and rounding it to the nearest dollar prints $0 against
+ * a bill that is genuinely owed. Six places for the small figures, two once
+ * there is a dollar on the invoice, so a $412.30 bill does not read
+ * $412.300000.
+ */
+function fmtMoney(n, currency){
   if(n===null||n===undefined||isNaN(n)) n=0;
-  const neg = n<0; n=Math.abs(Math.round(n));
-  return (neg?'-':'')+CURRENCY+' '+n.toLocaleString('en-US');
+  const cur = currency || CURRENCY;
+  const neg = n<0; n = Math.abs(+n);
+  if(cur === 'USD'){
+    const places = (n > 0 && n < 1) ? 6 : 2;
+    return (neg?'-':'')+'USD '+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:places});
+  }
+  // Rupees are shown whole — nobody quotes paisa — except when the whole
+  // figure would be zero and the real one is not. A cost of PKR 0.18 is small,
+  // but printing it as "PKR 0" is the same lie as printing a dollar bill as
+  // zero, and it is the reason this formatter exists.
+  if(n > 0 && n < 1) return (neg?'-':'')+cur+' '+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  return (neg?'-':'')+cur+' '+Math.round(n).toLocaleString('en-US');
 }
 function fmtNum(n){ return Math.round(n).toLocaleString('en-US'); }
 function uid(prefix){ return prefix+'_'+Math.random().toString(36).slice(2,9); }
@@ -541,6 +855,8 @@ async function loadState(){
       sellerNtn:settings.seller_ntn||'', sellerStrn:settings.seller_strn||'',
       sellerAddress:settings.seller_address||'', sellerEmail:settings.seller_email||'',
       defaultAitRate:settings.default_ait_rate!=null?+settings.default_ait_rate:0,
+      usdPkrRate:settings.usd_pkr_rate!=null?+settings.usd_pkr_rate:0,
+      internalInvoiceEmail:settings.internal_invoice_email||'',
       openingCash:settings.opening_cash!=null?+settings.opening_cash:0,
       openingCashDate:settings.opening_cash_date||'',
       internalCostLabel:settings.internal_cost_label||'Internal AI usage (own agents)',
@@ -722,7 +1038,7 @@ function renderSidebar(){
     <div class="brand">
       <div class="brand-mark">${sidebarPulseSVG()}</div>
       <div>
-        <div class="brand-name">Vantriq Ops</div>
+        <div class="brand-name">Vantriq<em>AI</em></div>
         <div class="brand-sub">Revenue Console</div>
       </div>
     </div>
@@ -742,18 +1058,26 @@ function renderSidebar(){
       ${authUser ? `
         <div style="color:#B9C6CE;font-weight:600;font-size:11.5px;">${esc(authUser.name)}</div>
         <div style="margin-bottom:6px;">${esc(authUser.email)} · ${authUser.role==='admin'?'Admin':'Staff'}</div>
-        <a href="#" onclick="event.preventDefault();signOut()" style="color:#8FD9CC;">Sign out</a>
+        <a href="#" onclick="event.preventDefault();signOut()" style="color:var(--teal-400);">Sign out</a>
       ` : `
         <div style="margin-bottom:6px;color:#C7A76B;">Signed in with an API key (emergency access)</div>
-        <a href="#" onclick="event.preventDefault();signOut()" style="color:#8FD9CC;">Sign out</a>
+        <a href="#" onclick="event.preventDefault();signOut()" style="color:var(--teal-400);">Sign out</a>
       `}
       <div style="margin-top:8px;">${esc(state.company.name)} · ${esc(state.company.city)}</div>
     </div>
   </div>`;
 }
+/**
+ * The real VantriqAI mark: the notched square from the website and the
+ * favicon, drawn inline so it paints with the first frame rather than after
+ * a request. Reversed — white frame, cobalt notch — because it sits on the
+ * dark sidebar.
+ */
 function sidebarPulseSVG(){
-  return `<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-    <path d="M1 10h3l2-6 3 12 2.5-9 1.5 4h6" stroke="#8FD9CC" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  return `<svg width="22" height="22" viewBox="0 0 100 100" aria-hidden="true">
+    <path d="M10 10 H90 V90 H10 Z M28 28 V72 H72 V28 Z" fill="#fff" fill-rule="evenodd"/>
+    <rect x="10" y="28" width="28" height="10" fill="#7f9bf2"/>
+    <rect x="28" y="10" width="10" height="28" fill="#7f9bf2"/>
   </svg>`;
 }
 
@@ -884,7 +1208,7 @@ function renderDashboard(){
           return `<tr class="row-click" onclick="openPanel={type:'invoice',id:'${inv.id}'};render()">
             <td><strong>${esc(c?c.company:'—')}</strong></td>
             <td>${esc(inv.type)}</td>
-            <td class="mono">${fmtMoney(inv.amount)}</td>
+            <td class="mono">${fmtMoney(inv.amount, inv.currency)}</td>
             <td>${esc(inv.period||fmtDate(inv.date))}</td>
             <td><span class="pill ${invoiceStatusPillClass(inv.status)}"><span class="pill-dot"></span>${inv.status}</span></td>
             <td>${iconArrowRight(14)}</td>
@@ -924,7 +1248,7 @@ function drawDashboardCharts(){
     const data = revenueByTier();
     dashboardCharts.push(new Chart(revEl, {
       type:'bar',
-      data:{ labels:data.map(d=>d.name), datasets:[{ data:data.map(d=>d.revenue), backgroundColor:'#12897A', borderRadius:6, maxBarThickness:42 }]},
+      data:{ labels:data.map(d=>d.name), datasets:[{ data:data.map(d=>d.revenue), backgroundColor:'#2f56d9', borderRadius:6, maxBarThickness:42 }]},
       options:{ plugins:{legend:{display:false}, tooltip:{callbacks:{label:(ctx)=>fmtMoney(ctx.raw)}}},
         scales:{ y:{ticks:{callback:(v)=>fmtMoney(v)}, grid:{color:'#EFEDE6'}}, x:{grid:{display:false}} } }
     }));
@@ -935,7 +1259,7 @@ function drawDashboardCharts(){
     const counts = stages.map(s=>state.clients.filter(c=>c.stage===s).length);
     dashboardCharts.push(new Chart(pipeEl,{
       type:'doughnut',
-      data:{ labels:stages.map(stageLabel), datasets:[{ data:counts, backgroundColor:['#98A2AC','#DE9C34','#3E6FA8','#9B5CB8'] }]},
+      data:{ labels:stages.map(stageLabel), datasets:[{ data:counts, backgroundColor:['#bdb4a5','#e0854f','#2f56d9','#7f9bf2'] }]},
       options:{ plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}}} }
     }));
   }
@@ -1197,7 +1521,7 @@ function showRepKeyModal(result){
       <div class="modal-head"><h3>${esc(result.name)}'s login key</h3></div>
       <div class="modal-body">
         <p style="font-size:13px;color:var(--muted);">Copy this now — it won't be shown again. Send it to the rep along with this URL: <span class="mono">${esc(API.base)}/rep.html</span></p>
-        <input readonly value="${esc(result.key)}" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-family:'JetBrains Mono';font-size:12.5px;background:#FAF8F3;" onclick="this.select()">
+        <input readonly value="${esc(result.key)}" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-family:var(--f-mono);font-size:12.5px;background:#FAF8F3;" onclick="this.select()">
       </div>
       <div class="modal-foot">
         <button class="btn btn-primary" onclick="document.getElementById('modal-root').innerHTML=''">Done</button>
@@ -1215,7 +1539,12 @@ function renderBilling(){
     : invoices.filter(i=>i.status===billingFilter);
   // The money figures cover customer invoices only. Our own account's billing
   // is a cost, not revenue, and counting it here would flatter every total.
-  const billable = invoices.filter(i=>!i.isInternal);
+  // They are also restricted to the company currency: these tiles add
+  // invoices together, and a dollar added to a rupee is not a number.
+  const billable = invoices.filter(i=>!i.isInternal && (i.currency||CURRENCY)===CURRENCY);
+  // What our own agents cost this period, in the dollars it was billed in.
+  const internalInvoices = invoices.filter(i=>i.isInternal);
+  const internalUsd = internalInvoices.filter(i=>i.currency==='USD').reduce((s,i)=>s+i.amount,0);
   const totalPaid = billable.filter(i=>i.status==='paid').reduce((s,i)=>s+i.received,0);
   const totalPending = billable.filter(i=>i.status==='pending'||i.status==='partial').reduce((s,i)=>s+i.outstanding,0);
   const totalOverdue = billable.filter(i=>i.status==='overdue').reduce((s,i)=>s+i.outstanding,0);
@@ -1230,6 +1559,7 @@ function renderBilling(){
     <div class="card kpi"><div class="label">GST billed</div><div class="value mono" style="font-size:19px;">${fmtMoney(totalTax)}</div></div>
     <div class="card kpi"><div class="label">Advance tax withheld</div><div class="value mono" style="font-size:19px;">${fmtMoney(totalAit)}</div></div>
     <div class="card kpi"><div class="label">Total invoices</div><div class="value" style="font-size:19px;">${invoices.length}</div>${internalCount?`<div class="delta">${internalCount} internal</div>`:''}</div>
+    ${internalUsd>0?`<div class="card kpi"><div class="label">Our own AI usage</div><div class="value mono" style="font-size:19px;">${fmtMoney(internalUsd,'USD')}</div><div class="delta">billed to us, an expense</div></div>`:''}
   </div>
   <div class="tabs">
     ${['all','paid','partial','pending','overdue'].concat(internalCount?['internal']:[]).map(f=>`<div class="tab ${billingFilter===f?'active':''}" onclick="billingFilter='${f}';render()">${f==='internal'?'Our own account':f[0].toUpperCase()+f.slice(1)}</div>`).join('')}
@@ -1245,11 +1575,11 @@ function renderBilling(){
           <td><strong>${esc(c?c.company:'—')}</strong>${inv.isInternal?` <span class="tag">Internal</span>`:''}</td>
           <td>${esc(inv.type)}${inv.overageSessions?` <span class="tag">+${inv.overageSessions} overage</span>`:''}</td>
           <td>${esc(inv.period||'—')}</td>
-          <td class="mono">${fmtMoney(inv.amount)}</td>
-          <td class="mono" style="color:var(--muted);">${inv.taxAmount?'+ '+fmtMoney(inv.taxAmount):'—'}</td>
-          <td class="mono" style="color:var(--muted);">${inv.aitAmount?'− '+fmtMoney(inv.aitAmount):'—'}</td>
-          <td class="mono"><strong>${fmtMoney(inv.netPayable)}</strong></td>
-          <td class="mono">${inv.isInternal?'—':(inv.outstanding>0.009?fmtMoney(inv.outstanding):'<span style="color:var(--teal-dark);">settled</span>')}</td>
+          <td class="mono">${fmtMoney(inv.amount, inv.currency)}</td>
+          <td class="mono" style="color:var(--muted);">${inv.taxAmount?'+ '+fmtMoney(inv.taxAmount, inv.currency):'—'}</td>
+          <td class="mono" style="color:var(--muted);">${inv.aitAmount?'− '+fmtMoney(inv.aitAmount, inv.currency):'—'}</td>
+          <td class="mono"><strong>${fmtMoney(inv.netPayable, inv.currency)}</strong></td>
+          <td class="mono">${inv.isInternal?'—':(inv.outstanding>0.009?fmtMoney(inv.outstanding, inv.currency):'<span style="color:var(--teal-dark);">settled</span>')}</td>
           <td>${fmtDate(inv.date)}</td>
           <td><span class="pill ${invoiceStatusPillClass(inv.status)}"><span class="pill-dot"></span>${inv.status}</span></td>
           <td>${iconArrowRight(14)}</td>
@@ -1509,10 +1839,10 @@ function renderProducts(){
         <div class="target">${esc(p.targetTier)}</div>
         <div class="prod-price"><span class="amt">${fmtMoney(p.setupFee)}</span><span class="per">setup</span></div>
         <div class="prod-price" style="margin-top:-8px;"><span class="amt" style="font-size:16px;color:var(--teal-dark)">${fmtMoney(p.retainer)}</span><span class="per">/month retainer</span></div>
-        <div class="prod-stat-row"><span class="k">Automation</span><span class="v" style="font-family:'Inter';font-weight:600;">${esc(p.automation)}</span></div>
-        <div class="prod-stat-row"><span class="k">Data layer</span><span class="v" style="font-family:'Inter';font-weight:600;">${esc(p.dataLayer)}</span></div>
-        <div class="prod-stat-row"><span class="k">AI model</span><span class="v" style="font-family:'Inter';font-weight:600;">${esc(p.aiModel)}</span></div>
-        <div class="prod-stat-row"><span class="k">Channels</span><span class="v" style="font-family:'Inter';font-weight:600;">${esc(p.channels)}</span></div>
+        <div class="prod-stat-row"><span class="k">Automation</span><span class="v" style="font-family:var(--f-body);font-weight:600;">${esc(p.automation)}</span></div>
+        <div class="prod-stat-row"><span class="k">Data layer</span><span class="v" style="font-family:var(--f-body);font-weight:600;">${esc(p.dataLayer)}</span></div>
+        <div class="prod-stat-row"><span class="k">AI model</span><span class="v" style="font-family:var(--f-body);font-weight:600;">${esc(p.aiModel)}</span></div>
+        <div class="prod-stat-row"><span class="k">Channels</span><span class="v" style="font-family:var(--f-body);font-weight:600;">${esc(p.channels)}</span></div>
         <div class="prod-stat-row"><span class="k">Quota / month</span><span class="v">${fmtNum(p.quota)}</span></div>
         <div class="prod-stat-row"><span class="k">Overage rate</span><span class="v">${fmtMoney(p.overageRate)}/session</span></div>
         <div class="prod-stat-row"><span class="k">Est. delivery cost (100% quota)</span><span class="v">${fmtMoney(p.deliveryCostFull)}</span></div>
@@ -1625,7 +1955,7 @@ function renderFinancials(){
   <div class="stat-strip">
     <div class="s-item"><div class="l">Monthly revenue (retainer)</div><div class="v">${fmtMoney(totalRetainerRev)}</div></div>
     <div class="s-item"><div class="l">Contribution margin</div><div class="v">${fmtMoney(cm)} (${cmPct.toFixed(0)}%)</div></div>
-    <div class="s-item"><div class="l">Net monthly result</div><div class="v" style="color:${netResult>=0?'#8FD9CC':'#F0A897'}">${fmtMoney(netResult)}</div></div>
+    <div class="s-item"><div class="l">Net monthly result</div><div class="v" style="color:${netResult>=0?'#7f9bf2':'#e79f6f'}">${fmtMoney(netResult)}</div></div>
     <div class="s-item"><div class="l">Utilization assumption</div><div class="v">${Math.round(state.utilization*100)}%</div></div>
   </div>
 
@@ -1687,6 +2017,7 @@ function renderFinancials(){
     <table>
       <thead><tr><th>Item</th><th>Category</th><th>Monthly amount</th><th>Since</th><th></th></tr></thead>
       <tbody>
+      ${internalAiCostRow()}
       ${state.expenses.map(e=>`
         <tr>
           <td>${esc(e.label)}</td>
@@ -1695,13 +2026,45 @@ function renderFinancials(){
           <td>${fmtDate(e.startDate)}</td>
           <td><button class="btn btn-danger-ghost btn-icon" onclick="deleteExpense('${e.id}')">${iconTrash(13)}</button></td>
         </tr>
-      `).join('') || `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--muted);">No recurring cost lines yet.</td></tr>`}
+      `).join('') || (internalAiCostRow() ? '' : `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--muted);">No recurring cost lines yet.</td></tr>`)}
       </tbody>
     </table>
   </div>
   <button class="btn btn-ghost" onclick="openModal={type:'expense'};render()">${iconPlus(15)} Add cost line</button>
   `;
 }
+/**
+ * What our own agents cost to run, as a line in the cost table.
+ *
+ * It is not a typed-in expense and must not become one: it is already an
+ * invoice on the internal account, so entering it by hand would double it.
+ * It is shown here, read-only, because this is the table a person opens
+ * when they want to know what the month costs, and a cost that only exists
+ * on a different screen is a cost nobody remembers.
+ *
+ * The figure is rupees. The invoices behind it are dollars, so the row says
+ * what it converted and at what rate — and says so plainly when no rate has
+ * been entered yet, rather than showing a confident zero.
+ */
+function internalAiCostRow(){
+  const internal = (state.invoices||[]).filter(i=>i.isInternal);
+  if(!internal.length) return '';
+  const usd = internal.filter(i=>i.currency==='USD').reduce((s,i)=>s+i.amount,0);
+  const converted = internal.reduce((s,i)=>s+(i.baseAmount!=null?i.baseAmount:(i.currency===CURRENCY?i.amount:0)),0);
+  const missing = internal.filter(i=>i.baseAmount==null && i.currency!==CURRENCY);
+  const note = missing.length
+    ? `<span style="color:var(--amber-dark,#94512b);">${fmtMoney(usd,'USD')} — no USD rate set in Settings</span>`
+    : (usd>0 ? `${fmtMoney(usd,'USD')} converted` : 'Billed on our own account');
+  return `<tr>
+    <td><strong>Internal AI usage (our own agents)</strong>
+      <div style="font-size:11.5px;color:var(--muted);">${note}</div></td>
+    <td><span class="tag">AI model usage</span></td>
+    <td class="mono">${missing.length ? '—' : fmtMoney(converted)}</td>
+    <td>${internal.length} invoice${internal.length===1?'':'s'}</td>
+    <td><span class="tag" title="Raised automatically on the internal account; it cannot be edited here.">auto</span></td>
+  </tr>`;
+}
+
 async function setUtilization(u){
   const prev = state.utilization;
   state.utilization = u; render();
@@ -1935,9 +2298,9 @@ function renderLedger(){
           <td><strong>${esc(c?c.company:'—')}</strong></td>
           <td>${fmtDate(i.date)}</td>
           <td style="${late?'color:var(--red);font-weight:700;':''}">${fmtDate(i.dueDate)}</td>
-          <td class="mono">${fmtMoney(i.netPayable)}</td>
-          <td class="mono" style="color:var(--muted);">${i.received?fmtMoney(i.received):'—'}</td>
-          <td class="mono"><strong>${fmtMoney(i.outstanding)}</strong></td>
+          <td class="mono">${fmtMoney(i.netPayable, i.currency)}</td>
+          <td class="mono" style="color:var(--muted);">${i.received?fmtMoney(i.received, i.currency):'—'}</td>
+          <td class="mono"><strong>${fmtMoney(i.outstanding, i.currency)}</strong></td>
           <td><span class="pill ${invoiceStatusPillClass(i.status)}"><span class="pill-dot"></span>${i.status}</span></td>
           <td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openModal={type:'payment',invoiceId:'${i.id}'};render()">Record</button></td>
         </tr>`;
@@ -2094,7 +2457,7 @@ function accountingPnlHTML(p){
   <div class="stat-strip">
     <div class="s-item"><div class="l">Revenue</div><div class="v">${money(p.revenue.net)}</div></div>
     <div class="s-item"><div class="l">Gross profit</div><div class="v">${money(p.gross_profit)} (${p.gross_margin_pct}%)</div></div>
-    <div class="s-item"><div class="l">Net profit</div><div class="v" style="color:${p.net_profit>=0?'#8FD9CC':'#F0A897'}">${money(p.net_profit)}</div></div>
+    <div class="s-item"><div class="l">Net profit</div><div class="v" style="color:${p.net_profit>=0?'#7f9bf2':'#e79f6f'}">${money(p.net_profit)}</div></div>
     <div class="s-item"><div class="l">Invoices issued</div><div class="v">${p.revenue.invoices_issued}</div></div>
   </div>
 
@@ -2190,10 +2553,10 @@ function drawAccountingChart(){
     data:{
       labels: m.map(r=>r.label),
       datasets:[
-        {label:'Revenue', data:m.map(r=>r.revenue), backgroundColor:'#12897A', borderRadius:4},
-        {label:'Cost of service', data:m.map(r=>r.cost_of_service), backgroundColor:'#DE9C34', borderRadius:4},
+        {label:'Revenue', data:m.map(r=>r.revenue), backgroundColor:'#2f56d9', borderRadius:4},
+        {label:'Cost of service', data:m.map(r=>r.cost_of_service), backgroundColor:'#e0854f', borderRadius:4},
         {label:'Operating expenses', data:m.map(r=>r.operating_expenses), backgroundColor:'#C7CDD3', borderRadius:4},
-        {label:'Net profit', data:m.map(r=>r.net_profit), type:'line', borderColor:'#0F1A22', backgroundColor:'#0F1A22', tension:.3, pointRadius:3},
+        {label:'Net profit', data:m.map(r=>r.net_profit), type:'line', borderColor:'#16151a', backgroundColor:'#16151a', tension:.3, pointRadius:3},
       ],
     },
     options:{
@@ -2689,7 +3052,7 @@ function opsRunHTML(){
         return `<tr>
         <td><strong>${esc(i.client)}</strong></td>
         <td class="mono" style="font-size:11.5px;">${esc(i.invoice_number||'— would be raised —')}</td>
-        <td class="mono"><strong>${fmtMoney(i.amount)}</strong></td>
+        <td class="mono"><strong>${fmtMoney(i.amount, i.currency)}</strong></td>
         <td>${d.outcome?`<span class="pill ${cls}"><span class="pill-dot"></span>${esc(d.outcome.replace('_',' '))}</span>
           ${d.detail?`<div style="font-size:11px;color:var(--muted);">${esc(d.detail)}</div>`:''}`:'—'}</td>
         <td style="font-size:12px;color:var(--muted);">${(i.lines||[]).map(l=>esc(l.description)).join(' · ')||'—'}</td>
@@ -2995,7 +3358,7 @@ function opsBankHTML(){
         <td class="mono" style="font-size:11.5px;">${esc(c.reference||'—')}</td>
         <td>${esc(c.payer||'—')}</td>
         <td><span class="pill ${c.status==='matched'?'pill-paid':c.status==='ignored'?'pill-pending':'pill-contacted'}"><span class="pill-dot"></span>${esc(c.status)}</span></td>
-        <td class="mono" style="font-size:11.5px;">${esc(c.invoice_number||'—')}${c.company?`<div style="font-family:'Inter';font-size:11px;color:var(--muted);">${esc(c.company)}</div>`:''}</td>
+        <td class="mono" style="font-size:11.5px;">${esc(c.invoice_number||'—')}${c.company?`<div style="font-family:var(--f-body);font-size:11px;color:var(--muted);">${esc(c.company)}</div>`:''}</td>
         <td style="font-size:11.5px;color:var(--muted);max-width:280px;">${esc(c.match_confidence||'—')}</td>
       </tr>`).join('') || `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Nothing imported yet.</td></tr>`}
       </tbody>
@@ -3282,6 +3645,12 @@ function renderSettings(){
       <div class="field"><label>Default advance income tax %</label><input id="setAitRate" type="number" step="0.01" value="${state.company.defaultAitRate!=null?state.company.defaultAitRate:0}">
         <div style="font-size:11px;color:var(--muted);margin-top:4px;"><strong>Withheld</strong> by the client under s.153 and deposited against your NTN. 11% is the usual rate for services. Set 0 if nobody withholds from you.</div></div>
     </div>
+    <div class="field-row">
+      <div class="field"><label>US dollar rate (PKR per USD)</label><input id="setUsdRate" type="number" step="0.01" min="0" value="${state.company.usdPkrRate!=null?state.company.usdPkrRate:0}" placeholder="0">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">Only our own account bills in dollars — it is priced on model tokens. This rate converts it into the books, and is <strong>stamped on each invoice as it is raised</strong>, so changing it never restates a month already reported. Leave at 0 and the cost is reported unconverted rather than guessed.</div></div>
+      <div class="field"><label>Our own invoice goes to</label><input id="setInternalEmail" value="${esc(state.company.internalInvoiceEmail||'')}" placeholder="support@vantriqai.com">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">Where the monthly invoice for our own AI usage is emailed. It has to be a mailbox that exists — an address with nothing behind it bounces rather than failing loudly.</div></div>
+    </div>
     <div class="field"><label>Payment terms (days)</label><input id="setTerms" type="number" value="${state.company.paymentTermsDays!=null?state.company.paymentTermsDays:7}">
       <div style="font-size:11px;color:var(--muted);margin-top:4px;">Sets the due date stamped on each invoice.</div></div>
     <div class="field"><label>Billing email shown on the invoice</label><input id="setSellerEmail" value="${esc(state.company.sellerEmail||'')}" placeholder="billing@vantriqai.com"></div>
@@ -3424,6 +3793,8 @@ function applySettings(updated){
     sellerNtn:updated.seller_ntn||'', sellerStrn:updated.seller_strn||'',
     sellerAddress:updated.seller_address||'', sellerEmail:updated.seller_email||'',
     defaultAitRate:updated.default_ait_rate!=null?+updated.default_ait_rate:0,
+    usdPkrRate:updated.usd_pkr_rate!=null?+updated.usd_pkr_rate:0,
+    internalInvoiceEmail:updated.internal_invoice_email||'',
     openingCash:updated.opening_cash!=null?+updated.opening_cash:0,
     openingCashDate:updated.opening_cash_date||'',
     internalCostLabel:updated.internal_cost_label||'Internal AI usage (own agents)',
@@ -3588,6 +3959,11 @@ async function saveTaxSettings(){
   const ait = parseFloat(v('setAitRate'));
   if(isNaN(rate) || rate < 0 || rate > 100){ showToast('GST must be a percentage between 0 and 100','warn'); return; }
   if(isNaN(ait) || ait < 0 || ait > 100){ showToast('Advance income tax must be a percentage between 0 and 100','warn'); return; }
+  // 0 is a real answer here — it means "no rate set", and the financials
+  // report the dollar cost unconverted rather than inventing a figure.
+  const usdRaw = v('setUsdRate');
+  const usdRate = usdRaw === '' ? 0 : parseFloat(usdRaw);
+  if(isNaN(usdRate) || usdRate < 0){ showToast('The dollar rate must be zero or more','warn'); return; }
   try{
     const updated = await API.put('/api/settings', {
       ntn: v('setNtn'), strn: v('setStrn'), address: v('setAddress'),
@@ -3599,6 +3975,8 @@ async function saveTaxSettings(){
       default_ait_rate: ait,
       payment_terms_days: parseInt(v('setTerms'),10) || 0,
       invoice_prefix: v('setPrefix') || 'VAI',
+      usd_pkr_rate: usdRate,
+      internal_invoice_email: v('setInternalEmail'),
     });
     applySettings(updated);
     render(); showToast('Tax details saved');
@@ -3927,9 +4305,9 @@ async function generatePortalCredentials(clientId){
       <div style="background:var(--teal-light);border:1px solid #BFE3D8;border-radius:10px;padding:12px;">
         <div style="font-weight:600;color:var(--teal-dark);margin-bottom:8px;">Portal login created</div>
         <div style="margin-bottom:4px;">Sign-in page: <a href="${esc(loginUrl)}" target="_blank" rel="noopener" style="color:var(--teal-dark);">${esc(loginUrl)}</a></div>
-        <div style="margin-bottom:4px;">Username: <strong style="font-family:'JetBrains Mono',monospace;">${esc(r.username)}</strong></div>
+        <div style="margin-bottom:4px;">Username: <strong style="font-family:var(--f-mono);">${esc(r.username)}</strong></div>
         ${r.password
-          ? `<div style="margin-bottom:8px;">Password: <strong style="font-family:'JetBrains Mono',monospace;font-size:14px;">${esc(r.password)}</strong></div>
+          ? `<div style="margin-bottom:8px;">Password: <strong style="font-family:var(--f-mono);font-size:14px;">${esc(r.password)}</strong></div>
              <button class="btn btn-ghost btn-sm" onclick="copyPortalCreds('${esc(r.username)}','${esc(r.password)}','${esc(loginUrl)}')">Copy all three</button>
              <div style="margin-top:8px;color:#8A5F17;background:var(--amber-light);padding:8px 10px;border-radius:8px;font-size:11.5px;">
                Copy this password now — it is stored hashed and can never be shown again. Send it to the
@@ -3969,7 +4347,7 @@ async function generatePortalLink_unused(clientId, regenerate){
     if(!area) return;
     area.innerHTML = `
       <div style="display:flex;gap:6px;">
-        <input readonly value="${esc(fullUrl)}" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:'JetBrains Mono';background:#FAF8F3;" onclick="this.select()">
+        <input readonly value="${esc(fullUrl)}" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:var(--f-mono);background:#FAF8F3;" onclick="this.select()">
         <button class="btn btn-primary btn-sm" onclick="copyPortalLink('${fullUrl.replace(/'/g,"\\'")}')">Copy</button>
       </div>
       <div style="margin-top:8px;">
@@ -4383,7 +4761,7 @@ function clientPanelHTML(id){
     <h4 style="font-size:13px;margin-bottom:8px;">Customer portal</h4>
     <div id="portal-link-area" style="font-size:12.5px;color:var(--muted);">
       ${c.portalEnabled
-        ? `<div style="margin-bottom:6px;">Sign-in is active. Username <strong style="font-family:'JetBrains Mono',monospace;">${esc(c.portalUsername)}</strong></div>
+        ? `<div style="margin-bottom:6px;">Sign-in is active. Username <strong style="font-family:var(--f-mono);">${esc(c.portalUsername)}</strong></div>
            <div style="margin-bottom:8px;font-size:11.5px;">Password last set ${c.portalPasswordSetAt?fmtDate(c.portalPasswordSetAt):'—'}${c.portalPasswordSetBy==='customer'?' by the customer themselves':c.portalPasswordSetBy==='admin'?' by an administrator':''}.</div>`
         : `<div style="margin-bottom:8px;">No portal login yet. The customer needs a username and password to sign in.</div>`}
       <div class="field" style="margin-bottom:8px;">
@@ -4400,7 +4778,7 @@ function clientPanelHTML(id){
     ${clientInvoices.length? clientInvoices.map(inv=>`
       <div class="detail-row" style="cursor:pointer;" onclick="openPanel={type:'invoice',id:'${inv.id}'};render()">
         <span class="k">${esc(inv.type)} · ${fmtDate(inv.date)}</span>
-        <span class="v"><span class="pill ${invoiceStatusPillClass(inv.status)}" style="margin-right:6px;"><span class="pill-dot"></span>${inv.status}</span>${fmtMoney(inv.amount)}</span>
+        <span class="v"><span class="pill ${invoiceStatusPillClass(inv.status)}" style="margin-right:6px;"><span class="pill-dot"></span>${inv.status}</span>${fmtMoney(inv.amount, inv.currency)}</span>
       </div>`).join('') : `<div style="font-size:12.5px;color:var(--muted);">No invoices yet.</div>`}
 
     <div style="margin-top:20px;display:flex;gap:8px;">
@@ -4430,19 +4808,19 @@ function invoicePanelHTML(id){
       ${inv.outstanding>0.009?'Amount due':'Settled in full'}
     </div>
     <div class="mono" style="font-size:26px;font-weight:700;margin:2px 0 14px;color:${inv.outstanding>0.009?'var(--text)':'var(--teal-dark)'};">
-      ${fmtMoney(inv.outstanding>0.009?inv.outstanding:inv.netPayable)}
-      ${inv.dueDate&&inv.outstanding>0.009?`<span style="font-size:12.5px;font-weight:500;color:var(--muted);font-family:'Inter';"> due ${fmtDate(inv.dueDate)}</span>`:''}
+      ${fmtMoney(inv.outstanding>0.009?inv.outstanding:inv.netPayable, inv.currency)}
+      ${inv.dueDate&&inv.outstanding>0.009?`<span style="font-size:12.5px;font-weight:500;color:var(--muted);font-family:var(--f-body);"> due ${fmtDate(inv.dueDate)}</span>`:''}
     </div>
 
-    <div class="detail-row"><span class="k">Subtotal</span><span class="v mono">${fmtMoney(inv.amount)}</span></div>
-    ${inv.taxRate||inv.taxAmount?`<div class="detail-row"><span class="k">GST @ ${inv.taxRate}% <span style="font-size:11px;">added</span></span><span class="v mono">+ ${fmtMoney(inv.taxAmount||0)}</span></div>`:''}
-    <div class="detail-row"><span class="k">Total</span><span class="v mono">${fmtMoney(inv.total!=null?inv.total:inv.amount)}</span></div>
-    ${inv.aitRate||inv.aitAmount?`<div class="detail-row"><span class="k">Advance income tax @ ${inv.aitRate}% <span style="font-size:11px;">withheld by the client</span></span><span class="v mono neg">− ${fmtMoney(inv.aitAmount||0)}</span></div>`:''}
-    <div class="detail-row" style="font-size:16px;"><strong>Net payable</strong><span class="v mono">${fmtMoney(inv.netPayable)}</span></div>
-    ${inv.received?`<div class="detail-row"><span class="k">Received</span><span class="v mono" style="color:var(--teal-dark);">${fmtMoney(inv.received)}</span></div>`:''}
-    ${inv.credited?`<div class="detail-row"><span class="k">Credited</span><span class="v mono">${fmtMoney(inv.credited)}</span></div>`:''}
-    ${inv.writtenOff?`<div class="detail-row"><span class="k">Written off</span><span class="v mono neg">${fmtMoney(inv.writtenOff)}</span></div>`:''}
-    ${inv.aitAmount?`<div class="detail-row"><span class="k">AIT challans received</span><span class="v mono">${fmtMoney(inv.aitChallans)}${inv.aitChallans<inv.aitAmount?` <span style="color:var(--amber);font-weight:500;">(${fmtMoney(inv.aitAmount-inv.aitChallans)} still to come)</span>`:''}</span></div>`:''}
+    <div class="detail-row"><span class="k">Subtotal</span><span class="v mono">${fmtMoney(inv.amount, inv.currency)}</span></div>
+    ${inv.taxRate||inv.taxAmount?`<div class="detail-row"><span class="k">GST @ ${inv.taxRate}% <span style="font-size:11px;">added</span></span><span class="v mono">+ ${fmtMoney(inv.taxAmount||0, inv.currency)}</span></div>`:''}
+    <div class="detail-row"><span class="k">Total</span><span class="v mono">${fmtMoney(inv.total!=null?inv.total:inv.amount, inv.currency)}</span></div>
+    ${inv.aitRate||inv.aitAmount?`<div class="detail-row"><span class="k">Advance income tax @ ${inv.aitRate}% <span style="font-size:11px;">withheld by the client</span></span><span class="v mono neg">− ${fmtMoney(inv.aitAmount||0, inv.currency)}</span></div>`:''}
+    <div class="detail-row" style="font-size:16px;"><strong>Net payable</strong><span class="v mono">${fmtMoney(inv.netPayable, inv.currency)}</span></div>
+    ${inv.received?`<div class="detail-row"><span class="k">Received</span><span class="v mono" style="color:var(--teal-dark);">${fmtMoney(inv.received, inv.currency)}</span></div>`:''}
+    ${inv.credited?`<div class="detail-row"><span class="k">Credited</span><span class="v mono">${fmtMoney(inv.credited, inv.currency)}</span></div>`:''}
+    ${inv.writtenOff?`<div class="detail-row"><span class="k">Written off</span><span class="v mono neg">${fmtMoney(inv.writtenOff, inv.currency)}</span></div>`:''}
+    ${inv.aitAmount?`<div class="detail-row"><span class="k">AIT challans received</span><span class="v mono">${fmtMoney(inv.aitChallans, inv.currency)}${inv.aitChallans<inv.aitAmount?` <span style="color:var(--amber);font-weight:500;">(${fmtMoney(inv.aitAmount-inv.aitChallans)} still to come)</span>`:''}</span></div>`:''}
 
     <div class="divider"></div>
     <div class="detail-row"><span class="k">Invoice number</span><span class="v mono" style="font-size:12px;">${esc(inv.number||'—')}</span></div>
@@ -4606,7 +4984,7 @@ function downloadInvoice(id){
     `Period: ${inv.period||'—'}`,
     `Date: ${inv.date}`,
     `Status: ${inv.status}`,
-    `Amount: ${fmtMoney(inv.amount)}`,
+    `Amount: ${fmtMoney(inv.amount, inv.currency)}`,
   ].join('\n');
   const blob = new Blob([text], {type:'text/plain'});
   const a = document.createElement('a');
@@ -4702,7 +5080,7 @@ function paymentModalHTML(invoiceId){
         <select id="pm_invoice" onchange="paymentInvoiceChanged()">
           ${open.map(i=>{
             const c = state.clients.find(x=>x.id===i.clientId);
-            return `<option value="${i.id}" ${i.id===picked?'selected':''}>${esc(i.number||'—')} · ${esc(c?c.company:'—')} · ${fmtMoney(i.outstanding)} outstanding</option>`;
+            return `<option value="${i.id}" ${i.id===picked?'selected':''}>${esc(i.number||'—')} · ${esc(c?c.company:'—')} · ${fmtMoney(i.outstanding, i.currency)} outstanding</option>`;
           }).join('') || '<option value="">No invoices yet</option>'}
         </select>
       </div>
@@ -4741,12 +5119,12 @@ function paymentSummaryHTML(inv){
   const c = state.clients.find(x=>x.id===inv.clientId);
   return `
     <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">${esc(c?c.company:'—')} · ${esc(inv.type)}</span><span class="mono">${esc(inv.number||'')}</span></div>
-    <div style="display:flex;justify-content:space-between;margin-top:5px;"><span>Subtotal</span><span class="mono">${fmtMoney(inv.amount)}</span></div>
-    ${inv.taxAmount?`<div style="display:flex;justify-content:space-between;"><span>GST @ ${inv.taxRate}%</span><span class="mono">+ ${fmtMoney(inv.taxAmount)}</span></div>`:''}
-    ${inv.aitAmount?`<div style="display:flex;justify-content:space-between;"><span>Advance tax withheld @ ${inv.aitRate}%</span><span class="mono">− ${fmtMoney(inv.aitAmount)}</span></div>`:''}
-    <div style="display:flex;justify-content:space-between;font-weight:700;margin-top:4px;padding-top:4px;border-top:1px solid var(--border);"><span>Net payable</span><span class="mono">${fmtMoney(inv.netPayable)}</span></div>
-    <div style="display:flex;justify-content:space-between;"><span>Already received</span><span class="mono">${fmtMoney(inv.received)}</span></div>
-    <div style="display:flex;justify-content:space-between;font-weight:700;color:${inv.outstanding>0?'var(--red)':'var(--teal-dark)'};"><span>Outstanding</span><span class="mono">${fmtMoney(inv.outstanding)}</span></div>`;
+    <div style="display:flex;justify-content:space-between;margin-top:5px;"><span>Subtotal</span><span class="mono">${fmtMoney(inv.amount, inv.currency)}</span></div>
+    ${inv.taxAmount?`<div style="display:flex;justify-content:space-between;"><span>GST @ ${inv.taxRate}%</span><span class="mono">+ ${fmtMoney(inv.taxAmount, inv.currency)}</span></div>`:''}
+    ${inv.aitAmount?`<div style="display:flex;justify-content:space-between;"><span>Advance tax withheld @ ${inv.aitRate}%</span><span class="mono">− ${fmtMoney(inv.aitAmount, inv.currency)}</span></div>`:''}
+    <div style="display:flex;justify-content:space-between;font-weight:700;margin-top:4px;padding-top:4px;border-top:1px solid var(--border);"><span>Net payable</span><span class="mono">${fmtMoney(inv.netPayable, inv.currency)}</span></div>
+    <div style="display:flex;justify-content:space-between;"><span>Already received</span><span class="mono">${fmtMoney(inv.received, inv.currency)}</span></div>
+    <div style="display:flex;justify-content:space-between;font-weight:700;color:${inv.outstanding>0?'var(--red)':'var(--teal-dark)'};"><span>Outstanding</span><span class="mono">${fmtMoney(inv.outstanding, inv.currency)}</span></div>`;
 }
 function paymentInvoiceChanged(){
   const inv = state.invoices.find(i=>i.id===document.getElementById('pm_invoice').value);
@@ -5118,17 +5496,30 @@ let loginStep = 'password';      // 'password' | 'otp' | 'apikey'
 let loginChallenge = null;
 let loginBusy = false;
 
+/** The mark as it appears on a light ground: ink frame, cobalt notch. */
+function loginMarkSVG(){
+  return `<svg width="38" height="38" viewBox="0 0 100 100" aria-hidden="true">
+    <path d="M10 10 H90 V90 H10 Z M28 28 V72 H72 V28 Z" fill="#16151a" fill-rule="evenodd"/>
+    <rect x="10" y="28" width="28" height="10" fill="#2f56d9"/>
+    <rect x="28" y="10" width="10" height="28" fill="#2f56d9"/>
+  </svg>`;
+}
+
 function shell(inner){
   return `
-  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;">
-    <div class="card" style="max-width:400px;width:100%;padding:30px 28px;">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;">
-        <div class="brand-mark" style="background:linear-gradient(135deg,#12897A,#0A4E45);">${sidebarPulseSVG()}</div>
-        <div><div style="font-family:'Space Grotesk';font-weight:600;font-size:16px;">Vantriq Ops</div><div style="font-size:11.5px;color:var(--muted);">Internal sign-in</div></div>
+  <div class="auth-screen">
+    <div class="auth-card">
+      <div class="auth-brand">
+        ${loginMarkSVG()}
+        <div>
+          <div class="auth-wordmark">Vantriq<em>AI</em></div>
+          <div class="auth-kicker">Revenue Console</div>
+        </div>
       </div>
-      ${connectError?`<div style="background:var(--red-light);color:#8F3527;padding:10px 12px;border-radius:8px;font-size:12.5px;margin-bottom:14px;">${esc(connectError)}</div>`:''}
+      ${connectError?`<div class="auth-error">${esc(connectError)}</div>`:''}
       ${inner}
     </div>
+    <p class="auth-foot">Signed-in sessions are tied to your company email.</p>
   </div>`;
 }
 
@@ -5151,7 +5542,7 @@ function renderConnectScreen(){
       <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">${esc((loginChallenge&&loginChallenge.message)||'We sent you a 6-digit code.')}</p>
       <div class="field"><label>6-digit code</label>
         <input id="otp_code" inputmode="numeric" autocomplete="one-time-code" maxlength="6"
-               style="letter-spacing:6px;font-size:19px;font-family:'JetBrains Mono',monospace;text-align:center;"
+               style="letter-spacing:6px;font-size:19px;font-family:var(--f-mono);text-align:center;"
                onkeydown="if(event.key==='Enter')submitOtp()"></div>
       <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitOtp()">Verify and sign in</button>
       <p class="footnote" style="text-align:center;"><a href="#" onclick="event.preventDefault();loginStep='password';loginChallenge=null;connectError='';renderConnectScreen()">Start again</a></p>`);

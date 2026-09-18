@@ -38,6 +38,15 @@ const db = require('../db');
  */
 const WHATSAPP_NUMBER = process.env.VANTRIQ_WHATSAPP_NUMBER || '923411120049';
 
+// What the model costs, as OpenAI publishes it. gpt-4o-mini is $0.15 per
+// million input tokens and $0.60 per million output. Both agents run on it.
+// These are a starting point, not a commitment: change them in the CRM when
+// OpenAI's prices change or the agents move to a different model.
+const MODEL_RATES = [
+  { metric: 'input_token',  unit_rate: 0.15, unit_size: 1000000, label: 'Model input tokens (gpt-4o-mini)' },
+  { metric: 'output_token', unit_rate: 0.60, unit_size: 1000000, label: 'Model output tokens (gpt-4o-mini)' },
+];
+
 const DEFAULT_AGENTS = [
   { name: 'Website assistant', kind: 'website', external_ref: 'vantriqai.com', notes: 'Live chat on vantriqai.com — the n8n website assistant workflow.' },
   { name: 'WhatsApp agent', kind: 'whatsapp', external_ref: WHATSAPP_NUMBER, notes: `Inbound WhatsApp Business enquiries on ${WHATSAPP_NUMBER}, text and voice.` },
@@ -68,6 +77,8 @@ async function ensureInternalClient(opts = {}) {
          (name, company, email, phone, external_ref, product_id, stage, est_value,
           source, notes, join_date, is_internal, ntn, billing_address, tax_rate, ait_rate, ait_exempt)
        values ($1,$2,$3,$4,$5,$6,'active',0,'Internal',$7, current_date, true, $8, $9, 0, 0, true)
+       -- currency is set separately below so an account created before v9.1
+       -- is corrected too, not only a freshly inserted one.
        on conflict (external_ref) do nothing
        returning *`,
       [
@@ -110,6 +121,33 @@ async function ensureInternalClient(opts = {}) {
     }
   }
 
+  // The internal account bills in USD, because what it is really recording
+  // is an OpenAI invoice. Converting to PKR here would freeze one day's
+  // exchange rate into the books; the conversion belongs at settlement.
+  if (!client.currency) {
+    client = (await db.query(
+      `update clients set currency = 'USD' where id = $1 returning *`, [client.id]
+    )).rows[0];
+    created.push('currency:USD');
+  }
+
+  // Price the usage at what the model actually costs, per million tokens.
+  // unit_size carries the million so unit_rate stays the published figure
+  // and stays readable next to OpenAI's own price list.
+  for (const r of MODEL_RATES) {
+    const { rows: has } = await db.query(
+      `select id from usage_rates where client_id = $1 and metric = $2 and effective_to is null`,
+      [client.id, r.metric]
+    );
+    if (has[0]) continue;
+    await db.query(
+      `insert into usage_rates (client_id, metric, unit_rate, included_units, unit_size, label)
+       values ($1,$2,$3,0,$4,$5)`,
+      [client.id, r.metric, r.unit_rate, r.unit_size, r.label]
+    );
+    created.push(`rate:${r.metric}`);
+  }
+
   const wanted = Array.isArray(opts.agents) && opts.agents.length ? opts.agents : DEFAULT_AGENTS;
   const agents = [];
   for (const a of wanted) {
@@ -129,4 +167,4 @@ async function ensureInternalClient(opts = {}) {
   return { client, agents, product: product || null, created };
 }
 
-module.exports = { ensureInternalClient, DEFAULT_AGENTS };
+module.exports = { ensureInternalClient, DEFAULT_AGENTS, MODEL_RATES };
