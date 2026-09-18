@@ -73,6 +73,48 @@ router.put('/', async (req, res) => {
  * and priced like any customer, with the billing landing as cost rather than
  * revenue. See src/utils/internalClient.js.
  */
+/**
+ * The tax authorities we bill under.
+ *
+ * Read-mostly: the rates change once a year at most, and each one is a
+ * statutory figure somebody has to stand behind. The endpoint therefore
+ * updates one authority at a time rather than accepting a bulk overwrite,
+ * so a malformed payload cannot quietly zero all five.
+ */
+router.get('/jurisdictions', async (req, res) => {
+  const { rows } = await db.query(
+    `select * from tax_jurisdictions order by sort_order asc, code asc`
+  );
+  res.json(rows);
+});
+
+router.put('/jurisdictions/:code', async (req, res) => {
+  const body = req.body || {};
+  const sets = [];
+  const vals = [req.params.code];
+
+  if (body.sales_tax_rate !== undefined) {
+    const r = Number(body.sales_tax_rate);
+    // A rate outside 0-100 is a typo, not a policy. Rejecting it here is
+    // cheaper than finding it on an issued invoice.
+    if (!Number.isFinite(r) || r < 0 || r > 100) {
+      return res.status(400).json({ error: 'Sales tax rate must be a number between 0 and 100.' });
+    }
+    vals.push(r); sets.push(`sales_tax_rate = $${vals.length}`);
+  }
+  for (const f of ['seller_reg_no', 'rate_note', 'name']) {
+    if (body[f] !== undefined) { vals.push(String(body[f]).slice(0, 500)); sets.push(`${f} = $${vals.length}`); }
+  }
+  if (body.active !== undefined) { vals.push(!!body.active); sets.push(`active = $${vals.length}`); }
+  if (!sets.length) return res.status(400).json({ error: 'Nothing to update.' });
+
+  const { rows } = await db.query(
+    `update tax_jurisdictions set ${sets.join(', ')} where code = $1 returning *`, vals
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'No such tax jurisdiction.' });
+  res.json(rows[0]);
+});
+
 router.get('/internal-account', async (req, res) => {
   const { rows } = await db.query(
     `select c.*, p.name as package_name from clients c

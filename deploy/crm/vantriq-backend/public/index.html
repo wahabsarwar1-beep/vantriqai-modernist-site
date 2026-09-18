@@ -393,6 +393,7 @@ function clientFromApi(c){ return { id:c.id, name:c.name, company:c.company, ema
   serviceStatus:c.service_status||'active', suspendedAt:c.suspended_at||null,
   suspensionReason:c.suspension_reason||'', suspendedBy:c.suspended_by||'',
   ntn:c.ntn||'', strn:c.strn||'', taxRate:(c.tax_rate===null||c.tax_rate===undefined)?null:+c.tax_rate,
+  taxJurisdiction:c.tax_jurisdiction||null,
   billingAddress:c.billing_address||'',
   // v7 — withholding, and whether this is VantriqAI's own account.
   aitRate:(c.ait_rate===null||c.ait_rate===undefined)?null:+c.ait_rate,
@@ -408,6 +409,7 @@ function clientToApi(c){
     // can go active — that is what its invoices are issued against.
     parent_client_id:c.parentClientId||null, ntn:c.ntn||'', strn:c.strn||'',
     tax_rate:(c.taxRate===null||c.taxRate===undefined||c.taxRate==='')?null:c.taxRate,
+    tax_jurisdiction: c.taxJurisdiction || null,
     ait_rate:(c.aitRate===null||c.aitRate===undefined||c.aitRate==='')?null:c.aitRate,
     ait_exempt:!!c.aitExempt,
     billing_address:c.billingAddress||'' };
@@ -496,8 +498,12 @@ function adminOnly(path, fallback){
   return isAdmin() ? API.get(path) : Promise.resolve(fallback);
 }
 
+// Cached for the client form's picker. Refreshed whenever the Settings card
+// loads, which is the only place they change.
+let jurisdictionsCache = [];
+
 async function loadState(){
-  const [products, clients, invoices, vendors, pos, expenses, settings, dash, reps, packageRequests] = await Promise.all([
+  const [products, clients, invoices, vendors, pos, expenses, settings, dash, reps, packageRequests, jurisdictions] = await Promise.all([
     API.get('/api/products'),
     API.get('/api/clients'),
     API.get('/api/invoices'),
@@ -513,7 +519,12 @@ async function loadState(){
     API.get('/api/dashboard'),
     adminOnly('/api/reps', []),
     API.get('/api/package-requests?status=pending'),
+    // Loaded here rather than on the Settings view, because the client form's
+    // authority picker needs them and that form opens from anywhere.
+    adminOnly('/api/settings/jurisdictions', []),
   ]);
+
+  jurisdictionsCache = jurisdictions || [];
 
   const camelClients = clients.map(clientFromApi);
   // merge in this month's *live* usage (from real usage_events, posted by n8n)
@@ -3282,6 +3293,19 @@ function renderSettings(){
       <div style="font-size:11px;color:var(--muted);margin-top:4px;">Numbers run in sequence, e.g. ${esc(state.company.invoicePrefix||'VAI')}-${new Date().getFullYear()}-000123.</div></div>
     <button class="btn btn-primary" onclick="saveTaxSettings()">Save tax details</button>
   </div>
+  <div class="card" style="max-width:640px;margin-top:16px;">
+    <h3 style="margin-top:0;font-size:14.5px;">Tax authorities</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:0;">
+      Sales tax on services is provincial. A client assigned to an authority is billed at
+      <strong>that</strong> authority's rate, and the invoice prints your registration with it.
+      A client with no authority falls back to the default GST rate above.
+    </p>
+    <div style="background:#FFF8E6;border:1px solid #E8D9A8;border-radius:8px;padding:10px 12px;font-size:11.5px;margin-bottom:12px;">
+      Every rate starts at <strong>0%</strong>. Nothing is charged until you enter a figure,
+      and a wrong rate on an issued invoice is an FBR problem — confirm each one before you set it.
+    </div>
+    <div id="jurisdictions-host" style="font-size:12.5px;">Loading…</div>
+  </div>
   <div class="card" style="max-width:520px;margin-top:16px;">
     <h3 style="margin-top:0;font-size:14.5px;">When a client runs out of conversations</h3>
     <p style="font-size:12.5px;color:var(--muted);margin-top:0;">
@@ -3513,6 +3537,51 @@ async function bootstrapInternalAccount(){
   }catch(e){ showToast(e.message||'Could not set up the internal account','warn'); }
 }
 
+async function loadJurisdictions(){
+  // Fetching and drawing are separate: the client form needs the cache even
+  // when the Settings card is nowhere on screen, so a missing host element
+  // must not stop the fetch.
+  try{
+    jurisdictionsCache = await API.get('/api/settings/jurisdictions');
+  }catch(e){
+    const host = document.getElementById('jurisdictions-host');
+    if(host) host.textContent = e.message || 'Could not load the tax authorities.';
+    return;
+  }
+  renderJurisdictions();
+}
+
+function renderJurisdictions(){
+  const host = document.getElementById('jurisdictions-host');
+  if(!host) return;
+  host.innerHTML = jurisdictionsCache.map(j=>`
+      <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
+          <strong>${esc(j.name)}</strong>
+          <span style="font-size:11px;color:var(--muted);">${esc(j.code)}</span>
+        </div>
+        ${j.rate_note ? `<div style="font-size:11px;color:var(--muted);margin:4px 0 8px;">${esc(j.rate_note)}</div>` : ''}
+        <div class="field-row" style="margin-bottom:6px;">
+          <div class="field"><label>Sales tax %</label>
+            <input id="jur_rate_${esc(j.code)}" type="number" step="0.01" min="0" max="100" value="${j.sales_tax_rate!=null?+j.sales_tax_rate:0}"></div>
+          <div class="field"><label>Your registration no.</label>
+            <input id="jur_reg_${esc(j.code)}" value="${esc(j.seller_reg_no||'')}" placeholder="Printed on invoices billed here"></div>
+        </div>
+        <button class="btn" onclick="saveJurisdiction('${esc(j.code)}')">Save ${esc(j.code)}</button>
+      </div>`).join('') || 'No tax authorities configured.';
+}
+
+async function saveJurisdiction(code){
+  const rate = parseFloat((document.getElementById('jur_rate_'+code)||{value:''}).value);
+  const reg  = (document.getElementById('jur_reg_'+code)||{value:''}).value.trim();
+  if(isNaN(rate) || rate < 0 || rate > 100){ showToast('Sales tax must be a percentage between 0 and 100','warn'); return; }
+  try{
+    await API.put('/api/settings/jurisdictions/'+encodeURIComponent(code), { sales_tax_rate: rate, seller_reg_no: reg });
+    showToast(code+' saved');
+    loadJurisdictions();
+  }catch(e){ showToast(e.message||'Could not save '+code,'warn'); }
+}
+
 async function saveTaxSettings(){
   const v = (id)=> (document.getElementById(id)||{value:''}).value.trim();
   const rate = parseFloat(v('setTaxRate'));
@@ -3681,7 +3750,14 @@ function clientModalHTML(id){
         <div class="field-row">
           <div class="field"><label>Sales tax rate %</label>
             <input id="f_tax_rate" type="number" step="0.01" value="${c&&c.taxRate!=null?c.taxRate:''}" placeholder="${isAdmin()?`blank = company default (${state.company.defaultTaxRate||0}%)`:'blank = the company default'}">
-            <div style="font-size:11px;color:var(--muted);margin-top:4px;">Leave blank to use the company default. Enter 0 for an exempt client.</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;">Leave blank to use the authority's rate below, or the company default.</div>
+          </div>
+          <div class="field"><label>Tax authority <span style="font-size:11px;color:var(--muted);font-weight:400;">(where this client is billed)</span></label>
+            <select id="f_jurisdiction">
+              <option value="">— company default rate —</option>
+              ${jurisdictionsCache.filter(j=>j.active!==false).map(j=>`<option value="${esc(j.code)}" ${c&&c.taxJurisdiction===j.code?'selected':''}>${esc(j.name)} (${j.sales_tax_rate!=null?+j.sales_tax_rate:0}%)</option>`).join('')}
+            </select>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;">Sets the sales tax rate and the registration number printed on their invoices.</div>
           </div>
           <div class="field"><label>Parent account <span style="font-size:11px;color:var(--muted);font-weight:400;">(optional)</span></label>
             <select id="f_parent">
@@ -3740,6 +3816,7 @@ async function saveClient(id){
     notes: v('f_notes'),
     ntn: v('f_ntn'), strn: v('f_strn'), billingAddress: v('f_billing_address'),
     taxRate: v('f_tax_rate')==='' ? null : (parseFloat(v('f_tax_rate'))||0),
+    taxJurisdiction: v('f_jurisdiction') || null,
     parentClientId: v('f_parent') || null,
   };
 
@@ -5028,7 +5105,7 @@ function attachPostRenderHooks(){
     if(accountingData===null) loadAccounting();
     else requestAnimationFrame(drawAccountingChart);
   }
-  if(currentView==='settings'){ refreshInternalAccountCard(); refreshEmailCard(); }
+  if(currentView==='settings'){ refreshInternalAccountCard(); refreshEmailCard(); loadJurisdictions(); }
   if(currentView==='quotes' && quotesData===null) loadQuotes();
   if(currentView==='ops' && opsData===null) loadOps();
 }
