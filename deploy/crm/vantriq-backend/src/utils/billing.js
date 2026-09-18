@@ -29,6 +29,51 @@ const { effectivePackage } = require('./pkg');
 
 const ROUND = (n) => Math.round(Number(n) * 100) / 100;
 
+/**
+ * Money, rounded to the precision its currency actually needs.
+ *
+ * PKR keeps two places, as it always has. USD keeps six, because the
+ * internal account is priced in model tokens: gpt-4o-mini is $0.15 per
+ * million input tokens, so a quiet month costs a fraction of a cent.
+ * Rounded to cents that reads as zero, the invoice total is zero, and the
+ * billing run discards it as "nothing to bill" — the cost disappears from
+ * the books precisely because it was small.
+ */
+const USD_PLACES = 1e6;
+const MONEY = (n, currency) => (currency === 'USD'
+  ? Math.round(Number(n) * USD_PLACES) / USD_PLACES
+  : ROUND(n));
+
+/** The currency a client is billed in; the company default when unset. */
+function resolveCurrency(client, settings) {
+  const c = client && client.currency;
+  return (c && String(c).trim()) || (settings && settings.currency) || 'PKR';
+}
+
+/**
+ * What this invoice is worth in the currency the books are kept in, and the
+ * rate it got there by — both stamped at issue, the same way a tax rate is.
+ *
+ * The financials add every invoice together, so a USD invoice has to carry a
+ * PKR figure or it corrupts the total it lands in. The rate that matters is
+ * the one on the day the cost was incurred, which is why it is recorded here
+ * rather than looked up whenever a report is run: today's rate must not
+ * restate a month that has already been reported and settled.
+ *
+ * No rate entered means no conversion. `base_amount` stays null and the
+ * financials report the figure as unconverted — which is a visible gap
+ * somebody can close, rather than an invented number nobody can audit.
+ */
+function baseValue(net, currency, settings) {
+  const base = (settings && settings.currency) || 'PKR';
+  if (currency === base) return { fx_rate: 1, base_amount: ROUND(net) };
+  const rate = Number((settings && settings.usd_pkr_rate) || 0);
+  if (!(currency === 'USD' && base === 'PKR' && rate > 0)) {
+    return { fx_rate: null, base_amount: null };
+  }
+  return { fx_rate: rate, base_amount: ROUND(net * rate) };
+}
+
 async function getSettings() {
   const { rows } = await db.query(`select * from settings where id = 1`);
   return rows[0] || {};
@@ -105,7 +150,12 @@ const LINE_LABEL = {
  * one, built from the invoice type — so every invoice has a body, and the
  * printed document never has to special-case the old single-figure shape.
  */
-function normaliseLines(lines, { type, amount, period, overage_sessions }) {
+function normaliseLines(lines, { type, amount, period, overage_sessions, currency }) {
+  // Lines round to their invoice's own precision. Rounding a USD token line to
+  // cents here would zero it before createInvoice ever sums the body, and the
+  // invoice would come out at 0.00 with its lines still reading correctly —
+  // which is exactly the shape of a cost that quietly vanishes from the books.
+  const M = (n) => MONEY(n, currency);
   const supplied = Array.isArray(lines) ? lines.filter((l) => l && (l.description || l.amount || l.unit_price)) : [];
   if (supplied.length) {
     return supplied.map((l, i) => {
@@ -116,14 +166,17 @@ function normaliseLines(lines, { type, amount, period, overage_sessions }) {
         description: String(l.description || LINE_LABEL[type] || type),
         detail: String(l.detail || ''),
         qty,
-        unit_price: ROUND(unit),
-        amount: ROUND(given(l.amount) ? Number(l.amount) : qty * unit),
+        // The unit price is a published rate, not money on this invoice —
+        // $0.15 per million tokens has to survive verbatim, so it keeps the
+        // full precision the rate card carries.
+        unit_price: M(unit),
+        amount: M(given(l.amount) ? Number(l.amount) : qty * unit),
       };
     });
   }
   // Overage is naturally a quantity × rate line; everything else is a single
   // unit, which is how the reference layout shows a subscription too.
-  const net = ROUND(amount || 0);
+  const net = M(amount || 0);
   if (type === 'overage' && Number(overage_sessions) > 0) {
     const qty = Number(overage_sessions);
     return [{
@@ -131,7 +184,7 @@ function normaliseLines(lines, { type, amount, period, overage_sessions }) {
       description: LINE_LABEL.overage,
       detail: period ? String(period) : '',
       qty,
-      unit_price: ROUND(net / qty),
+      unit_price: M(net / qty),
       amount: net,
     }];
   }
@@ -165,22 +218,25 @@ async function createInvoice(client, {
   const issued = issued_date || new Date().toISOString().slice(0, 10);
   const internal = !!client.is_internal;
 
+  const currency = resolveCurrency(client, settings);
+  const M = (n) => MONEY(n, currency);
   const jurisdiction = internal ? null : await getJurisdiction(client.tax_jurisdiction);
   const gstRate = internal ? 0
     : (given(tax_rate) ? Number(tax_rate) : resolveTaxRate(client, settings, jurisdiction));
   const aitRate = internal ? 0
     : (given(ait_rate) ? Number(ait_rate) : resolveAitRate(client, settings));
 
-  const body = normaliseLines(lines, { type, amount, period, overage_sessions });
+  const body = normaliseLines(lines, { type, amount, period, overage_sessions, currency });
   // Lines are the authority on the subtotal when they were supplied; a caller
   // passing only an amount still gets exactly that amount back.
-  const net = ROUND(body.reduce((s, l) => s + Number(l.amount), 0));
-  const tax = ROUND(net * gstRate / 100);
-  const total = ROUND(net + tax);
+  const net = M(body.reduce((s, l) => s + Number(l.amount), 0));
+  const tax = M(net * gstRate / 100);
+  const total = M(net + tax);
   // Withholding is computed on the value of the service, not on the
   // GST-inclusive figure — s.153 is a tax on the receipt, not on the tax.
-  const ait = ROUND(net * aitRate / 100);
-  const netPayable = ROUND(total - ait);
+  const ait = M(net * aitRate / 100);
+  const netPayable = M(total - ait);
+  const fx = baseValue(net, currency, settings);
   const number = await allocateInvoiceNumber(settings, issued);
 
   const { rows } = await db.query(
@@ -188,8 +244,9 @@ async function createInvoice(client, {
        (client_id, type, amount, period, status, issued_date, overage_sessions, notes,
         invoice_number, tax_rate, tax_amount, total_amount,
         client_ntn, client_strn, billing_address, due_date,
-        ait_rate, ait_amount, net_payable, tax_jurisdiction, seller_reg_no)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+        ait_rate, ait_amount, net_payable, tax_jurisdiction, seller_reg_no, currency,
+        fx_rate, base_amount)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
      returning *`,
     [
       client.id, type, net, period || null,
@@ -204,6 +261,8 @@ async function createInvoice(client, {
       // was actually issued under.
       jurisdiction ? jurisdiction.code : null,
       jurisdiction ? (jurisdiction.seller_reg_no || '') : (settings.seller_strn || ''),
+      currency,
+      fx.fx_rate, fx.base_amount,
     ]
   );
   const invoice = rows[0];
@@ -266,13 +325,16 @@ function monthLabel(date) {
  */
 function settlementOf(invoice, payments) {
   const rows = payments || [];
-  const sum = (k) => ROUND(rows.filter((p) => p.kind === k).reduce((s, p) => s + Number(p.amount), 0));
+  // The ledger is kept in the invoice's own currency, so a sub-cent USD
+  // balance stays visible instead of rounding itself settled.
+  const M = (n) => MONEY(n, invoice && invoice.currency);
+  const sum = (k) => M(rows.filter((p) => p.kind === k).reduce((s, p) => s + Number(p.amount), 0));
   const received = sum('receipt');
   const ait_challans = sum('ait_challan');
   const written_off = sum('write_off');
   const credited = sum('credit_note');
-  const due = ROUND(Number(invoice.net_payable != null ? invoice.net_payable : invoice.total_amount || invoice.amount));
-  const settled = ROUND(received + written_off + credited);
+  const due = M(Number(invoice.net_payable != null ? invoice.net_payable : invoice.total_amount || invoice.amount));
+  const settled = M(received + written_off + credited);
   return {
     due,
     received,
@@ -280,7 +342,7 @@ function settlementOf(invoice, payments) {
     written_off,
     credited,
     settled,
-    balance: ROUND(due - settled),
+    balance: M(due - settled),
   };
 }
 
@@ -296,7 +358,11 @@ function settlementOf(invoice, payments) {
 function derivedStatus(invoice, settlement, today) {
   if (invoice.status === 'void') return 'void';
   const now = today ? new Date(today) : new Date();
-  if (settlement.balance <= 0.009) return 'paid';
+  // "Nothing left to pay" is half a minor unit, and the minor unit depends on
+  // the currency: a cent for PKR, a millionth of a dollar for the token-priced
+  // internal account.
+  const eps = (invoice && invoice.currency === 'USD') ? 0.0000009 : 0.009;
+  if (settlement.balance <= eps) return 'paid';
   if (invoice.due_date && new Date(invoice.due_date) < new Date(now.toISOString().slice(0, 10))) return 'overdue';
   if (settlement.settled > 0) return 'partial';
   return 'pending';
@@ -316,7 +382,15 @@ function buildTaxInvoice(inv, client, settings, lines, payments) {
   const total = Number(inv.total_amount != null ? inv.total_amount : inv.amount);
   const ait = Number(inv.ait_amount || 0);
   const netPayable = Number(inv.net_payable != null ? inv.net_payable : total);
-  const settlement = settlementOf(inv, payments);
+  const ledger = settlementOf(inv, payments);
+  // An invoice stored as paid has nothing outstanding, whatever the payments
+  // ledger holds. The internal account is the case that matters: it is
+  // settled the moment it is issued and never has a receipt row, so reading
+  // the balance off the ledger alone would print "due" across the top of an
+  // invoice that is marked paid.
+  const settlement = (inv.status === 'paid' && ledger.balance > 0)
+    ? { ...ledger, settled: ledger.due, balance: 0 }
+    : ledger;
 
   const body = (lines && lines.length ? lines : normaliseLines(null, inv)).map((l) => ({
     description: l.description,
@@ -332,10 +406,11 @@ function buildTaxInvoice(inv, client, settings, lines, payments) {
     issued_date: inv.issued_date,
     due_date: inv.due_date,
     status: inv.status,
-    currency: settings.currency || 'PKR',
+    // The currency it was RAISED in, not whatever the company default is now.
+    currency: inv.currency || settings.currency || 'PKR',
     // The figure the reference layout prints large at the top: what is left
     // to pay, and by when.
-    amount_due: ROUND(settlement.balance > 0 ? settlement.balance : 0),
+    amount_due: MONEY(settlement.balance > 0 ? settlement.balance : 0, inv.currency || settings.currency),
     seller: {
       name: settings.company_name,
       address: settings.seller_address || settings.address || settings.city,
@@ -383,6 +458,8 @@ function buildTaxInvoice(inv, client, settings, lines, payments) {
 
 module.exports = {
   getJurisdiction,
+  MONEY,
+  resolveCurrency, baseValue,
   createInvoice, billOnActivation, buildTaxInvoice, resolveTaxRate, resolveAitRate,
   allocateInvoiceNumber, getSettings, monthLabel, settlementOf, derivedStatus,
   normaliseLines, LINE_LABEL, ROUND,

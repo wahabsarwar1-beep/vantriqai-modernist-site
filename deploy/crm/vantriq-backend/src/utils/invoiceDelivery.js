@@ -62,10 +62,21 @@ async function sendInvoice(invoiceId, { force = false, settings = null } = {}) {
     const inv = rows[0];
     if (!inv) return { outcome: 'skipped', detail: 'Invoice not found.' };
 
-    // Never email ourselves a bill we raised to ourselves.
-    if (inv.is_internal) return { outcome: 'skipped', detail: 'Internal account — not sent.' };
     if (inv.status === 'void') return { outcome: 'skipped', detail: 'Invoice is void.' };
-    if (!inv.email) return await record('skipped', 'No email address on the client record.');
+
+    // The internal account's invoice is a real invoice and is sent like any
+    // other — it is the monthly figure the adjustment cheque is written
+    // against, so somebody has to receive it. It goes to its own address
+    // rather than the client record's, because the "client" here is us.
+    const s0 = settings || await getSettings();
+    const to = inv.is_internal
+      ? (s0.internal_invoice_email || '').trim()
+      : inv.email;
+    if (!to) {
+      return await record('skipped', inv.is_internal
+        ? 'No internal invoice address set (Settings → internal invoice email).'
+        : 'No email address on the client record.');
+    }
     if (!mailConfigured()) {
       return await record('skipped', 'Email is not configured on the server (HOSTINGER_MAIL_TOKEN / HOSTINGER_MAILBOX_ID).');
     }
@@ -81,8 +92,8 @@ async function sendInvoice(invoiceId, { force = false, settings = null } = {}) {
 
     const doc = buildTaxInvoice(inv, inv, s, lines, pays);
     const { subject, text, html } = invoiceEmail(doc, PORTAL_URL());
-    await sendMail({ to: inv.email, subject, text, html });
-    return await record('sent', `Emailed ${inv.email}.`);
+    await sendMail({ to, subject, text, html });
+    return await record('sent', `Emailed ${to}.`);
   } catch (err) {
     return await record('failed', err.message || String(err));
   }
@@ -97,11 +108,16 @@ async function previewInvoiceSend(invoiceId) {
   );
   const inv = rows[0];
   if (!inv) return { outcome: 'skipped', detail: 'Invoice not found.' };
-  if (inv.is_internal) return { outcome: 'skipped', detail: 'Internal account — not sent.', ...inv };
-  if (!inv.email) return { outcome: 'skipped', detail: 'No email address on the client record.', ...inv };
+  const s = await getSettings();
+  const to = inv.is_internal ? (s.internal_invoice_email || '').trim() : inv.email;
+  if (!to) {
+    return { outcome: 'skipped', ...inv, detail: inv.is_internal
+      ? 'No internal invoice address set (Settings → internal invoice email).'
+      : 'No email address on the client record.' };
+  }
   if (!mailConfigured()) return { outcome: 'skipped', detail: 'Email is not configured on the server.', ...inv };
   if (await alreadySent(invoiceId)) return { outcome: 'skipped', detail: 'Already emailed.', ...inv };
-  return { outcome: 'would_send', detail: `Would email ${inv.email}.`, ...inv };
+  return { outcome: 'would_send', detail: `Would email ${to}.`, ...inv };
 }
 
 /** Everything that has been sent for one invoice, newest first. */

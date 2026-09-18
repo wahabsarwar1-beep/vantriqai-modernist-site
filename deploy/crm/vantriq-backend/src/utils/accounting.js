@@ -82,6 +82,60 @@ function expenseAccrual(expense, from, to) {
   return ROUND(amount * months);
 }
 
+/**
+ * An invoice's net value in the currency the books are kept in.
+ *
+ * Almost every invoice is already in that currency and this is just its
+ * amount. The internal account is not: it is raised in USD, because what it
+ * records is an OpenAI bill. Adding those dollars to a column of rupees would
+ * produce a total that is wrong by a factor of nearly three hundred, so the
+ * converted figure stamped on the invoice at issue is what the statements
+ * read \u2014 never the raw amount, and never today's rate applied to an old month.
+ *
+ * Returns null when an invoice is in a foreign currency with no rate stamped
+ * on it. The statements surface that as an unconverted figure instead of
+ * silently dropping a cost or inventing a rate for it.
+ */
+function bookValue(invoice, settings) {
+  if (invoice.base_amount != null) return Number(invoice.base_amount);
+  const base = (settings && settings.currency) || 'PKR';
+  if ((invoice.currency || base) === base) return Number(invoice.amount || 0);
+  return null;
+}
+
+/** Sums invoices in the books' currency, keeping back the ones that have no
+ *  rate so the caller can report them rather than lose them. */
+function bookTotal(invoices, settings) {
+  let total = 0;
+  const unconverted = [];
+  for (const i of invoices) {
+    const v = bookValue(i, settings);
+    if (v == null) {
+      unconverted.push({
+        invoice_number: i.invoice_number,
+        currency: i.currency,
+        amount: Number(i.amount || 0),
+      });
+      continue;
+    }
+    total += v;
+  }
+  return { total: ROUND(total), unconverted };
+}
+
+/** The same invoices grouped by the currency they were actually raised in,
+ *  e.g. { USD: 0.000621 }. Empty when everything was already in the books'
+ *  own currency, which is the normal case. */
+function foreignTotals(invoices) {
+  const out = {};
+  for (const i of invoices) {
+    const c = i.currency;
+    if (!c || c === 'PKR') continue;
+    out[c] = Math.round((Number(out[c] || 0) + Number(i.amount || 0)) * 1e6) / 1e6;
+  }
+  return out;
+}
+
 /** Everything the statements are built from, loaded once. */
 async function loadBooks(upTo) {
   const bound = upTo ? DAY(upTo) : null;
@@ -137,7 +191,8 @@ function computePnl(books, from, to) {
   const bad_debts = pay('write_off');
   const net_revenue = ROUND(gross - credit_notes);
 
-  const internal_ai_usage = ROUND(internal.reduce((s, i) => s + Number(i.amount), 0));
+  const internal_cost = bookTotal(internal, settings);
+  const internal_ai_usage = internal_cost.total;
   const vendor_purchases = ROUND(
     pos.filter((p) => inWindow(p.po_date, from, to)).reduce((s, p) => s + Number(p.amount), 0)
   );
@@ -181,6 +236,11 @@ function computePnl(books, from, to) {
     cost_of_service: {
       internal_ai_usage,
       internal_label: settings.internal_cost_label || 'Internal AI usage (own agents)',
+      // The statement is in PKR; the internal invoices behind this figure are
+      // in dollars. Both are carried so the line can say what it converted.
+      internal_ai_usage_foreign: foreignTotals(internal),
+      internal_ai_usage_unconverted: internal_cost.unconverted,
+      usd_pkr_rate: Number(settings.usd_pkr_rate || 0),
       vendor_purchases,
       total: cost_of_service,
     },
@@ -243,7 +303,7 @@ function computeBalanceSheet(books, asOf) {
   const gst_charged = sum(external, (i) => i.tax_amount);
   const ait_withheld = sum(external, (i) => i.ait_amount);
   const revenue = sum(external, (i) => i.amount);
-  const internal_cost = sum(internal, (i) => i.amount);
+  const internal_cost = bookTotal(internal, settings).total;
 
   const opex = ROUND(expenses.reduce((s, e) => s + expenseAccrual(e, start, date), 0));
   const purchases = sum(pos, (p) => p.amount);
@@ -317,5 +377,6 @@ async function inceptionDate() {
 
 module.exports = {
   loadBooks, computePnl, computeBalanceSheet, revenueBreakdown,
+  bookValue, bookTotal, foreignTotals,
   expenseAccrual, monthsBetween, monthName, inceptionDate, DAY, MONTH_START, ROUND, pct,
 };

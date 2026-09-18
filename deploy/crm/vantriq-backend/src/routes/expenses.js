@@ -1,10 +1,55 @@
 const express = require('express');
 const db = require('../db');
+const acc = require('../utils/accounting');
 const router = express.Router();
 
+/**
+ * GET /api/expenses?include_derived=1&from=&to=
+ *
+ * The typed-in expenses \u2014 rent, salaries, subscriptions \u2014 and, when asked
+ * for, the one cost nobody types in: what VantriqAI's own agents cost to run.
+ * That figure is already an invoice on the internal account, so re-entering it
+ * by hand would double it. It is derived instead, and marked `derived` so the
+ * UI shows it as a cost without offering to edit something that is really an
+ * invoice.
+ *
+ * It is converted to PKR on the way out. The internal invoices behind it are
+ * raised in dollars, and this list is a list of rupees.
+ */
 router.get('/', async (req, res) => {
   const { rows } = await db.query(`select * from expenses order by created_at desc`);
-  res.json(rows);
+  if (!req.query.include_derived) return res.json(rows);
+
+  const to = req.query.to ? acc.DAY(req.query.to) : acc.DAY(new Date());
+  const from = req.query.from ? acc.DAY(req.query.from) : acc.MONTH_START(to);
+  const books = await acc.loadBooks(to);
+  const pnl = acc.computePnl(books, from, to);
+  const ai = pnl.cost_of_service;
+
+  const derived = [];
+  if (ai.internal_ai_usage > 0 || Object.keys(ai.internal_ai_usage_foreign).length) {
+    const foreign = Object.entries(ai.internal_ai_usage_foreign)
+      .map(([c, v]) => `${c} ${v}`).join(', ');
+    derived.push({
+      id: 'derived:internal_ai_usage',
+      derived: true,
+      label: ai.internal_label,
+      category: 'AI model usage',
+      amount: ai.internal_ai_usage,
+      currency: books.settings.currency || 'PKR',
+      recurring: true,
+      start_date: from,
+      end_date: to,
+      // Says where the number came from and what it was before conversion,
+      // so the rupee figure on screen can always be traced back to a dollar
+      // invoice and the rate it was converted at.
+      source: foreign
+        ? `${foreign} at ${ai.usd_pkr_rate || 'no rate set'}`
+        : 'Internal invoices',
+      unconverted: ai.internal_ai_usage_unconverted,
+    });
+  }
+  res.json([...derived, ...rows]);
 });
 
 router.post('/', async (req, res) => {

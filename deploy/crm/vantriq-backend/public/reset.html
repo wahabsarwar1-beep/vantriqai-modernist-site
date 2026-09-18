@@ -4,33 +4,49 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Choose a new password — Vantriq AI</title>
+<link rel="icon" href="/brand/mark.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --ink:#0F1A22; --teal:#12897A; --teal-dark:#0B6357; --teal-light:#E3F1EE;
-  --red:#BC4B3C; --red-light:#FBE8E4; --paper:#F5F3ED; --card:#FFFFFF;
-  --text:#161F27; --muted:#6C7885; --border:#E4E0D6;
+  --ink:#16151a; --teal:#2f56d9; --teal-dark:#1f3a95; --teal-light:#e8ecfd;
+  --teal-300:#a9bbf7;
+  --red:#b4402f; --red-light:#fbe8e4; --paper:#fbf9f6; --card:#ffffff;
+  --text:#16151a; --muted:#6b645b; --border:#e7e2da; --border-2:#f0ece5;
+  --f-head:'Sora',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-body:'Manrope',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  --shadow-sm:0 1px 2px rgba(22,21,26,.04), 0 8px 20px -16px rgba(22,21,26,.10);
+  --shadow-md:0 1px 3px rgba(22,21,26,.04), 0 14px 32px -22px rgba(22,21,26,.14);
+  --shadow-lg:0 4px 10px rgba(22,21,26,.05), 0 28px 56px -30px rgba(22,21,26,.20);
+  --radius-pill:999px;
 }
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;height:100%;}
-body{font-family:'Inter',system-ui,sans-serif;background:var(--paper);color:var(--text);-webkit-font-smoothing:antialiased;}
-.wrap{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px;}
-.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:26px;max-width:400px;width:100%;box-shadow:0 10px 30px rgba(15,26,34,.07);}
+body{font-family:var(--f-body);background:var(--paper);color:var(--text);-webkit-font-smoothing:antialiased;}
+.wrap{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px;
+  background:
+    radial-gradient(900px 520px at 12% -10%, var(--teal-light) 0%, transparent 62%),
+    radial-gradient(760px 480px at 105% 108%, #fbeee4 0%, transparent 60%),
+    var(--paper);}
+.card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:30px 28px;max-width:404px;width:100%;box-shadow:var(--shadow-lg);}
 .brand{display:flex;align-items:center;gap:10px;margin-bottom:18px;}
-.brand-mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--teal),#0A4E45);display:flex;align-items:center;justify-content:center;}
-.brand-name{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;}
+.brand-mark{width:32px;height:32px;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.brand-mark svg{display:block;}
+.brand-name{font-family:var(--f-head);font-weight:700;font-size:15.5px;letter-spacing:-.02em;}
+.brand-name em{font-style:normal;color:var(--teal);}
 .brand-sub{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-top:1px;}
-h1{font-family:'Space Grotesk',sans-serif;font-size:17px;margin:0 0 4px;}
+h1{font-family:var(--f-head);font-size:17px;margin:0 0 4px;}
 p.lead{font-size:12.5px;color:var(--muted);margin:0 0 18px;}
 label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;}
-input{width:100%;padding:10px 11px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;font-family:inherit;margin-bottom:12px;}
-input:focus{outline:2px solid var(--teal-light);border-color:var(--teal);}
-button{width:100%;padding:11px;border:none;border-radius:9px;background:var(--teal);color:#fff;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;}
+input{width:100%;padding:11px 13px;border:1px solid var(--border);border-radius:11px;font-size:13.5px;font-family:inherit;margin-bottom:12px;}
+input:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 4px var(--teal-light);}
+button{width:100%;padding:12px;border:none;border-radius:var(--radius-pill);background:var(--teal);color:#fff;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;}
 button:disabled{opacity:.55;cursor:default;}
 .msg{padding:10px 12px;border-radius:9px;font-size:12.5px;margin-bottom:14px;}
 .msg.err{background:var(--red-light);color:#8F3527;}
-.msg.ok{background:var(--teal-light);color:var(--teal-dark);}
+.msg.ok{background:#e4f2eb;color:#1f5c45;}
 .hint{font-size:11.5px;color:var(--muted);margin-top:12px;text-align:center;}
 a{color:var(--teal-dark);}
 </style>
@@ -58,8 +74,8 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;'
 
 function brand(){
   return `<div class="brand">
-    <div class="brand-mark"><svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M1 10h3l2-6 3 12 2.5-9 1.5 4h6" stroke="#8FD9CC" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-    <div><div class="brand-name">Vantriq AI</div><div class="brand-sub">${TYPE === 'staff' ? 'Vantriq Ops' : 'Account portal'}</div></div>
+    <div class="brand-mark"><svg width="30" height="30" viewBox="0 0 100 100" aria-hidden="true"><path d="M10 10 H90 V90 H10 Z M28 28 V72 H72 V28 Z" fill="#16151a" fill-rule="evenodd"/><rect x="10" y="28" width="28" height="10" fill="#2f56d9"/><rect x="28" y="10" width="10" height="28" fill="#2f56d9"/></svg></div>
+    <div><div class="brand-name">Vantriq<em>AI</em></div><div class="brand-sub">${TYPE === 'staff' ? 'Vantriq Ops' : 'Account portal'}</div></div>
   </div>`;
 }
 

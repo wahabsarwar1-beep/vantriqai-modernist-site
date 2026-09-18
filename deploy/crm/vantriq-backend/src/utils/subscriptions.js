@@ -1,6 +1,6 @@
 const db = require('../db');
 const { effectivePackage } = require('./pkg');
-const { ROUND, createInvoice, monthLabel, getSettings } = require('./billing');
+const { ROUND, MONEY, resolveCurrency, createInvoice, monthLabel, getSettings } = require('./billing');
 const { sendInvoice, previewInvoiceSend } = require('./invoiceDelivery');
 
 /**
@@ -144,6 +144,10 @@ async function ratesFor(client, agentId, onDate) {
 
 /** What a month's metered usage costs under those rates. */
 async function meteredCharges(client, month) {
+  // Token rates are tiny per unit; rounding these to cents before they are
+  // summed throws the whole charge away on a quiet month.
+  const settings = await getSettings();
+  const M = (n) => MONEY(n, resolveCurrency(client, settings));
   const from = MONTH_START(month);
   const to = monthEnd(month);
   const rates = await ratesFor(client, null, to);
@@ -169,13 +173,16 @@ async function meteredCharges(client, month) {
     const billable = Math.max(0, quantity - Number(r.included_units || 0));
     if (billable <= 0) continue;
     const units = Number(r.unit_size || 1) > 1 ? billable / Number(r.unit_size) : billable;
-    const amount = ROUND(units * Number(r.unit_rate));
+    const amount = M(units * Number(r.unit_rate));
     if (amount <= 0) continue;
     out.push({
       metric: r.metric,
       description: r.label || METRIC_LABEL[r.metric] || r.metric,
       detail: `${Math.round(quantity).toLocaleString('en-US')} used, ${Math.round(Number(r.included_units)).toLocaleString('en-US')} included`,
-      qty: Math.round(units * 100) / 100,
+      // Token rates are priced per million, so a month's usage is a small
+      // fraction of a unit. Rounded to two places that shows as 0, and the
+      // line reads "0 x 0.15 = 0.000405", which is nonsense on an invoice.
+      qty: Math.round(units * 1e6) / 1e6,
       unit_price: Number(r.unit_rate),
       amount,
       kind: 'overage',
@@ -214,6 +221,9 @@ const METRIC_LABEL = {
  * and pay-as-you-go with nothing used is genuinely nothing owed.
  */
 async function buildUsageOnlyBill(client, eff, month, from, to, period) {
+  const settings = await getSettings();
+  const currency = resolveCurrency(client, settings);
+  const M = (n) => MONEY(n, currency);
   const lines = [];
   let sessionsBilled = 0;
 
@@ -234,15 +244,15 @@ async function buildUsageOnlyBill(client, eff, month, from, to, period) {
       lines.push({
         description: `${eff.name} — conversations used`,
         detail: `${period} · ${used.toLocaleString('en-US')} conversations at ${rate}/conversation · pay as you go, no included quota`,
-        qty: used, unit_price: rate, amount: ROUND(used * rate),
+        qty: used, unit_price: rate, amount: M(used * rate),
         kind: 'usage',
       });
     }
   }
 
-  const amount = ROUND(lines.reduce((s, l) => s + Number(l.amount), 0));
+  const amount = M(lines.reduce((s, l) => s + Number(l.amount), 0));
   if (amount <= 0) return null;
-  return { period, lines, amount, overage_sessions: sessionsBilled, bundles: [] };
+  return { period, lines, amount, overage_sessions: sessionsBilled, bundles: [], currency };
 }
 
 async function buildMonthlyBill(client, month) {
@@ -423,15 +433,25 @@ async function runMonthlyBilling({ month, dryRun, clientId } = {}) {
     if (dryRun) {
       raised.push({
         client: client.company, client_id: client.id, period,
-        amount: bill.amount, lines: bill.lines,
+        // Carried so the billing-run panel prints the figure in the currency
+        // it would actually be raised in — a dollar bill shown as rupees
+        // reads as zero.
+        amount: bill.amount, currency: bill.currency || resolveCurrency(client, settings), lines: bill.lines,
         // Who would receive it, worked out the same way the real send does.
-        delivery: emailInvoices
-          ? (client.is_internal
-              ? { outcome: 'skipped', detail: 'Internal account — not sent.' }
-              : !client.email
-                ? { outcome: 'skipped', detail: 'No email address on the client record.' }
-                : { outcome: 'would_send', detail: `Would email ${client.email}.` })
-          : { outcome: 'skipped', detail: 'Invoice emails are switched off in Settings.' },
+        // Who would receive it, resolved exactly as the real send resolves it:
+        // the internal account has its own address, because the "client" is us.
+        delivery: (() => {
+          if (!emailInvoices) return { outcome: 'skipped', detail: 'Invoice emails are switched off in Settings.' };
+          const to = client.is_internal
+            ? (settings.internal_invoice_email || '').trim()
+            : client.email;
+          if (!to) {
+            return { outcome: 'skipped', detail: client.is_internal
+              ? 'No internal invoice address set (Settings → internal invoice email).'
+              : 'No email address on the client record.' };
+          }
+          return { outcome: 'would_send', detail: `Would email ${to}.` };
+        })(),
       });
       continue;
     }
@@ -459,7 +479,7 @@ async function runMonthlyBilling({ month, dryRun, clientId } = {}) {
     raised.push({
       client: client.company, client_id: client.id, period,
       invoice_id: invoice.id, invoice_number: invoice.invoice_number, amount: bill.amount,
-      delivery,
+      currency: invoice.currency, delivery,
     });
   }
 

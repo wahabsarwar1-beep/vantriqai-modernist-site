@@ -19,6 +19,9 @@ const FIELDS = [
   'opening_cash', 'opening_cash_date', 'internal_cost_label',
   // Whether the monthly run emails each invoice as it raises it.
   'email_invoices', 'dunning_enabled',
+  // v9.2: the rate our own dollar-denominated invoices convert into the books
+  // at, and where those invoices are sent.
+  'usd_pkr_rate', 'internal_invoice_email',
 ];
 
 const OVERAGE_POLICIES = ['serve', 'grace', 'block'];
@@ -44,6 +47,20 @@ router.put('/', async (req, res) => {
   }
   if (cols.includes('opening_cash') && !Number.isFinite(Number(body.opening_cash))) {
     return res.status(400).json({ error: 'Opening cash must be a number.' });
+  }
+  if (cols.includes('usd_pkr_rate')) {
+    const fx = Number(body.usd_pkr_rate);
+    // 0 is valid and means "not set": the financials then report the dollar
+    // figure unconverted rather than applying a rate nobody chose.
+    if (!Number.isFinite(fx) || fx < 0) {
+      return res.status(400).json({ error: 'The US dollar rate must be zero or more.' });
+    }
+  }
+  if (cols.includes('internal_invoice_email')) {
+    const to = String(body.internal_invoice_email || '').trim();
+    if (to && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+      return res.status(400).json({ error: 'That does not look like an email address.' });
+    }
   }
   if (cols.includes('invoice_prefix') && !/^[A-Za-z0-9-]{1,10}$/.test(String(body.invoice_prefix))) {
     return res.status(400).json({ error: 'Invoice prefix must be 1–10 letters, digits or hyphens.' });
