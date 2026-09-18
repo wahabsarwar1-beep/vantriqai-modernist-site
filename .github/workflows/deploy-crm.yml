@@ -1,6 +1,6 @@
 # Deploy the Vantriq Ops CRM to the VPS.
 #
-# Runs upgrade-v8.sh on the server: verified backup, rebuild, migrate, seed,
+# Runs upgrade-v9.sh on the server: verified backup, rebuild, migrate, seed,
 # verify. It DEFAULTS TO A DRY RUN — you have to choose "apply" to change
 # anything, so a mis-click costs you a log and nothing else.
 #
@@ -92,7 +92,7 @@ jobs:
           set -euo pipefail
           scp -P "$PORT" \
             deploy/crm/vantriq-backend-deploy.zip \
-            deploy/crm/upgrade-v8.sh \
+            deploy/crm/upgrade-v9.sh \
             "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:$STACK/"
 
       - name: "Run the upgrade (${{ github.event.inputs.mode }})"
@@ -105,7 +105,7 @@ jobs:
           FLAG=""
           [ "$MODE" = "dry-run" ] && FLAG="--dry-run"
           ssh -p "$PORT" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
-            "cd $STACK && chmod +x upgrade-v8.sh && STACK_DIR=$STACK ./upgrade-v8.sh $FLAG vantriq-backend-deploy.zip"
+            "cd $STACK && chmod +x upgrade-v9.sh && STACK_DIR=$STACK ./upgrade-v9.sh $FLAG vantriq-backend-deploy.zip"
 
       - name: Confirm the API is answering
         if: ${{ github.event.inputs.mode == 'apply' }}
