@@ -200,6 +200,51 @@ const METRIC_LABEL = {
  * package, then any bundle's one-off setup, then the bundles themselves,
  * then whatever ran past the allowance.
  */
+/**
+ * A bill made only of what was consumed — no retainer, no included quota,
+ * priced from the first unit.
+ *
+ * Used for the internal account. A rate card on the client wins if one
+ * exists, which is how you price by token rather than by conversation and
+ * get closer to what OpenAI actually charges. Without one it falls back to
+ * the package's own per-conversation rate, so the internal transfer price is
+ * a figure already on the price list rather than something invented here.
+ *
+ * No usage means no invoice. A zero-value invoice in the pipeline is noise,
+ * and pay-as-you-go with nothing used is genuinely nothing owed.
+ */
+async function buildUsageOnlyBill(client, eff, month, from, to, period) {
+  const lines = [];
+  let sessionsBilled = 0;
+
+  const metered = await meteredCharges(client, month);
+  if (metered.length) {
+    lines.push(...metered);
+    const s = metered.find((m) => m.metric === 'session');
+    if (s) sessionsBilled = Math.round(s.qty);
+  } else {
+    const { rows } = await db.query(
+      `select sessions from v_monthly_usage where client_id = $1 and period_month = $2::date`,
+      [client.id, from]
+    );
+    const used = Number((rows[0] && rows[0].sessions) || 0);
+    const rate = Number(eff.overage_rate) || 0;
+    if (used > 0 && rate > 0) {
+      sessionsBilled = used;
+      lines.push({
+        description: `${eff.name} — conversations used`,
+        detail: `${period} · ${used.toLocaleString('en-US')} conversations at ${rate}/conversation · pay as you go, no included quota`,
+        qty: used, unit_price: rate, amount: ROUND(used * rate),
+        kind: 'usage',
+      });
+    }
+  }
+
+  const amount = ROUND(lines.reduce((s, l) => s + Number(l.amount), 0));
+  if (amount <= 0) return null;
+  return { period, lines, amount, overage_sessions: sessionsBilled, bundles: [] };
+}
+
 async function buildMonthlyBill(client, month) {
   const from = MONTH_START(month);
   const to = monthEnd(month);
@@ -209,6 +254,14 @@ async function buildMonthlyBill(client, month) {
   const { rows: prodRows } = await db.query(`select * from products where id = $1`, [client.product_id]);
   const eff = effectivePackage(client, prodRows[0]);
   if (!eff) return null;
+
+  // VantriqAI pays for what its own agents actually used, not a package
+  // retainer it would be sitting on both sides of. The point of the internal
+  // account is to put real cost against real usage: a flat 250,000 whether
+  // the agents answered ten conversations or ten thousand tells you nothing
+  // about what running them costs, which is the only question it exists to
+  // answer.
+  if (client.is_internal) return buildUsageOnlyBill(client, eff, month, from, to, period);
 
   const bundles = (await bundlesFor(client.id, from, to)).filter((b) => b.status !== 'cancelled');
   const lines = [];
