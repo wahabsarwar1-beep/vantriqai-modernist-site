@@ -3648,8 +3648,8 @@ function renderSettings(){
     <div class="field-row">
       <div class="field"><label>US dollar rate (PKR per USD)</label><input id="setUsdRate" type="number" step="0.01" min="0" value="${state.company.usdPkrRate!=null?state.company.usdPkrRate:0}" placeholder="0">
         <div style="font-size:11px;color:var(--muted);margin-top:4px;">Only our own account bills in dollars — it is priced on model tokens. This rate converts it into the books, and is <strong>stamped on each invoice as it is raised</strong>, so changing it never restates a month already reported. Leave at 0 and the cost is reported unconverted rather than guessed.</div></div>
-      <div class="field"><label>Our own invoice goes to</label><input id="setInternalEmail" value="${esc(state.company.internalInvoiceEmail||'')}" placeholder="server@vantriqai.com">
-        <div style="font-size:11px;color:var(--muted);margin-top:4px;">Where the monthly invoice for our own AI usage is emailed. The mailbox has to exist, or it will bounce.</div></div>
+      <div class="field"><label>Our own invoice goes to</label><input id="setInternalEmail" value="${esc(state.company.internalInvoiceEmail||'')}" placeholder="support@vantriqai.com">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">Where the monthly invoice for our own AI usage is emailed. It has to be a mailbox that exists — an address with nothing behind it bounces rather than failing loudly.</div></div>
     </div>
     <div class="field"><label>Payment terms (days)</label><input id="setTerms" type="number" value="${state.company.paymentTermsDays!=null?state.company.paymentTermsDays:7}">
       <div style="font-size:11px;color:var(--muted);margin-top:4px;">Sets the due date stamped on each invoice.</div></div>

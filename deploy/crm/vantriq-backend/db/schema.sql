@@ -1113,7 +1113,7 @@ alter table invoices add column if not exists currency text;
 -- Where the internal account's own invoice is sent. It is a real invoice
 -- and it should arrive like any other, rather than being the one nobody
 -- ever sees. Change it in Settings.
-alter table settings add column if not exists internal_invoice_email text not null default 'server@vantriqai.com';
+alter table settings add column if not exists internal_invoice_email text not null default 'support@vantriqai.com';
 
 -- =====================================================================
 -- v9.2 — one set of books, two currencies
@@ -1146,8 +1146,8 @@ alter table invoices add column if not exists base_amount numeric;
 update invoices set fx_rate = 1, base_amount = amount
  where fx_rate is null and coalesce(currency, 'PKR') = 'PKR';
 
--- The internal invoice goes to its own address. Set to what it should be
--- rather than to what happens to exist — the mailbox is created in hPanel,
--- and until it is, the monthly invoice will bounce back to the sender.
-update settings set internal_invoice_email = 'server@vantriqai.com'
- where id = 1 and internal_invoice_email = 'support@vantriqai.com';
+-- Where our own monthly invoice is sent. It defaults to the one mailbox the
+-- Hostinger account actually has; an address with no mailbox behind it does
+-- not fail loudly, it just bounces somewhere nobody reads. Change it in
+-- Settings once another mailbox exists — nothing here overwrites a choice
+-- made there, so re-running this file never undoes it.

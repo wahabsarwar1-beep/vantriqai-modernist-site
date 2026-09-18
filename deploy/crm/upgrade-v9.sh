@@ -347,9 +347,10 @@ cat <<'NEXT'
      applying a rate nobody chose.
 
   3. Settings → Tax & invoicing → "Our own invoice goes to".
-     The monthly invoice for our own AI usage is emailed there. THE MAILBOX
-     HAS TO EXIST — create it in hPanel first, or every month's invoice
-     bounces back to the sender.
+     Defaults to support@vantriqai.com, the one mailbox on the Hostinger
+     account. If you point it elsewhere, create that mailbox in hPanel
+     first: an address with nothing behind it bounces rather than failing
+     loudly, so the invoice looks sent and never arrives.
 
   4. Set HOSTINGER_MAIL_TOKEN on crm_app if it is not set, or invoice emails
      log as skipped rather than sending.
