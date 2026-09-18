@@ -18,6 +18,9 @@ const FIELDS = [
   // v7 — VantriqAI is a client of itself. An internal client is metered and
   // invoiced like anyone, but its billing is cost, not revenue.
   'is_internal',
+  // v9 — which tax authority this client is billed under. Null falls back to
+  // the company default rate, so leaving it unset changes nothing.
+  'tax_jurisdiction',
 ];
 
 // Per-client package overrides. Only accepted when the client's package is

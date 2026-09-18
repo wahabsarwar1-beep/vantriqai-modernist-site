@@ -42,9 +42,24 @@ const given = (v) => v !== null && v !== undefined && v !== '';
  * "whatever the company default is"; 0 is a real rate meaning exempt, so the
  * two cases must not be collapsed with a falsy check.
  */
-function resolveTaxRate(client, settings) {
+function resolveTaxRate(client, settings, jurisdiction) {
   if (client && given(client.tax_rate)) return Number(client.tax_rate);
+  // The authority the client is billed under comes next. Punjab zero-rating
+  // a service that ICT taxes is a real difference, not an exception, so the
+  // jurisdiction's rate has to outrank the company-wide default.
+  if (jurisdiction && given(jurisdiction.sales_tax_rate)) return Number(jurisdiction.sales_tax_rate);
   return Number((settings && settings.default_tax_rate) || 0);
+}
+
+/**
+ * The tax authority a client is billed under, or null for the company
+ * default. Looked up by code rather than joined so an invoice can be raised
+ * against a jurisdiction that has since been deactivated.
+ */
+async function getJurisdiction(code) {
+  if (!code) return null;
+  const { rows } = await db.query(`select * from tax_jurisdictions where code = $1`, [code]);
+  return rows[0] || null;
 }
 
 /**
@@ -150,8 +165,9 @@ async function createInvoice(client, {
   const issued = issued_date || new Date().toISOString().slice(0, 10);
   const internal = !!client.is_internal;
 
+  const jurisdiction = internal ? null : await getJurisdiction(client.tax_jurisdiction);
   const gstRate = internal ? 0
-    : (given(tax_rate) ? Number(tax_rate) : resolveTaxRate(client, settings));
+    : (given(tax_rate) ? Number(tax_rate) : resolveTaxRate(client, settings, jurisdiction));
   const aitRate = internal ? 0
     : (given(ait_rate) ? Number(ait_rate) : resolveAitRate(client, settings));
 
@@ -172,8 +188,8 @@ async function createInvoice(client, {
        (client_id, type, amount, period, status, issued_date, overage_sessions, notes,
         invoice_number, tax_rate, tax_amount, total_amount,
         client_ntn, client_strn, billing_address, due_date,
-        ait_rate, ait_amount, net_payable)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+        ait_rate, ait_amount, net_payable, tax_jurisdiction, seller_reg_no)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
      returning *`,
     [
       client.id, type, net, period || null,
@@ -183,6 +199,11 @@ async function createInvoice(client, {
       client.ntn || '', client.strn || '', client.billing_address || '',
       due_date || addDays(issued, settings.payment_terms_days || 7),
       aitRate, ait, netPayable,
+      // Stamped, not referenced. The authority's rate and our registration
+      // with it both change over time; this invoice must keep saying what it
+      // was actually issued under.
+      jurisdiction ? jurisdiction.code : null,
+      jurisdiction ? (jurisdiction.seller_reg_no || '') : (settings.seller_strn || ''),
     ]
   );
   const invoice = rows[0];
@@ -319,9 +340,16 @@ function buildTaxInvoice(inv, client, settings, lines, payments) {
       name: settings.company_name,
       address: settings.seller_address || settings.address || settings.city,
       ntn: settings.seller_ntn || settings.ntn || '',
-      strn: settings.seller_strn || settings.strn || '',
+      // The registration under which THIS invoice was raised. Stamped at
+      // issue, so it keeps showing the right authority even after the client
+      // moves jurisdiction or a registration number changes. Falls back to
+      // the company-wide number for invoices raised before v9.
+      strn: inv.seller_reg_no || settings.seller_strn || settings.strn || '',
       email: settings.seller_email || '',
     },
+    // Named on the document because five authorities means five returns, and
+    // whoever files them needs to know which pile this invoice belongs to.
+    tax_jurisdiction: inv.tax_jurisdiction || null,
     buyer: {
       company: client.company,
       contact_name: client.name,
@@ -354,6 +382,7 @@ function buildTaxInvoice(inv, client, settings, lines, payments) {
 }
 
 module.exports = {
+  getJurisdiction,
   createInvoice, billOnActivation, buildTaxInvoice, resolveTaxRate, resolveAitRate,
   allocateInvoiceNumber, getSettings, monthLabel, settlementOf, derivedStatus,
   normaliseLines, LINE_LABEL, ROUND,

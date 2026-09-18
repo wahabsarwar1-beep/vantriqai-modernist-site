@@ -1015,3 +1015,74 @@ create index if not exists idx_bank_credits_status on bank_credits(status, recei
 -- state. Nothing reaches anyone until the run is executed for real, and the
 -- run's dry run names every recipient before it does.
 alter table settings add column if not exists email_invoices boolean not null default true;
+
+-- =====================================================================
+-- v9 — one company, five tax authorities
+--
+-- Sales tax on services in Pakistan is provincial. Selling into ICT,
+-- Punjab, Sindh, KP and Balochistan means five different rates, five
+-- registrations, and five returns — and the rate for the SAME service
+-- genuinely differs: Punjab zero-rates software and IT-based system
+-- development while ICT charges its reduced or standard rate.
+--
+-- A single settings.default_tax_rate cannot express that, and one
+-- settings.seller_strn cannot carry five registration numbers. So the
+-- authority becomes a thing the system knows about, a client belongs to
+-- one, and the invoice records which one it was billed under.
+--
+-- Withholding does NOT move here. AIT is federal (s.153) and already has
+-- clients.ait_rate and clients.ait_exempt, which is the right shape: the
+-- rate turns on what the service is and who the customer is, not on
+-- which province they sit in.
+-- =====================================================================
+
+create table if not exists tax_jurisdictions (
+  code text primary key,
+  name text not null,
+  -- Sales tax on services for OUR services in that jurisdiction. Seeded at
+  -- 0 on purpose: a wrong rate on an issued invoice is an FBR problem, so
+  -- the system bills nothing until somebody who can be held to it enters
+  -- the number. `rate_note` carries what to go and check.
+  sales_tax_rate numeric not null default 0,
+  -- Our registration with THAT authority. Printed on invoices billed under
+  -- it; an invoice showing the wrong authority's number is not valid.
+  seller_reg_no text not null default '',
+  rate_note text not null default '',
+  active boolean not null default true,
+  sort_order int not null default 100,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+drop trigger if exists trg_tax_jurisdictions_updated on tax_jurisdictions;
+create trigger trg_tax_jurisdictions_updated before update on tax_jurisdictions
+  for each row execute function touch_updated_at();
+
+-- The five authorities plus export. Rates stay 0 until confirmed; the notes
+-- are prompts for whoever confirms them, not authority in themselves.
+insert into tax_jurisdictions (code, name, rate_note, sort_order) values
+  ('ICT',    'Islamabad Capital Territory (FBR)',
+   'Standard and reduced rates differ; the reduced rate is usually conditional on not claiming input tax. Confirm which applies to our services.', 10),
+  ('PRA',    'Punjab Revenue Authority',
+   'Software and IT-based system development services may be ZERO-RATED in Punjab. Confirm whether our services qualify before charging anything.', 20),
+  ('SRB',    'Sindh Revenue Board',
+   'Confirm the rate for IT and IT-enabled services, and whether a reduced rate applies.', 30),
+  ('KPRA',   'Khyber Pakhtunkhwa Revenue Authority',
+   'Rate not yet confirmed.', 40),
+  ('BRA',    'Balochistan Revenue Authority',
+   'Rate not yet confirmed.', 50),
+  ('EXPORT', 'Export of services (outside Pakistan)',
+   'Exports of IT and IT-enabled services are generally zero-rated. Confirm the documentation required to support zero-rating.', 60)
+on conflict (code) do nothing;
+
+-- Which authority a client is billed under. Null means "fall back to the
+-- company default rate", which is what every existing client does today, so
+-- this migration changes nobody's bill until a jurisdiction is assigned.
+alter table clients add column if not exists tax_jurisdiction text references tax_jurisdictions(code);
+create index if not exists idx_clients_jurisdiction on clients(tax_jurisdiction);
+
+-- Stamped onto the invoice at issue, never read back through the client.
+-- Rates and registrations change; an invoice issued last March must still
+-- show what it was actually billed under.
+alter table invoices add column if not exists tax_jurisdiction text;
+alter table invoices add column if not exists seller_reg_no text not null default '';
