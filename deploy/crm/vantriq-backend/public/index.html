@@ -4925,11 +4925,10 @@ function invoicePanelHTML(id){
     <div class="divider"></div>
     <h4 style="font-size:13px;">Sending it</h4>
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
-      ${c&&c.isInternal
-        ? `<span style="font-size:12.5px;color:var(--muted);">Internal account — invoices are never emailed.</span>`
-        : `<button class="btn btn-primary btn-sm" onclick="emailInvoice('${inv.id}')">${iconMail(13)} Email it to ${esc(c?c.company:'the customer')}</button>
-           <button class="btn btn-ghost btn-sm" onclick="loadDelivery('${inv.id}')">What has been sent</button>`}
+      <button class="btn btn-primary btn-sm" onclick="emailInvoice('${inv.id}')">${iconMail(13)} Email it to ${esc(invoiceRecipient(c))}</button>
+      <button class="btn btn-ghost btn-sm" onclick="loadDelivery('${inv.id}')">What has been sent</button>
     </div>
+    ${c&&c.isInternal?`<div style="font-size:12px;color:var(--muted);margin-top:8px;">Our own invoice is a real invoice and is sent like any other. It goes to the address in Settings rather than to a client record, because the client here is us.${(state.company||{}).internalInvoiceEmail?'':' None is set yet — Settings → Company → Our own invoice goes to.'}</div>`:''}
     <div id="inv-delivery-${inv.id}" style="margin-top:10px;"></div>
 
     <div style="margin-top:20px;display:flex;gap:8px;">
@@ -4938,6 +4937,20 @@ function invoicePanelHTML(id){
       <button class="btn btn-danger-ghost btn-sm" onclick="deleteInvoice('${inv.id}')">${iconTrash(13)} Delete</button>
     </div>
   </div>`;
+}
+
+/**
+ * Who an invoice is emailed to, named the way the button should name them.
+ *
+ * The internal account's invoice is not an exception to billing. It is the
+ * monthly figure our own costs are settled against, so it is raised, rendered
+ * and sent like every other invoice — but it goes to the address in Settings,
+ * because the "client" on it is us and there is no client record to read an
+ * address off.
+ */
+function invoiceRecipient(c){
+  if(c && c.isInternal) return (state.company||{}).internalInvoiceEmail || 'our own invoice address';
+  return (c && c.company) ? c.company : 'the customer';
 }
 
 /**

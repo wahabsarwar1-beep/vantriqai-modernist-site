@@ -164,6 +164,48 @@ const PKR_DOC = {
     global.fetch = realFetch;
   }
 
+  // The backend has sent internal invoices since v9.1 — the internal account
+  // is billed in USD for what it used and somebody has to receive the figure.
+  // The CRM's invoice panel went on saying 'Internal account — invoices are
+  // never emailed' and hid the button, so the one invoice that most needed
+  // sending was the one with no way to send it. The copy is not the contract;
+  // this asserts the button is not gated.
+  console.log('\n== the CRM offers to send an internal invoice ==');
+  const fs = require('fs');
+  const ui = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
+
+  ok(!/never emailed/i.test(ui), 'the panel no longer claims internal invoices are never emailed');
+
+  const sending = ui.slice(ui.indexOf('Sending it</h4>'));
+  const toButton = sending.slice(0, sending.indexOf('emailInvoice('));
+  ok(toButton.length > 0 && toButton.length < 400,
+    'the Sending-it section still has an email button', String(toButton.length));
+  ok(!/isInternal/.test(toButton),
+    'and reaching it does not depend on the account being external',
+    toButton.replace(/\s+/g, ' ').slice(-160));
+
+  // Who the button names. Pulled out of the page and run for real rather than
+  // pattern-matched, because the failure that shipped was a true statement
+  // about the wrong thing.
+  const src = ui.slice(ui.indexOf('function invoiceRecipient(c){'));
+  const invoiceRecipient = new Function('state',
+    src.slice(0, src.indexOf('\n}') + 2) + '\nreturn invoiceRecipient;'
+  )({ company: { internalInvoiceEmail: 'support@vantriqai.com' } });
+
+  ok(invoiceRecipient({ isInternal: true, company: 'Vantriq AI' }) === 'support@vantriqai.com',
+    'an internal invoice names the address in Settings, not the client record',
+    invoiceRecipient({ isInternal: true, company: 'Vantriq AI' }));
+  ok(invoiceRecipient({ isInternal: false, company: 'Acme Ltd' }) === 'Acme Ltd',
+    'a customer invoice still names the customer');
+  ok(typeof invoiceRecipient(null) === 'string' && invoiceRecipient(null).length > 0,
+    'and an invoice with no client record still reads as a sentence', String(invoiceRecipient(null)));
+
+  const noneSet = new Function('state',
+    src.slice(0, src.indexOf('\n}') + 2) + '\nreturn invoiceRecipient;'
+  )({ company: {} });
+  ok(!/undefined|null/.test(noneSet({ isInternal: true })),
+    'with no internal address set it does not print undefined', String(noneSet({ isInternal: true })));
+
   console.log(`\n==== ${pass} passed, ${fail} failed ====\n`);
   process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });
