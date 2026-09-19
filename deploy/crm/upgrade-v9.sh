@@ -293,8 +293,17 @@ else
     "select count(*) from clients where is_internal"
   chk "its two agents carry the live references" 2 \
     "select count(*) from client_agents where external_ref in ('vantriqai.com','923411120049')"
-  chk "dunning is OFF (nothing will be emailed yet)" f \
-    "select dunning_enabled from settings where id=1"
+  # Whether dunning is on is a decision, not a health check. Asserting it is
+  # off was right for a first install and wrong forever after: the moment you
+  # switch reminders on deliberately, every later deploy fails on it. Report
+  # the state so it is visible in the log; do not fail the deploy over it.
+  DUNNING=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
+    -c "select dunning_enabled from settings where id=1" 2>/dev/null || echo '?')
+  if [ "$DUNNING" = "t" ]; then
+    ok "dunning is ON — payment reminders will be emailed on schedule"
+  else
+    ok "dunning is off — no reminders will be emailed"
+  fi
   chk "v9 tax jurisdictions seeded (ICT, PRA, SRB, KPRA, BRA, EXPORT)" 6 \
     "select count(*) from tax_jurisdictions"
   chk "the five authorities and the export case are all there" 6 \
