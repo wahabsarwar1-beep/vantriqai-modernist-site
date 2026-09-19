@@ -35,12 +35,15 @@ const dbStub = {
     }
     if (q.includes("nextval('invoice_number_seq')")) return { rows: [{ n: 1 }] };
     if (q.startsWith('insert into invoices')) {
-      const row = {
-        id: 'inv-' + (state.inserted.length + 1),
-        client_id: params[0], amount: params[2], tax_rate: params[9], tax_amount: params[10],
-        total_amount: params[11], ait_rate: params[16], ait_amount: params[17],
-        net_payable: params[18], tax_jurisdiction: params[19], seller_reg_no: params[20],
-      };
+      // Columns are READ OUT OF THE SQL, never counted by hand. Positional
+      // indices into the param array look precise and are quietly wrong the
+      // moment a column is added in the middle of the real insert — every
+      // field after it shifts by one, and the failures land nowhere near the
+      // change that caused them.
+      const cols = q.slice(q.indexOf('(') + 1, q.indexOf(')'))
+        .split(',').map((c) => c.trim()).filter(Boolean);
+      const row = { id: 'inv-' + (state.inserted.length + 1) };
+      cols.forEach((c, i) => { row[c] = params[i]; });
       state.inserted.push(row);
       return { rows: [row] };
     }

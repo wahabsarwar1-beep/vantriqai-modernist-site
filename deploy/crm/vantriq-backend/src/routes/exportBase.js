@@ -164,7 +164,7 @@ router.get('/crm.xlsx', async (req, res) => {
     vendors, pos, remittances, usageMonthly, usageByAgent, quotaEvents,
     stageHistory, reps, packageRequests,
     bundles, quotes, quoteLines, phases, rates, dunningSteps, reminders,
-    automations, automationRuns, bankCredits, contracts,
+    automations, automationRuns, bankCredits, contracts, documents, identityChanges,
   ] = await Promise.all([
     q(`select * from settings where id = 1`).then((r) => r[0] || {}),
     q(`select c.*, p.name as package_name, parent.company as parent_company
@@ -254,6 +254,17 @@ router.get('/crm.xlsx', async (req, res) => {
          join clients c on c.id = k.client_id
          left join contracts prev on prev.id = k.superseded_by
         order by c.company, k.start_date desc nulls last`),
+    // A manifest of the paperwork, not the paperwork. The bytes are
+    // deliberately not selected: a spreadsheet is not a filing cabinet, and
+    // pulling every scan into memory to build one is how the export starts
+    // timing out. Download the file itself from the client's panel.
+    q(`select d.id, d.doc_type, d.title, d.filename, d.content_type, d.byte_size,
+              d.notes, d.uploaded_by, d.created_at, c.company
+         from client_documents d join clients c on c.id = d.client_id
+        order by c.company, d.created_at desc`),
+    q(`select h.*, c.company as current_company from client_identity_changes h
+         join clients c on c.id = h.client_id
+        order by h.changed_at desc`),
   ]);
 
   // Settlement per invoice, for the Invoices sheet's outstanding column.
@@ -529,6 +540,28 @@ router.get('/crm.xlsx', async (req, res) => {
     col('Scope', 'scope', { width: 30 }), col('Notes', 'notes', { width: 30 }),
     col('Replaced by', 'superseded_by_number', { width: 20 }),
   ], contracts);
+
+  addSheet(wb, 'Documents on file', [
+    col('Company', 'company', { width: 26 }),
+    col('Type', 'doc_type', { width: 12 }), col('Title', 'title', { width: 28 }),
+    col('Filename', 'filename', { width: 30 }),
+    col('Format', 'content_type', { width: 20 }),
+    col('Size (KB)', 'kb', { width: 11, value: (d) => Math.max(1, Math.round(Number(d.byte_size || 0) / 1024)) }),
+    col('Uploaded', 'created_at', { date: true, width: 20 }),
+    col('By', 'uploaded_by', { width: 22 }), col('Note', 'notes', { width: 30 }),
+  ], documents);
+
+  // Why a year's invoices for one customer can carry two different NTNs.
+  addSheet(wb, 'Identity changes', [
+    col('Company (now)', 'current_company', { width: 26 }),
+    col('Changed', 'changed_at', { date: true, width: 20 }),
+    col('Effective from', 'effective_from', { date: true, width: 14 }),
+    col('Name was', 'old_company', { width: 26 }), col('Name is', 'new_company', { width: 26 }),
+    col('NTN was', 'old_ntn', { width: 16 }), col('NTN is', 'new_ntn', { width: 16 }),
+    col('STRN was', 'old_strn', { width: 20 }), col('STRN is', 'new_strn', { width: 20 }),
+    col('Address was', 'old_address', { width: 30 }), col('Address is', 'new_address', { width: 30 }),
+    col('Reason', 'reason', { width: 34 }), col('By', 'changed_by', { width: 22 }),
+  ], identityChanges);
 
   addSheet(wb, 'Quotes', [
     col('Quote #', 'quote_number', { width: 20 }), col('Company', 'company', { width: 26 }),

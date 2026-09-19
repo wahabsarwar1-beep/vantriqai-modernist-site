@@ -36,11 +36,13 @@ const dbStub = {
     if (q.includes("nextval('invoice_number_seq')")) return { rows: [{ n: written.invoices.length + 1 }] };
     if (q.startsWith('select * from tax_jurisdictions')) return { rows: [] };
     if (q.startsWith('insert into invoices')) {
-      // Mirrors the column order in createInvoice's insert.
-      const cols = ['client_id', 'type', 'amount', 'period', 'status', 'issued_date', 'overage_sessions',
-        'notes', 'invoice_number', 'tax_rate', 'tax_amount', 'total_amount', 'client_ntn', 'client_strn',
-        'billing_address', 'due_date', 'ait_rate', 'ait_amount', 'net_payable', 'tax_jurisdiction',
-        'seller_reg_no', 'currency', 'fx_rate', 'base_amount'];
+      // The column order is READ OUT OF THE SQL rather than copied here.
+      // A hand-kept copy silently goes stale the moment a column is inserted
+      // in the middle of the real insert: every field after it shifts by one
+      // and thirteen assertions fail somewhere unrelated to the change. That
+      // happened once; this cannot repeat it.
+      const cols = q.slice(q.indexOf('(') + 1, q.indexOf(')'))
+        .split(',').map((c) => c.trim()).filter(Boolean);
       const row = { id: `inv-${written.invoices.length + 1}` };
       cols.forEach((c, i) => { row[c] = params[i]; });
       written.invoices.push(row);

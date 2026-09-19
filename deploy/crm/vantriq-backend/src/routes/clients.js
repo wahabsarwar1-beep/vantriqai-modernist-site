@@ -243,6 +243,36 @@ router.put('/:id', async (req, res) => {
         [req.params.id, existing.stage, body.stage, String(body.stage_comment).trim().slice(0, 1000)]
       );
     }
+
+    // A change to any detail that prints on a tax invoice is recorded.
+    //
+    // Invoices already issued do NOT move: each one stamped the identity it
+    // was raised under, and one filed with FBR under the old NTN must keep
+    // saying so. Invoices raised after this pick the new details up by
+    // themselves. What this log adds is the explanation — without it, a
+    // year's invoices jumping from one NTN to another looks like an error
+    // rather than a re-registration anybody can point at.
+    const idFields = [['company', 'company'], ['ntn', 'ntn'], ['strn', 'strn'], ['billing_address', 'address']];
+    const moved = idFields.filter(([f]) => body[f] !== undefined
+      && String(body[f] ?? '') !== String(existing[f] ?? ''));
+    if (moved.length) {
+      await db.query(
+        `insert into client_identity_changes
+           (client_id, effective_from, old_company, new_company, old_ntn, new_ntn,
+            old_strn, new_strn, old_address, new_address, reason, changed_by)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        [
+          req.params.id,
+          body.identity_effective_from || new Date().toISOString().slice(0, 10),
+          existing.company || '', rows[0].company || '',
+          existing.ntn || '', rows[0].ntn || '',
+          existing.strn || '', rows[0].strn || '',
+          existing.billing_address || '', rows[0].billing_address || '',
+          String(body.identity_reason || '').slice(0, 500),
+          (req.user && req.user.email) || '',
+        ]
+      );
+    }
     // Setup fee + first retainer are raised here rather than by the browser,
     // so the same thing happens however the client was activated. Idempotent.
     let billed = null;
@@ -420,5 +450,32 @@ router.delete('/:id/portal-credentials', blockAutomation, async (req, res) => {
   await db.query(`delete from portal_sessions where client_id = $1`, [req.params.id]);
   res.status(204).end();
 });
+
+/**
+ * GET /api/clients/:id/identity-history — every change to the details that
+ * print on a tax invoice, newest first.
+ *
+ * The point is to make a jump in NTN across a year's invoices explainable.
+ * Nothing here rewrites an invoice: each one keeps the identity it was
+ * stamped with, which is what makes the filing and the document agree.
+ */
+router.get('/:id/identity-history', async (req, res) => {
+  const { rows } = await db.query(
+    `select * from client_identity_changes where client_id = $1 order by changed_at desc`,
+    [req.params.id]
+  );
+  res.json(rows.map((r) => ({
+    ...r,
+    changed: [
+      r.old_company !== r.new_company ? 'name' : null,
+      r.old_ntn !== r.new_ntn ? 'NTN' : null,
+      r.old_strn !== r.new_strn ? 'STRN' : null,
+      r.old_address !== r.new_address ? 'address' : null,
+    ].filter(Boolean),
+  })));
+});
+
+// The paperwork on an account — SAF, NTN certificate, CNIC and the rest.
+router.use('/:id/documents', require('./clientDocuments'));
 
 module.exports = router;

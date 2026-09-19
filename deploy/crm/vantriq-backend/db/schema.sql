@@ -1228,3 +1228,86 @@ create trigger trg_contracts_updated before update on contracts
 -- Contract numbers run in their own sequence, like invoice numbers, so two
 -- contracts raised in the same second cannot collide on one.
 create sequence if not exists contract_number_seq start 1;
+
+-- =====================================================================
+-- v9.4 — CUSTOMER DOCUMENTS, AND CHANGING A COMPANY'S DETAILS
+--
+-- Two things, related by the same principle: a tax document has to keep
+-- saying what was true when it was issued.
+--
+-- 1. DOCUMENTS. The service agreement form, the NTN certificate, the
+--    CNIC, whatever else an account needs on file. Held as bytes in the
+--    database rather than on the container's disk, because the container
+--    is rebuilt on every deploy and its filesystem goes with it, while
+--    the database has a volume and is in the verified backup.
+--
+-- 2. IDENTITY CHANGES. Companies rename and re-register. When they do,
+--    invoices ALREADY ISSUED must not move — one has been filed with FBR
+--    under the old NTN and reprinting it under the new one makes the
+--    filing and the document disagree. Invoices issued afterwards pick
+--    the new details up by themselves, because every invoice snapshots
+--    the identity at issue. What was missing was a record of the change
+--    itself, so the jump from one NTN to another in a year's invoices
+--    can be explained rather than looking like an error.
+-- =====================================================================
+
+create table if not exists client_documents (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  doc_type text not null default 'other'
+    check (doc_type in ('saf','ntn','strn','cnic','contract','po','bank','other')),
+  title text not null default '',
+  filename text not null,
+  content_type text not null default 'application/octet-stream',
+  byte_size int not null default 0,
+  -- The bytes. bytea, not a path: a path into a container that is thrown
+  -- away on the next deploy is a broken link waiting to happen.
+  content bytea not null,
+  -- Lets a re-upload of the same file be spotted instead of silently
+  -- stored twice under two names.
+  sha256 text default '',
+  notes text default '',
+  uploaded_by text default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_client_docs on client_documents(client_id, created_at desc);
+create index if not exists idx_client_docs_type on client_documents(client_id, doc_type);
+
+drop trigger if exists trg_client_documents_updated on client_documents;
+create trigger trg_client_documents_updated before update on client_documents
+  for each row execute function touch_updated_at();
+
+-- Every change to the details that appear on a tax invoice, kept so the
+-- books can explain themselves. Written by the API, never by hand.
+create table if not exists client_identity_changes (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  changed_at timestamptz not null default now(),
+  -- When the new details take legal effect, which is not always the day
+  -- somebody got round to typing them in.
+  effective_from date,
+  old_company text default '', new_company text default '',
+  old_ntn text default '',     new_ntn text default '',
+  old_strn text default '',    new_strn text default '',
+  old_address text default '', new_address text default '',
+  reason text default '',
+  changed_by text default ''
+);
+create index if not exists idx_identity_changes on client_identity_changes(client_id, changed_at desc);
+
+-- The registered name the invoice was RAISED under.
+--
+-- The NTN, STRN and address were already snapshot onto each invoice; the
+-- company name was not — it was read live off the client record at print
+-- time. So a renamed company's old invoices reprinted under the new name
+-- carrying the old NTN: a document whose name and registration number
+-- belong to two different entities, which is worse than either being
+-- stale. Now the name is stamped with the rest of the identity.
+alter table invoices add column if not exists client_legal_name text;
+
+-- Existing invoices predate any rename, so the client's current name is
+-- still the name they were raised under. Guarded, so re-running this file
+-- never overwrites a stamped name.
+update invoices i set client_legal_name = c.company
+  from clients c where c.id = i.client_id and i.client_legal_name is null;

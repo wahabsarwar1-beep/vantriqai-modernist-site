@@ -310,6 +310,12 @@ else
     "select count(*) from information_schema.columns where table_name='contracts' and column_name in ('client_ntn','client_strn','client_legal_name','client_address')"
   chk "contract numbers have their own sequence" 1 \
     "select count(*) from information_schema.sequences where sequence_name='contract_number_seq'"
+  chk "v9.4 customer documents and identity log" 2 \
+    "select count(*) from information_schema.tables where table_name in ('client_documents','client_identity_changes')"
+  chk "the registered name is stamped on invoices" 1 \
+    "select count(*) from information_schema.columns where table_name='invoices' and column_name='client_legal_name'"
+  chk "every existing invoice carries the name it was raised under" 0 \
+    "select count(*) from invoices where client_legal_name is null"
   chk "v9 tax jurisdictions seeded (ICT, PRA, SRB, KPRA, BRA, EXPORT)" 6 \
     "select count(*) from tax_jurisdictions"
   chk "the five authorities and the export case are all there" 6 \

@@ -2819,6 +2819,281 @@ async function downloadWorkbook(){
 }
 
 
+/* ===================== CUSTOMER DOCUMENTS & IDENTITY ===================== */
+/**
+ * The paperwork on an account, and what happens when a company renames.
+ *
+ * Documents are held in the database rather than on disk — the container is
+ * rebuilt on every deploy and its filesystem goes with it — and are uploaded
+ * base64 in JSON, which is why there is a size cap worth naming on screen.
+ *
+ * The rename flow is deliberately its own action rather than a field you can
+ * quietly edit. Changing a registered name or NTN is a legal event: invoices
+ * already issued keep the identity they were raised under (one filed with FBR
+ * under the old number has to keep saying so), invoices raised afterwards use
+ * the new one, and the change itself is logged so the jump can be explained.
+ * A screen that lets you type over an NTN without saying any of that invites
+ * somebody to expect their old invoices to update.
+ */
+const DOC_TYPES = {saf:'Service agreement form', ntn:'NTN certificate', strn:'Sales tax registration',
+  cnic:'CNIC', contract:'Signed contract', po:'Purchase order', bank:'Bank details', other:'Other'};
+const DOC_MAX_MB = 10;
+const DOC_ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp,.heic,.tif,.tiff,.doc,.docx,.xls,.xlsx';
+
+let clientDocs = {};      // clientId -> array
+let identityHistory = {}; // clientId -> array
+
+function fmtBytes(n){
+  n = Number(n||0);
+  if(n < 1024) return n + ' B';
+  if(n < 1048576) return (n/1024).toFixed(0) + ' KB';
+  return (n/1048576).toFixed(1) + ' MB';
+}
+
+async function loadClientDocs(clientId){
+  try{
+    const [docs, hist] = await Promise.all([
+      API.get(`/api/clients/${clientId}/documents`),
+      API.get(`/api/clients/${clientId}/identity-history`),
+    ]);
+    clientDocs[clientId] = docs;
+    identityHistory[clientId] = hist;
+    render();
+  }catch(e){
+    clientDocs[clientId] = clientDocs[clientId] || [];
+    identityHistory[clientId] = identityHistory[clientId] || [];
+    showToast(e.message || 'Could not load the documents', 'warn');
+  }
+}
+
+/** The documents block inside a client's panel. */
+function clientDocumentsSection(c){
+  const docs = clientDocs[c.id];
+  return `
+  <div class="divider"></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+    <h4 style="font-size:13px;margin:0;">Documents${docs?` (${docs.length})`:''}</h4>
+    <button class="btn btn-ghost btn-sm" onclick="openModal={type:'clientDoc',clientId:'${c.id}'};render()">${iconPlus(13)} Upload</button>
+  </div>
+  <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">
+    Service agreement form, NTN certificate, CNIC and anything else on file. Up to ${DOC_MAX_MB} MB each.
+  </div>
+  ${docs === undefined
+    ? `<div style="font-size:12px;color:var(--muted);">Loading…</div>`
+    : (docs.length ? docs.map(d=>`
+        <div class="detail-row" style="align-items:center;">
+          <span class="k" style="min-width:0;">
+            <strong style="color:var(--ink);">${esc(d.title||d.filename)}</strong>
+            <div style="font-size:11px;color:var(--muted);">
+              <span class="tag">${esc(d.doc_type_label||d.doc_type)}</span>
+              ${esc(d.filename)} · ${fmtBytes(d.byte_size)} · ${fmtDate(d.created_at)}
+            </div>
+          </span>
+          <span class="v" style="white-space:nowrap;">
+            <button class="btn btn-ghost btn-sm" onclick="downloadClientDoc('${c.id}','${d.id}')">${iconDownload(12)} Download</button>
+            <button class="btn btn-danger-ghost btn-sm" onclick="deleteClientDoc('${c.id}','${d.id}')">${iconTrash(12)}</button>
+          </span>
+        </div>`).join('')
+      : `<div style="font-size:12px;color:var(--muted);">Nothing on file yet.</div>`)}
+  `;
+}
+
+/** The registered-identity block: what invoices will carry, and what changed. */
+function clientIdentitySection(c){
+  const hist = identityHistory[c.id] || [];
+  return `
+  <div class="divider"></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+    <h4 style="font-size:13px;margin:0;">Registered identity</h4>
+    <button class="btn btn-ghost btn-sm" onclick="openModal={type:'identity',clientId:'${c.id}'};render()">${iconEdit(13)} Change details</button>
+  </div>
+  <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">
+    What goes on their tax invoices from now on. Invoices already issued keep what they were raised under.
+  </div>
+  <div class="detail-row"><span class="k">Registered name</span><span class="v">${esc(c.company||'—')}</span></div>
+  <div class="detail-row"><span class="k">NTN</span><span class="v mono">${esc(c.ntn||'—')}</span></div>
+  <div class="detail-row"><span class="k">STRN</span><span class="v mono">${esc(c.strn||'—')}</span></div>
+  <div class="detail-row"><span class="k">Billing address</span><span class="v">${esc(c.billingAddress||'—')}</span></div>
+  ${hist.length ? `
+    <div style="margin-top:10px;font-size:10.5px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);">
+      Changed ${hist.length} time${hist.length===1?'':'s'}
+    </div>
+    ${hist.map(h=>`
+      <div style="border-left:2px solid var(--border);padding:6px 0 6px 10px;margin-top:6px;font-size:12px;">
+        <div><strong>${esc(h.changed.join(', ')||'details')}</strong> changed, effective ${h.effective_from?fmtDate(h.effective_from):fmtDate(h.changed_at)}</div>
+        ${h.old_company!==h.new_company?`<div style="color:var(--muted);">${esc(h.old_company||'—')} → ${esc(h.new_company||'—')}</div>`:''}
+        ${h.old_ntn!==h.new_ntn?`<div style="color:var(--muted);">NTN ${esc(h.old_ntn||'—')} → ${esc(h.new_ntn||'—')}</div>`:''}
+        ${h.old_strn!==h.new_strn?`<div style="color:var(--muted);">STRN ${esc(h.old_strn||'—')} → ${esc(h.new_strn||'—')}</div>`:''}
+        ${h.reason?`<div style="color:var(--muted);">${esc(h.reason)}</div>`:''}
+      </div>`).join('')}
+  ` : ''}
+  `;
+}
+
+/** Downloads one document, carrying the auth header the browser will not. */
+async function downloadClientDoc(clientId, docId){
+  const d = (clientDocs[clientId]||[]).find(x=>x.id===docId);
+  try{
+    const headers = {};
+    if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
+    else if(API.key) headers['x-api-key'] = API.key;
+    const res = await fetch(`${API.base}/api/clients/${clientId}/documents/${docId}/download`, { headers });
+    if(!res.ok) throw new Error(`Could not fetch it (${res.status})`);
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (d && d.filename) || 'document';
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  }catch(e){ showToast(e.message||'Could not download it','warn'); }
+}
+
+async function deleteClientDoc(clientId, docId){
+  const d = (clientDocs[clientId]||[]).find(x=>x.id===docId);
+  if(!confirm(`Delete "${d?(d.title||d.filename):'this document'}"? This cannot be undone.`)) return;
+  try{
+    await API.del(`/api/clients/${clientId}/documents/${docId}`);
+    clientDocs[clientId] = (clientDocs[clientId]||[]).filter(x=>x.id!==docId);
+    render(); showToast('Document deleted');
+  }catch(e){ showToast(e.message||'Could not delete it','warn'); }
+}
+
+function clientDocModalHTML(){
+  const id = openModal.clientId;
+  const c = state.clients.find(x=>x.id===id);
+  return `
+  <div class="modal">
+    <div class="modal-head"><h3>Upload a document</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
+    <div class="modal-body">
+      <div class="field"><label>For</label><input value="${esc(c?c.company:'')}" disabled></div>
+      <div class="field"><label>Type</label><select id="d_type">
+        ${Object.entries(DOC_TYPES).map(([k,v])=>`<option value="${k}">${esc(v)}</option>`).join('')}
+      </select></div>
+      <div class="field"><label>Title</label><input id="d_title" placeholder="Defaults to the document type"></div>
+      <div class="field"><label>File</label><input id="d_file" type="file" accept="${DOC_ACCEPT}">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">
+          PDF, image, Word or Excel, up to ${DOC_MAX_MB} MB. Kept in the database, so it survives a redeploy and is in the nightly backup.
+        </div></div>
+      <div class="field"><label>Note</label><input id="d_notes" placeholder="Optional"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="uploadClientDoc()">${iconCheck(14)} Upload</button>
+    </div>
+  </div>`;
+}
+
+async function uploadClientDoc(){
+  const id = openModal.clientId;
+  const input = document.getElementById('d_file');
+  const file = input && input.files && input.files[0];
+  if(!file){ showToast('Choose a file first','warn'); return; }
+  if(file.size > DOC_MAX_MB*1024*1024){
+    showToast(`That file is ${(file.size/1048576).toFixed(1)} MB — the limit is ${DOC_MAX_MB} MB`,'warn'); return;
+  }
+  const v = (i)=>{ const el=document.getElementById(i); return el?el.value.trim():''; };
+
+  showToast('Uploading…');
+  try{
+    const data = await new Promise((resolve,reject)=>{
+      const fr = new FileReader();
+      fr.onerror = ()=>reject(new Error('The file could not be read'));
+      // readAsDataURL gives 'data:<type>;base64,<payload>'; the server strips
+      // the prefix, so there is no need to slice it twice.
+      fr.onload = ()=>resolve(String(fr.result));
+      fr.readAsDataURL(file);
+    });
+    await API.post(`/api/clients/${id}/documents`, {
+      doc_type: v('d_type'), title: v('d_title'), notes: v('d_notes'),
+      filename: file.name,
+      // Firefox hands back '' for a type it does not recognise; fall back to
+      // the extension rather than failing the allow-list on an empty string.
+      content_type: file.type || guessContentType(file.name),
+      data,
+    });
+    openModal = null;
+    await loadClientDocs(id);
+    showToast('Document uploaded');
+  }catch(e){ showToast(e.message || 'Could not upload it','warn'); }
+}
+
+/** Only for browsers that hand back an empty File.type. */
+function guessContentType(name){
+  const ext = String(name||'').split('.').pop().toLowerCase();
+  return ({pdf:'application/pdf', jpg:'image/jpeg', jpeg:'image/jpeg', png:'image/png',
+    webp:'image/webp', heic:'image/heic', tif:'image/tiff', tiff:'image/tiff',
+    doc:'application/msword',
+    docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls:'application/vnd.ms-excel',
+    xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  })[ext] || 'application/octet-stream';
+}
+
+function identityModalHTML(){
+  const c = state.clients.find(x=>x.id===openModal.clientId) || {};
+  const issued = (state.invoices||[]).filter(i=>i.clientId===c.id && i.status!=='void').length;
+  return `
+  <div class="modal" style="max-width:620px;">
+    <div class="modal-head"><h3>Change registered details</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
+    <div class="modal-body">
+      <div style="background:var(--teal-light);border:1px solid #BFDED7;border-radius:8px;padding:10px 12px;font-size:12px;color:var(--teal-dark);margin-bottom:14px;">
+        <strong>What this does and does not touch.</strong>
+        Invoices raised from now on carry the new details.
+        ${issued?`The <strong>${issued} invoice${issued===1?'':'s'}</strong> already issued keep the name and NTN they were raised under — one filed with FBR under the old number has to keep saying so, and reprinting it under a new one would put two different entities on one tax document.`
+                :`Nothing has been invoiced yet, so there is nothing to keep.`}
+        The change is logged against the account so the switch can be explained later.
+      </div>
+      <div class="field"><label>Registered name</label><input id="i_company" value="${esc(c.company||'')}"></div>
+      <div class="field-row">
+        <div class="field"><label>NTN</label><input id="i_ntn" value="${esc(c.ntn||'')}"></div>
+        <div class="field"><label>STRN</label><input id="i_strn" value="${esc(c.strn||'')}"></div>
+      </div>
+      <div class="field"><label>Billing address</label><input id="i_address" value="${esc(c.billingAddress||'')}"></div>
+      <div class="field-row">
+        <div class="field"><label>Effective from</label><input id="i_effective" type="date" value="${todayISO()}">
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">When the new details take legal effect — not always the day you type them in.</div></div>
+        <div class="field"><label>Reason</label><input id="i_reason" placeholder="e.g. re-registered after restructure"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveIdentity()">${iconCheck(14)} Save changes</button>
+    </div>
+  </div>`;
+}
+
+async function saveIdentity(){
+  const c = state.clients.find(x=>x.id===openModal.clientId);
+  if(!c) return;
+  const v = (i)=>{ const el=document.getElementById(i); return el?el.value.trim():''; };
+  const company = v('i_company');
+  if(!company){ showToast('A registered name is required','warn'); return; }
+
+  const changes = [];
+  if(company !== (c.company||'')) changes.push(`name: ${c.company||'—'} → ${company}`);
+  if(v('i_ntn') !== (c.ntn||'')) changes.push(`NTN: ${c.ntn||'—'} → ${v('i_ntn')||'—'}`);
+  if(v('i_strn') !== (c.strn||'')) changes.push(`STRN: ${c.strn||'—'} → ${v('i_strn')||'—'}`);
+  if(v('i_address') !== (c.billingAddress||'')) changes.push('billing address');
+  if(!changes.length){ showToast('Nothing changed'); return; }
+  if(!confirm(`Change these on ${c.company}?\n\n  ${changes.join('\n  ')}\n\nInvoices already issued are not touched.`)) return;
+
+  try{
+    // The clients route is PUT and validates the whole record, so the full
+    // client goes up with the changed fields on top of it.
+    const full = await API.get(`/api/clients/${c.id}`);
+    await API.put(`/api/clients/${c.id}`, {
+      ...full,
+      company, ntn: v('i_ntn'), strn: v('i_strn'), billing_address: v('i_address'),
+      identity_effective_from: v('i_effective') || null,
+      identity_reason: v('i_reason'),
+    });
+    openModal = null;
+    await loadState();
+    await loadClientDocs(c.id);
+    showToast('Registered details updated');
+  }catch(e){ showToast(e.message || 'Could not save the change','warn'); }
+}
+
 /* ============================== CONTRACTS ============================== */
 /**
  * The signed agreement behind an account.
@@ -4377,6 +4652,8 @@ function renderModal(){
   else if(openModal.type==='automation') html = automationModalHTML();
   else if(openModal.type==='rate') html = rateModalHTML();
   else if(openModal.type==='contract') html = contractModalHTML();
+  else if(openModal.type==='clientDoc') html = clientDocModalHTML();
+  else if(openModal.type==='identity') html = identityModalHTML();
   root.innerHTML = `<div class="modal-overlay" onmousedown="if(event.target===this){openModal=null;render();}">${html}</div>`;
   if(openModal.type==='invoice') requestAnimationFrame(prefillInvoiceAmount);
   if(openModal.type==='bundle') requestAnimationFrame(bundleProductChanged);
@@ -5255,6 +5532,9 @@ function clientPanelHTML(id){
       </div>`;
     }).join('')}`:''}
 
+    ${clientIdentitySection(c)}
+    ${clientDocumentsSection(c)}
+
     <div class="divider"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
       <h4 style="font-size:13px;margin:0;">Contracts (${contractsFor(c.id).length})</h4>
@@ -6036,6 +6316,10 @@ function attachPostRenderHooks(){
   // panel is open as well as when the tab is — otherwise a client shows
   // "Loading…" forever for want of anything to trigger the fetch.
   if((currentView==='contracts' || (openPanel && openPanel.type==='client')) && contractsData===null) loadContracts();
+  // Documents and the identity log are per client, so they are fetched when a
+  // panel opens rather than up front — there is no point pulling every
+  // account's paperwork to render a list of company names.
+  if(openPanel && openPanel.type==='client' && clientDocs[openPanel.id] === undefined) loadClientDocs(openPanel.id);
   if(currentView==='ops' && opsData===null) loadOps();
 }
 

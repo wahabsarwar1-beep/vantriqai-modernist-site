@@ -243,10 +243,10 @@ async function createInvoice(client, {
     `insert into invoices
        (client_id, type, amount, period, status, issued_date, overage_sessions, notes,
         invoice_number, tax_rate, tax_amount, total_amount,
-        client_ntn, client_strn, billing_address, due_date,
+        client_ntn, client_strn, billing_address, client_legal_name, due_date,
         ait_rate, ait_amount, net_payable, tax_jurisdiction, seller_reg_no, currency,
         fx_rate, base_amount)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
      returning *`,
     [
       client.id, type, net, period || null,
@@ -254,6 +254,9 @@ async function createInvoice(client, {
       overage_sessions || 0, notes || '',
       number, gstRate, tax, total,
       client.ntn || '', client.strn || '', client.billing_address || '',
+      // The registered name, stamped with the rest of the identity so a
+      // later rename cannot reach back into an invoice already filed.
+      client.company || '',
       due_date || addDays(issued, settings.payment_terms_days || 7),
       aitRate, ait, netPayable,
       // Stamped, not referenced. The authority's rate and our registration
@@ -426,7 +429,14 @@ function buildTaxInvoice(inv, client, settings, lines, payments) {
     // whoever files them needs to know which pile this invoice belongs to.
     tax_jurisdiction: inv.tax_jurisdiction || null,
     buyer: {
-      company: client.company,
+      // The registered name as STAMPED on the invoice, not as the client
+      // record reads today. These four belong together: taking the name
+      // live while the NTN comes off the invoice is how a renamed company's
+      // old invoices came to print a new name against an old registration
+      // number — two different entities on one tax document. Older rows
+      // that predate the stamp fall back to the client record, which for
+      // them is still the name they were raised under.
+      company: inv.client_legal_name || client.company,
       contact_name: client.name,
       email: client.email,
       phone: client.phone,

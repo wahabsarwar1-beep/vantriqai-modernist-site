@@ -36,6 +36,10 @@ const corsOrigin = process.env.CORS_ORIGIN && process.env.CORS_ORIGIN !== '*'
   ? process.env.CORS_ORIGIN.split(',').map((s) => s.trim())
   : true;
 app.use(cors({ origin: corsOrigin }));
+// Document uploads arrive base64-encoded in JSON, so this route needs room
+// for a 10 MB file plus a third for the encoding. Everything else stays at
+// 1mb — a generous default body limit is a cheap way to be knocked over.
+app.use('/api/clients/:id/documents', express.json({ limit: '15mb' }));
 app.use(express.json({ limit: '1mb' }));
 
 // Health check — no auth, used by hosting platforms and n8n connection tests
