@@ -2,7 +2,7 @@ const express = require('express');
 const db = require('../db');
 const {
   createInvoice, getSettings, monthLabel, buildTaxInvoice,
-  settlementOf, derivedStatus,
+  settlementOf, derivedStatus, baseValue,
 } = require('../utils/billing');
 const { sendInvoice, previewInvoiceSend, deliveryHistory } = require('../utils/invoiceDelivery');
 const { renderInvoicePdf, invoiceFilename } = require('../utils/invoicePdf');
@@ -149,6 +149,72 @@ router.patch('/:id/status', async (req, res) => {
   );
   if (!rows[0]) return res.status(404).json({ error: 'Invoice not found' });
   res.json(rows[0]);
+});
+
+/**
+ * POST /api/invoices/fx-stamp — give a rate to the invoices raised without one.
+ *
+ * The rate is stamped on an invoice as it is raised and never looked up
+ * again, so that setting a new rate in September cannot restate August. That
+ * is the right rule, and it leaves one gap: an invoice raised while no rate
+ * existed at all was stamped with nothing, and nothing is not a historical
+ * fact to be preserved — it is a hole. Those invoices stay out of the books
+ * entirely, reported as an unconverted dollar figure, however long the rate
+ * has since been set.
+ *
+ * This fills the hole and nothing else. Only rows with no rate are touched;
+ * an invoice that already carries one is never restated, which is the whole
+ * point of stamping. Pass ?preview=true to see what would be stamped.
+ */
+router.post('/fx-stamp', async (req, res) => {
+  const settings = await getSettings();
+  const base = settings.currency || 'PKR';
+  const rate = Number(settings.usd_pkr_rate || 0);
+  if (!(rate > 0)) {
+    return res.status(400).json({
+      error: 'No US dollar rate is set. Set one in Settings first — stamping at a rate nobody chose is how a made-up figure gets into the books.',
+    });
+  }
+
+  const { rows } = await db.query(
+    `select id, invoice_number, currency, amount, status, issued_date
+       from invoices
+      where fx_rate is null and coalesce(currency, $1) <> $1
+      order by issued_date, invoice_number`,
+    [base]
+  );
+
+  // baseValue is the same function createInvoice stamps with, and it reads
+  // `amount` — the figure excluding GST, which is what the books value an
+  // invoice at. Converting net_payable here instead would quietly book a
+  // different number than every invoice raised the normal way.
+  const eligible = rows
+    .map((r) => ({ row: r, fx: baseValue(Number(r.amount || 0), r.currency, settings) }))
+    .filter((e) => e.fx.base_amount != null);
+
+  const listed = eligible.map((e) => ({
+    id: e.row.id,
+    invoice_number: e.row.invoice_number,
+    currency: e.row.currency,
+    amount: Number(e.row.amount || 0),
+    status: e.row.status,
+    base_amount: e.fx.base_amount,
+  }));
+
+  if (String(req.query.preview) === 'true') {
+    return res.json({ outcome: 'preview', rate, currency: base, count: listed.length, invoices: listed });
+  }
+  if (!listed.length) {
+    return res.json({ outcome: 'nothing_to_do', rate, currency: base, count: 0, invoices: [] });
+  }
+
+  for (const e of eligible) {
+    await db.query(
+      `update invoices set fx_rate = $1, base_amount = $2 where id = $3 and fx_rate is null`,
+      [e.fx.fx_rate, e.fx.base_amount, e.row.id]
+    );
+  }
+  res.json({ outcome: 'stamped', rate, currency: base, count: listed.length, invoices: listed });
 });
 
 /**

@@ -2087,8 +2087,14 @@ function internalAiCostRow(){
   const usd = internal.filter(i=>i.currency==='USD').reduce((s,i)=>s+i.amount,0);
   const converted = internal.reduce((s,i)=>s+(i.baseAmount!=null?i.baseAmount:(i.currency===CURRENCY?i.amount:0)),0);
   const missing = internal.filter(i=>i.baseAmount==null && i.currency!==CURRENCY);
+  // Two different faults read the same on screen if you let them: no rate has
+  // ever been set, or a rate exists now but these invoices were raised before
+  // it did. Only the first is fixed by typing a number into Settings.
+  const rateSet = Number(state.company.usdPkrRate||0) > 0;
   const note = missing.length
-    ? `<span style="color:var(--amber-dark,#94512b);">${fmtMoney(usd,'USD')} — no USD rate set in Settings</span>`
+    ? `<span style="color:var(--amber-dark,#94512b);">${fmtMoney(usd,'USD')} — ${rateSet
+        ? 'raised before the rate was set; stamp them in Settings'
+        : 'no USD rate set in Settings'}</span>`
     : (usd>0 ? `${fmtMoney(usd,'USD')} converted` : 'Billed on our own account');
   return `<tr>
     <td><strong>Internal AI usage (our own agents)</strong>
@@ -3682,7 +3688,13 @@ function renderSettings(){
     </div>
     <div class="field-row">
       <div class="field"><label>US dollar rate (PKR per USD)</label><input id="setUsdRate" type="number" step="0.01" min="0" value="${state.company.usdPkrRate!=null?state.company.usdPkrRate:0}" placeholder="0">
-        <div style="font-size:11px;color:var(--muted);margin-top:4px;">Only our own account bills in dollars — it is priced on model tokens. This rate converts it into the books, and is <strong>stamped on each invoice as it is raised</strong>, so changing it never restates a month already reported. Leave at 0 and the cost is reported unconverted rather than guessed.</div></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">Only our own account bills in dollars — it is priced on model tokens. This rate converts it into the books, and is <strong>stamped on each invoice as it is raised</strong>, so changing it never restates a month already reported. Leave at 0 and the cost is reported unconverted rather than guessed.</div>
+        ${invoicesNeedingRate().length ? `<div style="margin-top:8px;border:1px solid var(--border);border-radius:8px;padding:9px 11px;background:#FFF8EE;">
+          <div style="font-size:11.5px;color:var(--ink);">${invoicesNeedingRate().length} invoice${invoicesNeedingRate().length===1?' was':'s were'} raised before a rate existed, so ${invoicesNeedingRate().length===1?'it carries':'they carry'} none and ${invoicesNeedingRate().length===1?'stays':'stay'} out of the books entirely.</div>
+          ${Number(state.company.usdPkrRate||0) > 0
+            ? `<button class="btn btn-ghost btn-sm" style="margin-top:7px;" onclick="stampMissingRates()">Stamp ${invoicesNeedingRate().length===1?'it':'them'} at ${esc(String(state.company.usdPkrRate))}</button>`
+            : `<div style="font-size:11.5px;color:var(--muted);margin-top:5px;">Enter a rate above and save, and a button appears here to stamp ${invoicesNeedingRate().length===1?'it':'them'}.</div>`}
+        </div>` : ''}</div>
       <div class="field"><label>Our own invoice goes to</label><input id="setInternalEmail" value="${esc(state.company.internalInvoiceEmail||'')}" placeholder="support@vantriqai.com">
         <div style="font-size:11px;color:var(--muted);margin-top:4px;">Where the monthly invoice for our own AI usage is emailed. It has to be a mailbox that exists — an address with nothing behind it bounces rather than failing loudly.</div></div>
     </div>
@@ -4021,6 +4033,44 @@ async function saveJurisdiction(code){
     showToast(code+' saved');
     loadJurisdictions();
   }catch(e){ showToast(e.message||'Could not save '+code,'warn'); }
+}
+
+/**
+ * Invoices raised in a foreign currency that carry no rate at all.
+ *
+ * Not the same as invoices raised at a rate you have since changed: those are
+ * stamped, deliberately, so that a new rate cannot restate a month already
+ * reported. These carry nothing, which is not a historical fact — it is a
+ * hole, and it keeps them out of the books however long the rate has since
+ * been set.
+ */
+function invoicesNeedingRate(){
+  return (state.invoices||[]).filter(i=>i.fxRate==null && i.currency!==CURRENCY);
+}
+
+/** Fills that hole, and says exactly what it filled. */
+async function stampMissingRates(){
+  let prev;
+  try{ prev = await API.post('/api/invoices/fx-stamp?preview=true', {}); }
+  catch(e){ showToast(e.message || 'Could not check which invoices need a rate','warn'); return; }
+  if(!prev.count){ showToast('Every invoice already carries a rate'); return; }
+
+  const list = prev.invoices.slice(0,6)
+    .map(i=>`  ${i.invoice_number} — ${fmtMoney(i.amount,i.currency)} becomes ${fmtMoney(i.base_amount,prev.currency)}`)
+    .join('\n');
+  const more = prev.count > 6 ? `\n  …and ${prev.count-6} more` : '';
+  if(!confirm(`${prev.count} invoice${prev.count===1?'':'s'} will be stamped at ${prev.rate}:\n\n${list}${more}\n\nInvoices that already carry a rate are left alone. Go ahead?`)) return;
+
+  try{
+    const r = await API.post('/api/invoices/fx-stamp', {});
+    showToast(`Stamped ${r.count} invoice${r.count===1?'':'s'} at ${r.rate}`);
+    // The books move, so the statements cache has to go with them. The repaint
+    // keeps whatever is typed in the other Settings cards — a save in one card
+    // wiping a sibling's unsaved input is a bug already fixed once.
+    accountingData = null; ledgerData = null;
+    await loadState();
+    renderSettingsKeepingInput();
+  }catch(e){ showToast(e.message || 'Could not stamp them','warn'); }
 }
 
 async function saveTaxSettings(){
