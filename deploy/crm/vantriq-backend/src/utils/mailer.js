@@ -19,7 +19,13 @@ function mailConfigured() {
   return !!(process.env.HOSTINGER_MAIL_TOKEN && process.env.HOSTINGER_MAILBOX_ID);
 }
 
-async function sendMail({ to, subject, text, html }) {
+/**
+ * @param {object}  msg
+ * @param {Array}   [msg.attachments]  [{ filename, content: Buffer, contentType }]
+ *                  Base64-encoded here rather than by the caller, so no call
+ *                  site has to know the wire format.
+ */
+async function sendMail({ to, subject, text, html, attachments }) {
   if (!mailConfigured()) {
     throw new Error('Email is not configured on the server (HOSTINGER_MAIL_TOKEN / HOSTINGER_MAILBOX_ID).');
   }
@@ -42,6 +48,16 @@ async function sendMail({ to, subject, text, html }) {
       text,
       html,
       displayName: process.env.MAIL_DISPLAY_NAME || 'Vantriq AI',
+      ...(Array.isArray(attachments) && attachments.length ? {
+        attachments: attachments.map((a) => ({
+          filename: a.filename,
+          contentType: a.contentType || 'application/octet-stream',
+          encoding: 'base64',
+          content: Buffer.isBuffer(a.content)
+            ? a.content.toString('base64')
+            : Buffer.from(String(a.content)).toString('base64'),
+        })),
+      } : {}),
     }),
   });
 
@@ -145,76 +161,107 @@ function resetEmail(url, name, minutes) {
  * taxes moving in opposite directions, and "why is the transfer less than the
  * total" is otherwise the first question every customer asks.
  */
-function invoiceEmail(doc, portalUrl) {
+/**
+ * The covering note that carries an invoice.
+ *
+ * The invoice itself is the PDF attached beside this — a document a customer
+ * can file, print and hand to an accountant. This email exists to say what
+ * arrived, what it comes to and when it is due; it is deliberately NOT the
+ * invoice, because a bill pasted into an email body is not something anybody
+ * can keep.
+ *
+ * The figures it does quote come from the same document the PDF renders, and
+ * are formatted at the precision their currency needs. A token-priced USD
+ * invoice reading "USD 0.00" is how this went wrong the first time.
+ */
+function invoiceEmail(doc, portalUrl, opts = {}) {
   const cur = doc.currency || 'PKR';
-  const money = (n) => `${cur} ${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  // Two places for rupees; six for a dollar figure below one, because the
+  // internal account is priced per million model tokens and a real month
+  // costs a fraction of a cent.
+  const money = (n) => {
+    const v = Number(n || 0);
+    const max = (cur === 'USD' && v !== 0 && Math.abs(v) < 1) ? 6 : 2;
+    return `${cur} ${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: max })}`;
+  };
   const t = doc.totals || {};
   const who = doc.buyer.contact_name || doc.buyer.company || 'there';
   const withheld = Number(t.ait_amount || 0) > 0;
+  const attached = opts.attachmentName || null;
 
-  const subject = `${doc.seller.name} — invoice ${doc.invoice_number} for ${money(doc.amount_due)}`;
+  const eps = cur === 'USD' ? 0.0000009 : 0.009;
+  const due = Number(doc.amount_due !== undefined && doc.amount_due !== null
+    ? doc.amount_due
+    : (t.net_payable !== undefined ? t.net_payable : t.total_payable || 0));
+  const settled = due <= eps;
 
-  const lines = (doc.lines || [])
-    .map((l) => `  ${l.description}${l.detail ? ` (${l.detail})` : ''}  ${money(l.amount)}`)
-    .join('\n');
+  const headline = settled
+    ? `${money(t.net_payable !== undefined ? t.net_payable : t.total_payable || 0)} — paid, nothing outstanding`
+    : `${money(due)} due${doc.due_date ? ` ${day(doc.due_date)}` : ''}`;
+
+  const subject = settled
+    ? `${doc.seller.name} — invoice ${doc.invoice_number}`
+    : `${doc.seller.name} — invoice ${doc.invoice_number} for ${money(due)}`;
 
   const text = [
     `Hi ${who},`,
     ``,
-    `Here is your invoice from ${doc.seller.name}.`,
+    `Your invoice from ${doc.seller.name} is attached.`,
     ``,
-    `Invoice     ${doc.invoice_number}`,
-    `Issued      ${doc.issued_date}`,
-    doc.due_date ? `Due         ${doc.due_date}` : '',
+    `Invoice   ${doc.invoice_number}`,
+    `Issued    ${day(doc.issued_date)}`,
+    doc.due_date ? `Due       ${day(doc.due_date)}` : '',
+    `${settled ? 'Paid' : 'Amount due'}      ${money(settled ? (t.net_payable !== undefined ? t.net_payable : t.total_payable || 0) : due)}`,
     ``,
-    lines,
-    ``,
-    `Subtotal    ${money(t.subtotal)}`,
-    Number(t.tax_amount || 0) > 0 ? `Sales tax   ${money(t.tax_amount)}${t.tax_rate ? ` (${t.tax_rate}%)` : ''}` : '',
-    `Total       ${money(t.total)}`,
-    withheld ? `Less AIT    -${money(t.ait_amount)}${t.ait_rate ? ` (${t.ait_rate}% withheld)` : ''}` : '',
-    `Net payable ${money(t.net_payable)}`,
-    ``,
+    attached ? `The full invoice, with every line and the tax breakdown, is in ${attached}.` : '',
+    withheld ? `` : '',
     withheld ? doc.ait_note : '',
-    withheld ? '' : '',
-    portalUrl ? `You can see this invoice, your usage and your account here: ${portalUrl}` : '',
+    ``,
+    portalUrl ? `Your invoices, usage and account: ${portalUrl}` : '',
     ``,
     `Thank you,`,
     doc.seller.name,
   ].filter((l) => l !== '').join('\n');
 
-  const row = (k, v, strong) =>
-    `<tr><td style="padding:5px 0;color:#555;">${escapeHtml(k)}</td>` +
-    `<td style="padding:5px 0;text-align:right;white-space:nowrap;${strong ? 'font-weight:700;' : ''}">${escapeHtml(v)}</td></tr>`;
+  const meta = (k, v) =>
+    `<tr><td style="padding:4px 0;color:#6b645b;font-size:13px;">${escapeHtml(k)}</td>` +
+    `<td style="padding:4px 0;text-align:right;font-size:13px;font-weight:600;white-space:nowrap;">${escapeHtml(v)}</td></tr>`;
 
   const html = `
-    <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;color:#1A1A18;">
-      <p>Hi ${escapeHtml(who)},</p>
-      <p>Here is your invoice from ${escapeHtml(doc.seller.name)}.</p>
-      <p style="font-size:20px;font-weight:700;margin:18px 0 6px;">
-        ${escapeHtml(money(doc.amount_due))}${doc.due_date ? ` <span style="font-size:13px;font-weight:400;color:#555;">due ${escapeHtml(doc.due_date)}</span>` : ''}
-      </p>
-      <p style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#555;margin:0 0 16px;">${escapeHtml(doc.invoice_number)}</p>
-      <table style="width:100%;border-collapse:collapse;font-size:13px;border-top:1px solid #E3E0D8;">
-        ${(doc.lines || []).map((l) => `<tr>
-          <td style="padding:8px 0;border-bottom:1px solid #F1EFE8;">${escapeHtml(l.description)}
-            ${l.detail ? `<div style="color:#6B6B66;font-size:11.5px;">${escapeHtml(l.detail)}</div>` : ''}</td>
-          <td style="padding:8px 0;border-bottom:1px solid #F1EFE8;text-align:right;white-space:nowrap;">${escapeHtml(money(l.amount))}</td>
-        </tr>`).join('')}
+    <div style="font-family:'Manrope',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;color:#16151a;">
+      <p style="font-size:14.5px;">Hi ${escapeHtml(who)},</p>
+      <p style="font-size:14.5px;">Your invoice from ${escapeHtml(doc.seller.name)} is attached.</p>
+
+      <p style="font-size:21px;font-weight:700;margin:20px 0 4px;letter-spacing:-.02em;">${escapeHtml(headline)}</p>
+      <p style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#6b645b;margin:0 0 18px;">${escapeHtml(doc.invoice_number)}</p>
+
+      <table style="width:100%;border-collapse:collapse;border-top:1px solid #e7e2da;border-bottom:1px solid #e7e2da;margin-bottom:18px;">
+        ${meta('Issued', day(doc.issued_date))}
+        ${doc.due_date ? meta('Due', day(doc.due_date)) : ''}
+        ${meta(settled ? 'Paid' : 'Amount due', money(settled ? (t.net_payable !== undefined ? t.net_payable : t.total_payable || 0) : due))}
       </table>
-      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:10px;">
-        ${row('Subtotal', money(t.subtotal))}
-        ${Number(t.tax_amount || 0) > 0 ? row(`Sales tax${t.tax_rate ? ` (${t.tax_rate}%)` : ''}`, money(t.tax_amount)) : ''}
-        ${row('Total', money(t.total), true)}
-        ${withheld ? row(`Less advance income tax${t.ait_rate ? ` (${t.ait_rate}%)` : ''}`, `-${money(t.ait_amount)}`) : ''}
-        ${row('Net payable', money(t.net_payable), true)}
-      </table>
-      ${withheld ? `<p style="font-size:12px;color:#6B6B66;border-left:2px solid #E3E0D8;padding-left:10px;margin-top:18px;">${escapeHtml(doc.ait_note)}</p>` : ''}
-      ${portalUrl ? `<p style="margin-top:20px;"><a href="${escapeHtml(portalUrl)}" style="background:#12897A;color:#fff;padding:10px 16px;border-radius:7px;text-decoration:none;font-weight:600;font-size:13px;">View your account</a></p>` : ''}
-      <p style="color:#555;font-size:13px;margin-top:20px;">Thank you,<br>${escapeHtml(doc.seller.name)}</p>
+
+      ${attached ? `<p style="font-size:13px;color:#6b645b;margin:0 0 18px;">
+        Every line and the full tax breakdown are in the attached
+        <strong style="color:#16151a;">${escapeHtml(attached)}</strong>.
+      </p>` : ''}
+
+      ${withheld ? `<p style="font-size:12px;color:#6b645b;border-left:2px solid #e7e2da;padding-left:12px;margin:0 0 18px;">${escapeHtml(doc.ait_note)}</p>` : ''}
+
+      ${portalUrl ? `<p style="margin:20px 0;"><a href="${escapeHtml(portalUrl)}" style="background:#2f56d9;color:#fff;padding:11px 20px;border-radius:999px;text-decoration:none;font-weight:600;font-size:13px;display:inline-block;">View your account</a></p>` : ''}
+
+      <p style="color:#6b645b;font-size:13px;margin-top:20px;">Thank you,<br>${escapeHtml(doc.seller.name)}</p>
     </div>`;
 
   return { subject, text, html };
+}
+
+/** 'Sep 16, 2026' — the same unambiguous form the invoice itself prints. */
+function day(iso) {
+  if (!iso) return '';
+  const d = new Date(String(iso).slice(0, 10) + 'T00:00:00Z');
+  if (isNaN(d)) return String(iso);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 }
 
 function escapeHtml(s) {
