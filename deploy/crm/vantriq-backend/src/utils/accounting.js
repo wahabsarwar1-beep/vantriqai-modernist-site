@@ -197,7 +197,34 @@ async function loadBooks(upTo) {
       bound ? [bound] : []
     ).then((r) => r.rows),
   ]);
-  return { settings, invoices, payments, expenses, pos, remittances };
+  // What earlier months were worth after their rows were archived away.
+  // Every figure below is derived from invoice and payment rows, so without
+  // this a purge would quietly restate cash, receivables and advance tax.
+  const archived = await db.query(
+    `select * from archived_month_totals ${bound ? 'where month <= $1::date' : ''} order by month`,
+    bound ? [bound] : []
+  ).then((r) => r.rows);
+  return { settings, invoices, payments, expenses, pos, remittances, archived };
+}
+
+/**
+ * The archived months inside a window, summed.
+ *
+ * A month is either live (its rows are still here) or archived (they are
+ * not, and this is what they came to). Never both: the purge deletes the
+ * rows in the same transaction that writes the summary.
+ */
+function archivedIn(archived, from, to) {
+  const rows = (archived || []).filter((a) => DAY(a.month) >= DAY(from) && DAY(a.month) <= DAY(to));
+  const sum = (f) => ROUND(rows.reduce((s, a) => s + Number(a[f] || 0), 0));
+  return {
+    rows: rows.length,
+    invoice_count: rows.reduce((s, a) => s + Number(a.invoice_count || 0), 0),
+    revenue: sum('revenue'), billed_net: sum('billed_net'),
+    gst_charged: sum('gst_charged'), ait_withheld: sum('ait_withheld'),
+    receipts: sum('receipts'), written_off: sum('written_off'),
+    credited: sum('credited'), internal_cost: sum('internal_cost'),
+  };
 }
 
 const inWindow = (d, from, to) => DAY(d) >= DAY(from) && DAY(d) <= DAY(to);
@@ -208,23 +235,30 @@ const inWindow = (d, from, to) => DAY(d) >= DAY(from) && DAY(d) <= DAY(to);
  */
 function computePnl(books, from, to) {
   const { invoices, payments, expenses, pos, remittances, settings } = books;
+  // Months inside this window whose rows have been archived away. Their
+  // totals still belong in the period; only the line detail has gone.
+  const arch = archivedIn(books.archived, from, to);
 
   const external = invoices.filter((i) => !i.is_internal && inWindow(i.issued_date, from, to));
   const internal = invoices.filter((i) => i.is_internal && inWindow(i.issued_date, from, to));
 
+  // An archived month has no invoices left to split by type, so its revenue
+  // cannot be attributed to setup vs retainer vs overage. It is added to the
+  // gross, and the by-type split reports only what is still live — which is
+  // why archived_revenue is on the response for anyone totalling the parts.
   const byType = (t) => ROUND(external.filter((i) => i.type === t).reduce((s, i) => s + Number(i.amount), 0));
-  const gross = ROUND(external.reduce((s, i) => s + Number(i.amount), 0));
+  const gross = ROUND(external.reduce((s, i) => s + Number(i.amount), 0) + arch.revenue);
 
   const pay = (kind) => ROUND(
     payments.filter((p) => p.kind === kind && inWindow(p.received_date, from, to))
       .reduce((s, p) => s + Number(p.amount), 0)
   );
-  const credit_notes = pay('credit_note');
-  const bad_debts = pay('write_off');
+  const credit_notes = ROUND(pay('credit_note') + arch.credited);
+  const bad_debts = ROUND(pay('write_off') + arch.written_off);
   const net_revenue = ROUND(gross - credit_notes);
 
   const internal_cost = bookTotal(internal, settings);
-  const internal_ai_usage = internal_cost.total;
+  const internal_ai_usage = ROUND(internal_cost.total + arch.internal_cost);
   const vendor_purchases = ROUND(
     pos.filter((p) => inWindow(p.po_date, from, to)).reduce((s, p) => s + Number(p.amount), 0)
   );
@@ -263,7 +297,14 @@ function computePnl(books, from, to) {
       gross,
       credit_notes,
       net: net_revenue,
-      invoices_issued: external.length,
+      invoices_issued: external.length + arch.invoice_count,
+      // Part of `gross` that comes from months whose rows have been archived.
+      // The by-type split above cannot account for it — there are no invoices
+      // left to read a type off — so anyone adding the four types up needs
+      // this to reconcile with the gross.
+      archived_revenue: arch.revenue,
+      archived_invoices: arch.invoice_count,
+      archived_months: arch.rows,
     },
     cost_of_service: {
       internal_ai_usage,
@@ -321,21 +362,24 @@ function computeBalanceSheet(books, asOf) {
   const date = DAY(asOf);
   const opening_cash = ROUND(settings.opening_cash || 0);
   const start = settings.opening_cash_date ? DAY(settings.opening_cash_date) : '1970-01-01';
+  // The sheet is cumulative — it is the position on a date, not a period —
+  // so everything ever archived up to that date still counts towards it.
+  const arch = archivedIn(books.archived, '1970-01-01', date);
 
   const external = invoices.filter((i) => !i.is_internal);
   const internal = invoices.filter((i) => i.is_internal);
   const sum = (arr, f) => ROUND(arr.reduce((s, x) => s + Number(f(x) || 0), 0));
   const pay = (kind) => ROUND(payments.filter((p) => p.kind === kind).reduce((s, p) => s + Number(p.amount), 0));
 
-  const receipts = pay('receipt');
-  const written_off = pay('write_off');
-  const credited = pay('credit_note');
+  const receipts = ROUND(pay('receipt') + arch.receipts);
+  const written_off = ROUND(pay('write_off') + arch.written_off);
+  const credited = ROUND(pay('credit_note') + arch.credited);
 
-  const billed_net = sum(external, (i) => (i.net_payable != null ? i.net_payable : i.total_amount || i.amount));
-  const gst_charged = sum(external, (i) => i.tax_amount);
-  const ait_withheld = sum(external, (i) => i.ait_amount);
-  const revenue = sum(external, (i) => i.amount);
-  const internal_cost = bookTotal(internal, settings).total;
+  const billed_net = ROUND(sum(external, (i) => (i.net_payable != null ? i.net_payable : i.total_amount || i.amount)) + arch.billed_net);
+  const gst_charged = ROUND(sum(external, (i) => i.tax_amount) + arch.gst_charged);
+  const ait_withheld = ROUND(sum(external, (i) => i.ait_amount) + arch.ait_withheld);
+  const revenue = ROUND(sum(external, (i) => i.amount) + arch.revenue);
+  const internal_cost = ROUND(bookTotal(internal, settings).total + arch.internal_cost);
 
   const opex = ROUND(expenses.reduce((s, e) => s + expenseAccrual(e, start, date), 0));
   const purchases = sum(pos, (p) => p.amount);
@@ -408,7 +452,7 @@ async function inceptionDate() {
 }
 
 module.exports = {
-  internalAiCost, internalAiUnstamped,
+  internalAiCost, internalAiUnstamped, archivedIn,
   loadBooks, computePnl, computeBalanceSheet, revenueBreakdown,
   bookValue, bookTotal, foreignTotals,
   expenseAccrual, monthsBetween, monthName, inceptionDate, DAY, MONTH_START, ROUND, pct,

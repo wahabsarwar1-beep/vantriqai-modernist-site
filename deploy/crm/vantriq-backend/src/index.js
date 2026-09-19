@@ -28,6 +28,7 @@ const exportRoutes = require('./routes/exportBase');
 const subscriptionRoutes = require('./routes/subscriptions');
 const quotesRoutes = require('./routes/quotes');
 const contractsRoutes = require('./routes/contracts');
+const archiveRoutes = require('./routes/archive');
 const billingOpsRoutes = require('./routes/billingOps');
 
 const app = express();
@@ -43,7 +44,13 @@ app.use('/api/clients/:id/documents', express.json({ limit: '15mb' }));
 app.use(express.json({ limit: '1mb' }));
 
 // Health check — no auth, used by hosting platforms and n8n connection tests
-app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
+// The version comes off package.json rather than a constant someone has to
+// remember to bump twice. Reported here so "which build is actually live"
+// is a question the box can answer, instead of one inferred from a deploy log.
+const APP_VERSION = require('../package.json').version;
+app.get('/api/health', (req, res) => res.json({
+  ok: true, version: APP_VERSION, time: new Date().toISOString(),
+}));
 
 // Internal employee sign-in: company email + password, then a one-time code
 // emailed to that address. Public by necessity — it is how people get a
@@ -97,6 +104,10 @@ app.use('/api/payments', requireScope('staff'), paymentsRoutes);
 app.use('/api/accounting', requireScope('admin'), accountingRoutes);
 // The whole base as a spreadsheet. Admin only: it contains everything.
 app.use('/api/export', requireScope('admin'), exportRoutes);
+// Archiving old invoices out of the working set, and deleting them once they
+// have been downloaded. Admin only, and blockAutomation on the purge besides:
+// this is the one endpoint that destroys financial rows.
+app.use('/api/archive', requireScope('admin'), archiveRoutes);
 // The things that RUN: the monthly billing run, the chase schedule, the
 // automation rules and the bank statement coming back in. An automation key
 // reaches these on purpose — the monthly run and the daily chase are meant to

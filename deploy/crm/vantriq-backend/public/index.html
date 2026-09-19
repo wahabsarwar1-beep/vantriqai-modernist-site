@@ -1111,6 +1111,7 @@ function renderSidebar(){
         <a href="#" onclick="event.preventDefault();signOut()" style="color:var(--teal-400);">Sign out</a>
       `}
       <div style="margin-top:8px;">${esc(state.company.name)} · ${esc(state.company.city)}</div>
+      ${serverVersion?`<div class="mono" style="margin-top:2px;font-size:10px;opacity:.6;">v${esc(serverVersion)}</div>`:''}
     </div>
   </div>`;
 }
@@ -2819,6 +2820,182 @@ async function downloadWorkbook(){
 }
 
 
+/* ============================== ARCHIVE ============================== */
+/**
+ * Taking old invoices out of the working set.
+ *
+ * The flow is deliberately three steps with the destructive one last and
+ * gated on the previous: see what would go, download it, and only then — with
+ * the hash of the file you actually received — remove it. The button to purge
+ * does not exist until a download has happened in this session, because the
+ * server will refuse without the hash anyway and offering it sooner would be
+ * an invitation to a dead end.
+ *
+ * The screen says plainly that the figures stay and only the detail moves.
+ * People are right to be nervous about a button that deletes invoices; the
+ * cure is telling them exactly what survives, not hiding the button.
+ */
+let archiveData = null;
+let archiveMonths = 12;
+let archivePreview = null;
+let archiveDownloaded = null;   // {sha256, filename, cutoff} for this session
+
+async function loadArchive(){
+  try{
+    archiveData = await API.get('/api/archive');
+    render();
+  }catch(e){ archiveData = {error:e.message}; showToast(e.message||'Could not read the archive status','warn'); }
+}
+
+async function previewArchive(){
+  try{
+    archivePreview = await API.get(`/api/archive/preview?months=${archiveMonths}`);
+    render();
+  }catch(e){ showToast(e.message||'Could not work out what would be archived','warn'); }
+}
+
+/** Downloads the workbook and keeps the hash the purge will have to quote. */
+async function downloadArchive(){
+  showToast('Building the archive…');
+  try{
+    const headers = {};
+    if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
+    else if(API.key) headers['x-api-key'] = API.key;
+    const res = await fetch(`${API.base}/api/archive/download?months=${archiveMonths}`, { headers });
+    if(!res.ok){
+      const err = await res.json().catch(()=>null);
+      throw new Error((err&&err.error) || `Could not build it (${res.status})`);
+    }
+    const sha = res.headers.get('X-Archive-Sha256');
+    const cutoff = res.headers.get('X-Archive-Cutoff');
+    const blob = await res.blob();
+    const name = `vantriq-archive-before-${cutoff}.xlsx`;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    archiveDownloaded = { sha256: sha, filename: name, cutoff };
+    await loadArchive();
+    showToast('Archive downloaded — check it opens before removing anything');
+  }catch(e){ showToast(e.message||'Could not download the archive','warn'); }
+}
+
+/**
+ * The irreversible step.
+ *
+ * Two confirmations, and the second asks for the word to be typed. That is
+ * not theatre: the first click can be a misclick, and typing PURGE cannot.
+ */
+async function purgeArchive(){
+  if(!archiveDownloaded){ showToast('Download the archive first','warn'); return; }
+  const p = archivePreview || {};
+  if(!confirm(
+    `Remove everything issued before ${archiveDownloaded.cutoff} from the CRM?\n\n`+
+    `  ${p.invoice_count||'?'} invoices, ${p.line_count||'?'} lines, ${p.payment_count||'?'} ledger entries\n\n`+
+    `The monthly totals stay in the books — the balance sheet, the P&L and the FBR position do not change. `+
+    `The line-by-line detail lives only in the file you just downloaded.\n\n`+
+    `Open that file and check it before continuing.`)) return;
+
+  const typed = prompt('This cannot be undone. Type PURGE to confirm.');
+  if(typed !== 'PURGE'){ showToast('Nothing was removed'); return; }
+
+  try{
+    const r = await API.post('/api/archive/purge', { sha256: archiveDownloaded.sha256, confirm: 'PURGE' });
+    archiveDownloaded = null; archivePreview = null;
+    await loadArchive();
+    // The statements are derived, and their caches are now stale.
+    accountingData = null; ledgerData = null;
+    await loadState();
+    showToast(`Removed ${r.invoices_removed} invoices — the books are unchanged`);
+  }catch(e){ showToast(e.message || 'Could not remove them','warn'); }
+}
+
+function archiveCard(){
+  const d = archiveData;
+  if(d === null) return `
+    <div class="card" style="max-width:520px;margin-top:16px;">
+      <h3 style="margin-top:0;font-size:14.5px;">Keeping the CRM quick</h3>
+      <p style="font-size:12.5px;color:var(--muted);">Loading…</p>
+    </div>`;
+  if(d.error) return '';
+  const older = d.older_than_window || 0;
+  const arch = d.archived || {};
+  return `
+  <div class="card" style="max-width:520px;margin-top:16px;">
+    <h3 style="margin-top:0;font-size:14.5px;">Keeping the CRM quick</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:0;">
+      The CRM works from the invoices it holds, so every page gets a little slower as the years pile up.
+      This keeps the last <strong>${d.retention_months} months</strong> live, hands you everything older as one
+      workbook, and then takes it out of the database.
+    </p>
+    <div style="background:var(--teal-light);border:1px solid #BFDED7;border-radius:8px;padding:10px 12px;font-size:12px;color:var(--teal-dark);margin-bottom:14px;">
+      <strong>Your figures do not change.</strong> Each archived month's totals — revenue, GST, advance tax,
+      receipts, our own AI cost — stay in the CRM, so the balance sheet, the P&amp;L and the FBR position read
+      exactly the same afterwards. What moves into the file is the line-by-line detail.
+      <div style="margin-top:6px;">Keep the file: records still have to be retained for the statutory period.</div>
+    </div>
+
+    <div class="detail-row"><span class="k">Invoices held now</span><span class="v mono">${fmtNum(d.live?d.live.n:0)}</span></div>
+    <div class="detail-row"><span class="k">Older than ${d.retention_months} months</span><span class="v mono" style="${older?'color:#94512b;font-weight:650;':''}">${fmtNum(older)}</span></div>
+    ${arch.n ? `<div class="detail-row"><span class="k">Already archived</span><span class="v">${fmtNum(arch.invoices)} invoices over ${fmtNum(arch.n)} months</span></div>` : ''}
+
+    ${older === 0 ? `
+      <div style="font-size:12.5px;color:var(--muted);margin-top:12px;">
+        Nothing is older than the window yet. There is nothing to archive.
+      </div>` : `
+      <div class="field" style="max-width:240px;margin-top:14px;">
+        <label>Keep the last</label>
+        <select onchange="archiveMonths=parseInt(this.value);archivePreview=null;archiveDownloaded=null;previewArchive()">
+          ${[12,18,24,36,60].map(m=>`<option value="${m}" ${archiveMonths===m?'selected':''}>${m} months</option>`).join('')}
+        </select>
+      </div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">
+        <button class="btn btn-ghost btn-sm" onclick="previewArchive()">What would be archived?</button>
+      </div>
+
+      ${archivePreview ? `
+        <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:12px;">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">
+            Everything issued before <strong>${esc(archivePreview.cutoff_date)}</strong>
+            ${archivePreview.earliest_issued?` — from ${fmtDate(archivePreview.earliest_issued)} to ${fmtDate(archivePreview.latest_issued)}`:''}
+          </div>
+          <div class="detail-row"><span class="k">Invoices</span><span class="v mono">${fmtNum(archivePreview.invoice_count)}</span></div>
+          <div class="detail-row"><span class="k">Invoice lines</span><span class="v mono">${fmtNum(archivePreview.line_count)}</span></div>
+          <div class="detail-row"><span class="k">Ledger entries</span><span class="v mono">${fmtNum(archivePreview.payment_count)}</span></div>
+          <div class="detail-row"><span class="k">Months carried forward</span><span class="v mono">${fmtNum((archivePreview.months||[]).length)}</span></div>
+        </div>` : ''}
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+        <button class="btn btn-primary btn-sm" onclick="downloadArchive()">${iconDownload(13)} Download the archive</button>
+        ${archiveDownloaded ? `
+          <button class="btn btn-danger-ghost btn-sm" onclick="purgeArchive()">${iconTrash(13)} Remove them from the CRM</button>
+        ` : ''}
+      </div>
+      ${archiveDownloaded ? `
+        <div style="font-size:11.5px;color:var(--muted);margin-top:8px;">
+          Downloaded <strong>${esc(archiveDownloaded.filename)}</strong>.
+          Open it and check it before removing anything — once removed, that file is the only copy of the detail.
+          <div class="mono" style="font-size:10.5px;margin-top:4px;word-break:break-all;">sha256 ${esc(archiveDownloaded.sha256||'')}</div>
+        </div>` : `
+        <div style="font-size:11.5px;color:var(--muted);margin-top:8px;">
+          Nothing can be removed until the archive has been downloaded — the CRM will not delete anything you do not already hold.
+        </div>`}
+    `}
+
+    ${(d.runs||[]).filter(r=>r.status==='purged').length ? `
+      <div class="divider"></div>
+      <div style="font-size:10.5px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Past offloads</div>
+      ${d.runs.filter(r=>r.status==='purged').map(r=>`
+        <div style="font-size:11.5px;color:var(--muted);border-left:2px solid var(--border);padding:4px 0 4px 10px;margin-bottom:4px;">
+          ${fmtDate(r.purged_at)} — ${fmtNum(r.invoice_count)} invoices before ${esc(String(r.cutoff_date).slice(0,10))}
+          <div class="mono" style="font-size:10px;word-break:break-all;">${esc(r.archive_filename||'')}</div>
+        </div>`).join('')}
+    ` : ''}
+  </div>`;
+}
+
 /* ===================== CUSTOMER DOCUMENTS & IDENTITY ===================== */
 /**
  * The paperwork on an account, and what happens when a company renames.
@@ -3109,6 +3286,18 @@ async function saveIdentity(){
  * on the day; if they re-register next year, last year's contract still shows
  * the number it was actually signed under.
  */
+/** What the server is actually running — asked, never assumed from the page,
+ *  because a cached page and a fresh container is exactly the mismatch you
+ *  want to be able to see. */
+let serverVersion = null;
+async function loadServerVersion(){
+  try{
+    const r = await fetch(`${API.base}/api/health`);
+    const j = await r.json();
+    if(j && j.version && j.version !== serverVersion){ serverVersion = j.version; render(); }
+  }catch{ /* the footer simply stays blank */ }
+}
+
 let contractsData = null;
 let contractFilter = 'all';
 
@@ -4311,6 +4500,8 @@ function renderSettings(){
     </p>
     <button class="btn btn-primary" onclick="downloadWorkbook()">${iconDownload(14)} Download the CRM as Excel</button>
   </div>
+
+  ${archiveCard()}
 
   <div class="card" style="max-width:520px;margin-top:16px;">
     <h3 style="margin-top:0;font-size:14.5px;">API connection</h3>
@@ -6320,6 +6511,8 @@ function attachPostRenderHooks(){
   // panel opens rather than up front — there is no point pulling every
   // account's paperwork to render a list of company names.
   if(openPanel && openPanel.type==='client' && clientDocs[openPanel.id] === undefined) loadClientDocs(openPanel.id);
+  if(currentView==='settings' && archiveData===null) loadArchive();
+  if(serverVersion === null){ serverVersion = ''; loadServerVersion(); }
   if(currentView==='ops' && opsData===null) loadOps();
 }
 

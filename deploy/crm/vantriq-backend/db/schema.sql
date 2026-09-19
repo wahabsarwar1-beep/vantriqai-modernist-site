@@ -1311,3 +1311,79 @@ alter table invoices add column if not exists client_legal_name text;
 -- never overwrites a stamped name.
 update invoices i set client_legal_name = c.company
   from clients c where c.id = i.client_id and i.client_legal_name is null;
+
+-- =====================================================================
+-- v9.5 — ARCHIVE AND OFFLOAD
+--
+-- Keep a rolling window of invoices live and take the rest out of the
+-- working set, so the CRM stays quick as the years accumulate.
+--
+-- Deleting financial rows is the most destructive thing this system can
+-- do, so it is built around two guarantees.
+--
+-- 1. YOU CANNOT PURGE WHAT YOU HAVE NOT DOWNLOADED. A purge names an
+--    archive run and must present the SHA-256 of the workbook that run
+--    produced. No download, no hash; wrong hash, no purge.
+--
+-- 2. THE BOOKS DO NOT MOVE. Every statement here is derived from invoice
+--    and payment rows, so deleting them would quietly restate the balance
+--    sheet, the P&L and the FBR position — cash, receivables and advance
+--    tax all fall out of those rows. Before anything is deleted its
+--    totals are rolled into archived_month_totals, and the accounting
+--    reads those back. A month that has been archived still reports its
+--    figures; what it loses is the line-by-line detail, which is in the
+--    workbook you downloaded.
+--
+-- Records still have to be retained for the statutory period. This moves
+-- them out of the database and into a file you keep; it is not a licence
+-- to throw them away.
+-- =====================================================================
+
+create table if not exists archive_runs (
+  id uuid primary key default gen_random_uuid(),
+  -- Everything ISSUED STRICTLY BEFORE this date is in scope.
+  cutoff_date date not null,
+  status text not null default 'prepared'
+    check (status in ('prepared','purged','cancelled')),
+
+  -- The workbook this run produced. The hash is what a purge must quote.
+  archive_sha256 text default '',
+  archive_filename text default '',
+  archive_bytes int not null default 0,
+
+  invoice_count int not null default 0,
+  line_count int not null default 0,
+  payment_count int not null default 0,
+  earliest_issued date,
+  latest_issued date,
+
+  prepared_at timestamptz not null default now(),
+  prepared_by text default '',
+  purged_at timestamptz,
+  purged_by text default ''
+);
+create index if not exists idx_archive_runs on archive_runs(status, prepared_at desc);
+
+-- What a purged month was worth, so the statements can still report it.
+--
+-- One row per calendar month per purge. The columns mirror exactly the
+-- figures computeBalanceSheet and computePnl derive from invoice and
+-- payment rows — if a new figure is ever derived from those rows, it
+-- needs a column here too, or the sheet will silently stop balancing
+-- the first time somebody archives.
+create table if not exists archived_month_totals (
+  id uuid primary key default gen_random_uuid(),
+  archive_run_id uuid references archive_runs(id) on delete set null,
+  month date not null,
+  invoice_count int not null default 0,
+  revenue numeric not null default 0,        -- ex-GST, external clients
+  billed_net numeric not null default 0,     -- net payable, external
+  gst_charged numeric not null default 0,
+  ait_withheld numeric not null default 0,
+  receipts numeric not null default 0,
+  written_off numeric not null default 0,
+  credited numeric not null default 0,
+  internal_cost numeric not null default 0,  -- our own account, in book currency
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_archived_months on archived_month_totals(month);

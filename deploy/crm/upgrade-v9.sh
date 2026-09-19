@@ -230,7 +230,7 @@ else
 fi
 
 # ---------------------------------------------------------------- 3. unpack
-bold "3. Unpacking v9.2"
+bold "3. Unpacking the new build"
 BACKUP_SRC="$SRC_DIR.bak-$STAMP"
 if [ -d "$SRC_DIR" ]; then
   run cp -a "$SRC_DIR" "$BACKUP_SRC"
@@ -316,6 +316,13 @@ else
     "select count(*) from information_schema.columns where table_name='invoices' and column_name='client_legal_name'"
   chk "every existing invoice carries the name it was raised under" 0 \
     "select count(*) from invoices where client_legal_name is null"
+  chk "v9.5 archive tables" 2 \
+    "select count(*) from information_schema.tables where table_name in ('archive_runs','archived_month_totals')"
+  # The carry-forward columns ARE the guarantee that purging does not restate
+  # the books. If one is ever missing, the balance sheet stops balancing the
+  # first time somebody archives, and nothing else would catch it.
+  chk "the carry-forward keeps every figure the books derive" 8 \
+    "select count(*) from information_schema.columns where table_name='archived_month_totals' and column_name in ('revenue','billed_net','gst_charged','ait_withheld','receipts','written_off','credited','internal_cost')"
   chk "v9 tax jurisdictions seeded (ICT, PRA, SRB, KPRA, BRA, EXPORT)" 6 \
     "select count(*) from tax_jurisdictions"
   chk "the five authorities and the export case are all there" 6 \
@@ -351,7 +358,8 @@ else
   bold "Done."
 fi
 cat <<'NEXT'
-  The CRM is on v9.2. Nothing is charged differently: every jurisdiction is
+  The CRM is on v$(docker exec "$APP_CONTAINER" node -p "require('/app/package.json').version" 2>/dev/null || echo '?').
+  Nothing is charged differently: every jurisdiction is
   at 0%, and the dollar rate is unset until you enter one.
 
   Next, in this order:
