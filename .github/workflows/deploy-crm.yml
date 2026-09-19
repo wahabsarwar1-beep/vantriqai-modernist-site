@@ -20,6 +20,13 @@
 
 name: Deploy CRM
 
+# The mode belongs in the run's own title. A dry run and a real deploy both
+# finish green — that is what a dry run is for — so a caller reading only the
+# conclusion cannot tell them apart, and an API dispatch that passes no inputs
+# silently takes the dry-run default. Putting the mode here puts it in the run
+# list and in the API's display_title, where it cannot be missed.
+run-name: Deploy CRM — ${{ inputs.mode }}
+
 on:
   workflow_dispatch:
     inputs:

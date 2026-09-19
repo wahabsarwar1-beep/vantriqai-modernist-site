@@ -103,6 +103,38 @@ function bookValue(invoice, settings) {
   return null;
 }
 
+/**
+ * What our own agents cost in one month, in the books' currency.
+ *
+ * Taken from the PKR figure stamped on each internal invoice, never the raw
+ * USD — adding dollars into a rupee total is how this went wrong elsewhere.
+ * An invoice raised before a rate was entered carries no stamped figure and
+ * contributes nothing rather than a guess; Settings offers to stamp those.
+ *
+ * The Dashboard and Financials both subtract this, and both must subtract the
+ * same number, so the rule lives here rather than in a copy on each side.
+ *
+ * @param invoices rows from `invoices`
+ * @param internalIds a Set of client ids where is_internal
+ * @param month 'YYYY-MM' or any date in the month
+ */
+function internalAiCost(invoices, internalIds, month) {
+  const ym = DAY(month).slice(0, 7);
+  return ROUND(invoices
+    .filter((i) => internalIds.has(i.client_id) && i.status !== 'void'
+      && DAY(i.issued_date).slice(0, 7) === ym)
+    .reduce((s, i) => s + (i.base_amount != null ? Number(i.base_amount) : 0), 0));
+}
+
+/** The same month's internal invoices that carry no rate, so a caller can say
+ *  so rather than quietly reporting a total that is missing them. */
+function internalAiUnstamped(invoices, internalIds, month) {
+  const ym = DAY(month).slice(0, 7);
+  return invoices.filter((i) => internalIds.has(i.client_id) && i.status !== 'void'
+    && DAY(i.issued_date).slice(0, 7) === ym && i.base_amount == null)
+    .map((i) => ({ invoice_number: i.invoice_number, currency: i.currency, amount: Number(i.amount || 0) }));
+}
+
 /** Sums invoices in the books' currency, keeping back the ones that have no
  *  rate so the caller can report them rather than lose them. */
 function bookTotal(invoices, settings) {
@@ -376,6 +408,7 @@ async function inceptionDate() {
 }
 
 module.exports = {
+  internalAiCost, internalAiUnstamped,
   loadBooks, computePnl, computeBalanceSheet, revenueBreakdown,
   bookValue, bookTotal, foreignTotals,
   expenseAccrual, monthsBetween, monthName, inceptionDate, DAY, MONTH_START, ROUND, pct,

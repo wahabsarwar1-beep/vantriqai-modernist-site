@@ -296,6 +296,11 @@ input[type=checkbox],input[type=radio],select,label.check{cursor:pointer;}
 button:disabled,.btn:disabled{cursor:not-allowed;opacity:.55;}
 
 /* Pipeline stage bar — press a stage, see that stage. */
+/* Live vs assumed, on a projection page where the difference matters. */
+.basis{display:inline-block;font-size:9.5px;font-weight:650;letter-spacing:.06em;
+  text-transform:uppercase;padding:1px 5px;border-radius:4px;vertical-align:1px;margin-left:6px;}
+.basis-live{background:#E4F1EC;color:#1F6B57;}
+.basis-assumed{background:#F2EFE6;color:#7A6A45;}
 .stage-tabs{
   display:flex;gap:6px;overflow-x:auto;padding:5px;margin-bottom:16px;
   background:#EDEAE1;border:1px solid var(--border);border-radius:12px;
@@ -1034,10 +1039,22 @@ function clientDeliveryCostEstimate(client){
 function totalVariableDeliveryCostMonthly(){
   return activeClients().reduce((s,c)=>s+clientDeliveryCostEstimate(c),0);
 }
+/**
+ * What a client is actually contracted at, not what their tier lists at.
+ *
+ * A negotiated retainer is the figure on their invoice every month, so
+ * pricing them at list overstates revenue for every client who has one. The
+ * server prices the same way; the two disagreeing is worse than either alone.
+ */
+function retainerOf(c){
+  if(c && c.customRetainer!=null) return Number(c.customRetainer);
+  const p = productOf(c);
+  return p ? Number(p.retainer) : 0;
+}
 function revenueByTier(){
   const map={};
   state.products.forEach(p=>map[p.id]={name:p.name, revenue:0, count:0});
-  activeClients().forEach(c=>{ if(map[c.productId]){ map[c.productId].revenue+=productOf(c).retainer; map[c.productId].count++; } });
+  activeClients().forEach(c=>{ if(map[c.productId]){ map[c.productId].revenue+=retainerOf(c); map[c.productId].count++; } });
   return Object.values(map);
 }
 function stageLabel(s){ return {lead:'Lead',contacted:'Contacted',proposal:'Proposal sent',negotiation:'Negotiation',active:'Active',lost:'Lost',churned:'Churned'}[s]||s; }
@@ -1119,7 +1136,7 @@ const VIEW_TITLES = {
   products:['Products & Pricing','Standard tiers are fixed by the model; only Enterprise+ is customisable'],
   requests:['Package Requests','Changes customers have asked for from their portal'],
   procurement:['Procurement','Vendors, tools, and purchase orders behind delivery'],
-  financials:['Financials','Contribution margin and forward projection, from live data'],
+  financials:['Financials','Contribution margin and forward projection — live clients and costs, assumed utilization'],
   accounting:['Accounts & Statements','P&L, income statement and balance sheet, from the invoices and the ledger'],
   quotes:['Quotes','An estimate before anything is billed — the customer accepts it in their portal'],
   ops:['Billing Automation','The monthly run, the chase schedule, the rules and the bank statement coming back in'],
@@ -1321,6 +1338,8 @@ const PIPELINE_TABS = [
 function setPipelineStage(id){ pipelineStage=id; render(); window.scrollTo(0,0); }
 
 function pipelineStageBar(){
+  const tab = PIPELINE_TABS.find(t=>t.id===pipelineStage) || PIPELINE_TABS[0];
+  const n = state.clients.filter(tab.match).length;
   return `
   <div class="stage-tabs">
     ${PIPELINE_TABS.map(t=>{
@@ -1328,6 +1347,14 @@ function pipelineStageBar(){
       return `<button class="stage-tab ${t.tone||''} ${pipelineStage===t.id?'active':''}"
         onclick="setPipelineStage('${t.id}')">${esc(t.label)}<span class="n">${n}</span></button>`;
     }).join('')}
+  </div>
+  <div style="display:flex;justify-content:flex-end;margin:-4px 0 14px;">
+    <button class="btn btn-ghost btn-sm" onclick="downloadPipeline('${tab.id}')"
+      title="${pipelineStage==='all'
+        ? 'One sheet per stage, plus every row together on an All stages sheet'
+        : `The ${n} row${n===1?'':'s'} in this stage`}">
+      ${iconDownload(13)} ${pipelineStage==='all' ? 'Export pipeline to Excel' : `Export ${esc(tab.label)} to Excel`}
+    </button>
   </div>`;
 }
 
@@ -1982,9 +2009,15 @@ function renderFinancials(){
   const delivery = totalVariableDeliveryCostMonthly();
   const cm = totalRetainerRev - delivery;
   const cmPct = totalRetainerRev>0 ? (cm/totalRetainerRev*100) : 0;
+  const customCount = activeClients().filter(c=>c.customRetainer!=null).length;
   const fixedPlatform = totalPlatformCostMonthly();
   const contractLabour = totalContractLabourMonthly();
-  const netResult = cm - fixedPlatform - contractLabour;
+  // Our own AI usage is a real invoiced cost, metered from live token usage.
+  // It was already listed in the cost table below under a heading that reads
+  // "feeding the P&L", but nothing subtracted it, so this page reported a
+  // better result than the Dashboard for the same month.
+  const aiCost = internalAiCostMonthly();
+  const netResult = cm - fixedPlatform - contractLabour - aiCost;
 
   return `
   <div class="stat-strip">
@@ -1996,9 +2029,12 @@ function renderFinancials(){
 
   <div class="card" style="display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:18px;background:var(--teal-light);border-color:#BFDED7;">
     <div style="font-size:12.5px;color:var(--teal-dark);max-width:560px;">
-      <strong>This page is a projection.</strong> It prices what your active clients would produce in a
-      typical month at the utilization you assume below. For what actually happened — revenue from
-      invoices issued, cost from expenses paid, and a balance sheet that balances — open Accounts &amp; Statements.
+      <strong>This page is part measured, part assumed.</strong> Every line below is tagged:
+      <span class="basis basis-live">live</span> is read from your data as it stands — clients, contracted
+      rates, recurring costs, and our own metered AI usage. <span class="basis basis-assumed">assumed</span>
+      is a model: delivery cost priced at the utilization you choose, platform cost at the midpoint of each
+      vendor's range. For what actually happened — revenue from invoices issued, cost from expenses paid,
+      and a balance sheet that balances — open Accounts &amp; Statements.
     </div>
     <button class="btn btn-primary btn-sm" onclick="navigate('accounting')">Open Accounts &amp; Statements ${iconArrowRight(13)}</button>
   </div>
@@ -2011,14 +2047,15 @@ function renderFinancials(){
         ${[0.5,0.6,0.7,0.8,0.9,1.0].map(u=>`<option value="${u}" ${state.utilization===u?'selected':''}>${Math.round(u*100)}% of quota</option>`).join('')}
       </select>
     </div>
-    <div class="detail-row"><span class="k">Setup revenue (collected, all-time)</span><span class="v mono">${fmtMoney(totalSetupCollectedThisPeriod)}</span></div>
-    <div class="detail-row"><span class="k">Retainer revenue (monthly, active clients)</span><span class="v mono">${fmtMoney(totalRetainerRev)}</span></div>
+    <div class="detail-row"><span class="k">Setup revenue (collected, all-time) <span class="basis basis-live">live</span></span><span class="v mono">${fmtMoney(totalSetupCollectedThisPeriod)}</span></div>
+    <div class="detail-row"><span class="k">Retainer revenue (monthly, active clients) <span class="basis basis-live">live</span>${customCount?`<div style="font-size:11px;color:var(--muted);">${customCount} of ${activeClients().length} at a negotiated rate, the rest at list price</div>`:''}</span><span class="v mono">${fmtMoney(totalRetainerRev)}</span></div>
     <div class="divider"></div>
-    <div class="detail-row"><span class="k">Variable delivery cost (LLM + WhatsApp, est.)</span><span class="v mono">−${fmtMoney(delivery)}</span></div>
+    <div class="detail-row"><span class="k">Variable delivery cost (LLM + WhatsApp) <span class="basis basis-assumed">assumed</span><div style="font-size:11px;color:var(--muted);">Package delivery cost at ${Math.round(state.utilization*100)}% utilization</div></span><span class="v mono">−${fmtMoney(delivery)}</span></div>
     <div class="detail-row"><strong>Contribution margin</strong><span class="v mono" style="color:var(--teal-dark)">${fmtMoney(cm)} (${cmPct.toFixed(1)}%)</span></div>
     <div class="divider"></div>
-    <div class="detail-row"><span class="k">Fixed platform / tooling cost</span><span class="v mono">−${fmtMoney(fixedPlatform)}</span></div>
-    <div class="detail-row"><span class="k">Contract labour</span><span class="v mono">−${fmtMoney(contractLabour)}</span></div>
+    <div class="detail-row"><span class="k">Fixed platform / tooling cost <span class="basis basis-assumed">assumed</span></span><span class="v mono">−${fmtMoney(fixedPlatform)}</span></div>
+    <div class="detail-row"><span class="k">Contract labour <span class="basis basis-live">live</span></span><span class="v mono">−${fmtMoney(contractLabour)}</span></div>
+    <div class="detail-row"><span class="k">Our own AI usage <span class="basis basis-live">live</span><div style="font-size:11px;color:var(--muted);">Metered token usage, invoiced on our own account</div></span><span class="v mono">−${fmtMoney(aiCost)}</span></div>
     <div class="divider"></div>
     <div class="detail-row" style="font-size:15px;"><strong>Net monthly result</strong><span class="v mono" style="color:${netResult>=0?'var(--teal-dark)':'var(--red)'}">${fmtMoney(netResult)}</span></div>
     <div style="margin-top:16px;"><button class="btn btn-ghost" onclick="exportPnL()">${iconDownload(14)} Export as CSV</button></div>
@@ -2722,6 +2759,36 @@ async function deleteRemittance(id){
   if(!confirm('Delete this remittance record?')) return;
   try{ await API.del(`/api/accounting/remittances/${id}`); accountingData=null; await loadAccounting(); showToast('Remittance deleted'); }
   catch(e){ showToast(e.message||'Could not delete the remittance','warn'); }
+}
+
+/**
+ * Downloads the pipeline as a spreadsheet — the stage you are looking at, or
+ * every stage at once when you are on "All stages".
+ *
+ * With no stage the file carries one sheet per stage plus an All stages sheet,
+ * so the whole pipeline and each stage separately arrive together rather than
+ * as six downloads.
+ */
+async function downloadPipeline(stage){
+  const one = stage && stage !== 'all';
+  showToast(one ? 'Building the stage…' : 'Building the pipeline…');
+  try{
+    const headers = {};
+    if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
+    else if(API.key) headers['x-api-key'] = API.key;
+    const res = await fetch(`${API.base}/api/export/pipeline.xlsx${one?`?stage=${encodeURIComponent(stage)}`:''}`, { headers });
+    if(!res.ok){
+      const err = await res.json().catch(()=>null);
+      throw new Error((err&&err.error) || `Export failed (${res.status})`);
+    }
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `vantriq-pipeline-${one?stage+'-':''}${todayISO()}.xlsx`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    showToast(one ? 'Stage downloaded' : 'Pipeline downloaded');
+  }catch(e){ showToast(e.message||'Could not build the spreadsheet','warn'); }
 }
 
 /** Downloads the whole base as a spreadsheet, auth header and all. */

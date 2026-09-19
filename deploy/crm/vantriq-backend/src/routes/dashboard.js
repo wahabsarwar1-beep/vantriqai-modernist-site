@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { isAdminRequest } = require('../middleware/auth');
+const acc = require('../utils/accounting');
 const router = express.Router();
 
 router.get('/', async (req, res) => {
@@ -34,23 +35,26 @@ router.get('/', async (req, res) => {
   const internalIds = new Set(clients.filter((c) => c.is_internal).map((c) => c.id));
   const pipeline = clients.filter((c) => ['lead', 'contacted', 'proposal', 'negotiation'].includes(c.stage));
 
-  // What our own agents cost this month, in the books' currency. Taken from
-  // the PKR figure stamped on each internal invoice, never the raw USD —
-  // adding dollars to a rupee total is how this went wrong elsewhere. An
-  // invoice raised before a rate was entered has no stamped figure and
-  // contributes nothing rather than a guess.
-  const ym = month.slice(0, 7);
-  const internalAiCost = invoices
-    .filter((i) => internalIds.has(i.client_id) && i.status !== 'void'
-      && new Date(i.issued_date).toISOString().slice(0, 7) === ym)
-    .reduce((s, i) => s + (i.base_amount != null ? Number(i.base_amount) : 0), 0);
+  // What our own agents cost this month, in the books' currency. The rule
+  // lives in accounting.js because Financials subtracts the same figure and
+  // the two screens disagreeing about it is worse than either being wrong.
+  const internalAiCost = acc.internalAiCost(invoices, internalIds, month);
 
-  const mrr = active.reduce((s, c) => s + (productById[c.product_id] ? Number(productById[c.product_id].retainer) : 0), 0);
+  // What a client is actually contracted at, not what their tier lists at —
+  // the same rule Financials prices with, so MRR reads the same on both.
+  const retainerOf = (c) => (c.custom_retainer != null
+    ? Number(c.custom_retainer)
+    : (productById[c.product_id] ? Number(productById[c.product_id].retainer) : 0));
+  const mrr = active.reduce((s, c) => s + retainerOf(c), 0);
   const pipelineValue = pipeline.reduce((s, c) => s + Number(c.est_value || 0), 0);
 
   const revenueByTier = products.map((p) => {
     const tierClients = active.filter((c) => c.product_id === p.id);
-    return { id: p.id, name: p.name, revenue: tierClients.length * Number(p.retainer), count: tierClients.length };
+    return {
+      id: p.id, name: p.name,
+      revenue: tierClients.reduce((s, c) => s + retainerOf(c), 0),
+      count: tierClients.length,
+    };
   });
 
   const pipelineByStage = ['lead', 'contacted', 'proposal', 'negotiation'].map((stage) => ({

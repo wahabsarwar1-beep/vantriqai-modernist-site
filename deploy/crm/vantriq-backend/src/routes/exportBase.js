@@ -55,6 +55,98 @@ function addSheet(wb, name, columns, rows) {
 const col = (header, key, opts = {}) => ({ header, key, ...opts });
 
 /**
+ * The pipeline stages, in the order a deal moves through them.
+ *
+ * 'lost' folds churned in with it: from the pipeline's point of view they are
+ * the same answer — the deal is not coming, and you want both in one list
+ * when you sit down to work out why.
+ */
+const PIPELINE_STAGES = [
+  { id: 'lead',        label: 'New leads',      stages: ['lead'] },
+  { id: 'contacted',   label: 'Contacted',      stages: ['contacted'] },
+  { id: 'proposal',    label: 'Proposal sent',  stages: ['proposal'] },
+  { id: 'negotiation', label: 'Negotiation',    stages: ['negotiation'] },
+  { id: 'active',      label: 'Won — active',   stages: ['active'] },
+  { id: 'lost',        label: 'Lost — churned', stages: ['lost', 'churned'] },
+];
+
+/**
+ * GET /api/export/pipeline.xlsx[?stage=lead]
+ *
+ * The pipeline as a spreadsheet. With no stage it writes one sheet per stage
+ * plus an "All stages" sheet holding every row — so the whole pipeline and
+ * each stage on its own arrive in a single file, which is what you want when
+ * the question is "where is everything sitting". With ?stage= it writes that
+ * one stage alone.
+ *
+ * The columns are the ones you work a lead from — who, how to reach them,
+ * where they came from, what it is worth, who owns it and how long it has sat
+ * there — rather than every column the table happens to have. Days in stage
+ * comes off updated_at, which is what the stage-change trigger touches.
+ */
+router.get('/pipeline.xlsx', async (req, res) => {
+  const wanted = String(req.query.stage || 'all').toLowerCase();
+  const chosen = PIPELINE_STAGES.find((s) => s.id === wanted);
+  if (wanted !== 'all' && !chosen) {
+    return res.status(400).json({
+      error: `Unknown stage '${req.query.stage}'. Use one of: all, ${PIPELINE_STAGES.map((s) => s.id).join(', ')}.`,
+    });
+  }
+
+  const [clientsQ, productsQ, repsQ, settingsQ] = await Promise.all([
+    db.query(`select * from clients order by est_value desc nulls last, company`),
+    db.query(`select id, name from products`),
+    db.query(`select id, name from sales_reps`),
+    db.query(`select * from settings where id = 1`),
+  ]);
+  const settings = settingsQ.rows[0] || {};
+  const productName = Object.fromEntries(productsQ.rows.map((p) => [p.id, p.name]));
+  const repName = Object.fromEntries(repsQ.rows.map((r) => [r.id, r.name]));
+
+  const DAYS = (d) => (d ? Math.max(0, Math.round((Date.now() - new Date(d).getTime()) / 86400000)) : '');
+
+  const columns = [
+    col('Company', 'company', { width: 28 }),
+    col('Contact', 'name', { width: 22 }),
+    col('Email', 'email', { width: 26 }),
+    col('Phone', 'phone', { width: 16 }),
+    col('Stage', 'stage', { width: 13 }),
+    col('Est. value', 'est_value', { money: true, width: 14 }),
+    col('Package', 'package', { width: 16, value: (c) => productName[c.product_id] || '' }),
+    col('Source', 'source', { width: 16 }),
+    col('Owner (rep)', 'owner', { width: 18, value: (c) => repName[c.owner_rep_id] || '' }),
+    col('Days in stage', 'days_in_stage', { width: 14, value: (c) => DAYS(c.updated_at) }),
+    col('Created', 'created_at', { date: true, width: 13 }),
+    col('Joined', 'join_date', { date: true, width: 13 }),
+    col('Notes', 'notes', { width: 44 }),
+  ];
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = settings.company_name || 'Vantriq AI';
+  wb.created = new Date();
+
+  const groups = chosen ? [chosen] : PIPELINE_STAGES;
+  if (!chosen) {
+    // Every row in one sheet, so "the leads as a whole" is one tab rather
+    // than a copy-paste of the six that follow it.
+    const everything = clientsQ.rows.filter((c) => !c.is_internal);
+    addSheet(wb, 'All stages', columns, everything);
+  }
+  for (const g of groups) {
+    const rows = clientsQ.rows.filter((c) => g.stages.includes(c.stage) && !c.is_internal);
+    addSheet(wb, g.label, columns, rows);
+  }
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  const who = (settings.company_name || 'vantriq').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const name = `${who}-pipeline-${chosen ? chosen.id + '-' : ''}${stamp}.xlsx`;
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
+  await wb.xlsx.write(res);
+  res.end();
+});
+
+/**
  * GET /api/export/crm.xlsx
  *
  * Optional ?from=&to= narrows the transactional sheets (invoices, payments,
