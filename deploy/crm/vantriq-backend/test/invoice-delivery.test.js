@@ -75,6 +75,17 @@ const PKR_DOC = {
     (mail.html.match(/USD 0\.00\b/) || [''])[0]);
   ok(/USD 0\.000621/.test(mail.subject), 'the subject line too', mail.subject);
 
+  console.log('\n== dates read as dates ==');
+  // This went out to production once: the document carries Date objects when
+  // it is built in-process, and the email printed
+  // 'Fri Sep 18 2026 00:00:00 GMT+0000 (Coordinated Universal Time)'.
+  ok(/Sep 18, 2026/.test(mail.text), 'the issue date is a date, not a Date.toString',
+    (mail.text.match(/Issued.*/) || [''])[0]);
+  ok(/Sep 25, 2026/.test(mail.text), 'and so is the due date',
+    (mail.text.match(/Due.*/) || [''])[0]);
+  ok(!/GMT|Coordinated Universal Time/.test(mail.text + mail.html + mail.subject),
+    'nothing anywhere leaks a raw Date string');
+
   console.log('\n== the body points at the attachment; it is not the invoice ==');
   ok(/VAI-2026-000019\.pdf/.test(mail.text) && /VAI-2026-000019\.pdf/.test(mail.html),
     'the covering note names the attached file');

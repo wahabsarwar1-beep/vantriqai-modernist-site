@@ -1,4 +1,5 @@
 const PDFDocument = require('pdfkit');
+const { formatDay: day } = require('./formatDate');
 
 /**
  * The invoice as a PDF, for attaching to the email that sends it.
@@ -29,25 +30,6 @@ const PAGE = { size: 'A4', margin: 48 };
 const LEFT = PAGE.margin;
 const RIGHT = 595.28 - PAGE.margin;
 const WIDTH = RIGHT - LEFT;
-
-/**
- * 'Sep 16, 2026' — unambiguous wherever the invoice is opened, which a
- * numeric date is not.
- *
- * Takes a Date as readily as a string. The HTML renderer only ever sees ISO
- * strings, because its document arrives over HTTP as JSON; this one is called
- * in-process, where pg hands back Date objects. Slicing ten characters off a
- * Date's toString gives 'Fri Sep 18', which parses to Invalid Date and printed
- * the whole 'GMT+0000 (Coordinated Universal Time)' across the invoice.
- */
-function day(value) {
-  if (!value) return '';
-  const d = (value instanceof Date)
-    ? value
-    : new Date(String(value).slice(0, 10) + 'T00:00:00Z');
-  if (isNaN(d)) return String(value);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
-}
 
 /**
  * Money, at the precision its currency actually needs.

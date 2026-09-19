@@ -13,6 +13,8 @@
  * If the token is missing the send throws, and the caller decides what the
  * user sees — we never silently swallow a failure to deliver a login code.
  */
+const { formatDay: day } = require('./formatDate');
+
 const API_BASE = process.env.HOSTINGER_MAIL_API || 'https://api.mail.hostinger.com';
 
 function mailConfigured() {
@@ -254,14 +256,6 @@ function invoiceEmail(doc, portalUrl, opts = {}) {
     </div>`;
 
   return { subject, text, html };
-}
-
-/** 'Sep 16, 2026' — the same unambiguous form the invoice itself prints. */
-function day(iso) {
-  if (!iso) return '';
-  const d = new Date(String(iso).slice(0, 10) + 'T00:00:00Z');
-  if (isNaN(d)) return String(iso);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 }
 
 function escapeHtml(s) {
