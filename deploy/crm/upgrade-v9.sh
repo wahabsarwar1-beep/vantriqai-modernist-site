@@ -357,8 +357,17 @@ if [ "$DRY" = 1 ]; then
 else
   bold "Done."
 fi
+# Read the version off the container that is actually running, so this line
+# cannot go stale the way a hard-coded "v9.2" did. Computed HERE, because the
+# heredoc below is quoted — deliberately, so the $ and backticks in the notes
+# survive — and a command substitution inside it would print verbatim.
+if [ "$DRY" = 1 ]; then
+  RUNNING_VERSION="(unchanged — dry run)"
+else
+  RUNNING_VERSION="v$(docker exec "$APP_CONTAINER" node -p "require('/app/package.json').version" 2>/dev/null || echo '?')"
+fi
+echo "  The CRM is on ${RUNNING_VERSION}."
 cat <<'NEXT'
-  The CRM is on v$(docker exec "$APP_CONTAINER" node -p "require('/app/package.json').version" 2>/dev/null || echo '?').
   Nothing is charged differently: every jurisdiction is
   at 0%, and the dollar rate is unset until you enter one.
 
