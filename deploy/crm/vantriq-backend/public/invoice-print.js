@@ -36,10 +36,19 @@
 
     // 'Sep 16, 2026' reads unambiguously wherever the invoice is opened, which
     // a numeric date does not.
-    const day = (iso) => {
-      if (!iso) return '';
-      const dt = new Date(String(iso).slice(0, 10) + 'T00:00:00Z');
-      if (isNaN(dt)) return String(iso);
+    // Takes a Date as readily as an ISO string. This renderer is handed a
+    // document that came over HTTP, so in practice it only ever sees strings
+    // — but slicing ten characters off a Date gives 'Fri Sep 18', which
+    // parses to Invalid Date and prints the whole
+    // 'GMT+0000 (Coordinated Universal Time)' onto the invoice. That happened
+    // in the two server-side copies of this function; it is not worth leaving
+    // the third one able to do it.
+    const day = (value) => {
+      if (!value) return '';
+      const dt = (value instanceof Date)
+        ? value
+        : new Date(String(value).slice(0, 10) + 'T00:00:00Z');
+      if (isNaN(dt)) return String(value);
       return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
     };
 
