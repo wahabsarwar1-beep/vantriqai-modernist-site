@@ -164,7 +164,7 @@ router.get('/crm.xlsx', async (req, res) => {
     vendors, pos, remittances, usageMonthly, usageByAgent, quotaEvents,
     stageHistory, reps, packageRequests,
     bundles, quotes, quoteLines, phases, rates, dunningSteps, reminders,
-    automations, automationRuns, bankCredits,
+    automations, automationRuns, bankCredits, contracts,
   ] = await Promise.all([
     q(`select * from settings where id = 1`).then((r) => r[0] || {}),
     q(`select c.*, p.name as package_name, parent.company as parent_company
@@ -246,6 +246,14 @@ router.get('/crm.xlsx', async (req, res) => {
          left join invoices i on i.id = b.matched_invoice_id
          left join clients c on c.id = i.client_id
         order by b.received_date desc`),
+    // v9.3 — contracts. The legal identity comes off the CONTRACT, not the
+    // client, so the sheet shows what each one was actually signed under.
+    q(`select k.*, c.company, c.name as contact_name, c.email,
+              prev.contract_number as superseded_by_number
+         from contracts k
+         join clients c on c.id = k.client_id
+         left join contracts prev on prev.id = k.superseded_by
+        order by c.company, k.start_date desc nulls last`),
   ]);
 
   // Settlement per invoice, for the Invoices sheet's outstanding column.
@@ -500,6 +508,27 @@ router.get('/crm.xlsx', async (req, res) => {
     col('Added by', 'added_by'), col('Setup billed', 'setup_billed'),
     col('Note', 'note', { width: 30 }),
   ], bundles);
+
+  addSheet(wb, 'Contracts', [
+    col('Contract #', 'contract_number', { width: 20 }),
+    col('Company', 'company', { width: 26 }),
+    col('Title', 'title', { width: 30 }),
+    col('Type', 'kind', { width: 13 }), col('Status', 'status', { width: 13 }),
+    col('Starts', 'start_date', { date: true }), col('Ends', 'end_date', { date: true }),
+    col('Auto-renews', 'auto_renew'), col('Notice (days)', 'notice_days'),
+    col('Value', 'value', { money: true }), col('Currency', 'currency'),
+    col('Billed', 'billing_frequency', { width: 13 }),
+    col('Signed', 'signed_date', { date: true }),
+    col('Signed by (client)', 'signed_by_client', { width: 22 }),
+    col('Signed by (us)', 'signed_by_us', { width: 22 }),
+    // As signed — deliberately not the client record's current values.
+    col('Registered name', 'client_legal_name', { width: 26 }),
+    col('NTN', 'client_ntn', { width: 16 }), col('STRN', 'client_strn', { width: 20 }),
+    col('Registered address', 'client_address', { width: 30 }),
+    col('Document', 'document_url', { width: 34 }),
+    col('Scope', 'scope', { width: 30 }), col('Notes', 'notes', { width: 30 }),
+    col('Replaced by', 'superseded_by_number', { width: 20 }),
+  ], contracts);
 
   addSheet(wb, 'Quotes', [
     col('Quote #', 'quote_number', { width: 20 }), col('Company', 'company', { width: 26 }),

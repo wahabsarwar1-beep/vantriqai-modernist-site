@@ -304,6 +304,12 @@ else
   else
     ok "dunning is off — no reminders will be emailed"
   fi
+  chk "v9.3 contracts table" 1 \
+    "select count(*) from information_schema.tables where table_name='contracts'"
+  chk "contracts carry the identity they were signed under" 4 \
+    "select count(*) from information_schema.columns where table_name='contracts' and column_name in ('client_ntn','client_strn','client_legal_name','client_address')"
+  chk "contract numbers have their own sequence" 1 \
+    "select count(*) from information_schema.sequences where sequence_name='contract_number_seq'"
   chk "v9 tax jurisdictions seeded (ICT, PRA, SRB, KPRA, BRA, EXPORT)" 6 \
     "select count(*) from tax_jurisdictions"
   chk "the five authorities and the export case are all there" 6 \

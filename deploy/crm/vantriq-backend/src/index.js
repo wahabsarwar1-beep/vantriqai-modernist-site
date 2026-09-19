@@ -27,6 +27,7 @@ const accountingRoutes = require('./routes/accounting');
 const exportRoutes = require('./routes/exportBase');
 const subscriptionRoutes = require('./routes/subscriptions');
 const quotesRoutes = require('./routes/quotes');
+const contractsRoutes = require('./routes/contracts');
 const billingOpsRoutes = require('./routes/billingOps');
 
 const app = express();
@@ -76,6 +77,9 @@ app.use('/api/agents', requireScope('automation'), agentsRoutes);
 app.use('/api/subscriptions', requireScope('automation'), subscriptionRoutes);
 // Quotes sit with the rest of the sales work, so staff can raise one.
 app.use('/api/quotes', requireScope('staff'), quotesRoutes);
+// Contracts carry the counterparty's legal identity, so they sit behind the
+// same gate as quotes: staff who work accounts, not automation keys.
+app.use('/api/contracts', requireScope('staff'), contractsRoutes);
 app.use('/api/reps', requireScope('admin'), repsRoutes);
 app.use('/api/package-requests', requireScope('staff'), packageRequestsRoutes);
 app.use('/api/expenses', requireScope('admin'), expensesRoutes);

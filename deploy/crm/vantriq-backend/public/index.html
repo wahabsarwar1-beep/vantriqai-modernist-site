@@ -938,6 +938,7 @@ const NAV = [
     {id:'agents', label:'Agents & Automations', icon:iconBot},
     {id:'billing', label:'Billing & Invoices', icon:iconReceipt},
     {id:'quotes', label:'Quotes', icon:iconQuote},
+    {id:'contracts', label:'Contracts', icon:iconContract},
     {id:'ledger', label:'Payments & Ledger', icon:iconWallet},
     {id:'quota', label:'Quota & Overage', icon:iconChart},
     {id:'requests', label:'Package Requests', icon:iconBox},
@@ -987,6 +988,7 @@ function iconWallet(){ return icon('<path d="M3 7a2 2 0 012-2h12a2 2 0 012 2"/><
 function iconLedger(){ return icon('<path d="M5 3h12a2 2 0 012 2v16l-3-2-3 2-3-2-3 2V5a2 2 0 012-2z"/><path d="M9 8h6M9 12h6M9 16h3"/>'); }
 function iconMail(size){ return icon('<rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M3 6.5l9 6 9-6"/>', size); }
 function iconQuote(){ return icon('<path d="M6 3h9l5 5v13a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M15 3v5h5"/><path d="M9 13h6M9 17h4"/>'); }
+function iconContract(){ return icon('<path d="M7 3h7l4 4v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h4"/><circle cx="16.5" cy="17.5" r="2.6"/>'); }
 function iconBolt(){ return icon('<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'); }
 function iconInbox(size){ return icon('<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/>', size); }
 
@@ -1139,6 +1141,7 @@ const VIEW_TITLES = {
   financials:['Financials','Contribution margin and forward projection — live clients and costs, assumed utilization'],
   accounting:['Accounts & Statements','P&L, income statement and balance sheet, from the invoices and the ledger'],
   quotes:['Quotes','An estimate before anything is billed — the customer accepts it in their portal'],
+  contracts:['Contracts','Every signed agreement, with the legal identity it was signed under'],
   ops:['Billing Automation','The monthly run, the chase schedule, the rules and the bank statement coming back in'],
   agents:['Agents & Automations','Every AI agent and automation running, and who it belongs to'],
   ledger:['Payments & Ledger','What has been received, what is outstanding, and how old it is'],
@@ -1170,6 +1173,7 @@ function topbarAction(){
   if(currentView==='ledger') return `<button class="btn btn-primary" onclick="openModal={type:'payment'};render()">${iconPlus(15)} Record payment</button>`;
   if(currentView==='accounting') return `<button class="btn btn-ghost" onclick="downloadWorkbook()">${iconDownload(15)} Download Excel</button>`;
   if(currentView==='quotes') return `<button class="btn btn-primary" onclick="quoteLines=[];openModal={type:'quote'};render()">${iconPlus(15)} New quote</button>`;
+  if(currentView==='contracts') return `<button class="btn btn-primary" onclick="openContractModal()">${iconPlus(15)} Add contract</button>`;
   if(currentView==='ops') return `<button class="btn btn-ghost" onclick="opsData=null;loadOps()">Refresh</button>`;
   return '';
 }
@@ -1189,6 +1193,7 @@ function renderView(){
     case 'financials': return renderFinancials();
     case 'accounting': return renderAccounting();
     case 'quotes': return renderQuotes();
+    case 'contracts': return renderContracts();
     case 'ops': return renderOps();
     case 'agents': return renderAgents();
     case 'ledger': return renderLedger();
@@ -2814,6 +2819,168 @@ async function downloadWorkbook(){
 }
 
 
+/* ============================== CONTRACTS ============================== */
+/**
+ * The signed agreement behind an account.
+ *
+ * ONE renderer, two doors. contractCard() draws a contract the same way
+ * whether it is on the Contracts tab or inside a client's own panel, so the
+ * two can never show different details for the same agreement — which is the
+ * reason for holding contracts in the system rather than in a folder somebody
+ * has to remember to update twice.
+ *
+ * The legal identity shown is the one SNAPSHOT on the contract at signing,
+ * not the client's current NTN. A contract records what was agreed with whom
+ * on the day; if they re-register next year, last year's contract still shows
+ * the number it was actually signed under.
+ */
+let contractsData = null;
+let contractFilter = 'all';
+
+const CONTRACT_KIND = {service:'Service agreement', msa:'Master services agreement', sow:'Statement of work',
+  nda:'Non-disclosure', amendment:'Amendment', renewal:'Renewal', other:'Other'};
+const CONTRACT_STATUS = {draft:'Draft', sent:'Sent for signature', signed:'Signed', active:'Active',
+  expired:'Expired', terminated:'Terminated', superseded:'Superseded'};
+const CONTRACT_FREQ = {one_off:'One-off', monthly:'Monthly', quarterly:'Quarterly', annual:'Annual'};
+
+function contractStatusClass(s){
+  return {active:'pill-active', signed:'pill-active', draft:'pill-lead', sent:'pill-contacted',
+    expired:'pill-overdue', terminated:'pill-lost', superseded:'pill-lost'}[s] || 'pill-lead';
+}
+
+async function loadContracts(){
+  try{ contractsData = await API.get('/api/contracts'); render(); }
+  catch(e){ contractsData = []; showToast(e.message||'Could not load contracts','warn'); }
+}
+
+/** Every contract for one client, from the same list the tab renders. */
+function contractsFor(clientId){
+  return (contractsData||[]).filter(c=>c.client_id===clientId);
+}
+
+/**
+ * One contract, drawn identically wherever it appears.
+ *
+ * `compact` drops the company name — inside a client's panel you already know
+ * whose it is — and nothing else. Every other field is the same on both
+ * sides, deliberately: if the tab shows an NTN, the client panel shows the
+ * same NTN, because it is the same row rendered by the same function.
+ */
+function contractCard(c, {compact=false}={}){
+  const money = fmtMoney(Number(c.value||0), c.currency);
+  const term = [c.start_date?fmtDate(c.start_date):null, c.end_date?fmtDate(c.end_date):'open-ended']
+    .filter(Boolean).join(' → ');
+  return `
+  <div class="card" style="margin-bottom:10px;${c.expiring_soon?'border-color:#E0C08A;background:#FFFDF7;':''}">
+    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start;">
+      <div style="min-width:0;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <strong style="font-size:14px;">${esc(c.title||'Untitled contract')}</strong>
+          <span class="pill ${contractStatusClass(c.status)}">${esc(CONTRACT_STATUS[c.status]||c.status)}</span>
+          ${c.expiring_soon?`<span class="pill pill-pending">expires in ${c.days_remaining} day${c.days_remaining===1?'':'s'}</span>`:''}
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px;">
+          <span class="mono">${esc(c.contract_number||'—')}</span> · ${esc(CONTRACT_KIND[c.kind]||c.kind)}
+          ${compact?'':` · <a href="#" onclick="event.preventDefault();openClientFromContract('${c.client_id}')">${esc(c.company||'—')}</a>`}
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <div class="mono" style="font-size:15px;font-weight:650;">${money}</div>
+        <div style="font-size:11px;color:var(--muted);">${esc(CONTRACT_FREQ[c.billing_frequency]||c.billing_frequency)}</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="detail-row"><span class="k">Term</span><span class="v">${esc(term||'—')}${c.auto_renew?' · auto-renews':''}</span></div>
+    ${c.notice_days?`<div class="detail-row"><span class="k">Notice required</span><span class="v">${c.notice_days} days</span></div>`:''}
+    ${c.signed_date?`<div class="detail-row"><span class="k">Signed</span><span class="v">${fmtDate(c.signed_date)}${c.signed_by_client?` by ${esc(c.signed_by_client)}`:''}${c.signed_by_us?` · for us, ${esc(c.signed_by_us)}`:''}</span></div>`:''}
+
+    <div class="divider"></div>
+    <div style="font-size:10.5px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">
+      Counterparty as signed
+    </div>
+    <div class="detail-row"><span class="k">Legal name</span><span class="v">${esc(c.legal_name||'—')}</span></div>
+    <div class="detail-row"><span class="k">NTN</span><span class="v mono">${esc(c.ntn||'—')}</span></div>
+    <div class="detail-row"><span class="k">STRN</span><span class="v mono">${esc(c.strn||'—')}</span></div>
+    ${c.client_address?`<div class="detail-row"><span class="k">Address</span><span class="v">${esc(c.client_address)}</span></div>`:''}
+    ${c.scope?`<div class="detail-row"><span class="k">Scope</span><span class="v">${esc(c.scope)}</span></div>`:''}
+    ${c.notes?`<div class="detail-row"><span class="k">Notes</span><span class="v">${esc(c.notes)}</span></div>`:''}
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
+      ${c.document_url?`<a class="btn btn-ghost btn-sm" href="${esc(c.document_url)}" target="_blank" rel="noopener noreferrer">${iconDownload(13)} Open the document</a>`:''}
+      <button class="btn btn-ghost btn-sm" onclick="openContractModal('${c.id}')">${iconEdit(13)} Edit</button>
+      ${c.superseded_by||['superseded','terminated'].includes(c.status)?'':
+        `<button class="btn btn-ghost btn-sm" onclick="supersedeContract('${c.id}')">Renew / replace</button>`}
+      <button class="btn btn-danger-ghost btn-sm" onclick="deleteContract('${c.id}')">${iconTrash(13)} Delete</button>
+    </div>
+  </div>`;
+}
+
+/** The tab: every contract across every client. */
+function renderContracts(){
+  if(contractsData===null) return `<div class="card" style="text-align:center;padding:40px;color:var(--muted);">Loading contracts…</div>`;
+  const all = contractsData;
+  const TABS = [
+    {id:'all',      label:'All',            match:c=>true},
+    {id:'active',   label:'Active',         match:c=>c.status==='active'||c.status==='signed'},
+    {id:'expiring', label:'Expiring soon',  match:c=>c.expiring_soon},
+    {id:'draft',    label:'Draft / sent',   match:c=>c.status==='draft'||c.status==='sent'},
+    {id:'ended',    label:'Ended',          match:c=>['expired','terminated','superseded'].includes(c.status)},
+  ];
+  const tab = TABS.find(t=>t.id===contractFilter) || TABS[0];
+  const rows = all.filter(tab.match);
+  const liveValue = all.filter(c=>c.status==='active'||c.status==='signed')
+    .reduce((s,c)=> s + (c.currency===CURRENCY ? Number(c.value||0) : 0), 0);
+  const expiring = all.filter(c=>c.expiring_soon).length;
+
+  return `
+  <div class="stat-strip">
+    <div class="s-item"><div class="l">Contracts</div><div class="v">${all.length}</div></div>
+    <div class="s-item"><div class="l">Active</div><div class="v">${all.filter(c=>c.status==='active'||c.status==='signed').length}</div></div>
+    <div class="s-item"><div class="l">Contracted value</div><div class="v">${fmtMoney(liveValue)}</div></div>
+    <div class="s-item"><div class="l">Expiring soon</div><div class="v" style="${expiring?'color:#e79f6f;':''}">${expiring}</div></div>
+  </div>
+
+  <div class="stage-tabs" style="margin-top:16px;">
+    ${TABS.map(t=>`<button class="stage-tab ${contractFilter===t.id?'active':''}"
+      onclick="contractFilter='${t.id}';render()">${esc(t.label)}<span class="n">${all.filter(t.match).length}</span></button>`).join('')}
+  </div>
+
+  ${rows.length ? rows.map(c=>contractCard(c)).join('') : `
+    <div class="card" style="text-align:center;padding:38px;color:var(--muted);">
+      Nothing under <strong>${esc(tab.label)}</strong>.
+      ${contractFilter==='all'?'<div style="margin-top:8px;">Add the first contract with the button above, or from the panel of any client — both put it in the same place.</div>':''}
+    </div>`}
+  `;
+}
+
+/** Jumps from a contract to the client it belongs to. */
+function openClientFromContract(clientId){
+  currentView='clients'; openPanel={type:'client', id:clientId}; render(); window.scrollTo(0,0);
+}
+
+async function deleteContract(id){
+  const c = (contractsData||[]).find(x=>x.id===id);
+  if(!confirm(`Delete ${c?c.contract_number:'this contract'}? This cannot be undone.`)) return;
+  try{
+    await API.del(`/api/contracts/${id}`);
+    contractsData = (contractsData||[]).filter(x=>x.id!==id);
+    render(); showToast('Contract deleted');
+  }catch(e){ showToast(e.message||'Could not delete it','warn'); }
+}
+
+/** Rolls a contract forward into its replacement, in one step. */
+async function supersedeContract(id){
+  const c = (contractsData||[]).find(x=>x.id===id);
+  if(!c) return;
+  if(!confirm(`Create a renewal of ${c.contract_number}?\n\nIt copies the terms forward as a draft, and marks ${c.contract_number} superseded so two contracts never both read active.`)) return;
+  try{
+    await API.post(`/api/contracts/${id}/supersede`, {});
+    await loadContracts();
+    showToast('Renewal drafted');
+  }catch(e){ showToast(e.message||'Could not create the renewal','warn'); }
+}
+
 /* ============================== QUOTES ============================== */
 /**
  * An estimate before anything is billed. A quote consumes no invoice number
@@ -4209,6 +4376,7 @@ function renderModal(){
   else if(openModal.type==='dunningStep') html = dunningStepModalHTML();
   else if(openModal.type==='automation') html = automationModalHTML();
   else if(openModal.type==='rate') html = rateModalHTML();
+  else if(openModal.type==='contract') html = contractModalHTML();
   root.innerHTML = `<div class="modal-overlay" onmousedown="if(event.target===this){openModal=null;render();}">${html}</div>`;
   if(openModal.type==='invoice') requestAnimationFrame(prefillInvoiceAmount);
   if(openModal.type==='bundle') requestAnimationFrame(bundleProductChanged);
@@ -4828,6 +4996,157 @@ async function saveRep(){
   }catch(e){ showToast(e.message||'Could not create rep','warn'); }
 }
 
+/**
+ * Add or edit a contract.
+ *
+ * Reached from two places — the Contracts tab and a client's own panel — and
+ * it is the same form either way. Opened from a client, it is pinned to that
+ * client; opened from the tab, it asks which one.
+ *
+ * The counterparty block prefills from the client record and is then EDITABLE
+ * and frozen on save, because the entity that signs is not always the account
+ * name and because a contract must keep saying what was true on the day it
+ * was signed.
+ */
+function openContractModal(id, clientId){
+  openModal = {type:'contract', id: id||null, clientId: clientId||null};
+  render();
+  requestAnimationFrame(()=>{ if(!id) contractClientChanged(); });
+}
+
+/** Prefills the counterparty from whichever client is selected. */
+function contractClientChanged(){
+  const sel = document.getElementById('k_client');
+  if(!sel) return;
+  const c = state.clients.find(x=>x.id===sel.value);
+  if(!c) return;
+  const set = (id,v)=>{ const el=document.getElementById(id); if(el && !el.value) el.value = v||''; };
+  set('k_legal', c.company); set('k_ntn', c.ntn); set('k_strn', c.strn); set('k_address', c.billingAddress);
+  const cur = document.getElementById('k_currency');
+  if(cur) cur.value = c.isInternal ? 'USD' : CURRENCY;
+}
+
+function contractModalHTML(){
+  const editing = openModal.id ? (contractsData||[]).find(c=>c.id===openModal.id) : null;
+  const c = editing || {};
+  const pinned = openModal.clientId || c.client_id || '';
+  const day = (v)=> v ? String(new Date(v).toISOString().slice(0,10)) : '';
+  const opts = (map, val) => Object.entries(map)
+    .map(([k,label])=>`<option value="${k}" ${val===k?'selected':''}>${esc(label)}</option>`).join('');
+  return `
+  <div class="modal" style="max-width:660px;">
+    <div class="modal-head"><h3>${editing?'Edit contract':'Add contract'}</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
+    <div class="modal-body">
+      ${editing
+        ? `<div class="field"><label>Client</label><input value="${esc(editing.company||'')}" disabled>
+             <div style="font-size:11px;color:var(--muted);margin-top:4px;">A contract cannot be moved to another client — raise it against the right one instead.</div></div>`
+        : `<div class="field"><label>Client</label>
+             <select id="k_client" onchange="contractClientChanged()">
+               ${state.clients.map(x=>`<option value="${x.id}" ${pinned===x.id?'selected':''}>${esc(x.company)}</option>`).join('')}
+             </select></div>`}
+
+      <div class="field"><label>Title</label><input id="k_title" value="${esc(c.title||'')}" placeholder="e.g. Master services agreement"></div>
+      <div class="field-row">
+        <div class="field"><label>Type</label><select id="k_kind">${opts(CONTRACT_KIND, c.kind||'service')}</select></div>
+        <div class="field"><label>Status</label><select id="k_status">${opts(CONTRACT_STATUS, c.stored_status||c.status||'draft')}</select></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Starts</label><input id="k_start" type="date" value="${day(c.start_date)}"></div>
+        <div class="field"><label>Ends</label><input id="k_end" type="date" value="${day(c.end_date)}">
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">Leave blank for open-ended.</div></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Value</label><input id="k_value" type="number" step="0.01" min="0" value="${c.value!=null?c.value:''}"></div>
+        <div class="field"><label>Currency</label><select id="k_currency">
+          <option value="PKR" ${c.currency==='PKR'?'selected':''}>PKR</option>
+          <option value="USD" ${c.currency==='USD'?'selected':''}>USD</option>
+        </select></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Billed</label><select id="k_freq">${opts(CONTRACT_FREQ, c.billing_frequency||'monthly')}</select></div>
+        <div class="field"><label>Notice required (days)</label><input id="k_notice" type="number" min="0" value="${c.notice_days!=null?c.notice_days:0}">
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">Drives the expiring-soon warning, so it lands while there is still time to give notice.</div></div>
+      </div>
+      <div class="field"><label>Renewal</label><select id="k_renew">
+        <option value="false" ${!c.auto_renew?'selected':''}>Ends on its end date</option>
+        <option value="true" ${c.auto_renew?'selected':''}>Renews automatically unless cancelled</option>
+      </select></div>
+
+      <div class="divider"></div>
+      <div style="font-size:10.5px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Signing</div>
+      <div class="field-row">
+        <div class="field"><label>Date signed</label><input id="k_signed" type="date" value="${day(c.signed_date)}"></div>
+        <div class="field"><label>Signed for the client by</label><input id="k_by_client" value="${esc(c.signed_by_client||'')}"></div>
+      </div>
+      <div class="field"><label>Signed for us by</label><input id="k_by_us" value="${esc(c.signed_by_us||'')}"></div>
+
+      <div class="divider"></div>
+      <div style="font-size:10.5px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Counterparty as signed</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">
+        Prefilled from the client record and then kept with the contract. Editing the client later will not rewrite it —
+        a contract has to keep saying what was true on the day it was signed.
+      </div>
+      <div class="field"><label>Registered name</label><input id="k_legal" value="${esc(c.client_legal_name||'')}"></div>
+      <div class="field-row">
+        <div class="field"><label>NTN</label><input id="k_ntn" value="${esc(c.client_ntn||'')}"></div>
+        <div class="field"><label>STRN</label><input id="k_strn" value="${esc(c.client_strn||'')}"></div>
+      </div>
+      <div class="field"><label>Registered address</label><input id="k_address" value="${esc(c.client_address||'')}"></div>
+
+      <div class="divider"></div>
+      <div class="field"><label>Link to the signed document</label><input id="k_doc" value="${esc(c.document_url||'')}" placeholder="https://…">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">The CRM keeps the link, not the file. A link that resolves beats a copy that goes stale.</div></div>
+      <div class="field"><label>Scope</label><input id="k_scope" value="${esc(c.scope||'')}" placeholder="What the agreement covers"></div>
+      <div class="field"><label>Notes</label><input id="k_notes" value="${esc(c.notes||'')}"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveContract()">${iconCheck(14)} ${editing?'Save changes':'Add contract'}</button>
+    </div>
+  </div>`;
+}
+
+async function saveContract(){
+  const v = (id)=> { const el=document.getElementById(id); return el ? el.value.trim() : ''; };
+  const editing = openModal.id;
+  const title = v('k_title');
+  if(!title){ showToast('Give the contract a title','warn'); return; }
+  const start = v('k_start'), end = v('k_end');
+  if(start && end && end < start){ showToast('The end date cannot fall before the start date','warn'); return; }
+
+  const body = {
+    title,
+    kind: v('k_kind'), status: v('k_status'),
+    start_date: start || null, end_date: end || null,
+    value: v('k_value') === '' ? 0 : Number(v('k_value')),
+    currency: v('k_currency'),
+    billing_frequency: v('k_freq'),
+    notice_days: v('k_notice') === '' ? 0 : Number(v('k_notice')),
+    auto_renew: v('k_renew') === 'true',
+    signed_date: v('k_signed') || null,
+    signed_by_client: v('k_by_client'), signed_by_us: v('k_by_us'),
+    client_legal_name: v('k_legal'), client_ntn: v('k_ntn'),
+    client_strn: v('k_strn'), client_address: v('k_address'),
+    document_url: v('k_doc'), scope: v('k_scope'), notes: v('k_notes'),
+  };
+
+  try{
+    if(editing){
+      await API.patch(`/api/contracts/${editing}`, body);
+    }else{
+      const clientId = openModal.clientId || v('k_client');
+      if(!clientId){ showToast('Pick a client','warn'); return; }
+      await API.post('/api/contracts', { ...body, client_id: clientId });
+    }
+    openModal = null;
+    // Reload rather than patch state by hand: the server derives status,
+    // days remaining and the expiring flag, and guessing them here is how the
+    // tab and the client panel start disagreeing.
+    await loadContracts();
+    showToast(editing ? 'Contract updated' : 'Contract added');
+  }catch(e){ showToast(e.message || 'Could not save the contract','warn'); }
+}
+
 function expenseModalHTML(){
   return `
   <div class="modal">
@@ -4935,6 +5254,20 @@ function clientPanelHTML(id){
         <span class="v">${sp?esc(sp.name):'—'} · ${fmtNum(sc.sessionsUsedThisMonth||0)}${sp?' / '+fmtNum(sp.quota):''}</span>
       </div>`;
     }).join('')}`:''}
+
+    <div class="divider"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+      <h4 style="font-size:13px;margin:0;">Contracts (${contractsFor(c.id).length})</h4>
+      <button class="btn btn-ghost btn-sm" onclick="openContractModal(null,'${c.id}')">${iconPlus(13)} Add contract</button>
+    </div>
+    <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">
+      The same records as the Contracts tab — one row, shown in both places, so they cannot disagree.
+    </div>
+    ${contractsData===null
+      ? `<div style="font-size:12px;color:var(--muted);">Loading…</div>`
+      : (contractsFor(c.id).length
+          ? contractsFor(c.id).map(k=>contractCard(k,{compact:true})).join('')
+          : `<div style="font-size:12px;color:var(--muted);">Nothing signed with them yet.</div>`)}
 
     <div class="divider"></div>
     <h4 style="font-size:13px;margin-bottom:4px;">Service</h4>
@@ -5699,6 +6032,10 @@ function attachPostRenderHooks(){
   }
   if(currentView==='settings'){ refreshInternalAccountCard(); refreshEmailCard(); loadJurisdictions(); }
   if(currentView==='quotes' && quotesData===null) loadQuotes();
+  // The client panel renders contracts too, so they have to be loaded when a
+  // panel is open as well as when the tab is — otherwise a client shows
+  // "Loading…" forever for want of anything to trigger the fetch.
+  if((currentView==='contracts' || (openPanel && openPanel.type==='client')) && contractsData===null) loadContracts();
   if(currentView==='ops' && opsData===null) loadOps();
 }
 

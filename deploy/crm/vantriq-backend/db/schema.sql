@@ -1151,3 +1151,80 @@ update invoices set fx_rate = 1, base_amount = amount
 -- not fail loudly, it just bounces somewhere nobody reads. Change it in
 -- Settings once another mailbox exists — nothing here overwrites a choice
 -- made there, so re-running this file never undoes it.
+
+-- =====================================================================
+-- v9.3 — CONTRACTS
+--
+-- The signed agreement behind an account. Until now the CRM held what a
+-- client is billed but not what they agreed to, so "what did we actually
+-- commit to, and when does it run out" lived in somebody's inbox.
+--
+-- One table, read from two places: the Contracts tab lists every contract
+-- across all clients, and a client's own panel lists theirs. Both render
+-- the same rows through the same code, so the two can never disagree —
+-- which is the whole point of having it in the system rather than a folder.
+--
+-- The counterparty's legal identity (NTN, STRN, registered name and
+-- address) is SNAPSHOT onto the contract, exactly as invoices snapshot
+-- theirs. A contract is a record of what was agreed with whom on the day
+-- it was signed; if a client later re-registers under a new NTN, last
+-- year's contract must still show the number it was actually signed under.
+-- Editing the client record must not silently rewrite history.
+-- =====================================================================
+
+create table if not exists contracts (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  contract_number text unique,
+  title text not null default '',
+  kind text not null default 'service'
+    check (kind in ('service','msa','sow','nda','amendment','renewal','other')),
+  status text not null default 'draft'
+    check (status in ('draft','sent','signed','active','expired','terminated','superseded')),
+
+  -- The term. end_date null means it runs until somebody ends it.
+  start_date date,
+  end_date date,
+  -- Renews by itself unless cancelled; notice_days is how much warning the
+  -- other side is owed. Both drive the "expiring soon" list, nothing else.
+  auto_renew boolean not null default false,
+  notice_days int not null default 0,
+
+  -- What it is worth. Currency follows the client's, so an internal
+  -- contract in USD stays in USD rather than being silently rebased.
+  value numeric not null default 0,
+  currency text not null default 'PKR',
+  billing_frequency text not null default 'monthly'
+    check (billing_frequency in ('one_off','monthly','quarterly','annual')),
+
+  -- Who signed, and under what legal identity. Snapshot at signing.
+  signed_date date,
+  signed_by_client text default '',
+  signed_by_us text default '',
+  client_legal_name text default '',
+  client_ntn text default '',
+  client_strn text default '',
+  client_address text default '',
+
+  -- The document itself lives wherever your files live; this is the link
+  -- to it. The CRM deliberately does not store the PDF: a CRM is not a
+  -- document store, and a link that resolves beats a blob that rots.
+  document_url text default '',
+
+  scope text default '',
+  notes text default '',
+  superseded_by uuid references contracts(id) on delete set null,
+  created_by text default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_contracts_client on contracts(client_id, start_date desc);
+create index if not exists idx_contracts_status on contracts(status, end_date);
+
+drop trigger if exists trg_contracts_updated on contracts;
+create trigger trg_contracts_updated before update on contracts
+  for each row execute function touch_updated_at();
+
+-- Contract numbers run in their own sequence, like invoice numbers, so two
+-- contracts raised in the same second cannot collide on one.
+create sequence if not exists contract_number_seq start 1;
