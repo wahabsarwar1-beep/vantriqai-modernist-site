@@ -1,6 +1,7 @@
 const db = require('../db');
 const { buildTaxInvoice, getSettings } = require('./billing');
 const { sendMail, invoiceEmail, mailConfigured } = require('./mailer');
+const { renderInvoicePdf, invoiceFilename } = require('./invoicePdf');
 
 /**
  * Sending an invoice to the customer.
@@ -10,9 +11,14 @@ const { sendMail, invoiceEmail, mailConfigured } = require('./mailer');
  * reached them was a dunning reminder days later saying an invoice was due —
  * a bill they had never been sent.
  *
- * This closes that. The email is built from the SAME printable document the
- * CRM and the portal render (buildTaxInvoice), so the figures a customer reads
- * in their inbox cannot drift from the figures on the invoice itself.
+ * This closes that. The invoice goes out as a PDF ATTACHMENT — a document a
+ * customer can file, print and hand to an accountant — with a short covering
+ * note in the body saying what it is and when it is due. A bill pasted into
+ * an email body is not something anybody can keep.
+ *
+ * Both are built from the SAME printable document the CRM and the portal
+ * render (buildTaxInvoice), so the figures a customer reads in their inbox
+ * cannot drift from the figures on the invoice itself.
  *
  * Three rules it will not break:
  *
@@ -91,9 +97,20 @@ async function sendInvoice(invoiceId, { force = false, settings = null } = {}) {
     ]);
 
     const doc = buildTaxInvoice(inv, inv, s, lines, pays);
-    const { subject, text, html } = invoiceEmail(doc, PORTAL_URL());
-    await sendMail({ to, subject, text, html });
-    return await record('sent', `Emailed ${to}.`);
+
+    // The attachment is the invoice; the body is a note about it. If the PDF
+    // cannot be produced we do NOT quietly fall back to a body-only email —
+    // that is how a bill goes out in a form nobody can file, and it already
+    // happened once. Fail, log why, and let it be retried.
+    const filename = invoiceFilename(doc);
+    const pdf = await renderInvoicePdf(doc);
+
+    const { subject, text, html } = invoiceEmail(doc, PORTAL_URL(), { attachmentName: filename });
+    await sendMail({
+      to, subject, text, html,
+      attachments: [{ filename, content: pdf, contentType: 'application/pdf' }],
+    });
+    return await record('sent', `Emailed ${to} with ${filename} attached.`);
   } catch (err) {
     return await record('failed', err.message || String(err));
   }
