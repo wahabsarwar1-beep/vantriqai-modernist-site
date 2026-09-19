@@ -987,7 +987,35 @@ function iconInbox(size){ return icon('<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path
 
 /* ---------------------------- Derived data helpers ---------------------------- */
 function productOf(client){ return state.products.find(p=>p.id===client.productId); }
-function activeClients(){ return state.clients.filter(c=>c.stage==='active'); }
+/**
+ * Paying customers. NOT our own account.
+ *
+ * VantriqAI is a client of itself so its agents can be metered and costed, and
+ * it sits at stage 'active' carrying an Enterprise+ package. Counting it here
+ * put its retainer into monthly recurring revenue — booking what we pay
+ * ourselves as money coming in, and inflating the client count, the tier
+ * breakdown and the margin with it. The P&L already knew our own account is a
+ * cost; the dashboard and the projection did not.
+ *
+ * Anything that adds up revenue starts here. The cost side uses
+ * internalAiCostMonthly() below.
+ */
+function activeClients(){ return state.clients.filter(c=>c.stage==='active' && !c.isInternal); }
+
+/**
+ * What our own agents cost this month, in rupees.
+ *
+ * Read off the internal invoices' stamped PKR figure — never the raw USD,
+ * which would add dollars to a rupee total. An invoice raised before a
+ * conversion rate was entered has no PKR figure and contributes nothing; the
+ * Financials page reports those separately rather than guessing at them.
+ */
+function internalAiCostMonthly(){
+  const thisMonth = todayISO().slice(0,7);
+  return (state.invoices||[])
+    .filter(i=>i.isInternal && i.status!=='void' && String(i.date||'').slice(0,7)===thisMonth)
+    .reduce((s,i)=>s+(i.baseAmount!=null?Number(i.baseAmount):0),0);
+}
 function pipelineClients(){ return state.clients.filter(c=>['lead','contacted','proposal','negotiation'].includes(c.stage)); }
 function mrr(){ return activeClients().reduce((s,c)=>{ const p=productOf(c); return s+(p?p.retainer:0); },0); }
 function pipelineValue(){ return pipelineClients().reduce((s,c)=>s+(c.estValue||0),0); }
@@ -1162,7 +1190,9 @@ function renderDashboard(){
   const pending = state.invoices.filter(i=>i.status==='pending');
   const totalDelivery = totalVariableDeliveryCostMonthly();
   const totalFixed = totalPlatformCostMonthly() + totalContractLabourMonthly();
-  const netMonthly = mrrVal - totalDelivery - totalFixed;
+  // Our own agents are a cost like any other, and one of the larger ones.
+  const ownAiCost = internalAiCostMonthly();
+  const netMonthly = mrrVal - totalDelivery - totalFixed - ownAiCost;
   const marginPct = mrrVal>0 ? ((mrrVal-totalDelivery)/mrrVal*100) : 0;
 
   return `
@@ -1176,6 +1206,11 @@ function renderDashboard(){
       <div class="label">Monthly recurring revenue</div>
       <div class="value mono">${fmtMoney(mrrVal)}</div>
       <div class="delta up">${fmtMoney(mrrVal*12)} annualised</div>
+    </div>
+    <div class="card kpi">
+      <div class="label">Our own AI usage</div>
+      <div class="value mono">${fmtMoney(ownAiCost)}</div>
+      <div class="delta">cost this month, not revenue</div>
     </div>
     <div class="card kpi">
       <div class="label">Pipeline value</div>

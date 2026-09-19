@@ -25,8 +25,25 @@ router.get('/', async (req, res) => {
   const settings = settingsQ.rows[0];
 
   const productById = Object.fromEntries(products.map((p) => [p.id, p]));
-  const active = clients.filter((c) => c.stage === 'active');
+  // Paying customers only. VantriqAI is a client of itself so its agents can
+  // be metered, and it sits at stage 'active' on an Enterprise+ package — so
+  // counting it here booked what we pay ourselves as recurring revenue, and
+  // inflated the client count, the tier split and the margin with it. The P&L
+  // already treated our own account as cost; this did not.
+  const active = clients.filter((c) => c.stage === 'active' && !c.is_internal);
+  const internalIds = new Set(clients.filter((c) => c.is_internal).map((c) => c.id));
   const pipeline = clients.filter((c) => ['lead', 'contacted', 'proposal', 'negotiation'].includes(c.stage));
+
+  // What our own agents cost this month, in the books' currency. Taken from
+  // the PKR figure stamped on each internal invoice, never the raw USD —
+  // adding dollars to a rupee total is how this went wrong elsewhere. An
+  // invoice raised before a rate was entered has no stamped figure and
+  // contributes nothing rather than a guess.
+  const ym = month.slice(0, 7);
+  const internalAiCost = invoices
+    .filter((i) => internalIds.has(i.client_id) && i.status !== 'void'
+      && new Date(i.issued_date).toISOString().slice(0, 7) === ym)
+    .reduce((s, i) => s + (i.base_amount != null ? Number(i.base_amount) : 0), 0);
 
   const mrr = active.reduce((s, c) => s + (productById[c.product_id] ? Number(productById[c.product_id].retainer) : 0), 0);
   const pipelineValue = pipeline.reduce((s, c) => s + Number(c.est_value || 0), 0);
@@ -47,7 +64,7 @@ router.get('/', async (req, res) => {
     const p = productById[c.product_id];
     return s + (p ? Number(p.delivery_cost_full) * utilization : 0);
   }, 0);
-  const netMonthlyResult = mrr - totalDeliveryCost - totalPlatformCost - totalContractLabour;
+  const netMonthlyResult = mrr - totalDeliveryCost - totalPlatformCost - totalContractLabour - internalAiCost;
 
   const attention = invoices
     .filter((i) => i.status === 'pending' || i.status === 'overdue')
@@ -70,10 +87,11 @@ router.get('/', async (req, res) => {
       total_platform_cost: totalPlatformCost,
       total_contract_labour: totalContractLabour,
       total_delivery_cost: totalDeliveryCost,
+      internal_ai_cost: internalAiCost,
       utilization,
   };
   if (withholdCosts) {
-    for (const k of ['net_monthly_result','margin_pct','total_platform_cost','total_contract_labour','total_delivery_cost','utilization']) {
+    for (const k of ['net_monthly_result','margin_pct','total_platform_cost','total_contract_labour','total_delivery_cost','internal_ai_cost','utilization']) {
       delete kpis[k];
     }
   }
