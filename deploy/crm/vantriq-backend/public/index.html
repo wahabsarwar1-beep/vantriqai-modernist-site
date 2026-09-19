@@ -3626,7 +3626,7 @@ function renderSettings(){
     <div class="field"><label>Company name</label><input id="setCompanyName" value="${esc(state.company.name)}"></div>
     <div class="field"><label>City</label><input id="setCompanyCity" value="${esc(state.company.city)}"></div>
     <div class="field"><label>Founder</label><input id="setCompanyFounder" value="${esc(state.company.founder)}"></div>
-    <button class="btn btn-primary" onclick="saveSettings()">Save changes</button>
+    <button class="btn btn-primary" onclick="saveSettings()">Save company details</button>
   </div>
   <div class="card" style="max-width:520px;margin-top:16px;">
     <h3 style="margin-top:0;font-size:14.5px;">Tax &amp; invoicing</h3>
@@ -3774,6 +3774,37 @@ function renderSettings(){
   </div>
   `;
 }
+/**
+ * Repaints Settings without throwing away what is typed in the other cards.
+ *
+ * Settings is a stack of cards, each with its own save button, and every save
+ * ends in render() — which rebuilds the page from `state` with innerHTML and
+ * takes any unsaved typing with it. Fill in your NTN, press the button above
+ * it (which belongs to the card above), and the NTN you just typed vanishes
+ * while a toast says "saved". It saved something; just not that.
+ *
+ * So: snapshot every field, repaint, put the values back. Fields belonging to
+ * the card that just saved are left out of the snapshot, because `state` now
+ * holds the saved-and-normalised version of those and it should win.
+ */
+function renderSettingsKeepingInput(savedIds = []) {
+  const keep = {};
+  document.querySelectorAll('#app input[id^="set"], #app select[id^="set"], #app textarea[id^="set"]')
+    .forEach((el) => {
+      if (savedIds.includes(el.id)) return;
+      keep[el.id] = el.value;
+    });
+
+  render();
+
+  for (const [id, value] of Object.entries(keep)) {
+    const el = document.getElementById(id);
+    // Only write it back when it actually differs, so a repaint does not mark
+    // untouched fields as changed.
+    if (el && el.value !== value) el.value = value;
+  }
+}
+
 async function saveSettings(){
   const payload = {
     company_name: document.getElementById('setCompanyName').value || state.company.name,
@@ -3783,7 +3814,8 @@ async function saveSettings(){
   try{
     const updated = await API.put('/api/settings', payload);
     applySettings(updated);
-    render(); showToast('Settings saved');
+    renderSettingsKeepingInput(['setCompanyName', 'setCompanyCity', 'setCompanyFounder']);
+    showToast('Company details saved');
   }catch(e){ showToast(e.message||'Could not save settings','warn'); }
 }
 
@@ -3825,7 +3857,8 @@ async function saveOveragePolicy(){
   try{
     const updated = await API.put('/api/settings', { overage_policy: policy, overage_grace_pct: pct });
     applySettings(updated);
-    render(); showToast('Policy saved');
+    renderSettingsKeepingInput(['setOveragePolicy', 'setOverageGrace']);
+    showToast('Policy saved');
   }catch(e){ showToast(e.message||'Could not save the policy','warn'); }
 }
 
@@ -3838,7 +3871,9 @@ async function saveAccountingSettings(){
   if(d) payload.opening_cash_date = d;
   try{
     applySettings(await API.put('/api/settings', payload));
-    accountingData = null; render(); showToast('Accounting settings saved');
+    accountingData = null;
+    renderSettingsKeepingInput(['setOpeningCash', 'setInternalLabel', 'setOpeningCashDate']);
+    showToast('Accounting settings saved');
   }catch(e){ showToast(e.message||'Could not save accounting settings','warn'); }
 }
 
@@ -3979,7 +4014,11 @@ async function saveTaxSettings(){
       internal_invoice_email: v('setInternalEmail'),
     });
     applySettings(updated);
-    render(); showToast('Tax details saved');
+    renderSettingsKeepingInput([
+      'setNtn', 'setStrn', 'setAddress', 'setTaxRate', 'setAitRate',
+      'setUsdRate', 'setInternalEmail', 'setTerms', 'setSellerEmail', 'setPrefix',
+    ]);
+    showToast('Tax details saved');
   }catch(e){ showToast(e.message||'Could not save tax details','warn'); }
 }
 function exportAllData(){
@@ -4972,25 +5011,35 @@ async function printTaxInvoice(id){
   if(!r.ok) showToast(r.error, 'warn');
 }
 
-function downloadInvoice(id){
+/**
+ * Downloads the invoice as the PDF the customer gets.
+ *
+ * This used to write a text file listing eight fields — no line items, no tax
+ * breakdown, no registration numbers, a raw ISO timestamp for a date, and a
+ * .txt extension. Nobody can file that or give it to an accountant. It is now
+ * the same document the email attaches and the portal prints, rendered
+ * server-side from the same figures.
+ */
+async function downloadInvoice(id){
   const inv = state.invoices.find(i=>i.id===id);
-  const c = state.clients.find(x=>x.id===inv.clientId);
-  const p = c?productOf(c):null;
-  const text = [
-    `${state.company.name} — Invoice`,
-    `Bill to: ${c?c.company:'—'} (${c?c.name:''})`,
-    `Type: ${inv.type}`,
-    `Package: ${p?p.name:'—'}`,
-    `Period: ${inv.period||'—'}`,
-    `Date: ${inv.date}`,
-    `Status: ${inv.status}`,
-    `Amount: ${fmtMoney(inv.amount, inv.currency)}`,
-  ].join('\n');
-  const blob = new Blob([text], {type:'text/plain'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `invoice-${(c?c.company:'client').replace(/\s+/g,'-')}-${inv.date}.txt`;
-  a.click();
+  showToast('Preparing the invoice…');
+  try{
+    const headers = {};
+    if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
+    else if(API.key) headers['x-api-key'] = API.key;
+    const res = await fetch(`${API.base}/api/invoices/${id}/pdf`, { headers });
+    if(!res.ok){
+      const err = await res.json().catch(()=>null);
+      throw new Error((err && err.error) || `Could not build the invoice (${res.status})`);
+    }
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${(inv && inv.number) || 'invoice'}.pdf`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    showToast('Invoice downloaded');
+  }catch(e){ showToast(e.message||'Could not download the invoice','warn'); }
 }
 
 

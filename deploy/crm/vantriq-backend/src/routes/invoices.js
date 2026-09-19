@@ -5,6 +5,7 @@ const {
   settlementOf, derivedStatus,
 } = require('../utils/billing');
 const { sendInvoice, previewInvoiceSend, deliveryHistory } = require('../utils/invoiceDelivery');
+const { renderInvoicePdf, invoiceFilename } = require('../utils/invoicePdf');
 const { blockAutomation } = require('../middleware/auth');
 const router = express.Router();
 
@@ -194,6 +195,44 @@ router.get('/:id/tax-invoice', async (req, res) => {
     db.query(`select * from payments where invoice_id = $1 order by received_date, created_at`, [inv.id]),
   ]);
   res.json(buildTaxInvoice(inv, inv, settings, lines, pays));
+});
+
+/**
+ * GET /api/invoices/:id/pdf — the invoice as a file you can keep.
+ *
+ * The same document the customer is emailed and the same one the portal
+ * prints, rendered from the same buildTaxInvoice() output. Before this, the
+ * CRM's Download button wrote a hand-built text file listing five fields,
+ * which is not something anyone can file or hand to an accountant.
+ */
+router.get('/:id/pdf', async (req, res) => {
+  const [{ rows }, settings] = await Promise.all([
+    db.query(
+      `select i.*, c.company, c.name, c.email, c.phone
+         from invoices i join clients c on c.id = i.client_id
+        where i.id = $1`,
+      [req.params.id]
+    ),
+    getSettings(),
+  ]);
+  const inv = rows[0];
+  if (!inv) return res.status(404).json({ error: 'Invoice not found' });
+  const [{ rows: lines }, { rows: pays }] = await Promise.all([
+    db.query(`select * from invoice_lines where invoice_id = $1 order by position`, [inv.id]),
+    db.query(`select * from payments where invoice_id = $1 order by received_date, created_at`, [inv.id]),
+  ]);
+
+  const doc = buildTaxInvoice(inv, inv, settings, lines, pays);
+  try {
+    const pdf = await renderInvoicePdf(doc);
+    res.setHeader('Content-Type', 'application/pdf');
+    // `inline` so a browser can preview it; the filename is still what it
+    // saves as. invoiceFilename strips anything with no business in a header.
+    res.setHeader('Content-Disposition', `inline; filename="${invoiceFilename(doc)}"`);
+    res.send(pdf);
+  } catch (err) {
+    res.status(500).json({ error: `Could not render the invoice: ${err.message}` });
+  }
 });
 
 /**
