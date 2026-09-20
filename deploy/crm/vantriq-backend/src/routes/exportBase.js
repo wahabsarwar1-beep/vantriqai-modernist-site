@@ -55,6 +55,121 @@ function addSheet(wb, name, columns, rows) {
 const col = (header, key, opts = {}) => ({ header, key, ...opts });
 
 /**
+ * The Contracts tab's own filters, mirrored exactly.
+ *
+ * The screen and the spreadsheet have to agree on what "expiring soon" means,
+ * so the rule lives here once and the tab's counts are derived from the same
+ * fields the API already computes. Getting these out of step would be worse
+ * than having no export: somebody reconciles a download against the screen and
+ * finds a different number with no way to tell which is right.
+ */
+const CONTRACT_VIEWS = [
+  { id: 'active',   label: 'Active',        match: (c) => c.status === 'active' || c.status === 'signed' },
+  { id: 'expiring', label: 'Expiring soon', match: (c) => c.expiring_soon },
+  { id: 'draft',    label: 'Draft or sent', match: (c) => c.status === 'draft' || c.status === 'sent' },
+  { id: 'ended',    label: 'Ended',         match: (c) => ['expired', 'terminated', 'superseded'].includes(c.status) },
+];
+
+const CONTRACT_COLUMNS = [
+  col('Contract #', 'contract_number', { width: 20 }),
+  col('Company', 'company', { width: 26 }),
+  col('Title', 'title', { width: 30 }),
+  col('Type', 'kind', { width: 13 }), col('Status', 'status', { width: 13 }),
+  col('Starts', 'start_date', { date: true }), col('Ends', 'end_date', { date: true }),
+  col('Days remaining', 'days_remaining', { width: 14 }),
+  col('Expiring soon', 'expiring_soon', { width: 13 }),
+  col('Auto-renews', 'auto_renew'), col('Notice (days)', 'notice_days'),
+  col('Value', 'value', { money: true }), col('Currency', 'currency'),
+  col('Billed', 'billing_frequency', { width: 13 }),
+  col('Signed', 'signed_date', { date: true }),
+  col('Signed by (client)', 'signed_by_client', { width: 22 }),
+  col('Signed by (us)', 'signed_by_us', { width: 22 }),
+  // As signed, never the client record's current values.
+  col('Registered name', 'client_legal_name', { width: 26 }),
+  col('NTN', 'client_ntn', { width: 16 }), col('STRN', 'client_strn', { width: 20 }),
+  col('Registered address', 'client_address', { width: 30 }),
+  col('Document', 'document_url', { width: 34 }),
+  col('Scope', 'scope', { width: 30 }), col('Notes', 'notes', { width: 30 }),
+];
+
+/**
+ * GET /api/export/contracts.xlsx[?view=expiring]
+ *
+ * With no view it writes one sheet per filter on the Contracts tab plus an
+ * "All contracts" sheet, so the whole book and each section separately arrive
+ * together. With ?view= it writes that section alone.
+ */
+router.get('/contracts.xlsx', async (req, res) => {
+  const wanted = String(req.query.view || 'all').toLowerCase();
+  const chosen = CONTRACT_VIEWS.find((v) => v.id === wanted);
+  if (wanted !== 'all' && !chosen) {
+    return res.status(400).json({
+      error: `Unknown section '${req.query.view}'. Use one of: all, ${CONTRACT_VIEWS.map((v) => v.id).join(', ')}.`,
+    });
+  }
+
+  const [{ rows }, { rows: settingsRows }] = await Promise.all([
+    db.query(
+      `select k.*, c.company, c.ntn as client_current_ntn, c.strn as client_current_strn
+         from contracts k join clients c on c.id = k.client_id
+        order by c.company, k.start_date desc nulls last`
+    ),
+    db.query(`select * from settings where id = 1`),
+  ]);
+  const settings = settingsRows[0] || {};
+
+  // The same derivations the Contracts tab shows. Status follows the term —
+  // a contract whose end date has passed reads expired whether or not anyone
+  // opened the CRM to say so — and expiring-soon uses the contract's own
+  // notice period, so a 90-day-notice agreement warns three months out.
+  const today = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00Z').getTime();
+  // pg hands dates back as Date objects in-process, and String(aDate) gives
+  // 'Thu Oct 15 2026 ...' — so slicing ten characters off it yields
+  // 'Thu Oct 15', which parses to Invalid Date. Every comparison against NaN
+  // is then false, and the spreadsheet quietly reports nothing as expiring
+  // while the screen reports two. Same trap as the invoice PDF's dates.
+  const asDay = (d) => (d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10));
+  const daysUntil = (d) => (d ? Math.round((new Date(asDay(d) + 'T00:00:00Z').getTime() - today) / 86400000) : null);
+  const contracts = rows.map((c) => {
+    const left = daysUntil(c.end_date);
+    let status = c.status;
+    if (!['terminated', 'superseded', 'draft', 'sent'].includes(c.status)) {
+      if (c.end_date && left < 0) status = 'expired';
+      else if (c.status === 'signed' && c.start_date && daysUntil(c.start_date) <= 0) status = 'active';
+    }
+    return {
+      ...c,
+      status,
+      days_remaining: left,
+      expiring_soon: status === 'active' && left != null && left >= 0
+        && left <= Math.max(30, Number(c.notice_days || 0)),
+      client_legal_name: c.client_legal_name || c.company,
+      client_ntn: c.client_ntn || c.client_current_ntn || '',
+      client_strn: c.client_strn || c.client_current_strn || '',
+    };
+  });
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = settings.company_name || 'Vantriq AI';
+  wb.created = new Date();
+
+  if (chosen) {
+    addSheet(wb, chosen.label, CONTRACT_COLUMNS, contracts.filter(chosen.match));
+  } else {
+    addSheet(wb, 'All contracts', CONTRACT_COLUMNS, contracts);
+    for (const v of CONTRACT_VIEWS) addSheet(wb, v.label, CONTRACT_COLUMNS, contracts.filter(v.match));
+  }
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  const who = (settings.company_name || 'vantriq').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition',
+    `attachment; filename="${who}-contracts-${chosen ? chosen.id + '-' : ''}${stamp}.xlsx"`);
+  await wb.xlsx.write(res);
+  res.end();
+});
+
+/**
  * The pipeline stages, in the order a deal moves through them.
  *
  * 'lost' folds churned in with it: from the pipeline's point of view they are

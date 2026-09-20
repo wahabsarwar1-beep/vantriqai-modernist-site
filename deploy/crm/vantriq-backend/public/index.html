@@ -2768,6 +2768,37 @@ async function deleteRemittance(id){
 }
 
 /**
+ * Downloads the Contracts tab as a spreadsheet — the section you are looking
+ * at, or every section at once when you are on All.
+ *
+ * The file's sections are derived server-side from the same fields the tab
+ * counts, so a download reconciled against the screen agrees with it. Getting
+ * that wrong is worse than having no export: you end up with two numbers and
+ * no way to tell which is right.
+ */
+async function downloadContracts(view){
+  const one = view && view !== 'all';
+  showToast(one ? 'Building the section…' : 'Building the contracts book…');
+  try{
+    const headers = {};
+    if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
+    else if(API.key) headers['x-api-key'] = API.key;
+    const res = await fetch(`${API.base}/api/export/contracts.xlsx${one?`?view=${encodeURIComponent(view)}`:''}`, { headers });
+    if(!res.ok){
+      const err = await res.json().catch(()=>null);
+      throw new Error((err&&err.error) || `Export failed (${res.status})`);
+    }
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `vantriq-contracts-${one?view+'-':''}${todayISO()}.xlsx`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    showToast(one ? 'Section downloaded' : 'Contracts downloaded');
+  }catch(e){ showToast(e.message||'Could not build the spreadsheet','warn'); }
+}
+
+/**
  * Downloads the pipeline as a spreadsheet — the stage you are looking at, or
  * every stage at once when you are on "All stages".
  *
@@ -3408,6 +3439,14 @@ function renderContracts(){
   <div class="stage-tabs" style="margin-top:16px;">
     ${TABS.map(t=>`<button class="stage-tab ${contractFilter===t.id?'active':''}"
       onclick="contractFilter='${t.id}';render()">${esc(t.label)}<span class="n">${all.filter(t.match).length}</span></button>`).join('')}
+  </div>
+  <div style="display:flex;justify-content:flex-end;margin:-4px 0 14px;">
+    <button class="btn btn-ghost btn-sm" onclick="downloadContracts('${tab.id==='all'?'all':tab.id}')"
+      title="${contractFilter==='all'
+        ? 'One sheet per section, plus every contract together on an All sheet'
+        : `The ${rows.length} contract${rows.length===1?'':'s'} in this section`}">
+      ${iconDownload(13)} ${contractFilter==='all' ? 'Export contracts to Excel' : `Export ${esc(tab.label)} to Excel`}
+    </button>
   </div>
 
   ${rows.length ? rows.map(c=>contractCard(c)).join('') : `

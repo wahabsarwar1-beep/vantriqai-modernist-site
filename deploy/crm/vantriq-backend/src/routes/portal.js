@@ -9,6 +9,9 @@ const { buildTaxInvoice, getSettings } = require('../utils/billing');
 const { requirePortalSession } = require('../middleware/portalAuth');
 const { effectivePackage } = require('../utils/pkg');
 const { acceptQuote, buildQuoteDocument } = require('./quotes');
+const { renderInvoicePdf, invoiceFilename } = require('../utils/invoicePdf');
+const { renderWhtStatement, whtFilename } = require('../utils/whtCertificate');
+const ExcelJS = require('exceljs');
 
 const router = express.Router();
 
@@ -204,6 +207,85 @@ router.get('/invoices', async (req, res) => {
   res.json(rows.map(formatInvoice));
 });
 
+/**
+ * GET /api/portal/invoices/tax-withheld.pdf[?year=2026][&invoice=<id>]
+ *
+ * The statement of advance income tax withheld — for a year, or for one
+ * invoice. Declared BEFORE the /invoices/:invoiceId routes would otherwise
+ * be reached, since 'tax-withheld.pdf' would match :invoiceId and 404 as a
+ * missing invoice rather than doing anything useful.
+ *
+ * Only invoices that actually had tax withheld appear. An invoice with no
+ * deduction on it has nothing to certify, and listing it at zero invites the
+ * reader to think something went wrong.
+ */
+router.get('/invoices/tax-withheld.pdf', async (req, res) => {
+  const client = req.portalClient;
+  const settings = await getSettings();
+
+  const params = [client.id];
+  let where = `client_id = $1 and status <> 'void' and coalesce(ait_amount, 0) > 0`;
+  let label;
+  if (req.query.invoice) {
+    params.push(req.query.invoice);
+    where += ` and id = $${params.length}`;
+    label = 'single invoice';
+  } else {
+    const year = /^\d{4}$/.test(String(req.query.year || '')) ? String(req.query.year)
+      : String(new Date().getUTCFullYear());
+    params.push(`${year}-01-01`, `${year}-12-31`);
+    where += ` and issued_date between $${params.length - 1}::date and $${params.length}::date`;
+    label = year;
+  }
+
+  const { rows } = await db.query(
+    `select invoice_number, issued_date, amount, tax_amount, total_amount,
+            ait_rate, ait_amount, net_payable, currency, client_legal_name,
+            client_ntn, client_strn, billing_address
+       from invoices where ${where} order by issued_date, invoice_number`,
+    params
+  );
+  if (!rows.length) {
+    return res.status(404).json({
+      error: req.query.invoice
+        ? 'No tax was withheld on that invoice, so there is nothing to state.'
+        : `No tax was withheld on any invoice in ${label}.`,
+    });
+  }
+  if (req.query.invoice) label = rows[0].invoice_number || 'single invoice';
+
+  // The identity as STAMPED on the invoices, not the client record's current
+  // values — the statement has to agree with the documents it summarises, and
+  // a customer who re-registered mid-year must see what was actually filed.
+  const first = rows[0];
+  const d = {
+    seller: {
+      name: settings.company_name || 'Vantriq AI',
+      ntn: settings.seller_ntn || settings.ntn || '',
+      strn: settings.seller_strn || settings.strn || '',
+      address: settings.seller_address || settings.address || '',
+      email: settings.seller_email || '',
+    },
+    buyer: {
+      company: first.client_legal_name || client.company,
+      ntn: first.client_ntn || client.ntn || '',
+      strn: first.client_strn || client.strn || '',
+      address: first.billing_address || client.billing_address || '',
+    },
+    period: { label },
+    rows,
+  };
+  try {
+    const pdf = await renderWhtStatement(d);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${whtFilename(d)}"`);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.send(pdf);
+  } catch (err) {
+    res.status(500).json({ error: `Could not build the statement: ${err.message}` });
+  }
+});
+
 router.get('/invoices/:invoiceId', async (req, res) => {
   const { rows } = await db.query(
     `select * from invoices where id = $1 and client_id = $2`,
@@ -253,6 +335,154 @@ function formatInvoice(inv) {
 }
 
 /* ---------------------------- Ledger ---------------------------- */
+/**
+ * GET /api/portal/invoices/:invoiceId/pdf
+ *
+ * The same document the CRM sends and prints, rendered from the same
+ * buildTaxInvoice output — so the copy the customer pulls down themselves is
+ * byte-for-byte the copy we emailed them, not a lookalike.
+ */
+router.get('/invoices/:invoiceId/pdf', async (req, res) => {
+  const [{ rows }, settings] = await Promise.all([
+    db.query(`select * from invoices where id = $1 and client_id = $2`,
+      [req.params.invoiceId, req.portalClient.id]),
+    getSettings(),
+  ]);
+  if (!rows[0]) return res.status(404).json({ error: 'Invoice not found' });
+  const [{ rows: lines }, { rows: pays }] = await Promise.all([
+    db.query(`select * from invoice_lines where invoice_id = $1 order by position`, [rows[0].id]),
+    db.query(`select * from payments where invoice_id = $1 order by received_date, created_at`, [rows[0].id]),
+  ]);
+  const doc = buildTaxInvoice(rows[0], req.portalClient, settings, lines, pays);
+  try {
+    const pdf = await renderInvoicePdf(doc);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${invoiceFilename(doc)}"`);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.send(pdf);
+  } catch (err) {
+    res.status(500).json({ error: `Could not build the invoice: ${err.message}` });
+  }
+});
+
+/**
+ * GET /api/portal/contracts — the customer's own agreements and when they end.
+ *
+ * Read-only on purpose. A customer should be able to see what they signed and
+ * how long is left on it without asking; changing any of it is a conversation,
+ * not a button.
+ */
+router.get('/contracts', async (req, res) => {
+  const { rows } = await db.query(
+    `select id, contract_number, title, kind, status, start_date, end_date,
+            auto_renew, notice_days, value, currency, billing_frequency,
+            signed_date, signed_by_client, signed_by_us, document_url, scope,
+            client_legal_name, client_ntn, client_strn
+       from contracts where client_id = $1
+      order by coalesce(start_date, created_at::date) desc`,
+    [req.portalClient.id]
+  );
+  const today = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00Z').getTime();
+  // A Date, not a string, is what pg hands back in-process — and
+  // String(aDate).slice(0,10) is 'Thu Oct 15', which parses to Invalid Date.
+  // The customer would then never be told their contract is about to expire.
+  const asDay = (d) => (d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10));
+  const daysUntil = (d) => (d ? Math.round((new Date(asDay(d) + 'T00:00:00Z').getTime() - today) / 86400000) : null);
+
+  res.json(rows.map((c) => {
+    const left = daysUntil(c.end_date);
+    let status = c.status;
+    if (!['terminated', 'superseded', 'draft', 'sent'].includes(c.status)) {
+      if (c.end_date && left < 0) status = 'expired';
+      else if (c.status === 'signed' && c.start_date && daysUntil(c.start_date) <= 0) status = 'active';
+    }
+    return {
+      ...c, status, days_remaining: left,
+      // The same rule the CRM uses, so neither side is warned before or after
+      // the other: the contract's own notice period, floored at 30 days.
+      expiring_soon: status === 'active' && left != null && left >= 0
+        && left <= Math.max(30, Number(c.notice_days || 0)),
+      // A draft is ours until it is sent; a customer seeing one would be
+      // reading a document nobody has agreed to yet.
+    };
+  }).filter((c) => c.status !== 'draft'));
+});
+
+/**
+ * GET /api/portal/sessions.xlsx[?month=YYYY-MM]
+ *
+ * The month's conversations as a spreadsheet — the same rows, the same
+ * included-or-billable split, as the Activity tab shows.
+ *
+ * session_id is deliberately NOT in the file. It contains the end consumer's
+ * phone number; the portal has never shown it and a download must not be the
+ * way it leaks.
+ */
+router.get('/sessions.xlsx', async (req, res) => {
+  const client = req.portalClient;
+  const m = String(req.query.month || '').slice(0, 7);
+  const month = /^\d{4}-\d{2}$/.test(m) ? `${m}-01` : new Date().toISOString().slice(0, 7) + '-01';
+
+  let quota = null, overageRate = null;
+  if (client.product_id) {
+    const { rows } = await db.query(`select * from products where id = $1`, [client.product_id]);
+    const eff = effectivePackage(client, rows[0]);
+    if (eff) { quota = eff.quota; overageRate = eff.overage_rate; }
+  }
+
+  const { rows } = await db.query(
+    `with s as (
+       select session_id,
+              min(occurred_at) as started_at,
+              max(occurred_at) as ended_at,
+              sum(messages_count)::int as messages,
+              mode() within group (order by channel) as channel
+         from usage_events
+        where client_id = $1 and occurred_at >= $2::date
+          and occurred_at < ($2::date + interval '1 month')
+        group by session_id
+     )
+     select started_at, ended_at, messages, channel,
+            row_number() over (order by started_at asc)::int as seq
+       from s order by started_at asc`,
+    [client.id, month]
+  );
+
+  const settings = await getSettings();
+  const wb = new ExcelJS.Workbook();
+  wb.creator = settings.company_name || 'Vantriq AI';
+  const ws = wb.addWorksheet(`Sessions ${month.slice(0, 7)}`);
+  ws.columns = [
+    { header: '#', key: 'seq', width: 7 },
+    { header: 'Started', key: 'started', width: 22, style: { numFmt: 'yyyy-mm-dd hh:mm' } },
+    { header: 'Ended', key: 'ended', width: 22, style: { numFmt: 'yyyy-mm-dd hh:mm' } },
+    { header: 'Channel', key: 'channel', width: 14 },
+    { header: 'Messages', key: 'messages', width: 11 },
+    { header: 'Length (minutes)', key: 'minutes', width: 16 },
+    { header: 'Charge', key: 'charge', width: 16 },
+  ];
+  for (const r of rows) {
+    const billable = quota != null && r.seq > quota;
+    ws.addRow({
+      seq: r.seq,
+      started: r.started_at, ended: r.ended_at,
+      channel: r.channel || '', messages: r.messages || 0,
+      minutes: Math.max(0, Math.round((new Date(r.ended_at) - new Date(r.started_at)) / 60000)),
+      charge: billable ? Number(overageRate || 0) : 'Included',
+    });
+  }
+  ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF111111' } };
+  ws.views = [{ state: 'frozen', ySplit: 1 }];
+  if (rows.length) ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 7 } };
+
+  const who = String(client.company || 'sessions').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${who}-sessions-${month.slice(0, 7)}.xlsx"`);
+  await wb.xlsx.write(res);
+  res.end();
+});
+
 router.get('/ledger', async (req, res) => {
   const { rows } = await db.query(
     `select * from invoices where client_id = $1 order by issued_date asc, created_at asc`,

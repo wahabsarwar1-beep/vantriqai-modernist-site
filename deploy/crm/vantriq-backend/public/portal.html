@@ -369,7 +369,11 @@ async function boot(){
       api('/account'), api('/usage'), api('/invoices'), api('/ledger'), api('/packages'),
       api('/agents'), api('/bundles'), api('/quotes'),
     ]);
-    data = { account, usage, invoices, ledger, packages, agents, bundles, quotes, activity: null };
+    // Contracts are loaded separately and tolerate failure: an account with
+    // no agreements on file should still see the rest of its portal rather
+    // than an error page.
+    const contracts = await api('/contracts').catch(()=>[]);
+    data = { account, usage, invoices, ledger, packages, agents, bundles, quotes, contracts, activity: null };
     render();
   }catch(e){
     if(e.expired){ renderLogin('Your session has ended. Please sign in again.'); return; }
@@ -500,6 +504,7 @@ function render(){
         <div class="tab ${currentTab==='activity'?'active':''}" onclick="setTab('activity')">Activity</div>
         <div class="tab ${currentTab==='invoices'?'active':''}" onclick="setTab('invoices')">Invoices</div>
         <div class="tab ${currentTab==='ledger'?'active':''}" onclick="setTab('ledger')">Statement</div>
+        ${data.contracts&&data.contracts.length?`<div class="tab ${currentTab==='contracts'?'active':''}" onclick="setTab('contracts')">Contracts${data.contracts.some(c=>c.expiring_soon)?` <span class="tab-n tab-n-live">${data.contracts.filter(c=>c.expiring_soon).length}</span>`:''}</div>`:''}
         <div class="tab ${currentTab==='packages'?'active':''}" onclick="setTab('packages')">Packages &amp; bundles</div>
         ${data.quotes&&data.quotes.length?`<div class="tab ${currentTab==='quotes'?'active':''}" onclick="setTab('quotes')">Quotes${data.quotes.some(q=>q.status==='sent')?` <span class="tab-n tab-n-live">${data.quotes.filter(q=>q.status==='sent').length}</span>`:''}</div>`:''}
         <div class="tab ${currentTab==='security'?'active':''}" onclick="setTab('security')">Security</div>
@@ -528,6 +533,7 @@ function tabBody(){
   if(currentTab==='usage') return renderUsage();
   if(currentTab==='invoices') return renderInvoices();
   if(currentTab==='ledger') return renderLedger();
+  if(currentTab==='contracts') return renderContracts();
   if(currentTab==='activity') return renderActivity();
   if(currentTab==='packages') return renderPackages();
   if(currentTab==='agents') return renderAgents();
@@ -670,7 +676,10 @@ function renderActivity(){
   </div>
 
   <div class="card">
-    <h3>Sessions</h3>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+      <h3 style="margin:0;">Sessions</h3>
+      ${a.sessions.length?`<button class="btn btn-ghost btn-sm" onclick="downloadSessions('${esc(String(a.period_month||'').slice(0,7))}')">Download as Excel</button>`:''}
+    </div>
     ${a.sessions.length ? `
     <div style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -975,21 +984,160 @@ function drawUsageChart(){
 function renderInvoices(){
   const invs = data.invoices;
   if(!invs.length) return `<div class="card"><div class="empty">No invoices yet.</div></div>`;
+  // Years in which tax was actually withheld. A year with no deduction has
+  // nothing to state, and offering a download that returns "nothing withheld"
+  // is worse than not offering it.
+  const whtYears = [...new Set(invs.filter(i=>Number(i.ait_amount||0)>0)
+    .map(i=>String(i.issued_date).slice(0,4)))].sort().reverse();
   return `
   <div class="card" style="padding:8px 4px;">
     <table>
-      <thead><tr><th style="padding-left:16px;">Invoice</th><th>Total</th><th style="padding-right:16px;">Status</th></tr></thead>
+      <thead><tr><th style="padding-left:16px;">Invoice</th><th>Total</th><th>Status</th><th style="padding-right:16px;"></th></tr></thead>
       <tbody>
         ${invs.map(inv=>`
         <tr class="row-click" onclick="openInvoiceId='${inv.id}';renderInvoiceModal()">
           <td style="padding-left:16px;"><div style="font-weight:600;">${esc(inv.type_label)}</div><div style="font-size:11.5px;color:var(--muted);">${esc(inv.invoice_number||inv.period||fmtDate(inv.issued_date))}</div></td>
           <td class="mono">${fmtMoney(inv.net_payable!=null?inv.net_payable:(inv.total_amount!=null?inv.total_amount:inv.amount))}</td>
-          <td style="padding-right:16px;"><span class="pill ${invoiceStatusClass(inv.status)}"><span class="pill-dot"></span>${inv.status}</span></td>
+          <td><span class="pill ${invoiceStatusClass(inv.status)}"><span class="pill-dot"></span>${inv.status}</span></td>
+          <td style="padding-right:16px;text-align:right;white-space:nowrap;">
+            <button class="btn btn-ghost btn-sm"
+              onclick="event.stopPropagation();downloadPortalInvoice('${inv.id}','${esc(inv.invoice_number||'invoice')}')">PDF</button>
+          </td>
         </tr>`).join('')}
       </tbody>
     </table>
   </div>
+
+  ${whtYears.length ? `
+  <div class="card">
+    <h3 style="margin-top:0;">Tax withheld</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:0;">
+      A statement of the advance income tax you deducted from payments to us under section 153, invoice by invoice,
+      so both sides are working from the same figures. It is not the statutory certificate — that is yours to issue
+      with the CPR — but it is what you reconcile against before you do.
+    </p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      ${whtYears.map(y=>`<button class="btn btn-ghost btn-sm" onclick="downloadWhtStatement('${y}')">${y} statement</button>`).join('')}
+    </div>
+  </div>` : ''}
   `;
+}
+
+/* --------------------------- Contracts & downloads --------------------------- */
+/**
+ * What the customer signed, and how long is left on it.
+ *
+ * Read-only by design. Seeing the agreement and its end date is something a
+ * customer should never have to ask for; changing any of it is a conversation,
+ * not a button. Drafts are filtered out server-side — a document nobody has
+ * agreed to yet is not theirs to read.
+ *
+ * "Expiring soon" uses the contract's own notice period, the same rule the
+ * CRM applies, so neither side is warned before or after the other.
+ */
+const CONTRACT_KIND_LABEL = {service:'Service agreement', msa:'Master services agreement',
+  sow:'Statement of work', nda:'Non-disclosure', amendment:'Amendment', renewal:'Renewal', other:'Agreement'};
+const CONTRACT_STATUS_LABEL = {sent:'Awaiting signature', signed:'Signed', active:'Active',
+  expired:'Expired', terminated:'Ended', superseded:'Replaced'};
+
+function contractPill(c){
+  const cls = {active:'pill-active', signed:'pill-active', sent:'pill-pending',
+    expired:'pill-overdue', terminated:'pill-pending', superseded:'pill-pending'}[c.status] || 'pill-pending';
+  return `<span class="pill ${cls}"><span class="pill-dot"></span>${esc(CONTRACT_STATUS_LABEL[c.status]||c.status)}</span>`;
+}
+
+function renderContracts(){
+  const cs = data.contracts || [];
+  if(!cs.length) return `<div class="card"><div class="empty">No agreements on file yet.</div></div>`;
+  const soon = cs.filter(c=>c.expiring_soon);
+  const live = cs.filter(c=>c.status==='active'||c.status==='signed');
+
+  return `
+  ${soon.length ? `
+  <div class="card" style="border-color:#E0C08A;background:#FFFDF7;">
+    <h3 style="margin-top:0;">${soon.length===1?'An agreement is':'Agreements are'} coming up for renewal</h3>
+    ${soon.map(c=>`
+      <div style="font-size:13px;margin-bottom:6px;">
+        <strong>${esc(c.title||CONTRACT_KIND_LABEL[c.kind]||'Agreement')}</strong>
+        ends ${fmtDate(c.end_date)} — <strong>${c.days_remaining} day${c.days_remaining===1?'':'s'}</strong> left.
+        ${c.auto_renew
+          ? `It renews automatically unless cancelled${c.notice_days?`, and ${c.notice_days} days' notice is required`:''}.`
+          : `${c.notice_days?`${c.notice_days} days' notice is required to end it.`:'It ends on that date unless renewed.'}`}
+      </div>`).join('')}
+    <p style="font-size:12.5px;color:var(--muted);margin-bottom:0;">
+      Get in touch if you would like to renew, change or end it — there is nothing to do here.
+    </p>
+  </div>` : ''}
+
+  <div class="stat-grid">
+    <div class="stat-card"><div class="label">Agreements on file</div><div class="value">${fmtNum(cs.length)}</div></div>
+    <div class="stat-card"><div class="label">Currently in force</div><div class="value">${fmtNum(live.length)}</div></div>
+    <div class="stat-card"><div class="label">Up for renewal</div><div class="value" style="${soon.length?'color:#94512b;':''}">${fmtNum(soon.length)}</div></div>
+  </div>
+
+  ${cs.map(c=>`
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start;">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <strong style="font-size:15px;">${esc(c.title||CONTRACT_KIND_LABEL[c.kind]||'Agreement')}</strong>
+            ${contractPill(c)}
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:3px;">
+            <span class="mono">${esc(c.contract_number||'—')}</span> · ${esc(CONTRACT_KIND_LABEL[c.kind]||c.kind)}
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div class="mono" style="font-size:15px;font-weight:650;">${fmtMoney(c.value, c.currency)}</div>
+          <div style="font-size:11px;color:var(--muted);">${esc({one_off:'One-off',monthly:'Monthly',quarterly:'Quarterly',annual:'Annual'}[c.billing_frequency]||c.billing_frequency||'')}</div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="kv"><span>Term</span><span>${c.start_date?fmtDate(c.start_date):'—'} → ${c.end_date?fmtDate(c.end_date):'open-ended'}</span></div>
+      ${c.end_date && c.days_remaining!=null && c.days_remaining>=0
+        ? `<div class="kv"><span>Time left</span><span>${fmtNum(c.days_remaining)} days</span></div>` : ''}
+      ${c.auto_renew?`<div class="kv"><span>Renewal</span><span>Renews automatically unless cancelled</span></div>`:''}
+      ${c.notice_days?`<div class="kv"><span>Notice required</span><span>${c.notice_days} days</span></div>`:''}
+      ${c.signed_date?`<div class="kv"><span>Signed</span><span>${fmtDate(c.signed_date)}${c.signed_by_client?` by ${esc(c.signed_by_client)}`:''}</span></div>`:''}
+      ${c.scope?`<div class="kv"><span>Covers</span><span>${esc(c.scope)}</span></div>`:''}
+      ${c.document_url?`<div style="margin-top:12px;"><a class="btn btn-ghost btn-sm" href="${esc(c.document_url)}" target="_blank" rel="noopener noreferrer">Open the signed document</a></div>`:''}
+    </div>`).join('')}
+  `;
+}
+
+/**
+ * Downloads a file from the portal API.
+ *
+ * fetch rather than a plain link, because the session travels in an
+ * Authorization header and a link cannot carry one.
+ */
+async function portalDownload(path, filename, busy){
+  toast(busy || 'Preparing your download…');
+  try{
+    const res = await fetch(`/api/portal${path}`, { headers: { 'Authorization': 'Bearer ' + SESSION } });
+    if(!res.ok){
+      const j = await res.json().catch(()=>null);
+      throw new Error((j && j.error) || `Could not build it (${res.status})`);
+    }
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  }catch(e){ toast(e.message || 'Could not download it', true); }
+}
+
+function downloadPortalInvoice(id, number){
+  portalDownload(`/invoices/${id}/pdf`, `${number||'invoice'}.pdf`, 'Preparing your invoice…');
+}
+function downloadWhtStatement(year){
+  portalDownload(`/invoices/tax-withheld.pdf?year=${year}`, `tax-withheld-${year}.pdf`,
+    'Preparing your tax statement…');
+}
+function downloadSessions(month){
+  portalDownload(`/sessions.xlsx${month?`?month=${encodeURIComponent(month)}`:''}`,
+    `sessions-${month||'this-month'}.xlsx`, 'Building your spreadsheet…');
 }
 
 function renderLedger(){
