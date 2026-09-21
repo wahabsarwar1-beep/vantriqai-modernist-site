@@ -1,5 +1,5 @@
 import PageHero from "@/components/PageHero";
-import HeroOrbitCard from "@/components/HeroOrbitCard";
+import HeroChatCard from "@/components/HeroChatCard";
 import LineReveal from "@/components/LineReveal";
 import Kicker from "@/components/Kicker";
 import PosterCTA from "@/components/PosterCTA";
@@ -101,13 +101,15 @@ export default function Products() {
         }
         body="Each product is a module on the same platform: three channels, eight capabilities, two ways to deploy. Start with one, add as volume grows — nothing is rebuilt when you do."
         orbit={
-          <HeroOrbitCard label="14 modules" delay={0.3} spinDuration={13} orbitDuration={7} reverse>
-            <div style={{ position: "relative", display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: "10%", width: "52%" }}>
-              {[0, 0.2, 0.4, 0.6].map((d) => (
-                <span key={d} style={{ aspectRatio: 1, borderRadius: 9, background: "var(--color-accent)", animation: "blip 1.6s infinite", animationDelay: `${d}s` }} />
-              ))}
-            </div>
-          </HeroOrbitCard>
+          <HeroChatCard
+            time="20:52"
+            bubbles={[
+              { from: "them", text: "Is the navy kurta available in medium?" },
+              { from: "us", text: "Two left in medium. Want me to hold one?" },
+            ]}
+            speed="Checked live stock"
+            outcome={["Item held for 24 h", "Payment link sent"]}
+          />
         }
       />
 

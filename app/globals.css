@@ -376,6 +376,25 @@ span[data-chev] { display: inline-block; transition: transform .2s ease; }
   .stack-mobile { grid-template-columns: 1fr !important; }
 }
 
+/* ── hero split ──
+   Copy on the left, the conversation card on the right. Both columns have
+   a floor (420px and 300px) plus the gap, so the pair only fits from about
+   820px of viewport up. The columns live here rather than inline because
+   the stacked case has to be able to win: laid out side by side on a phone,
+   the second column is pushed off the right edge and the card — the whole
+   point of the hero — disappears. */
+.hero-split {
+  display: grid;
+  grid-template-columns: minmax(min(420px, 100%), 1.25fr) minmax(min(300px, 100%), 0.75fr);
+  gap: clamp(28px, 4vw, 56px);
+}
+@media (max-width: 860px) {
+  .hero-split { grid-template-columns: 1fr; }
+}
+/* Full-width row under both columns, so on a phone it falls after the card
+   instead of pushing it below the fold. */
+.hero-split-full { grid-column: 1 / -1; }
+
 @media (max-width: 760px) {
   .chat-launcher-label { display: none !important; }
 }

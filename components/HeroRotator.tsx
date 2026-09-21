@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Magnetic from "@/components/Magnetic";
+import HeroChatCard, { type ChatBubble } from "@/components/HeroChatCard";
+import ResponseGapStrip from "@/components/ResponseGapStrip";
 import { waLink } from "@/lib/whatsapp";
 
 const SCENES = [
@@ -26,32 +28,40 @@ const SCENES = [
   },
 ];
 
-function ScenePhoto({ scene }: { scene: number }) {
-  if (scene === 0) {
-    return (
-      <div style={{ position: "relative", width: "52%", aspectRatio: 1.4, background: "var(--color-surface)", borderRadius: "12px 12px 12px 4px", boxShadow: "var(--shadow-sm)", display: "flex", alignItems: "center", justifyContent: "center", gap: "8%" }}>
-        <span style={{ width: "12%", aspectRatio: 1, borderRadius: "50%", background: "var(--color-accent)", animation: "blip 1.4s infinite" }} />
-        <span style={{ width: "12%", aspectRatio: 1, borderRadius: "50%", background: "var(--color-accent)", animation: "blip 1.4s infinite", animationDelay: ".2s" }} />
-        <span style={{ width: "12%", aspectRatio: 1, borderRadius: "50%", background: "var(--color-accent)", animation: "blip 1.4s infinite", animationDelay: ".4s" }} />
-      </div>
-    );
-  }
-  if (scene === 1) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", gap: 6, height: "36%" }}>
-        {[0, 0.15, 0.3, 0.45, 0.6].map((d) => (
-          <span key={d} style={{ width: 7, height: "100%", borderRadius: 4, background: "var(--color-accent)", animation: "wavebar 1s ease-in-out infinite", animationDelay: `${d}s` }} />
-        ))}
-      </div>
-    );
-  }
-  return (
-    <svg width="38%" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth={1.6} style={{ animation: "spinslow 6s linear infinite" }}>
-      <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1" strokeLinecap="round" />
-      <circle cx={12} cy={12} r={5.2} />
-    </svg>
-  );
-}
+/** One exchange per scene, so the card argues the same case the headline
+ *  does instead of showing a generic chat. */
+const CHATS: { channel: string; time: string; bubbles: ChatBubble[]; speed: string; outcome: string[] }[] = [
+  {
+    channel: "WhatsApp",
+    time: "21:40",
+    bubbles: [
+      { from: "them", text: "Is the black leather sofa in stock?" },
+      { from: "us", text: "Yes — in stock. Shall I hold one for you?" },
+    ],
+    speed: "Replied in 1.2 s",
+    outcome: ["Visit booked · tomorrow, 18:30", "Reminder scheduled"],
+  },
+  {
+    channel: "Voice",
+    time: "19:05",
+    bubbles: [
+      { from: "them", text: "Calling — do you have anything Saturday morning?" },
+      { from: "us", text: "We do. 10:30 or 11:15 — which suits?" },
+    ],
+    speed: "Answered on ring 2",
+    outcome: ["Appointment set · Sat, 10:30", "Confirmation sent by SMS"],
+  },
+  {
+    channel: "WhatsApp",
+    time: "08:15",
+    bubbles: [
+      { from: "us", text: "Morning! Your quote from Tuesday is still open — shall I hold the price?" },
+      { from: "them", text: "Yes please, go ahead." },
+    ],
+    speed: "Reopened after 3 days",
+    outcome: ["Quote accepted · PKR value logged", "Deal moved to Negotiation"],
+  },
+];
 
 export default function HeroRotator() {
   const [scene, setScene] = useState(0);
@@ -75,20 +85,25 @@ export default function HeroRotator() {
           {SCENES[scene].tag}
         </span>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(min(460px,100%),1.6fr) minmax(min(180px,100%),0.4fr)", gap: "clamp(28px,4vw,56px)", alignItems: "start" }}>
+      <div className="hero-split" style={{ alignItems: "start" }}>
         <div>
-          <div style={{ position: "relative", minHeight: "clamp(260px,26vw,340px)" }}>
+          {/* All three scenes share one grid cell, so the stage is exactly as
+              tall as the tallest of them at any width. The old fixed
+              minHeight could not be right at both ends: it reserved ~70px of
+              dead space at 1440, and at 320px it was ~85px too short, so the
+              copy ran over the buttons underneath. */}
+          <div style={{ display: "grid" }}>
             {SCENES.map((s, i) => (
               <div
                 key={i}
                 style={{
-                  position: "absolute",
-                  inset: 0,
+                  gridArea: "1 / 1",
                   transition: "opacity .55s cubic-bezier(.16,1,.3,1), transform .55s cubic-bezier(.16,1,.3,1)",
                   opacity: i === scene ? 1 : 0,
                   transform: i === scene ? "translateY(0)" : i < scene ? "translateY(-14px)" : "translateY(14px)",
                   pointerEvents: i === scene ? "auto" : "none",
                 }}
+                aria-hidden={i === scene ? undefined : true}
               >
                 <h1 style={{ fontSize: "clamp(34px,5vw,64px)", lineHeight: 0.98, letterSpacing: "-0.03em", margin: 0, maxWidth: "16ch", overflowWrap: "break-word" }}>
                   <span style={{ display: "block" }}>{s.lines[0]}</span>
@@ -131,18 +146,17 @@ export default function HeroRotator() {
             ))}
           </div>
         </div>
-        <div style={{ position: "relative", justifySelf: "center", width: "min(90%,280px)", aspectRatio: 1, marginTop: 8 }}>
-          <div style={{ position: "absolute", inset: 0, borderRadius: 58, overflow: "hidden", boxShadow: "var(--shadow-lg)", background: "var(--color-accent-100)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <ScenePhoto scene={scene} />
-          </div>
-          <span aria-hidden="true" style={{ position: "absolute", inset: "9%", borderRadius: "50%", border: "1.5px dashed var(--color-accent-300)", animation: "spinslow 14s linear infinite", zIndex: 4, pointerEvents: "none" }} />
-          <span aria-hidden="true" style={{ position: "absolute", inset: 0, animation: "orbitspin 7s linear infinite", zIndex: 4, pointerEvents: "none" }}>
-            <span style={{ position: "absolute", top: "3%", left: "50%", width: 10, height: 10, marginLeft: -5, borderRadius: "50%", background: "var(--color-accent)", boxShadow: "0 0 0 5px color-mix(in srgb, var(--color-accent) 16%, transparent)" }} />
-          </span>
+        {/* Keyed on the scene so the card remounts and its bubbles wave in
+            again on every switch — the arrival is the point. */}
+        <div style={{ position: "relative", justifySelf: "center", width: "min(100%,340px)", marginTop: 8 }}>
+          <HeroChatCard key={scene} {...CHATS[scene]} />
           <div aria-hidden="true" style={{ position: "absolute", left: "50%", bottom: -16, transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 6, background: "color-mix(in srgb, var(--color-bg) 88%, transparent)", backdropFilter: "blur(6px)", borderRadius: 999, padding: "6px 11px", boxShadow: "var(--shadow-sm)", whiteSpace: "nowrap", pointerEvents: "none", zIndex: 5 }}>
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--color-accent)", animation: "blip 1.6s infinite" }} />
             <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 10.5, letterSpacing: "-0.01em" }}>{SCENES[scene].badge}</span>
           </div>
+        </div>
+        <div className="hero-split-full">
+          <ResponseGapStrip />
         </div>
       </div>
     </>

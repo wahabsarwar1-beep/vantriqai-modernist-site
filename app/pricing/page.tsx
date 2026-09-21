@@ -1,5 +1,5 @@
 import PageHero from "@/components/PageHero";
-import HeroOrbitCard from "@/components/HeroOrbitCard";
+import HeroChatCard from "@/components/HeroChatCard";
 import LineReveal from "@/components/LineReveal";
 import Kicker from "@/components/Kicker";
 import PosterCTA from "@/components/PosterCTA";
@@ -29,13 +29,15 @@ export default function Pricing() {
         }
         body="A one-time setup fee plus a simple monthly plan, quoted in PKR after we scope your workflow. No hidden surprises, and no charge for normal business volume."
         orbit={
-          <HeroOrbitCard label="Growing" delay={0.9} spinDuration={12} orbitDuration={6.5} reverse>
-            <div style={{ position: "relative", display: "flex", alignItems: "flex-end", gap: "8%", height: "44%", width: "70%" }}>
-              {[0.4, 0.6, 0.8, 1].map((h, i) => (
-                <span key={i} style={{ width: "16%", height: `${h * 100}%`, borderRadius: 4, background: "var(--color-accent)", transformOrigin: "bottom", animation: "growbar 1.6s ease-in-out infinite", animationDelay: `${i * 0.2}s` }} />
-              ))}
-            </div>
-          </HeroOrbitCard>
+          <HeroChatCard
+            time="11:06"
+            bubbles={[
+              { from: "them", text: "We handle around 2,000 messages a month." },
+              { from: "us", text: "That sits in Scale. I'll have the team confirm on a short call." },
+            ]}
+            speed="Scoped in 2 replies"
+            outcome={["Volume logged against the tier", "Discovery call requested"]}
+          />
         }
       />
 

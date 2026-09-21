@@ -1,5 +1,5 @@
 import PageHero from "@/components/PageHero";
-import HeroOrbitCard from "@/components/HeroOrbitCard";
+import HeroChatCard from "@/components/HeroChatCard";
 import LineReveal from "@/components/LineReveal";
 import Kicker from "@/components/Kicker";
 import PosterCTA from "@/components/PosterCTA";
@@ -30,13 +30,15 @@ export default function Industries() {
         body="The same core agent, tuned to the workflow of each sector — your catalogue, your booking rules, your tone."
         maxWidthCh="16ch"
         orbit={
-          <HeroOrbitCard label="Everywhere" delay={0.6} orbitDuration={8}>
-            <div style={{ position: "relative", width: "44%", aspectRatio: 1 }}>
-              <span aria-hidden="true" style={{ position: "absolute", left: "50%", top: "50%", width: "100%", height: "100%", margin: "-50% 0 0 -50%", borderRadius: "50%", border: "2px solid var(--color-accent)", animation: "radarping 2.2s ease-out infinite" }} />
-              <span aria-hidden="true" style={{ position: "absolute", left: "50%", top: "50%", width: "100%", height: "100%", margin: "-50% 0 0 -50%", borderRadius: "50%", border: "2px solid var(--color-accent)", animation: "radarping 2.2s ease-out infinite", animationDelay: ".7s" }} />
-              <svg width="100%" height="100%" viewBox="0 0 24 24" fill="var(--color-accent)"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z" /></svg>
-            </div>
-          </HeroOrbitCard>
+          <HeroChatCard
+            time="18:24"
+            bubbles={[
+              { from: "them", text: "Looking for a 2-bed in DHA, under 3 crore." },
+              { from: "us", text: "Three match. Shall I send them and book a viewing?" },
+            ]}
+            speed="Qualified in one reply"
+            outcome={["Budget and area captured", "Viewing booked · Sat, 17:00"]}
+          />
         }
       />
 

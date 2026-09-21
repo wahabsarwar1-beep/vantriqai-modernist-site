@@ -1,5 +1,5 @@
 import PageHero from "@/components/PageHero";
-import HeroOrbitCard from "@/components/HeroOrbitCard";
+import HeroChatCard from "@/components/HeroChatCard";
 import LineReveal from "@/components/LineReveal";
 import Kicker from "@/components/Kicker";
 import PosterCTA from "@/components/PosterCTA";
@@ -36,17 +36,15 @@ export default function HowItWorks() {
         body="One AI agent, configured around how your business actually runs."
         maxWidthCh="18ch"
         orbit={
-          <HeroOrbitCard label="On repeat">
-            <div style={{ position: "relative", display: "flex", gap: "10%", width: "70%" }}>
-              {[0.4, 0.8].map((d) => (
-                <span key={d} style={{ width: "16%", aspectRatio: 1, borderRadius: "50%", background: "var(--color-surface)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "var(--shadow-sm)" }}>
-                  <svg width="70%" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth={2.6} strokeLinecap="round" style={{ animation: "checkpop 2.4s ease-in-out infinite", animationDelay: `${d}s` }}>
-                    <path d="M4 12l5 5L20 6" />
-                  </svg>
-                </span>
-              ))}
-            </div>
-          </HeroOrbitCard>
+          <HeroChatCard
+            time="22:10"
+            bubbles={[
+              { from: "them", text: "Do you have anything free this week?" },
+              { from: "us", text: "Thursday 16:00 or Friday 11:30 — which works?" },
+            ]}
+            speed="Replied in 1.4 s"
+            outcome={["Booked · Thu, 16:00", "Added to the calendar, reminder set"]}
+          />
         }
       />
 
