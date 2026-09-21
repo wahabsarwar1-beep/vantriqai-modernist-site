@@ -32,7 +32,7 @@ export default function Contact() {
     <>
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" }}>
         <section className="stack-mobile" style={{ padding: "clamp(34px,4.4vw,58px) 0 clamp(40px,5.2vw,68px)", position: "relative", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(340px,100%),1fr))", gap: "clamp(40px,6vw,88px)", alignItems: "start" }}>
-          <div aria-hidden="true" data-hero-texture="" style={{ position: "absolute", top: 0, bottom: 0, left: "50%", width: "calc(100vw + 24px)", marginLeft: "calc(-50vw - 12px)", zIndex: 0, pointerEvents: "none" }} />
+          <div aria-hidden="true" data-hero-texture="" style={{ position: "absolute", top: "calc(clamp(72px, 7vw, 92px) * -1)", bottom: 0, left: "50%", width: "calc(100vw + 24px)", marginLeft: "calc(-50vw - 12px)", zIndex: 0, pointerEvents: "none" }} />
           <div style={{ position: "relative", zIndex: 1 }}>
             <Kicker label="Contact" />
             <h1 style={{ fontSize: "clamp(32px,4.8vw,60px)", lineHeight: 0.96, letterSpacing: "-0.03em", margin: 0 }}>

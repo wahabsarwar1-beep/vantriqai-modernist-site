@@ -17,7 +17,10 @@ export default function PageHero({
   return (
     <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" }}>
       <section style={{ padding: "clamp(36px,4.6vw,62px) 0 clamp(28px,4vw,50px)", position: "relative" }}>
-        <div aria-hidden="true" data-hero-texture="" style={{ position: "absolute", top: 0, bottom: 0, left: "50%", width: "calc(100vw + 24px)", marginLeft: "calc(-50vw - 12px)", zIndex: 0, pointerEvents: "none" }} />
+        {/* Same upward bleed as the Home hero, so the wash runs behind the
+            translucent nav on every page instead of starting at a seam
+            under it. */}
+        <div aria-hidden="true" data-hero-texture="" style={{ position: "absolute", top: "calc(clamp(72px, 7vw, 92px) * -1)", bottom: 0, left: "50%", width: "calc(100vw + 24px)", marginLeft: "calc(-50vw - 12px)", zIndex: 0, pointerEvents: "none" }} />
         <div className="stack-mobile" style={{ position: "relative", zIndex: 1, display: "grid", gridTemplateColumns: "minmax(min(420px,100%),1.6fr) minmax(min(150px,100%),0.4fr)", gap: "clamp(28px,4vw,56px)", alignItems: "center" }}>
           <div>
             <Kicker label={kicker} marginBottom="clamp(24px,4vw,44px)" />

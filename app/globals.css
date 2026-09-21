@@ -92,8 +92,32 @@ a:focus-visible, button:focus-visible, summary:focus-visible, [tabindex]:focus-v
 }
 @media (max-width: 640px) { h1 { overflow-wrap: break-word; } }
 
+/* The hero wash. Three soft blooms over the cream ground — cobalt at the top
+   left, terracotta at the top right, a cool green at the foot — behind the
+   same fine concentric-ring texture the section always had.
+
+   Everything here is atmospheric. The alphas are low enough that ink text
+   keeps its full contrast on top, and nothing on the page takes its colour
+   from this layer, so the wash can be retuned without touching anything
+   else. The green deliberately has no token: it exists only as this tint and
+   is not a brand colour. */
 [data-hero-texture] {
-  background-image: repeating-radial-gradient(circle at 78% 35%, rgba(22,21,26,0.045) 0px, rgba(22,21,26,0.045) 0.5px, transparent 0.5px, transparent 5px);
+  --wash-cobalt: 47, 86, 217;
+  --wash-terracotta: 224, 133, 79;
+  --wash-green: 72, 166, 139;
+
+  background-image:
+    repeating-radial-gradient(circle at 76% 38%, rgba(22, 21, 26, 0.028) 0px, rgba(22, 21, 26, 0.028) 0.5px, transparent 0.5px, transparent 6px),
+    radial-gradient(48% 46% at 94% -6%, rgba(var(--wash-terracotta), 0.55), transparent 66%),
+    radial-gradient(44% 42% at -2% -2%, rgba(var(--wash-cobalt), 0.38), transparent 66%),
+    radial-gradient(42% 38% at 14% 100%, rgba(var(--wash-green), 0.36), transparent 66%),
+    radial-gradient(40% 38% at 100% 90%, rgba(var(--wash-cobalt), 0.20), transparent 68%);
+  background-repeat: no-repeat;
+
+  /* Fades out before the section ends, so there is no hard horizontal edge
+     where the wash stops and the rest of the cream page begins. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 82%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 82%, transparent 100%);
 }
 
 /* ── actions ── */

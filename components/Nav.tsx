@@ -50,9 +50,15 @@ export default function Nav() {
         gap: "clamp(14px,2vw,30px)",
         padding: shrunk ? "8px clamp(20px,5vw,64px)" : "16px clamp(20px,5vw,64px)",
         borderBottom: "1px solid var(--color-divider)",
-        background: "color-mix(in srgb, var(--color-bg) 90%, transparent)",
+        // At rest the bar is mostly transparent so the hero wash carries up
+        // behind the wordmark and the page opens in one continuous field.
+        // Once shrunk it is scrolling over real content, so it goes opaque
+        // enough to keep the links legible against whatever is underneath.
+        background: shrunk
+          ? "color-mix(in srgb, var(--color-bg) 92%, transparent)"
+          : "color-mix(in srgb, var(--color-bg) 55%, transparent)",
         backdropFilter: "blur(12px)",
-        transition: "padding .28s ease, box-shadow .28s ease",
+        transition: "padding .28s ease, box-shadow .28s ease, background-color .28s ease",
         boxShadow: shrunk ? "0 2px 0 0 var(--color-divider)" : "none",
       }}
     >
