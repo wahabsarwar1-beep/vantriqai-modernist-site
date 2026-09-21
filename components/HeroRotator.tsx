@@ -110,15 +110,24 @@ export default function HeroRotator() {
               </Link>
             </Magnetic>
           </div>
-          <div style={{ display: "flex", gap: 8, marginTop: 24 }}>
+          <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
             {SCENES.map((s, i) => (
               <button
                 key={i}
                 type="button"
                 aria-label={`Show ${s.tag}`}
+                aria-pressed={i === scene}
                 onClick={() => setScene(i)}
-                style={{ width: 28, height: 4, borderRadius: 2, border: "none", padding: 0, cursor: "pointer", background: i === scene ? "var(--color-accent)" : "var(--color-divider)" }}
-              />
+                /* The mark stays a 28x4 bar, but the button around it is 44px
+                   tall so it can actually be hit with a thumb — the extra
+                   height is padding, so the row still sits where it did. */
+                style={{ width: 28, height: 44, padding: "20px 0", border: "none", background: "none", cursor: "pointer", display: "block" }}
+              >
+                <span
+                  aria-hidden="true"
+                  style={{ display: "block", width: 28, height: 4, borderRadius: 2, background: i === scene ? "var(--color-accent)" : "var(--color-divider)", transition: "background-color .2s ease" }}
+                />
+              </button>
             ))}
           </div>
         </div>

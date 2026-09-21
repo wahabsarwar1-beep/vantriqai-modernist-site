@@ -124,6 +124,7 @@ export default function HowItWorks() {
             <div style={{ gridColumn: "1 / -1", marginTop: 20 }}>
               <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px", maxWidth: "24ch" }}>Why speed is the whole argument</h2>
               <p data-anim="" style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 36px", maxWidth: "54ch", ...bodyMuted }}>Published benchmarks for lead response and business messaging, with the source against each line. These are category figures, not VantriqAI client results.</p>
+              <p className="scroll-hint" aria-hidden="true">Swipe the table to see every column &rarr;</p>
               <div data-anim="" style={{ overflowX: "auto" }}>
                 <table className="table" style={{ minWidth: 720, fontSize: 15 }}>
                   <thead>
@@ -154,6 +155,7 @@ export default function HowItWorks() {
             <div style={{ marginTop: 20 }}>
               <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px" }}>Not a chatbot. Not another hire.</h2>
               <p data-anim="" style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 36px", maxWidth: "52ch", ...bodyMuted }}>Compared honestly against the two things you&rsquo;re probably weighing instead.</p>
+              <p className="scroll-hint" aria-hidden="true">Swipe the table to see every column &rarr;</p>
               <div data-anim="" style={{ overflowX: "auto" }}>
                 <table className="table" style={{ minWidth: 760, fontSize: 15 }}>
                   <thead>

@@ -235,6 +235,24 @@ textarea.input { min-height: 110px; resize: vertical; }
 .hr { height: 1px; background: var(--color-divider); border: 0; }
 summary { cursor: pointer; list-style: none; }
 summary::-webkit-details-marker { display: none; }
+
+/* The rate and comparison tables are wider than a phone and scroll
+   sideways. Without a prompt most people never find the columns past the
+   first two, so the cue only appears at the widths where it is true. */
+.scroll-hint { display: none; }
+@media (max-width: 760px) {
+  .scroll-hint {
+    display: block;
+    font-family: var(--font-heading);
+    font-weight: 800;
+    font-size: 11px;
+    line-height: 16px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--color-text) 50%, transparent);
+    margin: -20px 0 12px;
+  }
+}
 details[open] summary span[data-chev] { transform: rotate(45deg); }
 span[data-chev] { display: inline-block; transition: transform .2s ease; }
 

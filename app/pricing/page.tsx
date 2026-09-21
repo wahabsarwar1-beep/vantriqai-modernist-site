@@ -87,6 +87,7 @@ export default function Pricing() {
             <div style={{ marginTop: 20 }}>
               <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px", maxWidth: "24ch" }}>The same table your quote is built from</h2>
               <p data-anim="" style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 36px", maxWidth: "54ch", ...bodyMuted }}>Every plan carries several times the sessions a business its size normally uses, so ordinary months never touch the overage rate. Your quote confirms the tier against your real message history.</p>
+              <p className="scroll-hint" aria-hidden="true">Swipe the table to see every column &rarr;</p>
               <div data-anim="" style={{ overflowX: "auto" }}>
                 <table className="table" style={{ minWidth: 840, fontSize: 15 }}>
                   <thead>
@@ -122,15 +123,18 @@ export default function Pricing() {
             <Kicker label="Questions" marginBottom="0" />
             <div style={{ marginTop: 20 }}>
               <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 40px" }}>Before you ask us</h2>
+              {/* The row padding lives on each summary, not on the details:
+                  on a phone the padded area is most of the row, and only what
+                  is inside the summary responds to a tap. */}
               <div style={{ display: "grid", maxWidth: 900 }}>
                 {FAQS.map((f) => (
-                  <details key={f.n} data-anim="" style={{ borderTop: "1px solid var(--color-divider)", padding: "20px 0" }}>
-                    <summary style={{ display: "flex", gap: 16, alignItems: "baseline", fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 19, lineHeight: 1.35, letterSpacing: "-0.02em" }}>
+                  <details key={f.n} data-anim="" style={{ borderTop: "1px solid var(--color-divider)" }}>
+                    <summary style={{ display: "flex", gap: 16, alignItems: "baseline", padding: "20px 0", fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 19, lineHeight: 1.35, letterSpacing: "-0.02em" }}>
                       <span style={{ flex: "none", fontSize: 12, letterSpacing: "0.1em", fontVariantNumeric: "tabular-nums", color: "color-mix(in srgb, var(--color-text) 45%, transparent)" }}>{f.n}</span>
                       <span data-chev="" style={{ color: "var(--color-accent)", fontSize: 16, flex: "none" }}>+</span>
                       {f.q}
                     </summary>
-                    <p style={{ fontSize: 15.5, lineHeight: "28px", color: "color-mix(in srgb, var(--color-text) 78%, transparent)", margin: "12px 0 0 62px", maxWidth: "56ch" }}>{f.a}</p>
+                    <p style={{ fontSize: 15.5, lineHeight: "28px", color: "color-mix(in srgb, var(--color-text) 78%, transparent)", margin: "0 0 22px 62px", maxWidth: "56ch" }}>{f.a}</p>
                   </details>
                 ))}
                 <div data-anim="rule" style={{ height: 1, background: "var(--color-divider)" }} />
