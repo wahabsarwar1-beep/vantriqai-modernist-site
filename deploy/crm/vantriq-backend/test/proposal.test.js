@@ -173,6 +173,41 @@ const post = send('POST'), patch = send('PATCH'), del = send('DELETE');
     }
   }
 
+  console.log('\n== what the page must say, and must not ==');
+  // Asserted against the rendered TEXT LAYER, not the document object: these
+  // are promises to a customer and a renderer that silently stops drawing
+  // one would leave the JSON perfectly correct.
+  const { execFileSync } = require('child_process');
+  const fsx = require('fs');
+  const pdfPath = '/tmp/proposal-assert.pdf';
+  const rr = await fetch(`${B}/api/quotes/${all.body.id}/proposal.pdf`, { headers: H });
+  fsx.writeFileSync(pdfPath, Buffer.from(await rr.arrayBuffer()));
+  let text = '';
+  try { text = execFileSync('pdftotext', [pdfPath, '-'], { encoding: 'utf8' }); }
+  catch { text = ''; }
+
+  if (text) {
+    const count = (re) => (text.match(re) || []).length;
+    ok(!/\S+@\S+\.[a-z]{2,}/i.test(text),
+      'no email address anywhere on the document',
+      (text.match(/\S+@\S+\.[a-z]{2,}/i) || [''])[0]);
+    ok(count(/exclusive of taxes/gi) >= 2,
+      'the tax line appears under the packages AND under the total', String(count(/exclusive of taxes/gi)));
+    ok(/Government taxes, duties and levies/i.test(text), 'and names government taxes explicitly');
+    ok(/Errors and omissions excepted/i.test(text), 'the errors-and-omissions clause is present');
+    ok(/Usage and credits/.test(text) && /Pricing and taxes/.test(text)
+      && /Performance and third parties/.test(text) && /General/.test(text),
+      'all four terms clauses are present');
+    // The website's terms disclaim being an offer; a document with a
+    // signature block cannot say that about itself.
+    ok(!/illustrative and not an offer/i.test(text),
+      'the terms do not disclaim the offer this document is making');
+    ok(/offer open for acceptance/i.test(text),
+      'they state the opposite, which is what a signed proposal needs');
+  } else {
+    console.log('  SKIP pdftotext unavailable — text-layer assertions not run');
+  }
+
   console.log('\n== an accepted proposal is frozen with its quote ==');
   const acc = await post('/api/quotes', { client_id: client.id, product_id: scale.id });
   made.push(acc.body.id);

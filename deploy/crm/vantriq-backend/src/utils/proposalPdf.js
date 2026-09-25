@@ -181,6 +181,20 @@ function cardGrid(doc, items, y, cols = 2, gap = 12) {
   return cursor;
 }
 
+/**
+ * The tax line, drawn wherever a price is.
+ *
+ * One helper rather than three copies of the sentence: a rate that is
+ * exclusive of tax in one place and silent about it in another is exactly
+ * how a customer ends up disputing an invoice they already agreed to.
+ */
+function taxNote(doc, y) {
+  doc.save().rect(LEFT, y, WIDTH, 0.7).fillColor(RULE).fill().restore();
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor(MUTED)
+    .text(C.TAX_NOTE, LEFT, y + 8, { width: WIDTH, lineGap: 1.5 });
+  return y + 8 + measure(doc, C.TAX_NOTE, { font: 'Helvetica-Bold', size: 7.5, width: WIDTH, lineGap: 1.5 });
+}
+
 /* ------------------------------------------------------------------ */
 /* Pages                                                               */
 /* ------------------------------------------------------------------ */
@@ -228,14 +242,12 @@ function coverPage(doc, d) {
 
   // ---- signature
   //
-  // Signed by the team, under the mark, rather than by a mailbox. The
-  // sending address belongs on the envelope; a proposal is from the company.
-  // The reply-to is in the email this is attached to, and the contact
-  // details are on the last page, so nothing is lost by leaving it out.
-  if (d.prepared_by) {
-    doc.font('Helvetica-Bold').fontSize(10).fillColor(INK).text(d.prepared_by, LEFT, y);
-    y += 16;
-  }
+  // The mark and the team, and nothing else. No individual and no mailbox:
+  // quotes.created_by holds whichever account raised the quote, which is an
+  // operational detail and on this account is a service address — it has no
+  // business appearing over a signature on a document sent to a customer.
+  // The reply-to is on the covering email; the contact details are in the
+  // agreement.
   drawMark(doc, LEFT, y, 18);
   doc.font('Helvetica-Bold').fontSize(10.5).fillColor(INK)
     .text(`${d.seller.name} Team`, LEFT + 25, y + 4);
@@ -405,11 +417,8 @@ function packagesPage(doc, d) {
       // of overprinting the one below it.
       const nameH = measure(doc, p.name, { font: 'Helvetica-Bold', size: 9.5, width: COLS[0].w });
       const tagH = p.recommended ? 10 : 0;
-      const tierH = p.target_tier
-        ? measure(doc, p.target_tier, { font: 'Helvetica-Oblique', size: 6.8, width: COLS[0].w, lineGap: 0.5 })
-        : 0;
       const chanH = measure(doc, chans, { size: 7.5, width: COLS[5].w, lineGap: 1 });
-      const rowH = Math.max(30, 6 + nameH + tagH + tierH + 8, chanH + 16);
+      const rowH = Math.max(30, 6 + nameH + tagH + 8, chanH + 16);
 
       if (p.recommended) {
         doc.save().roundedRect(LEFT - 6, y - 5, WIDTH + 12, rowH, 4).fillColor(COBALT_WASH).fill().restore();
@@ -424,12 +433,11 @@ function packagesPage(doc, d) {
           .text('RECOMMENDED', COLS[0].x, ny, { width: COLS[0].w, characterSpacing: 0.6 });
         ny += tagH;
       }
-      // The tier caption belongs under the package name it describes, not
-      // under the numbers — it says who the package is for, not what it costs.
-      if (p.target_tier) {
-        doc.font('Helvetica-Oblique').fontSize(6.8).fillColor(MUTED)
-          .text(p.target_tier, COLS[0].x, ny, { width: COLS[0].w, lineGap: 0.5 });
-      }
+      // No expected-usage caption under the name. It sat next to the
+      // INCLUDED allowance and quietly disagreed with it — 300–600 beside
+      // 1,500 reads as a contradiction rather than as headroom, and a buyer
+      // deciding on a package should not have to work out which number is
+      // the one they are being sold.
 
       doc.font('Helvetica').fontSize(9).fillColor(INK);
       doc.text(int(p.quota), COLS[1].x, y, { width: COLS[1].w, align: 'right' });
@@ -448,6 +456,8 @@ function packagesPage(doc, d) {
       .text('Setup is a one-time fee. Monthly is the recurring retainer. Over-quota applies only to '
         + 'sessions beyond the included allowance, and is billed in arrears.',
         LEFT, y, { width: WIDTH, lineGap: 1.5 });
+    y += 24;
+    taxNote(doc, y);
   } else {
     // ---- detail cards for a small selection.
     packs.forEach((p) => {
@@ -458,7 +468,7 @@ function packagesPage(doc, d) {
         ['Beyond the allowance', `${round0(p.overage_rate, d.currency)} per session`],
         ['Channels', String(p.channels || '—')],
       ];
-      const h = 34 + lines.length * 16 + (p.target_tier ? 16 : 0) + 12;
+      const h = 34 + lines.length * 16 + 12;
       const tint = p.recommended ? COBALT_WASH : WASH;
       doc.save().roundedRect(LEFT, y, WIDTH, h, 6).fillColor(tint).fill().restore();
       doc.save().roundedRect(LEFT, y, 3, h, 1.5).fillColor(p.recommended ? COBALT : RULE).fill().restore();
@@ -469,10 +479,6 @@ function packagesPage(doc, d) {
           .text('RECOMMENDED', RIGHT - 84, y + 18, { width: 70, align: 'right', characterSpacing: 0.7 });
       }
       let cy = y + 32;
-      if (p.target_tier) {
-        doc.font('Helvetica-Oblique').fontSize(8).fillColor(MUTED).text(p.target_tier, LEFT + 16, cy);
-        cy += 16;
-      }
       lines.forEach(([k, v]) => {
         doc.font('Helvetica').fontSize(8.5).fillColor(MUTED).text(k, LEFT + 16, cy, { width: 150 });
         doc.font('Helvetica-Bold').fontSize(8.5).fillColor(INK).text(v, LEFT + 172, cy, { width: WIDTH - 190 });
@@ -480,6 +486,7 @@ function packagesPage(doc, d) {
       });
       y += h + 14;
     });
+    taxNote(doc, y + 2);
   }
   return true;
 }
@@ -502,6 +509,45 @@ function onboardingPage(doc) {
       .text(step.body, LEFT + 34, y + 17, { width: WIDTH - 46, lineGap: 2 });
     y += 20 + measure(doc, step.body, { size: 9, width: WIDTH - 46, lineGap: 2 }) + 18;
   });
+}
+
+/**
+ * TERMS — the conditions the quoted price is given under.
+ *
+ * Placed BEFORE the commercials rather than as an annex after them, because
+ * the signature block is on the commercials page: terms that appear after
+ * the line somebody signs are terms they signed without reading, which is
+ * both unfair and, in a dispute, useless to us.
+ */
+function termsPage(doc) {
+  let y = sectionHead(
+    doc, 'Terms', 'The conditions this price is given under',
+    PAGE.margin + 6,
+    'The same terms published on the Packages page at vantriqai.com. Where a signed agreement '
+    + 'follows, that agreement prevails over anything here.'
+  );
+
+  C.TERMS.forEach(([title, body]) => {
+    const h = measure(doc, body, { size: 8, width: WIDTH, lineGap: 2 });
+    if (y + h + 26 > FOOT - 20) { doc.addPage(); y = PAGE.margin + 6; }
+    doc.font('Helvetica-Bold').fontSize(9).fillColor(INK).text(title, LEFT, y);
+    y += 13;
+    doc.font('Helvetica').fontSize(8).fillColor(MUTED)
+      .text(body, LEFT, y, { width: WIDTH, lineGap: 2 });
+    y += h + 14;
+  });
+
+  // Errors and omissions, set apart so it is not mistaken for another
+  // clause limiting the customer's position — it protects them too.
+  const eh = measure(doc, C.ERRORS_NOTE, { size: 8, width: WIDTH - 28, lineGap: 2 });
+  if (y + eh + 40 > FOOT - 20) { doc.addPage(); y = PAGE.margin + 6; }
+  y += 4;
+  doc.save().roundedRect(LEFT, y, WIDTH, eh + 34, 5).fillColor(WASH).fill().restore();
+  doc.save().roundedRect(LEFT, y, 2.5, eh + 34, 1.2).fillColor(COBALT).fill().restore();
+  doc.font('Helvetica-Bold').fontSize(8.5).fillColor(INK)
+    .text('If something here is wrong', LEFT + 14, y + 11);
+  doc.font('Helvetica').fontSize(8).fillColor(MUTED)
+    .text(C.ERRORS_NOTE, LEFT + 14, y + 24, { width: WIDTH - 28, lineGap: 2 });
 }
 
 /**
@@ -571,7 +617,11 @@ function commercialsPage(doc, d) {
     .text('TOTAL PROPOSED', LEFT + 14, y + 12, { characterSpacing: 0.6 });
   doc.font('Helvetica-Bold').fontSize(17).fillColor(COBALT)
     .text(money(d.totals.total), LEFT + 14, y + 24, { width: WIDTH - 28, align: 'right' });
-  y += 62;
+  // taxNote returns where it actually finished — the note wraps to two
+  // lines at this width, and a guessed offset put "Notes and terms" on top
+  // of its second line.
+  y += 56;
+  y = taxNote(doc, y) + 20;
 
   // ---- notes and terms
   if (d.notes) {
@@ -645,6 +695,7 @@ function renderProposal(d) {
     doc.addPage(); integrationsPage(doc);
     if ((d.packages || []).length) { doc.addPage(); packagesPage(doc, d); }
     doc.addPage(); onboardingPage(doc);
+    doc.addPage(); termsPage(doc);
     doc.addPage(); commercialsPage(doc, d);
 
     // ---- footers. Page 1 is a cover and carries none.

@@ -244,8 +244,95 @@ function defaultCoverLetter({ contactName, company }) {
   ].join('\n');
 }
 
+/**
+ * The line that goes under every price on the document.
+ *
+ * Short enough to sit under a table without becoming the table. It appears
+ * everywhere a figure does — the package comparison, the package cards and
+ * the commercials total — because "I didn't see that bit" is a conversation
+ * worth never having, and repeating one line is cheaper than having it.
+ */
+const TAX_NOTE =
+  'All rates are exclusive of taxes. All applicable Government taxes, duties and levies '
+  + '(including GST and withholding tax) apply and are charged in addition, at the rates in '
+  + 'force on the date of invoice.';
+
+/**
+ * Errors and omissions.
+ *
+ * A proposal is assembled from a catalogue and a conversation, and both can
+ * carry a typo. This says a clerical mistake does not bind either side to
+ * something nobody meant — which protects the customer from a wrong figure
+ * as much as it protects us.
+ */
+const ERRORS_NOTE =
+  'Errors and omissions excepted. This proposal has been prepared in good faith from the '
+  + 'information available at the time of writing. Should any clerical, typographical or '
+  + 'arithmetical error appear in these pages — in a figure, an allowance, a date or a '
+  + 'description — it does not bind either party, and the correct particulars will be '
+  + 'confirmed in writing before the work begins or the first invoice is raised. Nothing '
+  + 'here is intended to mislead, and anything unclear will be clarified on request.';
+
+/**
+ * Terms and conditions, taken from the Packages page on vantriqai.com.
+ *
+ * ADAPTED, NOT COPIED, AND DELIBERATELY SO. The website's terms are written
+ * to sit under an indicative price list, and two of their sentences would
+ * contradict this document outright if pasted verbatim:
+ *
+ *   "any PKR or USD amount shown is illustrative and not an offer"
+ *   "Nothing on this page constitutes a contract, an offer capable of
+ *    acceptance ... or a commitment to supply"
+ *
+ * A proposal with a signature block IS an offer capable of acceptance, and
+ * its figures ARE the quoted price. Carrying those two sentences over would
+ * produce a document that invites a signature on the same page as a denial
+ * that anything is being offered — which helps nobody and would be the
+ * first thing a buyer's lawyer struck out.
+ *
+ * So the substance is kept, and only those two points are restated to match
+ * what this document actually is. Everything else — credits, capacity,
+ * third parties, liability, IP — is the site's wording.
+ */
+const TERMS = [
+  ['Usage and credits',
+    'Every action performed by an agent or tool consumes AI credits. The amount is determined '
+    + 'by VantriqAI after the action completes, based on its complexity and the tool used, and '
+    + 'is not quoted in advance. Credits are allocated monthly, expire at the end of each '
+    + 'billing period, do not roll over, and are neither refundable nor exchangeable for cash '
+    + 'or service. Sessions, session counts and headroom figures describe expected capacity, '
+    + 'not a guaranteed entitlement; usage beyond the included allowance is billed at the '
+    + 'stated overage rate.'],
+  ['Pricing and taxes',
+    'The figures in this proposal are the prices quoted to you and are held until the validity '
+    + 'date shown, after which they may be revised. All amounts are exclusive of taxes, duties '
+    + 'and payment-processing charges, which are applied according to your billing address and '
+    + 'the rates in force on the date of invoice. Beyond the validity date, VantriqAI may '
+    + 'revise tier pricing, allowances, overage rates and package contents; any such change '
+    + 'takes effect from the following billing period.'],
+  ['Performance and third parties',
+    'Response times, volumes, conversion figures and any other metrics shown are illustrative '
+    + 'examples drawn from past deployments and published research. They are not warranties, '
+    + 'forecasts or guarantees of results for your business. Service delivery depends on third '
+    + 'parties outside our control, including messaging platforms, business solution providers, '
+    + 'calendar and CRM vendors and AI model providers; their pricing, policies, availability '
+    + 'or model behaviour may change, and such changes pass through to you. Unless a separate '
+    + 'written agreement states otherwise, the service is provided without service-level '
+    + 'guarantees and our aggregate liability is limited to the fees paid in the three months '
+    + 'preceding a claim.'],
+  ['General',
+    'This proposal is an offer open for acceptance until the validity date shown. On '
+    + 'acceptance, scope, fees, term and support are governed by the written agreement signed '
+    + 'with VantriqAI, which prevails over anything stated here. Trademarks, product names and '
+    + 'materials remain the property of VantriqAI or their respective owners. VantriqAI '
+    + 'reserves all rights not expressly granted.'],
+];
+
 module.exports = {
   THE_GAP,
+  TAX_NOTE,
+  ERRORS_NOTE,
+  TERMS,
   CHANNEL_MODULES,
   CAPABILITY_MODULES,
   INTEGRATIONS,
