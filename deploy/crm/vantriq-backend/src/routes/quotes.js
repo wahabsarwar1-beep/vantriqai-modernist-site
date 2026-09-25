@@ -467,7 +467,12 @@ async function buildProposalDocument(quoteId) {
     packages: packages.map((p) => ({
       id: p.id,
       name: p.name,
-      target_tier: p.target_tier || '',
+      // 'Typically 300–600 sessions/mo' -> '300–600 sessions/mo'. The hedge
+      // reads as vagueness under a package name on a document somebody is
+      // deciding on; the figure alone says the same thing with more
+      // confidence. Stripped on the way out rather than edited in the
+      // catalogue, so Products & Pricing keeps its own wording.
+      target_tier: String(p.target_tier || '').replace(/^\s*typically\s+/i, ''),
       setup_fee: Number(p.setup_fee),
       retainer: Number(p.retainer),
       quota: Number(p.quota),

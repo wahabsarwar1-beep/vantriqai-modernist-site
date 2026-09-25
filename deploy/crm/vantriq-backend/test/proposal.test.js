@@ -150,6 +150,29 @@ const post = send('POST'), patch = send('PATCH'), del = send('DELETE');
   const fn = /filename="([^"]+)"/.exec(r.headers.get('content-disposition') || '')[1];
   ok(!/[\\/"]/.test(fn), 'the filename cannot break out of the header', fn);
 
+  console.log('\n== the tier caption drops its hedge ==');
+  ok(allDoc.packages.every((p) => !/^\s*typically/i.test(p.target_tier || '')),
+    'no package caption still begins "Typically"',
+    JSON.stringify(allDoc.packages.map((p) => p.target_tier).slice(0, 2)));
+  ok(allDoc.packages.some((p) => /sessions\/mo/.test(p.target_tier || '')),
+    'but the figure itself survived — only the hedge was cut',
+    JSON.stringify(allDoc.packages[0].target_tier));
+
+  console.log('\n== every column stays inside the right margin ==');
+  // Both table layouts have now shipped a column measured from WIDTH rather
+  // than to RIGHT, which put right-aligned money hard against the trim. The
+  // arithmetic is asserted here because a PDF renders happily either way and
+  // only a person looking at the page would notice.
+  const { LAYOUT } = require('../src/utils/proposalPdf');
+  for (const table of ['packages', 'commercials']) {
+    const cols = LAYOUT[table];
+    for (const c of cols) {
+      ok(c.x + c.w <= LAYOUT.RIGHT + 0.01,
+        `${table}.${c.h} ends at or before the right margin`,
+        `${c.h}: ${(c.x + c.w).toFixed(2)} > ${LAYOUT.RIGHT}`);
+    }
+  }
+
   console.log('\n== an accepted proposal is frozen with its quote ==');
   const acc = await post('/api/quotes', { client_id: client.id, product_id: scale.id });
   made.push(acc.body.id);

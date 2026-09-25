@@ -48,6 +48,33 @@ const WIDTH = RIGHT - LEFT;
 const BOTTOM = 792 - PAGE.margin;   // A4 height in points
 const FOOT = BOTTOM - 18;           // footers live below the content floor
 
+/**
+ * The two table layouts, at module scope so a test can check the arithmetic.
+ *
+ * Both of these have now shipped once with a column measured as
+ * `WIDTH - n + LEFT` instead of `RIGHT - (LEFT + n)`. The two differ by
+ * exactly one margin, so the last column ended at 595.28 — the physical edge
+ * of the paper — and right-aligned money printed against the trim. A PDF
+ * renders perfectly happily either way, which is why it reached a customer
+ * before anybody noticed. Exporting them lets the suite assert what the eye
+ * has to catch otherwise.
+ */
+const PACKAGE_COLS = [
+  { h: 'Package', x: LEFT, w: 116, align: 'left' },
+  { h: 'Sessions/mo', x: LEFT + 120, w: 58, align: 'right' },
+  { h: 'Setup', x: LEFT + 182, w: 74, align: 'right' },
+  { h: 'Monthly', x: LEFT + 260, w: 74, align: 'right' },
+  { h: 'Over-quota', x: LEFT + 338, w: 62, align: 'right' },
+  { h: 'Channels', x: LEFT + 404, w: RIGHT - (LEFT + 404), align: 'left' },
+];
+
+const COMMERCIAL_COLS = [
+  { h: 'Item', x: LEFT, w: 236, align: 'left' },
+  { h: 'Qty', x: LEFT + 244, w: 42, align: 'right' },
+  { h: 'Unit', x: LEFT + 292, w: 90, align: 'right' },
+  { h: 'Amount', x: LEFT + 388, w: RIGHT - (LEFT + 388), align: 'right' },
+];
+
 /** Money, to the precision a rupee invoice needs. Mirrors invoicePdf. */
 function makeMoney(currency) {
   const cur = currency || 'PKR';
@@ -199,13 +226,19 @@ function coverPage(doc, d) {
     .text(d.cover_letter, LEFT, y, { width: WIDTH * 0.88, lineGap: 4 });
   y += measure(doc, d.cover_letter, { size: 10, width: WIDTH * 0.88, lineGap: 4 }) + 26;
 
-  // Signature block.
+  // ---- signature
+  //
+  // Signed by the team, under the mark, rather than by a mailbox. The
+  // sending address belongs on the envelope; a proposal is from the company.
+  // The reply-to is in the email this is attached to, and the contact
+  // details are on the last page, so nothing is lost by leaving it out.
   if (d.prepared_by) {
     doc.font('Helvetica-Bold').fontSize(10).fillColor(INK).text(d.prepared_by, LEFT, y);
-    y += 14;
+    y += 16;
   }
-  doc.font('Helvetica').fontSize(8.5).fillColor(MUTED)
-    .text(d.seller.name + (d.seller.email ? `  ·  ${d.seller.email}` : ''), LEFT, y);
+  drawMark(doc, LEFT, y, 18);
+  doc.font('Helvetica-Bold').fontSize(10.5).fillColor(INK)
+    .text(`${d.seller.name} Team`, LEFT + 25, y + 4);
 
   // Reference strip, pinned near the foot so it never collides with a
   // long letter above it.
@@ -358,17 +391,7 @@ function packagesPage(doc, d) {
 
   if (comparing) {
     // ---- comparison table: one package per row, portrait-friendly.
-    // The last column is measured to the right margin rather than derived
-    // from WIDTH, which is how an earlier version ran 'on-premise option'
-    // off the edge of the page.
-    const COLS = [
-      { h: 'Package', x: LEFT, w: 116, align: 'left' },
-      { h: 'Sessions/mo', x: LEFT + 120, w: 58, align: 'right' },
-      { h: 'Setup', x: LEFT + 182, w: 74, align: 'right' },
-      { h: 'Monthly', x: LEFT + 260, w: 74, align: 'right' },
-      { h: 'Over-quota', x: LEFT + 338, w: 62, align: 'right' },
-      { h: 'Channels', x: LEFT + 404, w: RIGHT - (LEFT + 404), align: 'left' },
-    ];
+    const COLS = PACKAGE_COLS;
     doc.font('Helvetica-Bold').fontSize(7).fillColor(MUTED);
     COLS.forEach((c) => doc.text(c.h.toUpperCase(), c.x, y, { width: c.w, align: c.align, characterSpacing: 0.5 }));
     y += 13;
@@ -497,12 +520,7 @@ function commercialsPage(doc, d) {
     d.valid_until ? `These terms are held until ${day(d.valid_until)}.` : ''
   );
 
-  const COLS = [
-    { h: 'Item', x: LEFT, w: 236, align: 'left' },
-    { h: 'Qty', x: LEFT + 244, w: 42, align: 'right' },
-    { h: 'Unit', x: LEFT + 292, w: 90, align: 'right' },
-    { h: 'Amount', x: LEFT + 388, w: WIDTH - 388 + LEFT, align: 'right' },
-  ];
+  const COLS = COMMERCIAL_COLS;
   doc.font('Helvetica-Bold').fontSize(7.5).fillColor(MUTED);
   COLS.forEach((c) => doc.text(c.h.toUpperCase(), c.x, y, { width: c.w, align: c.align, characterSpacing: 0.5 }));
   y += 14;
@@ -564,10 +582,23 @@ function commercialsPage(doc, d) {
     y += measure(doc, d.notes, { size: 8, width: WIDTH, lineGap: 2 }) + 18;
   }
 
-  // ---- acceptance. Pinned to the foot if there is room, so it reads as
-  // the end of the document rather than as another paragraph.
-  const acceptH = 96;
-  const acceptY = Math.min(Math.max(y, 560), BOTTOM - acceptH - 24);
+  // ---- acceptance
+  //
+  // Pinned to the foot of the page, always, so it reads as the end of the
+  // document rather than as one more paragraph — and so the signature lines
+  // land where a person expects to find them. If the notes run long enough
+  // to reach it, the block moves to a fresh page rather than overlapping
+  // them; the earlier version clamped it and would have printed the two on
+  // top of each other.
+  // Measured back from the footer's hairline rather than from the page
+  // height: the footer is drawn afterwards, in a second pass, so anything
+  // positioned against BOTTOM lands underneath it. Sizing from FOOT is the
+  // only version that cannot collide with it.
+  const acceptH = 90;               // heading, note, signature lines, labels
+  const footRule = FOOT - 10;
+  const floor = footRule - acceptH - 12;
+  if (y + 20 > floor) { doc.addPage(); }
+  const acceptY = floor;
   rule(doc, acceptY - 14);
   doc.font('Helvetica-Bold').fontSize(10).fillColor(INK).text('Acceptance', LEFT, acceptY);
   doc.font('Helvetica').fontSize(8.5).fillColor(MUTED)
@@ -645,3 +676,5 @@ function proposalFilename(d) {
 }
 
 module.exports = { renderProposal, proposalFilename };
+// Exported for the layout assertions in test/proposal.test.js.
+module.exports.LAYOUT = { RIGHT, packages: PACKAGE_COLS, commercials: COMMERCIAL_COLS };
