@@ -24,6 +24,13 @@ function effectivePackage(client, product) {
     data_layer: pick(client.custom_data_layer, product.data_layer),
     ai_model: pick(client.custom_ai_model, product.ai_model),
     channels: pick(client.custom_channels, product.channels),
+    // Per-number pricing is set directly on the product row — including the
+    // standard tiers, via the addon-pricing route — rather than through the
+    // client custom_* override system above. It was never one of the
+    // figures the business model locks, so there is nothing here for a
+    // per-client override to win against; passed straight through.
+    included_agents: +product.included_agents,
+    extra_agent_price: +product.extra_agent_price,
     is_customised: customisable && [
       client.custom_setup_fee, client.custom_retainer, client.custom_quota,
       client.custom_overage_rate, client.custom_msgs_per_session,

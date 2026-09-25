@@ -305,6 +305,35 @@ async function buildMonthlyBill(client, month) {
     }
   }
 
+  // Extra numbers beyond what the package includes. client_agents already
+  // pools every number's usage into this one client's quota — the schema
+  // comment on v_monthly_usage is explicit that it groups by client_id, not
+  // agent_id — which is the right shape for one business running several
+  // branches on one account, and, left unpriced, also the shape of two
+  // unrelated businesses splitting one bill. This is that other half:
+  // charging for it where a package actually prices it.
+  //
+  // Counts every ACTIVE client_agents row regardless of kind — a second
+  // WhatsApp line, an Instagram handle, a website domain — because that
+  // mirrors exactly what pools together for quota. Paused or retired
+  // numbers are not billed; they are not consuming anything this month.
+  if (Number(eff.extra_agent_price) > 0) {
+    const { rows: agentRows } = await db.query(
+      `select count(*)::int as n from client_agents where client_id = $1 and status = 'active'`,
+      [client.id]
+    );
+    const activeAgents = agentRows[0].n;
+    const extra = Math.max(0, activeAgents - Number(eff.included_agents));
+    if (extra > 0) {
+      lines.push({
+        description: `${eff.name} — extra numbers`,
+        detail: `${period} · ${activeAgents} active, ${eff.included_agents} included`,
+        qty: extra, unit_price: Number(eff.extra_agent_price), amount: ROUND(extra * Number(eff.extra_agent_price)),
+        kind: 'extra_agents',
+      });
+    }
+  }
+
   // Overage. Rate cards, where they exist, replace the tier's flat figure.
   const metered = await meteredCharges(client, month);
   let overageSessions = 0;

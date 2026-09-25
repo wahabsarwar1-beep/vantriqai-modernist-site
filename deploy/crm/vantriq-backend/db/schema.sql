@@ -1467,3 +1467,14 @@ alter table quotes add column if not exists recommended_product_id uuid
 -- ---------------------------------------------------------------------
 alter table products add column if not exists included_agents int not null default 1;
 alter table products add column if not exists extra_agent_price numeric not null default 0;
+
+-- invoice_lines.kind is checked against a fixed list — the same list the
+-- monthly billing run in buildMonthlyBill() draws from, so a line without a
+-- matching kind here fails at insert, loudly, rather than as a mystery
+-- 'other' row nobody can report on later. The extra-numbers line needs its
+-- own value for the same reason bundles and overage already have theirs:
+-- so "how much of this did the extra-number pricing actually bring in" is
+-- one query, not a text search over free-form descriptions.
+alter table invoice_lines drop constraint if exists invoice_lines_kind_check;
+alter table invoice_lines add constraint invoice_lines_kind_check
+  check (kind in ('retainer','setup','bundle','bundle_setup','overage','addon','discount','extra_agents','other'));

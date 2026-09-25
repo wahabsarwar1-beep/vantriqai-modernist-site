@@ -412,13 +412,19 @@ function packagesPage(doc, d) {
 
     packs.forEach((p) => {
       const chans = String(p.channels || '').trim() || '—';
+      // Silent when a package doesn't price this — a proposal for a single
+      // location has no reason to tell the reader what a second one WOULD
+      // cost. Only shown where it is actually part of the offer.
+      const extraLine = Number(p.extra_agent_price) > 0
+        ? `Extra number ${round0(p.extra_agent_price, d.currency)}/mo after ${p.included_agents}` : '';
       // Every row's height is measured from what it actually contains, so a
       // long channel list or a two-line tier caption grows the row instead
       // of overprinting the one below it.
       const nameH = measure(doc, p.name, { font: 'Helvetica-Bold', size: 9.5, width: COLS[0].w });
       const tagH = p.recommended ? 10 : 0;
       const chanH = measure(doc, chans, { size: 7.5, width: COLS[5].w, lineGap: 1 });
-      const rowH = Math.max(30, 6 + nameH + tagH + 8, chanH + 16);
+      const extraH = extraLine ? measure(doc, extraLine, { font: 'Helvetica-Oblique', size: 6.8, width: COLS[5].w, lineGap: 0.5 }) + 3 : 0;
+      const rowH = Math.max(30, 6 + nameH + tagH + 8, chanH + extraH + 16);
 
       if (p.recommended) {
         doc.save().roundedRect(LEFT - 6, y - 5, WIDTH + 12, rowH, 4).fillColor(COBALT_WASH).fill().restore();
@@ -446,6 +452,10 @@ function packagesPage(doc, d) {
       doc.font('Helvetica').fontSize(8).fillColor(MUTED)
         .text(`${round0(p.overage_rate, d.currency)}/session`, COLS[4].x, y, { width: COLS[4].w, align: 'right' });
       doc.fontSize(7.5).fillColor(MUTED).text(chans, COLS[5].x, y, { width: COLS[5].w, lineGap: 1 });
+      if (extraLine) {
+        doc.font('Helvetica-Oblique').fontSize(6.8).fillColor(MUTED)
+          .text(extraLine, COLS[5].x, y + chanH + 3, { width: COLS[5].w, lineGap: 0.5 });
+      }
 
       y += rowH;
       rule(doc, y - 5);
@@ -467,6 +477,11 @@ function packagesPage(doc, d) {
         ['Monthly retainer', round0(p.retainer, d.currency)],
         ['Beyond the allowance', `${round0(p.overage_rate, d.currency)} per session`],
         ['Channels', String(p.channels || '—')],
+        // Silent when the package doesn't price a second number — no reason
+        // to raise the question in a proposal that isn't offering it.
+        ...(Number(p.extra_agent_price) > 0
+          ? [['Extra number', `${round0(p.extra_agent_price, d.currency)}/mo after ${p.included_agents} included`]]
+          : []),
       ];
       const h = 34 + lines.length * 16 + 12;
       const tint = p.recommended ? COBALT_WASH : WASH;

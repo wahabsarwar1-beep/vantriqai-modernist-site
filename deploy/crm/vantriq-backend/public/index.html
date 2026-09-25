@@ -11,7 +11,17 @@
      reads as the same company as the website, rather than as a tool someone
      bolted on beside it. -->
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<!-- Vendored rather than loaded from cdnjs. The dashboard charts used to go
+     blank with "Charts need an internet connection" any time cdnjs was
+     unreachable from the browser — a network-level block, an ad blocker,
+     or the CDN itself having a bad day, not the CRM's own connection at
+     all. Every other outage in this system has been the same shape: a
+     silent dependency on one external thing quietly stopped answering.
+     This is that same failure mode, just with a caught, worded fallback
+     instead of a crash — worded wrongly, since it blamed the viewer's
+     internet for a CDN neither they nor we control. Serving the file
+     ourselves removes the dependency outright. -->
+<script src="/vendor/chart/chart.umd.js"></script>
 <script src="/invoice-print.js"></script>
 <style>
 /* The console is set in VantriqAI's own palette — the cream ground, ink
@@ -1290,13 +1300,18 @@ function renderDashboard(){
 }
 
 function drawDashboardCharts(){
-  // The chart library is loaded from a CDN. If it can't be reached, draw
-  // nothing rather than throwing — the numbers matter more than the graphs.
+  // The chart library is served from this same origin (see index.html —
+  // it used to be cdnjs, which blamed "internet connection" for what was
+  // really the CDN or a network policy, not the viewer's own connection).
+  // This branch is now a defensive fallback for the rarer case of a
+  // browser extension blocking the script itself, rather than the normal
+  // path — draw nothing rather than throwing, since the numbers above are
+  // real either way and matter more than the graphs.
   if(typeof Chart === 'undefined'){
     document.querySelectorAll('canvas').forEach(el=>{
       const note = document.createElement('div');
       note.style.cssText = 'font-size:12px;color:var(--muted);padding:18px 0;text-align:center;';
-      note.textContent = 'Charts need an internet connection — the figures above are live either way.';
+      note.textContent = 'This browser blocked the chart library — the figures above are live either way.';
       el.replaceWith(note);
     });
     return;

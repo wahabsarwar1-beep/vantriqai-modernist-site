@@ -478,6 +478,8 @@ async function buildProposalDocument(quoteId) {
       quota: Number(p.quota),
       overage_rate: Number(p.overage_rate),
       channels: p.channels || '',
+      included_agents: Number(p.included_agents),
+      extra_agent_price: Number(p.extra_agent_price),
       recommended: !!q.recommended_product_id && p.id === q.recommended_product_id,
     })),
   };
