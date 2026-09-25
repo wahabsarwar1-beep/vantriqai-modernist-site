@@ -511,7 +511,9 @@ function onboardingPage(doc) {
   let y = sectionHead(
     doc, 'How it runs', 'From first call to answering live',
     PAGE.margin + 6,
-    'Nothing is built before we understand how your customers actually message you.'
+    'Nothing is built before we understand how your customers actually message you. Where '
+    + 'WhatsApp is a channel, Meta\'s business verification runs on your account and its own '
+    + 'timeline, not ours — see step one.'
   );
 
   C.ONBOARDING.forEach((step, i) => {
@@ -538,8 +540,8 @@ function termsPage(doc) {
   let y = sectionHead(
     doc, 'Terms', 'The conditions this price is given under',
     PAGE.margin + 6,
-    'The same terms published on the Packages page at vantriqai.com. Where a signed agreement '
-    + 'follows, that agreement prevails over anything here.'
+    'Consistent with the terms published on the Packages page at vantriqai.com. Where a '
+    + 'signed agreement follows, that agreement prevails over anything here.'
   );
 
   C.TERMS.forEach(([title, body]) => {
@@ -549,7 +551,7 @@ function termsPage(doc) {
     y += 13;
     doc.font('Helvetica').fontSize(8).fillColor(MUTED)
       .text(body, LEFT, y, { width: WIDTH, lineGap: 2 });
-    y += h + 14;
+    y += h + 10;
   });
 
   // Errors and omissions, set apart so it is not mistaken for another

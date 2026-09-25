@@ -154,8 +154,23 @@ const INTEGRATIONS = [
   ['Commerce', 'Shopify, WooCommerce, Stripe, local payment gateways, ERP exports'],
 ];
 
-/** How the engagement runs. No calendar dates — see the header note. */
+/** How the engagement runs. No calendar dates — see the header note.
+ *
+ *  The WhatsApp step is deliberately first and deliberately not folded
+ *  into "the agent gets built": Meta's business verification is the one
+ *  part of onboarding that runs on someone else's clock, and it can
+ *  outpace the whole build if it is left as a footnote instead of step
+ *  one. See the shared knowledge base for the same fact told to a
+ *  prospect who asks directly. */
 const ONBOARDING = [
+  {
+    title: 'Your WhatsApp number, verified',
+    body:
+      'If WhatsApp is one of your channels, the number and the WhatsApp Business Account have '
+      + 'to be registered and verified with Meta in your own business\'s name — not ours. We '
+      + 'guide you through the setup, but the paperwork and the verification are yours to '
+      + 'complete, and it is usually the one step in this list that can outpace everything else.',
+  },
   {
     title: 'Tell us how you work',
     body:
@@ -293,6 +308,22 @@ const ERRORS_NOTE =
  * So the substance is kept, and only those two points are restated to match
  * what this document actually is. Everything else — credits, capacity,
  * third parties, liability, IP — is the site's wording.
+ *
+ * THREE CLAUSES BELOW ARE NOT FROM THE WEBSITE. "Your accounts and
+ * platform compliance" and "Indemnity and professional advice" were added
+ * because the site's terms sit under a price list with nothing to sign,
+ * and never had to name who is on the hook when a client's own WhatsApp
+ * account gets suspended, or when someone treats an agent's answer as
+ * medical or legal advice. "General" gained one sentence on data
+ * ownership for the same reason: a signed proposal is the first place a
+ * client's lawyer will look for it, and it was not there.
+ *
+ * THIS IS DRAFTED, NOT REVIEWED. Indemnity and liability language is the
+ * most consequential wording in this file — more so than anything else on
+ * this page — and it has not been checked by a lawyer. Treat it as a
+ * placeholder to have reviewed before it goes to a customer whose signature
+ * would actually matter, exactly as previously flagged for the rest of
+ * this page.
  */
 const TERMS = [
   ['Usage and credits',
@@ -310,6 +341,16 @@ const TERMS = [
     + 'the rates in force on the date of invoice. Beyond the validity date, VantriqAI may '
     + 'revise tier pricing, allowances, overage rates and package contents; any such change '
     + 'takes effect from the following billing period.'],
+  ['Your accounts and platform compliance',
+    'Where WhatsApp is one of your channels, the WhatsApp Business Account, phone number and '
+    + 'Meta Business Manager must be registered, verified and owned in your own business\'s '
+    + 'name, never ours. VantriqAI will guide you through that setup but cannot complete '
+    + 'Meta\'s identity verification on your behalf, and its timeline is set by Meta, not by '
+    + 'us. You are responsible for your own compliance with the policies of WhatsApp, Meta, '
+    + 'Instagram, Facebook and any other platform the agent operates on, including obtaining '
+    + 'and recording your end customers\' consent before any outbound or broadcast message is '
+    + 'sent. VantriqAI is not liable for a suspension, restriction or rejection imposed by a '
+    + 'platform on your account, number or content, nor for any delay or loss that results.'],
   ['Performance and third parties',
     'Response times, volumes, conversion figures and any other metrics shown are illustrative '
     + 'examples drawn from past deployments and published research. They are not warranties, '
@@ -320,12 +361,22 @@ const TERMS = [
     + 'written agreement states otherwise, the service is provided without service-level '
     + 'guarantees and our aggregate liability is limited to the fees paid in the three months '
     + 'preceding a claim.'],
+  ['Indemnity and professional advice',
+    'You indemnify VantriqAI against any third-party claim, penalty or loss arising from your '
+    + 'own content, data or instructions, or from your non-compliance with applicable law or a '
+    + 'platform\'s policies. The agent answers using the information and instructions you '
+    + 'provide and is not a substitute for licensed medical, legal, financial or other '
+    + 'professional advice; it must not be relied on for an emergency or a safety-critical '
+    + 'decision, and you remain responsible for reviewing its output before it is relied upon '
+    + 'in such a context.'],
   ['General',
     'This proposal is an offer open for acceptance until the validity date shown. On '
     + 'acceptance, scope, fees, term and support are governed by the written agreement signed '
-    + 'with VantriqAI, which prevails over anything stated here. Trademarks, product names and '
-    + 'materials remain the property of VantriqAI or their respective owners. VantriqAI '
-    + 'reserves all rights not expressly granted.'],
+    + 'with VantriqAI, which prevails over anything stated here. The underlying platform, '
+    + 'workflows and methodology remain VantriqAI\'s property; your business data and your '
+    + 'customers\' data remain yours, and VantriqAI processes them only to deliver the service. '
+    + 'Trademarks, product names and materials remain the property of VantriqAI or their '
+    + 'respective owners. VantriqAI reserves all rights not expressly granted.'],
 ];
 
 module.exports = {

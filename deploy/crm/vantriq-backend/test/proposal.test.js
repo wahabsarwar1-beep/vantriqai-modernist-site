@@ -196,8 +196,17 @@ const post = send('POST'), patch = send('PATCH'), del = send('DELETE');
     ok(/Government taxes, duties and levies/i.test(text), 'and names government taxes explicitly');
     ok(/Errors and omissions excepted/i.test(text), 'the errors-and-omissions clause is present');
     ok(/Usage and credits/.test(text) && /Pricing and taxes/.test(text)
-      && /Performance and third parties/.test(text) && /General/.test(text),
-      'all four terms clauses are present');
+      && /Your accounts and platform compliance/.test(text)
+      && /Performance and third parties/.test(text)
+      && /Indemnity and professional advice/.test(text) && /General/.test(text),
+      'all six terms clauses are present');
+    ok(/registered.{0,20}verified.{0,20}Meta/is.test(text) || /Meta.{0,80}verification/is.test(text),
+      'the WhatsApp account/WABA ownership clause names Meta verification');
+    ok(/You indemnify VantriqAI/i.test(text), 'the indemnity clause is present and names the customer');
+    ok(/not a\s*substitute for licensed/i.test(text),
+      'the professional-advice limit is present');
+    ok(/Your WhatsApp number, verified/i.test(text),
+      'the WABA onboarding step is present and appears first');
     // The website's terms disclaim being an offer; a document with a
     // signature block cannot say that about itself.
     ok(!/illustrative and not an offer/i.test(text),
