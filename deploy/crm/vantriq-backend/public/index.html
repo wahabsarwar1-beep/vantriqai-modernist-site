@@ -677,7 +677,9 @@ class ApiError extends Error{ constructor(msg,status,body){ super(msg); this.sta
 const INVOICE_TYPE_TO_API = {'Setup fee':'setup_fee','Retainer':'retainer','Overage':'overage','Add-on / change request':'addon'};
 const INVOICE_TYPE_FROM_API = {'setup_fee':'Setup fee','retainer':'Retainer','overage':'Overage','addon':'Add-on / change request'};
 
-function productFromApi(p){ return { id:p.id, name:p.name, isStandard:p.is_standard!==false, targetTier:p.target_tier, setupFee:+p.setup_fee, retainer:+p.retainer, msgsPerSession:+p.msgs_per_session, quota:+p.quota, overageRate:+p.overage_rate, deliveryCostFull:+p.delivery_cost_full, automation:p.automation, dataLayer:p.data_layer, aiModel:p.ai_model, channels:p.channels, order:p.sort_order }; }
+function productFromApi(p){ return { id:p.id, name:p.name, isStandard:p.is_standard!==false, targetTier:p.target_tier, setupFee:+p.setup_fee, retainer:+p.retainer, msgsPerSession:+p.msgs_per_session, quota:+p.quota, overageRate:+p.overage_rate, deliveryCostFull:+p.delivery_cost_full, automation:p.automation, dataLayer:p.data_layer, aiModel:p.ai_model, channels:p.channels, order:p.sort_order,
+  includedAgents:(p.included_agents===undefined||p.included_agents===null)?1:+p.included_agents,
+  extraAgentPrice:(p.extra_agent_price===undefined||p.extra_agent_price===null)?0:+p.extra_agent_price }; }
 function productToApi(p){ return { name:p.name, target_tier:p.targetTier, setup_fee:p.setupFee, retainer:p.retainer, msgs_per_session:p.msgsPerSession, quota:p.quota, overage_rate:p.overageRate, delivery_cost_full:p.deliveryCostFull, automation:p.automation, data_layer:p.dataLayer, ai_model:p.aiModel, channels:p.channels }; }
 
 function clientFromApi(c){ return { id:c.id, name:c.name, company:c.company, email:c.email, phone:c.phone, externalRef:c.external_ref||'', productId:c.product_id, stage:c.stage, estValue:+c.est_value||0, source:c.source, notes:c.notes, joinDate:c.join_date, sessionsUsedThisMonth:0, ownerRepId:c.owner_rep_id||null, salesStage:c.sales_stage||null, closeOutcome:c.close_outcome||null,
@@ -1914,10 +1916,17 @@ function renderProducts(){
         <div class="prod-stat-row"><span class="k">Quota / month</span><span class="v">${fmtNum(p.quota)}</span></div>
         <div class="prod-stat-row"><span class="k">Overage rate</span><span class="v">${fmtMoney(p.overageRate)}/session</span></div>
         <div class="prod-stat-row"><span class="k">Est. delivery cost (100% quota)</span><span class="v">${fmtMoney(p.deliveryCostFull)}</span></div>
+        <div class="prod-stat-row">
+          <span class="k">Extra number</span>
+          <span class="v">${p.extraAgentPrice>0
+            ? `${fmtMoney(p.extraAgentPrice)}/mo after ${p.includedAgents}`
+            : `<span style="color:var(--muted);font-weight:400;">Not charged</span>`}</span>
+        </div>
         <div class="prod-actions">
           ${p.isStandard===false
             ? `<button class="btn btn-ghost btn-sm" onclick="openModal={type:'product',id:'${p.id}'};render()">${iconEdit(13)} Edit</button>`
             : `<span style="font-size:11.5px;color:var(--muted);display:inline-flex;align-items:center;gap:5px;">🔒 Fixed by the business model</span>`}
+          <button class="btn btn-ghost btn-sm" onclick="openModal={type:'productAddon',id:'${p.id}'};render()">${iconEdit(13)} Extra-number price</button>
         </div>
       </div>
     `).join('')}
@@ -4993,6 +5002,7 @@ function renderModal(){
   if(openModal.type==='client') html = clientModalHTML(openModal.id);
   else if(openModal.type==='teamUser') html = teamUserModalHTML();
   else if(openModal.type==='product') html = productModalHTML(openModal.id);
+  else if(openModal.type==='productAddon') html = productAddonModalHTML(openModal.id);
   else if(openModal.type==='vendor') html = vendorModalHTML(openModal.id);
   else if(openModal.type==='po') html = poModalHTML();
   else if(openModal.type==='invoice') html = invoiceModalHTML();
@@ -5418,6 +5428,49 @@ async function saveProduct(id){
     }
     closeModal(); render(); showToast('Package saved');
   }catch(e){ showToast(e.message||'Could not save package','warn'); }
+}
+
+/**
+ * Pricing for a second WhatsApp number, Instagram handle or website domain
+ * on the SAME package. Separate from the full package editor on purpose:
+ * this opens on every card, including the standard tiers the business
+ * model locks, because per-number pricing isn't one of the figures that
+ * lock protects — nobody has fixed it yet, which is exactly why it needs
+ * setting rather than being left to happen for free.
+ */
+function productAddonModalHTML(id){
+  const p = state.products.find(x=>x.id===id);
+  if(!p) return '';
+  return `
+  <div class="modal">
+    <div class="modal-head"><h3>Extra-number pricing — ${esc(p.name)}</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
+    <div class="modal-body">
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;line-height:1.6;">
+        One client can already run several metered numbers on this package — every message from any of them
+        pools against the same quota and the same bill. This sets what, if anything, an additional number costs.
+        Leave the price at 0 to keep offering extra numbers free, as every package does today.
+      </p>
+      <div class="field-row">
+        <div class="field"><label>Numbers included free</label><input id="pa_included" type="number" min="0" step="1" value="${p.includedAgents}"></div>
+        <div class="field"><label>Price per extra number (PKR/month)</label><input id="pa_price" type="number" min="0" step="1" value="${p.extraAgentPrice}"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveProductAddon('${p.id}')">${iconCheck(14)} Save</button>
+    </div>
+  </div>`;
+}
+async function saveProductAddon(id){
+  const included = parseInt(document.getElementById('pa_included').value, 10);
+  const price = parseFloat(document.getElementById('pa_price').value);
+  if(!Number.isInteger(included) || included < 0){ showToast('Included numbers must be 0 or more','warn'); return; }
+  if(!Number.isFinite(price) || price < 0){ showToast('Price must be 0 or more','warn'); return; }
+  try{
+    const updated = await API.patch(`/api/products/${id}/addon-pricing`, { included_agents: included, extra_agent_price: price });
+    Object.assign(state.products.find(x=>x.id===id), productFromApi(updated));
+    closeModal(); render(); showToast('Extra-number pricing saved');
+  }catch(e){ showToast(e.message||'Could not save that','warn'); }
 }
 
 function vendorModalHTML(id){

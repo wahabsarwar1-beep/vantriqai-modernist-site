@@ -68,6 +68,58 @@ router.put('/:id', adminOnly, async (req, res) => {
   res.json(rows[0]);
 });
 
+/**
+ * PATCH /:id/addon-pricing  { included_agents, extra_agent_price }
+ *
+ * One client can already run several metered agents — several WhatsApp
+ * numbers, an Instagram handle, a website domain — all pooled against one
+ * package's quota (v_monthly_usage groups by client_id, not agent_id). That
+ * is the right shape for one business with several branches on one
+ * account, and also, left unpriced, the shape of two unrelated businesses
+ * splitting one bill. This is where a package says what the second number
+ * costs.
+ *
+ * Deliberately its OWN route rather than two more entries in FIELDS above.
+ * The lock on Starter through Enterprise protects the figures the business
+ * model document fixes — setup fee, retainer, quota, overage — and nothing
+ * in that document prices an extra number. There is no fixed figure here
+ * to protect, so this edits on ANY package, standard or custom: a business
+ * sold as "one bill covers every branch" needs to be priceable on Growth
+ * or Scale, not held hostage to Enterprise+ being the only unlocked tier.
+ */
+router.patch('/:id/addon-pricing', adminOnly, async (req, res) => {
+  const existing = await loadProduct(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Product not found' });
+
+  const b = req.body || {};
+  const sets = [];
+  const values = [];
+  if (b.included_agents !== undefined) {
+    const n = Number(b.included_agents);
+    if (!Number.isInteger(n) || n < 0) {
+      return res.status(400).json({ error: 'included_agents must be a whole number, 0 or more.' });
+    }
+    values.push(n);
+    sets.push(`included_agents = $${values.length}`);
+  }
+  if (b.extra_agent_price !== undefined) {
+    const n = Number(b.extra_agent_price);
+    if (!Number.isFinite(n) || n < 0) {
+      return res.status(400).json({ error: 'extra_agent_price must be a number, 0 or more.' });
+    }
+    values.push(n);
+    sets.push(`extra_agent_price = $${values.length}`);
+  }
+  if (!sets.length) return res.status(400).json({ error: 'Nothing to update' });
+
+  values.push(req.params.id);
+  const { rows } = await db.query(
+    `update products set ${sets.join(', ')} where id = $${values.length} returning *`,
+    values
+  );
+  res.json(rows[0]);
+});
+
 router.delete('/:id', adminOnly, async (req, res) => {
   const existing = await loadProduct(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Product not found' });

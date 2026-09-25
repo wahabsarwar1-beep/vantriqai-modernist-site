@@ -1431,3 +1431,39 @@ alter table quotes add column if not exists show_all_packages boolean not null d
 -- should take. Null means present them evenly and make no call.
 alter table quotes add column if not exists recommended_product_id uuid
   references products(id) on delete set null;
+
+-- ---------------------------------------------------------------------
+-- v9.8 — per-number pricing: charging for extra channels on one package
+--
+-- client_agents already lets one client run several metered numbers —
+-- several WhatsApp lines, an Instagram handle, a website domain — all
+-- pooled against one package's quota (v_monthly_usage groups by
+-- client_id, not agent_id). That is the right shape for one business
+-- with several branches sharing one account. Left unpriced, it is also
+-- the shape of two unrelated businesses splitting one bill.
+--
+-- These two columns give a package an explicit answer to "and the
+-- second number costs what?" — an included count, and a monthly price
+-- for anything past it. Both default to values that change nothing for
+-- anyone until deliberately set:
+--
+--   included_agents = 1      matches how every client behaves today —
+--                            one number, no charge, no prior fixed limit.
+--   extra_agent_price = 0    "not charged" is the current, silent
+--                            default the business is already running on.
+--                            Zero is stated, not invented: nothing in the
+--                            seeded business model prices this, so no
+--                            figure is set here that nobody has approved.
+--
+-- Deliberately NOT added to products.FIELDS (the set the core /:id PUT
+-- route can touch) and deliberately NOT gated by is_standard. The lock
+-- on Starter through Enterprise protects the figures the business model
+-- document fixes — setup fee, retainer, quota, overage. Per-number
+-- pricing was never part of that document, so there is no fixed figure
+-- to protect, and a business selling this as "one bill covers every
+-- branch" needs to be able to price it on Growth or Scale, not only on
+-- the one bespoke tier. See routes/products.js for the separate,
+-- narrower endpoint that edits only these two fields, on any package.
+-- ---------------------------------------------------------------------
+alter table products add column if not exists included_agents int not null default 1;
+alter table products add column if not exists extra_agent_price numeric not null default 0;

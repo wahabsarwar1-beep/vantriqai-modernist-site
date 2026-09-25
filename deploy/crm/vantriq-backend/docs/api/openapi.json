@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "VantriqAI CRM API",
-    "version": "9.7.2",
+    "version": "9.8.0",
     "description": "The CRM behind VantriqAI: clients, invoices, payments, quotes and proposals,\ncontracts, statements, and the webhook surface the AI agents write through.\n\n## Authentication\n\nTwo ways in, and one of them is for people:\n\n- **Staff session** — `Authorization: Bearer <token>`, issued by `POST /api/auth/verify`\n  after a password and an emailed one-time code. A staff member's role decides reach.\n- **API key** — `x-api-key: <key>`, for machines. Keys are scoped.\n\n## Scopes\n\nLeast to most: `webhook` < `automation` < `staff` < `admin`. A scope opens everything\nbelow it. The admin key opens everything and is intended as break-glass only — set\n`ALLOW_API_KEY_LOGIN=false` once staff accounts exist.\n\n## Automation writes through this API, never to the database\n\nn8n and any other integration must use these endpoints rather than connecting to\nPostgres. Tenancy, quota and tax rules live here; a direct write bypasses all three."
   },
   "servers": [
@@ -5905,6 +5905,66 @@
           "products"
         ],
         "summary": "PUT /api/products/:id",
+        "description": "Requires the **automation** scope or higher. Automation key or any staff session. Clients, invoices, packages, agents.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/products/{id}/addon-pricing": {
+      "patch": {
+        "tags": [
+          "products"
+        ],
+        "summary": "PATCH /:id/addon-pricing { included_agents, extra_agent_price } One client can already run several metered agents — several WhatsApp numbers, an Instagram handle, a website domain — all pooled against one package's quota (v_monthly_usage groups by client_id, not agent_id). That is the right shape for one business with several branches on one account, and also, left unpriced, the shape of two unrelated businesses splitting one bill. This is where a package says what the second number costs. Deliberately its OWN route rather than two more entries in FIELDS above. The lock on Starter through Enterprise protects the figures the business model document fixes — setup fee, retainer, quota, overage — and nothing in that document prices an extra number. There is no fixed figure here to protect, so this edits on ANY package, standard or custom: a business sold as \"one bill covers every branch\" needs to be priceable on Growth or Scale, not held hostage to Enterprise+ being the only unlocked tier.",
         "description": "Requires the **automation** scope or higher. Automation key or any staff session. Clients, invoices, packages, agents.",
         "parameters": [
           {
