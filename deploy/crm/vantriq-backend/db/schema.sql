@@ -1387,3 +1387,47 @@ create table if not exists archived_month_totals (
   created_at timestamptz not null default now()
 );
 create index if not exists idx_archived_months on archived_month_totals(month);
+
+-- ---------------------------------------------------------------------
+-- v9.7 — a quotation that reads like a proposal
+--
+-- A quote used to be an invoice with a different word at the top: one
+-- page, a table of lines, a total. That is the right shape for a bill
+-- somebody already agreed to and the wrong shape for asking them to
+-- agree in the first place. A prospect reading a bare total has no way
+-- to judge whether it is a good one.
+--
+-- So a quote now carries the material a proposal needs: a covering
+-- letter in the sender's own words, the packages being put forward, and
+-- which of them we actually recommend. The commercials are unchanged —
+-- same quote_lines, same arithmetic — they simply arrive last, after
+-- the reader knows what they are buying.
+--
+-- All four columns are optional. A quote with none of them set renders
+-- exactly as it did before, so nothing already sent changes shape.
+-- ---------------------------------------------------------------------
+
+-- The page-one letter. Free text, the seller's own voice. Blank falls
+-- back to a generated opening rather than an empty page.
+alter table quotes add column if not exists cover_letter text default '';
+
+-- Which packages this proposal puts in front of the reader. Empty means
+-- "just the quote lines" — the old behaviour.
+--
+-- Deliberately an array of ids rather than a join table: a proposal's
+-- package list is read and written whole, never queried across, and a
+-- join table would add a migration, two indexes and an ordering column
+-- to store what is genuinely one field of one row.
+alter table quotes add column if not exists selected_product_ids uuid[] not null default '{}';
+
+-- Show the entire range as a comparison, not only the selected ones.
+-- Some buyers want to see where they sit on the ladder before choosing;
+-- others find six columns of pricing overwhelming. The sender decides
+-- per proposal rather than us deciding once for everybody.
+alter table quotes add column if not exists show_all_packages boolean not null default false;
+
+-- The one we are actually recommending. Drawn highlighted, so a reader
+-- who skims the comparison still leaves knowing what we think they
+-- should take. Null means present them evenly and make no call.
+alter table quotes add column if not exists recommended_product_id uuid
+  references products(id) on delete set null;

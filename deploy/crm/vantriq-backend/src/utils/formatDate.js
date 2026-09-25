@@ -27,4 +27,23 @@ function formatDay(value) {
   });
 }
 
-module.exports = { formatDay };
+/**
+ * '2026-09-25' — the same value as a plain ISO day.
+ *
+ * The companion to formatDay, and here for the same reason. Documents that
+ * carry a date onward as data rather than printing it were reaching for
+ * `String(value).slice(0, 10)` and getting 'Fri Sep 25' out of a Date, which
+ * then reached formatDay already broken and printed 'Fri Sep 25' with no
+ * year onto a customer-facing page. Normalising once, here, means a caller
+ * never has to know whether it was handed a Date or a string.
+ */
+function isoDay(value) {
+  if (!value) return null;
+  const d = (value instanceof Date)
+    ? value
+    : new Date(String(value).slice(0, 10) + 'T00:00:00Z');
+  if (isNaN(d)) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+module.exports = { formatDay, isoDay };

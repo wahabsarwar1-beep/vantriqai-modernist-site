@@ -323,6 +323,8 @@ else
   # first time somebody archives, and nothing else would catch it.
   chk "the carry-forward keeps every figure the books derive" 8 \
     "select count(*) from information_schema.columns where table_name='archived_month_totals' and column_name in ('revenue','billed_net','gst_charged','ait_withheld','receipts','written_off','credited','internal_cost')"
+  chk "v9.7 proposal fields on quotes" 4 \
+    "select count(*) from information_schema.columns where table_name='quotes' and column_name in ('cover_letter','selected_product_ids','show_all_packages','recommended_product_id')"
   chk "v9 tax jurisdictions seeded (ICT, PRA, SRB, KPRA, BRA, EXPORT)" 6 \
     "select count(*) from tax_jurisdictions"
   chk "the five authorities and the export case are all there" 6 \

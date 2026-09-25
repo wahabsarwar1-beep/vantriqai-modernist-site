@@ -3592,9 +3592,11 @@ async function openQuote(id){
           ${q.status==='draft'?`<button class="btn btn-primary btn-sm" onclick="sendQuote('${q.id}')">Send it to the customer</button>`:''}
           ${open?`<button class="btn btn-ghost btn-sm" onclick="acceptQuoteAdmin('${q.id}')">${iconCheck(13)} Accept on their behalf</button>`:''}
           ${open?`<button class="btn btn-ghost btn-sm" onclick="declineQuoteAdmin('${q.id}')">Mark declined</button>`:''}
+          <button class="btn btn-ghost btn-sm" onclick="downloadProposal('${q.id}')">${iconQuote().replace('width="17"','width="13"').replace('height="17"','height="13"')} Download proposal</button>
           <button class="btn btn-ghost btn-sm" onclick="printQuote('${q.id}')">${iconReceipt().replace('width="17"','width="13"').replace('height="17"','height="13"')} Print</button>
           ${q.status!=='accepted'?`<button class="btn btn-danger-ghost btn-sm" onclick="deleteQuote('${q.id}')">${iconTrash(13)} Delete</button>`:''}
         </div>
+        ${open?proposalOptionsHTML(q):''}
         ${q.status==='sent'?`<p class="footnote" style="margin-top:10px;">This is in the customer's portal now — they can accept it themselves.</p>`:''}
         ${q.invoice_id?`<p class="footnote" style="margin-top:10px;">Accepted — <a href="#" onclick="event.preventDefault();navigate('billing');setTimeout(()=>{openPanel={type:'invoice',id:'${q.invoice_id}'};render();},100)">see the invoice it raised</a>.</p>`:''}
       </div>`;
@@ -3630,6 +3632,92 @@ async function deleteQuote(id){
     const host=document.getElementById('quote-detail'); if(host) host.innerHTML='';
   }catch(e){ showToast(e.message||'Could not delete it','warn'); }
 }
+/**
+ * The proposal controls on an existing quote.
+ *
+ * Separate from the quote's own figures on purpose: changing which packages
+ * a proposal shows, or rewriting the letter, does not touch what the
+ * customer is being charged. Editing them after the quote exists is the
+ * normal case — a first draft goes out, the buyer asks to see a cheaper
+ * tier, and the same quote is re-sent showing two.
+ */
+function proposalOptionsHTML(q){
+  const picked = new Set(q.selected_product_ids || []);
+  return `
+  <details class="prop-opts" style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px;">
+    <summary style="cursor:pointer;font-size:12.5px;font-weight:600;">Proposal document — letter and packages</summary>
+    <div style="margin-top:10px;">
+      <div class="field">
+        <label>Covering letter</label>
+        <textarea id="pr_cover" rows="5" placeholder="Blank uses a generated letter addressed to their contact.">${esc(q.cover_letter||'')}</textarea>
+      </div>
+      <label style="display:flex;gap:8px;align-items:center;font-size:12.5px;margin-bottom:8px;">
+        <input type="checkbox" id="pr_showall" ${q.show_all_packages?'checked':''} style="width:auto;margin:0;">
+        Show the whole range as a comparison table
+      </label>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:4px;">
+        ${state.products.filter(p=>!p.archived).map(p=>`
+          <label style="display:flex;gap:6px;align-items:center;font-size:12px;">
+            <input type="checkbox" class="pr-pkg" value="${p.id}" ${picked.has(p.id)?'checked':''} style="width:auto;margin:0;">
+            ${esc(p.name)}${q.recommended_product_id===p.id?' <span style="color:var(--teal);font-size:10px;">★</span>':''}
+          </label>`).join('')}
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin:6px 0 10px;">★ marks the recommended package — the one the quote prices.</div>
+      <button class="btn btn-ghost btn-sm" onclick="saveProposalOptions('${q.id}')">Save and re-download</button>
+    </div>
+  </details>`;
+}
+
+async function saveProposalOptions(id){
+  const picked = [...document.querySelectorAll('.pr-pkg')].filter(c=>c.checked).map(c=>c.value);
+  try{
+    await API.patch(`/api/quotes/${id}`, {
+      cover_letter: (document.getElementById('pr_cover')||{}).value || '',
+      show_all_packages: !!(document.getElementById('pr_showall')||{}).checked,
+      selected_product_ids: picked,
+    });
+    showToast('Proposal updated');
+    await downloadProposal(id);
+    openQuote(id);
+  }catch(e){ showToast(e.message||'Could not save that','warn'); }
+}
+
+/** The seven-page proposal PDF. */
+async function downloadProposal(id){
+  showToast('Building the proposal…');
+  try{
+    const headers = {};
+    if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
+    else if(API.key) headers['x-api-key'] = API.key;
+    const res = await fetch(`${API.base}/api/quotes/${id}/proposal.pdf`, { headers });
+    if(!res.ok){
+      const err = await res.json().catch(()=>null);
+      throw new Error((err&&err.error) || `Could not build it (${res.status})`);
+    }
+    // The server already worked out a safe, meaningful filename; use it
+    // rather than inventing a second one that drifts from it.
+    const cd = res.headers.get('content-disposition') || '';
+    const m = /filename="([^"]+)"/.exec(cd);
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (m && m[1]) || `proposal-${id}.pdf`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    showToast('Proposal downloaded');
+  }catch(e){ showToast(e.message||'Could not build the proposal','warn'); }
+}
+
+/** Ticking "show the whole range" makes the per-package boxes redundant,
+ *  so they grey out rather than sitting there implying they still matter. */
+function quoteToggleAllPackages(){
+  const all = !!(document.getElementById('qt_showall')||{}).checked;
+  const host = document.getElementById('qt_packages');
+  if(!host) return;
+  host.style.opacity = all ? 0.4 : 1;
+  host.style.pointerEvents = all ? 'none' : 'auto';
+}
+
 async function printQuote(id){
   const r = await openTaxInvoice(()=>API.get(`/api/quotes/${id}/document`));
   if(!r.ok) showToast(r.error,'warn');
@@ -3670,6 +3758,39 @@ function quoteModalHTML(){
       <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin:14px 0 6px;">Lines</label>
       <div id="qt_lines">${quoteLinesHTML()}</div>
       <button class="btn btn-ghost btn-sm" onclick="addQuoteLine()">${iconPlus(13)} Add a line</button>
+
+      <!-- Everything below shapes the PROPOSAL PDF rather than the quote
+           itself. A quote left alone still prints; these only decide how
+           much of the story goes with it. -->
+      <div style="margin:18px 0 6px;padding-top:14px;border-top:1px solid var(--border);">
+        <div style="font-size:12px;font-weight:700;">The proposal document</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">
+          A seven-page PDF: your letter first, then what we do, then the price. Leave it all blank and it still works.
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Covering letter <span style="font-weight:400;color:var(--muted);">— page one, in your words</span></label>
+        <textarea id="qt_cover" rows="4" placeholder="Leave blank and we'll write a sensible one addressed to their contact."></textarea>
+      </div>
+
+      <div class="field">
+        <label>Which packages to show</label>
+        <label style="display:flex;gap:8px;align-items:center;font-weight:400;font-size:12.5px;margin-bottom:6px;">
+          <input type="checkbox" id="qt_showall" onchange="quoteToggleAllPackages()" style="width:auto;margin:0;">
+          Show the whole range as a comparison table
+        </label>
+        <div id="qt_packages" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:4px;">
+          ${state.products.filter(p=>!p.archived).map(p=>`
+            <label style="display:flex;gap:6px;align-items:center;font-size:12px;font-weight:400;">
+              <input type="checkbox" class="qt-pkg" value="${p.id}" style="width:auto;margin:0;">
+              ${esc(p.name)}
+            </label>`).join('')}
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:5px;">
+          Tick none and it shows just the package you priced above. The one you priced is marked <em>recommended</em>.
+        </div>
+      </div>
 
       <div class="field" style="margin-top:14px;"><label>Notes for the customer</label><textarea id="qt_notes" rows="2"></textarea></div>
       <div id="qt_total" style="background:#F7F5F0;border-radius:8px;padding:10px 12px;font-size:13px;font-weight:700;display:flex;justify-content:space-between;">
@@ -3717,12 +3838,17 @@ async function saveQuote(){
   const lines = quoteLines.filter(l=>l.description && l.description.trim());
   if(!lines.length){ showToast('A quote needs at least one line','warn'); return; }
   try{
+    const showAll = !!(document.getElementById('qt_showall')||{}).checked;
+    const picked = [...document.querySelectorAll('.qt-pkg')].filter(c=>c.checked).map(c=>c.value);
     const q = await API.post('/api/quotes', {
       client_id: v('qt_client'),
       title: v('qt_title').trim(),
       valid_until: v('qt_valid') || null,
       product_id: v('qt_product') || undefined,
       notes: v('qt_notes').trim(),
+      cover_letter: v('qt_cover').trim(),
+      show_all_packages: showAll,
+      selected_product_ids: picked,
       lines,
     });
     quoteLines = []; closeModal();

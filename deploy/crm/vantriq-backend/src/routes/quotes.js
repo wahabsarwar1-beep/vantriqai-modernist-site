@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { createInvoice, getSettings, resolveTaxRate, ROUND } = require('../utils/billing');
+const { formatDay, isoDay } = require('../utils/formatDate');
 const { effectivePackage } = require('../utils/pkg');
 const { blockAutomation } = require('../middleware/auth');
 const router = express.Router();
@@ -42,6 +43,35 @@ function normaliseLines(lines) {
         amount: ROUND(l.amount !== undefined && l.amount !== '' ? Number(l.amount) : qty * unit),
       };
     });
+}
+
+/**
+ * The package ids a proposal puts in front of the reader.
+ *
+ * Anything that is not a UUID is dropped rather than rejected. The column
+ * is uuid[], so one stray value from a form would fail the whole insert
+ * and lose the quote — and a proposal is not the place to be strict about
+ * a field whose worst failure is showing one package fewer.
+ */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function normaliseProductIds(v) {
+  const list = Array.isArray(v) ? v : (typeof v === 'string' && v ? v.split(',') : []);
+  return [...new Set(list.map((s) => String(s).trim()).filter((s) => UUID_RE.test(s)))];
+}
+
+/**
+ * Who to print over the signature on a proposal, if anybody.
+ *
+ * quotes.created_by holds a staff email when a person raised it and the
+ * bare auth kind — 'apikey', 'session' — when an integration did. Printing
+ * "apikey" above the company name on a document a customer reads is worse
+ * than printing nothing, so anything that is not plainly a person's
+ * identity yields an empty string and the block simply omits the line.
+ */
+const AUTH_SENTINELS = new Set(['apikey', 'session', 'webhook', 'automation', 'admin', 'staff', '']);
+function preparerName(createdBy) {
+  const v = String(createdBy || '').trim();
+  return AUTH_SENTINELS.has(v.toLowerCase()) ? '' : v;
 }
 
 async function writeLines(quoteId, lines) {
@@ -128,13 +158,20 @@ router.post('/', async (req, res) => {
   const { rows } = await db.query(
     `insert into quotes
        (client_id, quote_number, title, status, valid_until, subtotal, tax_rate, tax_amount, total,
-        product_id, bundle_product_id, notes, terms, created_by)
-     values ($1,$2,$3,'draft',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) returning *`,
+        product_id, bundle_product_id, notes, terms, created_by,
+        cover_letter, selected_product_ids, show_all_packages, recommended_product_id)
+     values ($1,$2,$3,'draft',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) returning *`,
     [
       client.id, number, b.title || '', b.valid_until || null,
       t.subtotal, taxRate, t.tax_amount, t.total,
       b.product_id || null, b.bundle_product_id || null,
       b.notes || '', b.terms || '', (req.user && req.user.email) || req.authKind || '',
+      b.cover_letter || '',
+      normaliseProductIds(b.selected_product_ids),
+      b.show_all_packages === true || b.show_all_packages === 'true',
+      // A proposal naming one package recommends it unless told otherwise;
+      // the common case should not need a second field filled in.
+      b.recommended_product_id || b.product_id || null,
     ]
   );
   await writeLines(rows[0].id, lines);
@@ -153,13 +190,26 @@ router.patch('/:id', async (req, res) => {
 
   const sets = [];
   const params = [req.params.id];
-  for (const f of ['title', 'valid_until', 'notes', 'terms', 'product_id', 'bundle_product_id', 'status']) {
+  for (const f of ['title', 'valid_until', 'notes', 'terms', 'product_id', 'bundle_product_id',
+    'status', 'cover_letter', 'recommended_product_id']) {
     if (b[f] === undefined) continue;
     if (f === 'status' && !['draft', 'sent', 'declined', 'expired', 'cancelled'].includes(b[f])) {
       return res.status(400).json({ error: 'Accept a quote through /accept, not by setting its status.' });
     }
-    params.push(b[f] === '' ? null : b[f]);
+    // cover_letter is prose: an empty string means "the sender cleared it"
+    // and must stay an empty string, or clearing the letter would null the
+    // column and silently bring the generated default back.
+    const blankIsNull = f !== 'cover_letter';
+    params.push(b[f] === '' && blankIsNull ? null : b[f]);
     sets.push(`${f} = $${params.length}`);
+  }
+  if (b.show_all_packages !== undefined) {
+    params.push(b.show_all_packages === true || b.show_all_packages === 'true');
+    sets.push(`show_all_packages = $${params.length}`);
+  }
+  if (b.selected_product_ids !== undefined) {
+    params.push(normaliseProductIds(b.selected_product_ids));
+    sets.push(`selected_product_ids = $${params.length}`);
   }
 
   if (b.lines !== undefined || b.tax_rate !== undefined) {
@@ -302,8 +352,11 @@ async function buildQuoteDocument(quoteId) {
   return {
     document_title: 'Quotation',
     invoice_number: q.quote_number,
-    issued_date: String(q.created_at).slice(0, 10),
-    due_date: q.valid_until,
+    // isoDay, not String(...).slice(0, 10): pg hands this back as a Date
+    // in-process, and slicing one yields 'Fri Sep 25' — which reaches the
+    // renderer already broken and prints a day with no year.
+    issued_date: isoDay(q.created_at),
+    due_date: isoDay(q.valid_until),
     status: q.status,
     currency: settings.currency || 'PKR',
     amount_due: Number(q.total),
@@ -331,7 +384,10 @@ async function buildQuoteDocument(quoteId) {
       amount_excluding_tax: Number(q.subtotal), total_payable: Number(q.total),
     },
     ait_note: '',
-    notes: [q.notes, q.terms, q.valid_until ? `This quotation is valid until ${q.valid_until}.` : '']
+    // formatDay, not the raw value: interpolating a pg Date into a template
+    // literal put the whole 'Sat Oct 31 2026 00:00:00 GMT+0000 (Coordinated
+    // Universal Time)' onto the page a customer reads.
+    notes: [q.notes, q.terms, q.valid_until ? `This quotation is valid until ${formatDay(q.valid_until)}.` : '']
       .filter(Boolean).join('\n\n'),
   };
 }
@@ -340,6 +396,105 @@ router.get('/:id/document', async (req, res) => {
   const doc = await buildQuoteDocument(req.params.id);
   if (!doc) return res.status(404).json({ error: 'Quote not found' });
   res.json(doc);
+});
+
+/**
+ * The same quote, shaped for the multi-page proposal.
+ *
+ * Extends the quotation document rather than replacing it, so the money —
+ * lines, subtotal, GST, total — is computed in exactly one place and the
+ * commercials page cannot drift from the on-screen quote or from the
+ * invoice that accepting it will raise.
+ *
+ * What it adds is the surrounding argument: the covering letter, and the
+ * packages to put in front of the reader. Package figures are read live
+ * from the products table, so a proposal can never quote a price the CRM
+ * would not honour.
+ */
+async function buildProposalDocument(quoteId) {
+  const base = await buildQuoteDocument(quoteId);
+  if (!base) return null;
+
+  const { rows: qr } = await db.query(
+    `select q.title, q.quote_number, q.valid_until, q.product_id,
+            q.cover_letter, q.selected_product_ids, q.show_all_packages,
+            q.recommended_product_id, q.created_by, c.name as contact_name, c.company
+       from quotes q join clients c on c.id = q.client_id where q.id = $1`,
+    [quoteId]
+  );
+  const q = qr[0];
+
+  // Which packages to show. "Show all" wins over a selection, because a
+  // sender who ticked it wants the ladder; otherwise show what was picked,
+  // and failing that the package the quote itself names.
+  const ids = (q.selected_product_ids || []).length
+    ? q.selected_product_ids
+    : (q.product_id ? [q.product_id] : []);
+  let packages = [];
+  if (q.show_all_packages) {
+    const { rows } = await db.query(
+      `select * from products where archived = false order by sort_order, name`
+    );
+    packages = rows;
+  } else if (ids.length) {
+    const { rows } = await db.query(
+      `select * from products where id = any($1::uuid[]) and archived = false
+        order by sort_order, name`,
+      [ids]
+    );
+    packages = rows;
+  }
+
+  return {
+    ...base,
+    // buildQuoteDocument names its fields after an invoice, because that is
+    // the shape the shared renderer wants. A proposal is not an invoice, so
+    // the same values are re-exposed under the names this document uses —
+    // rather than the renderer reaching for `due_date` and meaning "valid
+    // until", which is the kind of alias nobody remembers a year later.
+    quote_number: q.quote_number || base.invoice_number || '',
+    valid_until: q.valid_until || null,
+    title: q.title || '',
+    // created_by falls back to req.authKind, so a quote raised by an
+    // integration is stamped 'apikey' — which must never appear over a
+    // signature on a document a customer reads. Only a real identity signs.
+    prepared_by: preparerName(q.created_by),
+    show_all_packages: !!q.show_all_packages,
+    cover_letter: (q.cover_letter || '').trim()
+      || require('../content/proposal').defaultCoverLetter({
+        contactName: q.contact_name, company: q.company,
+      }),
+    packages: packages.map((p) => ({
+      id: p.id,
+      name: p.name,
+      target_tier: p.target_tier || '',
+      setup_fee: Number(p.setup_fee),
+      retainer: Number(p.retainer),
+      quota: Number(p.quota),
+      overage_rate: Number(p.overage_rate),
+      channels: p.channels || '',
+      recommended: !!q.recommended_product_id && p.id === q.recommended_product_id,
+    })),
+  };
+}
+
+/** The proposal as JSON, for the CRM to preview without rendering a PDF. */
+router.get('/:id/proposal', async (req, res) => {
+  const doc = await buildProposalDocument(req.params.id);
+  if (!doc) return res.status(404).json({ error: 'Quote not found' });
+  res.json(doc);
+});
+
+/** The proposal as a PDF, ready to send. */
+router.get('/:id/proposal.pdf', async (req, res) => {
+  const doc = await buildProposalDocument(req.params.id);
+  if (!doc) return res.status(404).json({ error: 'Quote not found' });
+  const { renderProposal, proposalFilename } = require('../utils/proposalPdf');
+  const pdf = await renderProposal(doc);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${proposalFilename(doc)}"`);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.send(pdf);
 });
 
 router.delete('/:id', blockAutomation, async (req, res) => {
