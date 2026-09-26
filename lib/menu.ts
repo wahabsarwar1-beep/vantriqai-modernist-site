@@ -1,4 +1,4 @@
-import { SECTORS } from "@/lib/content";
+import { SECTORS, TIERS } from "@/lib/content";
 import { PRODUCT_GROUPS, productSlug, products } from "@/lib/products";
 import { hrefIn, navHref, type Region } from "@/lib/region";
 import { RESOURCES } from "@/lib/resources";
@@ -73,6 +73,28 @@ export function menuPanels(region: Region): MenuPanel[] {
         },
       ],
       footer: { href: navHref(region, { href: "/industries" }), label: "Every sector we work in" },
+    },
+    {
+      label: "Packages",
+      href: navHref(region, { href: "/pricing" }),
+      columns: [
+        {
+          title: "Tiers",
+          links: TIERS.map((t) => ({
+            href: `${hrefIn(region, "/pricing")}#${productSlug(t.name)}`,
+            label: t.name,
+            note: t.audience,
+          })),
+        },
+        {
+          title: "Before you buy",
+          links: [
+            { href: `${hrefIn(region, "/pricing")}#what-each-tier-carries`, label: "What each tier carries", note: "Sessions, headroom, overage" },
+            { href: `${hrefIn(region, "/pricing")}#questions`, label: "Common questions", note: "Seven, answered plainly" },
+          ],
+        },
+      ],
+      footer: { href: navHref(region, { href: "/pricing" }), label: "Compare every package" },
     },
     {
       label: "Resources",

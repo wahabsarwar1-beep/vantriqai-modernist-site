@@ -50,7 +50,7 @@ export default function PinnedRail({ steps }: { steps: JStep[] }) {
         display: "inline-block",
       }}
     >
-      04 — Step by step
+      03 — Step by step
     </span>
   );
 

@@ -4,11 +4,10 @@ import HeroRotator from "@/components/HeroRotator";
 import GapClock from "@/components/GapClock";
 import InteractiveDemo from "@/components/InteractiveDemo";
 import TileBand from "@/components/TileBand";
-import PinnedSteps from "@/components/PinnedSteps";
 import PinnedRail from "@/components/PinnedRail";
 import Marquee from "@/components/Marquee";
 import WorkspaceCards from "@/components/WorkspaceCards";
-import { BENCH, MISSED, ANSWERED, AGENTS, JSTEPS, INTEGRATIONS, MARQUEE_ITEMS, WHY, STEPS } from "@/lib/content";
+import { AGENTS, JSTEPS, INTEGRATIONS, MARQUEE_ITEMS, WHY } from "@/lib/content";
 import { hrefIn, type Region } from "@/lib/region";
 
 const bodyMuted = { color: "color-mix(in srgb, var(--color-text) 78%, transparent)" };
@@ -27,18 +26,6 @@ export default function HomePage({ region }: { region: Region }) {
           </div>
         </section>
       </div>
-
-      <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)" }}>
-        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(22px,3vw,40px) clamp(20px,5vw,64px)", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(220px,100%),1fr))", gap: 18 }} data-stagger="">
-          {BENCH.map((b) => (
-            <div key={b.fig} data-anim="" data-tilt="" className="hover-lift" style={{ background: "var(--color-surface)", padding: "clamp(26px,3.4vw,46px) clamp(18px,2.4vw,34px)", borderRadius: 28, border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-sm)", display: "flex", flexDirection: "column" }}>
-              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(34px,3.8vw,54px)", lineHeight: 1, letterSpacing: "-0.04em", margin: 0, fontVariantNumeric: "tabular-nums" }}>{b.fig}</p>
-              <p style={{ fontSize: 14.5, lineHeight: "23px", margin: "16px 0 22px", flex: 1, maxWidth: "30ch", ...bodyMuted }}>{b.claim}</p>
-              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 10, lineHeight: "16px", letterSpacing: "0.1em", textTransform: "uppercase", margin: 0, paddingTop: 12, borderTop: "1px solid var(--color-divider)", color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>{b.src}</p>
-            </div>
-          ))}
-        </div>
-      </section>
 
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(34px,4.4vw,58px) clamp(20px,5vw,64px) 0" }}>
         <Kicker label="01 — The response gap" />
@@ -75,36 +62,6 @@ export default function HomePage({ region }: { region: Region }) {
         <p data-anim="" style={{ fontSize: 12, lineHeight: "20px", margin: "16px 0 0", maxWidth: "74ch", color: "color-mix(in srgb, var(--color-text) 55%, transparent)" }}>
           Every figure on this page is a published third-party benchmark for messaging and lead response, cited where it appears. None of them are VantriqAI client results.
         </p>
-
-        <div style={{ margin: "clamp(48px,7vw,90px) 0 clamp(20px,3vw,32px)" }}>
-          <Kicker label="Same message, two businesses" marginBottom="0" />
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(300px,100%),1fr))", gap: 18 }}>
-          <div data-anim="" style={{ background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: 28, boxShadow: "var(--shadow-sm)", padding: "clamp(26px,3.2vw,42px) clamp(22px,2.8vw,38px)" }}>
-            <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", margin: "0 0 6px", color: "color-mix(in srgb, var(--color-text) 55%, transparent)" }}>Without an agent</p>
-            <h3 style={{ fontSize: 22, lineHeight: 1.1, letterSpacing: "-0.025em", margin: "0 0 20px" }}>The thread nobody saw</h3>
-            {MISSED.map((r) => (
-              <div key={r.t + r.text} style={{ display: "flex", gap: 18, alignItems: "baseline", borderTop: "1px solid var(--color-divider)", padding: "13px 0" }}>
-                <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.06em", flex: "none", width: 44, fontVariantNumeric: "tabular-nums", color: "color-mix(in srgb, var(--color-text) 55%, transparent)" }}>{r.t}</span>
-                <span style={{ fontSize: 15, lineHeight: "24px" }}>{r.text}</span>
-              </div>
-            ))}
-            <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(24px,2.6vw,34px)", lineHeight: 1, letterSpacing: "-0.03em", margin: "24px 0 8px", borderTop: "1px solid var(--color-text)", paddingTop: 20 }}>12 h 07 m</p>
-            <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 10, lineHeight: "16px", letterSpacing: "0.1em", textTransform: "uppercase", margin: 0, color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>To first reply — the average across 1,000 companies is 12 h 10 m · SuperOffice</p>
-          </div>
-          <div data-anim="" style={{ background: "var(--color-accent-100)", border: "1px solid var(--color-accent-200)", borderRadius: 28, boxShadow: "var(--shadow-sm)", padding: "clamp(26px,3.2vw,42px) clamp(22px,2.8vw,38px)" }}>
-            <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", margin: "0 0 6px", color: "var(--color-accent-700)" }}>With the agent</p>
-            <h3 style={{ fontSize: 22, lineHeight: 1.1, letterSpacing: "-0.025em", margin: "0 0 20px" }}>The same thread, answered</h3>
-            {ANSWERED.map((r) => (
-              <div key={r.t + r.text} style={{ display: "flex", gap: 18, alignItems: "baseline", borderTop: "1px solid var(--color-divider)", padding: "13px 0" }}>
-                <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.06em", flex: "none", width: 44, fontVariantNumeric: "tabular-nums", color: "var(--color-accent-700)" }}>{r.t}</span>
-                <span style={{ fontSize: 15, lineHeight: "24px" }}>{r.text}</span>
-              </div>
-            ))}
-            <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(24px,2.6vw,34px)", lineHeight: 1, letterSpacing: "-0.03em", margin: "24px 0 8px", borderTop: "1px solid var(--color-accent)", paddingTop: 20, color: "var(--color-accent-700)" }}>3 m</p>
-            <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 10, lineHeight: "16px", letterSpacing: "0.1em", textTransform: "uppercase", margin: 0, color: "color-mix(in srgb, var(--color-text) 55%, transparent)" }}>Message to booked — inside the five-minute window where qualification odds run 21× higher · MIT / InsideSales.com</p>
-          </div>
-        </div>
       </div>
 
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" }}>
@@ -159,10 +116,9 @@ export default function HomePage({ region }: { region: Region }) {
         </div>
       </div>
 
-      <PinnedSteps steps={STEPS} />
 
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(12px,2vw,22px) clamp(20px,5vw,64px) clamp(18px,2.4vw,30px)" }}>
-        <Kicker label="03 — The agents" />
+        <Kicker label="02 — The agents" />
         <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: 0, maxWidth: "24ch" }}>
           One brain, ten jobs. Switch on the ones your day actually needs — the rest stay quiet until you want them.
         </h2>
@@ -195,7 +151,7 @@ export default function HomePage({ region }: { region: Region }) {
       <PinnedRail steps={JSTEPS} />
 
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(12px,2vw,22px) clamp(20px,5vw,64px) clamp(18px,2.4vw,30px)" }}>
-        <Kicker label="05 — What it plugs into" />
+        <Kicker label="04 — What it plugs into" />
         <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: 0, maxWidth: "24ch" }}>It acts inside the tools you already pay for.</h2>
       </div>
 
@@ -236,7 +192,7 @@ export default function HomePage({ region }: { region: Region }) {
         <section style={{ padding: "clamp(40px,5vw,68px) 0" }}>
           <div className="stack-mobile" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(240px,100%),1fr))", gap: "20px clamp(24px,5vw,72px)", borderTop: "1px solid var(--color-divider)", paddingTop: 22 }}>
             <p data-anim="" style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)", margin: 0 }}>
-              07 — Why Vantriq<span style={{ color: "var(--color-accent)" }}>AI</span>
+              06 — Why Vantriq<span style={{ color: "var(--color-accent)" }}>AI</span>
             </p>
             <div>
               <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 44px", maxWidth: "22ch" }}>A local partner, not a faceless subscription</h2>

@@ -9,6 +9,7 @@ import Counter from "@/components/Counter";
 import Magnetic from "@/components/Magnetic";
 import Link from "next/link";
 import { TIERS, USAGE, FAQS } from "@/lib/content";
+import { productSlug } from "@/lib/products";
 import { hrefIn, type Region } from "@/lib/region";
 
 const bodyMuted = { color: "color-mix(in srgb, var(--color-text) 78%, transparent)" };
@@ -52,8 +53,9 @@ export default function PricingPage({ region }: { region: Region }) {
           {TIERS.map((t) => (
             <div
               key={t.name}
+              id={productSlug(t.name)}
               data-anim=""
-              className="hover-lift"
+              className="hover-lift anchor-target"
               style={{ background: "var(--color-surface)", padding: "clamp(28px,3vw,40px) clamp(20px,2.5vw,36px)", display: "flex", flexDirection: "column", borderRadius: 28, border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-sm)" }}
             >
               <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)", margin: "0 0 16px" }}>{t.tier}</p>
@@ -91,6 +93,7 @@ export default function PricingPage({ region }: { region: Region }) {
 
         <section style={{ padding: "clamp(34px,4.4vw,58px) 0 0" }}>
           <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 22 }}>
+            <span id="what-each-tier-carries" className="anchor-target" />
             <Kicker label="What each tier carries" marginBottom="0" />
             <div style={{ marginTop: 20 }}>
               <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px", maxWidth: "24ch" }}>The same table your quote is built from</h2>
@@ -128,6 +131,7 @@ export default function PricingPage({ region }: { region: Region }) {
 
         <section style={{ padding: "clamp(34px,4.4vw,58px) 0 clamp(40px,5.2vw,68px)" }}>
           <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 22 }}>
+            <span id="questions" className="anchor-target" />
             <Kicker label="Questions" marginBottom="0" />
             <div style={{ marginTop: 20 }}>
               <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 40px" }}>Before you ask us</h2>

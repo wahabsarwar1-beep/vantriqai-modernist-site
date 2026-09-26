@@ -86,6 +86,12 @@ export const products = (region: Region): Product[] => [
 
 /** The anchor a module's card carries, and the menu links to. */
 export const productSlug = (name: string) =>
-  name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  name
+    .toLowerCase()
+    // "Enterprise" and "Enterprise+" would otherwise both become "enterprise",
+    // putting the same id on two cards and sending the menu to the wrong one.
+    .replace(/\+/g, "-plus")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 
 export const PRODUCT_GROUPS: Product["kicker"][] = ["Channel", "Capability", "Deployment"];
