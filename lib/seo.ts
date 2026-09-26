@@ -103,6 +103,15 @@ export function industryMetadata(region: Region, slug: string, title: string, de
   });
 }
 
+/** A platform module page, from lib/modules. */
+export function moduleMetadata(region: Region, slug: string, name: string, description: string): Metadata {
+  return pageMetadata(region, `/products/${slug}`, {
+    title: `${name} — AI Agent Module`,
+    globalTitle: `${name} — AI Agent Module (Global)`,
+    description,
+  });
+}
+
 function pageMetadata(region: Region, path: string, page: PageSeo): Metadata {
 
   const isGlobal = region.key === "global";

@@ -68,7 +68,7 @@ export function menuPanels(region: Region): MenuPanel[] {
         links: all
           .filter((p) => p.kicker === group)
           .map((p) => ({
-            href: `${hrefIn(region, "/products")}#${productSlug(p.name)}`,
+            href: hrefIn(region, `/products/${productSlug(p.name)}`),
             label: p.name,
             note: p.tier,
             mark: p.mark,

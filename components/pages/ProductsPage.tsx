@@ -1,3 +1,4 @@
+import Link from "next/link";
 import JsonLd from "@/components/JsonLd";
 import { breadcrumbSchema } from "@/lib/schema";
 import PageHero from "@/components/PageHero";
@@ -80,8 +81,13 @@ export default function ProductsPage({ region }: { region: Region }) {
                     {p.mark ? <ProductMark id={p.mark} size={p.featured ? 64 : 52} /> : null}
                     <span className="mod-tier">{p.tier}</span>
                   </div>
-                  <h2 className="mod-title">{p.name}</h2>
+                  <h2 className="mod-title">
+                    <Link href={hrefIn(region, `/products/${productSlug(p.name)}`)} className="card-link" style={{ color: "inherit" }}>
+                      {p.name}
+                    </Link>
+                  </h2>
                   <p className="mod-body">{p.body}</p>
+                  <span aria-hidden="true" className="mod-more">Explore {p.name} →</span>
                   {p.featured ? (
                     <div className="bento-chat mod-feature-chat" aria-hidden="true">
                       <span className="bento-bubble bento-them">Can I come in Saturday morning?</span>

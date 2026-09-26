@@ -13,6 +13,7 @@ import { productSlug, products } from "@/lib/products";
 import { hrefIn, SITE_URL, type Region } from "@/lib/region";
 import { breadcrumbSchema } from "@/lib/schema";
 import { waLink } from "@/lib/whatsapp";
+import { TRUST } from "@/lib/trust";
 
 const bodyMuted = { color: "color-mix(in srgb, var(--color-text) 76%, transparent)" };
 const wrap: CSSProperties = { maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" };
@@ -22,17 +23,6 @@ const INK_A = "color-mix(in srgb, var(--ind-a) 78%, #000)";
 
 const CHANNELS = ["WhatsApp", "Instagram", "Facebook", "Website", "Voice"];
 
-/**
- * What we commit to in every sector. Commitments we can keep, not
- * certifications: a badge wall is only worth something when every badge is
- * real, and these are the things a buyer can hold us to in writing.
- */
-const TRUST = [
-  { title: "Answers only from what you approve", body: "The agent speaks from your content and your rules. Where it does not know, it says so and hands over." },
-  { title: "A person for every judgement call", body: "Escalation is in every plan: the right colleague gets the conversation with the full thread attached." },
-  { title: "Every conversation on record", body: "Each exchange is kept with its outcome, so you can see exactly what was said and what was done." },
-  { title: "Your data, where you need it", body: "Handling agreed in writing, and a fully private deployment on your own infrastructure when residency demands it." },
-];
 
 export default function IndustryPage({ region, industry }: { region: Region; industry: Industry }) {
   const catalogue = products(region);
