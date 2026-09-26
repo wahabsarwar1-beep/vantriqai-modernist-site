@@ -6,7 +6,7 @@ import GapClock from "@/components/GapClock";
 import InteractiveDemo from "@/components/InteractiveDemo";
 import PinnedRail from "@/components/PinnedRail";
 import ProductMark, { type MarkId } from "@/components/ProductMark";
-import WorkspaceCards from "@/components/WorkspaceCards";
+import AgentTrace from "@/components/AgentTrace";
 import Magnetic from "@/components/Magnetic";
 import { AGENTS, INTEGRATIONS, JSTEPS, WHY } from "@/lib/content";
 import { industries } from "@/lib/industries";
@@ -39,6 +39,41 @@ const AGENT_MARKS: Record<string, MarkId> = {
   Insights: "insights",
   Yours: "custom",
 };
+
+/* The limits the agent works inside. Each is a commitment the configuration
+   actually enforces, not a certification. */
+const GUARDRAILS = [
+  {
+    title: "Speaks only from what you approve",
+    body: "Answers come from your catalogue, policies and FAQs. When it doesn't know, it says so.",
+    icon: <path d="M5 5.5A1.5 1.5 0 016.5 4H13l5 5v9.5a1.5 1.5 0 01-1.5 1.5h-10A1.5 1.5 0 015 18.5zM9 13l2 2 4-4" />,
+  },
+  {
+    title: "Knows when to hand over",
+    body: "Complaints, refunds and judgement calls go to a named person, with the whole thread attached.",
+    icon: <path d="M4 12h11m0 0l-4-4m4 4l-4 4M20 5v14" />,
+  },
+  {
+    title: "Nothing broadcast without you",
+    body: "Offers and outreach are drafted, then wait. Nothing goes to a list until you approve it.",
+    icon: <path d="M4 10v4a1 1 0 001 1h2l5 4V5L7 9H5a1 1 0 00-1 1zM16 9a4 4 0 010 6M18.5 6.5a8 8 0 010 11" />,
+  },
+  {
+    title: "Every conversation on record",
+    body: "Each message and outcome is kept, so you can see exactly what was said and what was done.",
+    icon: <path d="M12 7v5l3 2M21 12a9 9 0 11-9-9 9 9 0 019 9z" />,
+  },
+  {
+    title: "Only the access you grant",
+    body: "It reaches the systems and fields you connect during onboarding — and nothing else.",
+    icon: <path d="M7 11V8a5 5 0 0110 0v3M6 11h12a1 1 0 011 1v7a1 1 0 01-1 1H6a1 1 0 01-1-1v-7a1 1 0 011-1z" />,
+  },
+  {
+    title: "Your servers, when you need them",
+    body: "A fully private deployment on your own infrastructure for strict data-residency rules.",
+    icon: <path d="M4 6a2 2 0 012-2h12a2 2 0 012 2v3H4zM4 13h16v5a2 2 0 01-2 2H6a2 2 0 01-2-2zM8 6.5h.01M8 16.5h.01" />,
+  },
+];
 
 /* Bento sizes by agent: the front door gets the big tile, booking the wide
    one, and the last two close the grid as a pair. */
@@ -94,11 +129,27 @@ export default function HomePage({ region }: { region: Region }) {
         </p>
       </section>
 
-      {/* ---------- 02 Try it ---------- */}
+      {/* ---------- 02 Watch it think ---------- */}
+      <section style={{ ...wrap, paddingTop: "clamp(72px,9vw,120px)" }}>
+        <div className="split-head">
+          <div>
+            <Eyebrow n="02" label="Watch it think" />
+            <h2 data-anim="" style={{ ...h2, maxWidth: "17ch" }}>
+              Not a chatbot. <span className="grad-text">An agent that reasons, then acts.</span>
+            </h2>
+          </div>
+          <p data-anim="" style={{ fontSize: 17, lineHeight: "29px", margin: 0, maxWidth: "44ch", ...muted }}>
+            A chatbot matches keywords to a script. A VantriqAI agent works out what was meant, checks your real systems, stays inside your rules — and knows when a person should take over.
+          </p>
+        </div>
+        <AgentTrace region={region} />
+      </section>
+
+      {/* ---------- 03 Try it ---------- */}
       <section style={{ ...wrap, paddingTop: "clamp(72px,9vw,120px)" }}>
         <div className="demo-split">
           <div>
-            <Eyebrow n="02" label="Try it yourself" />
+            <Eyebrow n="03" label="Try it yourself" />
             <h2 data-anim="" style={{ ...h2, maxWidth: "14ch" }}>
               Be the customer for <span className="grad-text">a minute.</span>
             </h2>
@@ -128,11 +179,11 @@ export default function HomePage({ region }: { region: Region }) {
         </div>
       </section>
 
-      {/* ---------- 03 The agents ---------- */}
+      {/* ---------- 04 The agents ---------- */}
       <section style={{ ...wrap, paddingTop: "clamp(72px,9vw,120px)" }}>
         <div className="split-head">
           <div>
-            <Eyebrow n="03" label="The agents" />
+            <Eyebrow n="04" label="The agents" />
             <h2 data-anim="" style={{ ...h2, maxWidth: "15ch" }}>
               One brain. <span className="grad-text">Ten jobs.</span>
             </h2>
@@ -166,39 +217,24 @@ export default function HomePage({ region }: { region: Region }) {
             </div>
           ))}
         </GlowGrid>
-      </section>
-
-      {/* ---------- 04 Workspace ---------- */}
-      <section style={{ ...wrap, paddingTop: "clamp(72px,9vw,120px)", paddingBottom: "clamp(40px,5vw,64px)" }}>
-        <div className="split-head">
-          <div>
-            <Eyebrow n="04" label="The workspace" />
-            <h2 data-anim="" style={{ ...h2, maxWidth: "16ch" }}>
-              For work bigger than <span className="grad-text">one inbox.</span>
-            </h2>
-          </div>
-          <p data-anim="" style={{ fontSize: 17, lineHeight: "29px", margin: 0, maxWidth: "44ch", ...muted }}>
-            Switch on the modules you need, watch one thread carry a customer to a booking, and read the week in a minute.
-          </p>
-        </div>
-        <WorkspaceCards region={region} />
+        <p aria-hidden="true" className="swipe-hint">Swipe to see all ten →</p>
       </section>
 
       <PinnedRail steps={JSTEPS} label="05 — Step by step" />
 
-      {/* ---------- 06 Integrations ---------- */}
+      {/* ---------- 06 Stack and guardrails ---------- */}
       <section className="dark-band">
         <div aria-hidden="true" className="dark-band-aurora" />
         <div style={{ ...wrap, position: "relative", padding: "clamp(56px,7vw,100px) clamp(20px,5vw,64px)" }}>
           <div className="split-head">
             <div>
-              <Eyebrow n="06" label="What it plugs into" dark />
+              <Eyebrow n="06" label="Stack and guardrails" dark />
               <h2 data-anim="" style={{ ...h2, maxWidth: "16ch", color: "#fff" }}>
-                It acts inside the tools <span className="grad-text-light">you already pay for.</span>
+                Connected to your stack. <span className="grad-text-light">Bound by your rules.</span>
               </h2>
             </div>
             <p data-anim="" style={{ fontSize: 17, lineHeight: "29px", margin: 0, maxWidth: "44ch", color: "rgba(255,255,255,.66)" }}>
-              Wired up during onboarding, not months later. The agent writes into your systems — it never keeps a second copy of the truth.
+              Wired into the tools you already pay for during onboarding. It writes into your systems rather than keeping a second copy of the truth — and it never steps outside the limits you set.
             </p>
           </div>
 
@@ -221,6 +257,29 @@ export default function HomePage({ region }: { region: Region }) {
               </div>
             ))}
           </GlowGrid>
+
+          <div className="guard-head">
+            <span className="guard-shield" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3l7 2.6v5.3c0 4.3-2.9 7.7-7 9.1-4.1-1.4-7-4.8-7-9.1V5.6z" />
+                <path d="M9 12l2.2 2.2L15.5 10" />
+              </svg>
+            </span>
+            <p>Guardrails, built in — not bolted on</p>
+          </div>
+          <ul className="guard-grid">
+            {GUARDRAILS.map((g) => (
+              <li key={g.title} data-anim="" className="guard-item">
+                <span className="guard-icon" aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    {g.icon}
+                  </svg>
+                </span>
+                <strong>{g.title}</strong>
+                <span>{g.body}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 

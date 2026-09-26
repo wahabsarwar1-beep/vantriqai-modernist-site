@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Magnetic from "@/components/Magnetic";
+import Marquee from "@/components/Marquee";
 import { waLink } from "@/lib/whatsapp";
 import { hrefIn, type Region } from "@/lib/region";
 
@@ -38,6 +39,10 @@ const EVENTS = [
 
 const WORDS = ["message.", "call.", "lead.", "booking."];
 
+/* Tools the agent works inside — named as text, not logos, since they are
+   integrations rather than endorsements. */
+const WORKS_WITH = ["WhatsApp Business Platform", "Instagram", "Messenger", "Google Calendar", "Outlook", "HubSpot", "Salesforce", "Zoho", "Shopify", "WooCommerce", "Stripe", "Google Sheets"];
+
 /* Node rows as a share of the stage height, and the curve each one draws to
    the core. The SVG and the HTML nodes read the same numbers. */
 const ROWS = [16, 38, 62, 84];
@@ -50,18 +55,15 @@ const outPath = (y: number) => `M ${CX + 60} ${CY} C ${W - 190} ${CY}, ${W - 170
 
 export default function HomeHero({ region }: { region: Region }) {
   const [tick, setTick] = useState(0);
-  const [word, setWord] = useState(0);
-  const [prevWord, setPrevWord] = useState<number | null>(null);
+  const [words, setWords] = useState<{ word: number; prev: number | null }>({ word: 0, prev: null });
+  const { word, prev: prevWord } = words;
+  const stageRef = useRef<HTMLDivElement>(null);
+  const tiltFrame = useRef(0);
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const a = setInterval(() => setTick((t) => t + 1), 2800);
-    const b = setInterval(() => {
-      setWord((w) => {
-        setPrevWord(w);
-        return (w + 1) % WORDS.length;
-      });
-    }, 2200);
+    const b = setInterval(() => setWords(({ word: w }) => ({ word: (w + 1) % WORDS.length, prev: w })), 2200);
     return () => {
       clearInterval(a);
       clearInterval(b);
@@ -77,10 +79,11 @@ export default function HomeHero({ region }: { region: Region }) {
 
       <div className="hh-inner">
         <div className="hh-copy">
-          <p className="hh-eyebrow">
-            <span aria-hidden="true" className="hh-live" />
-            AI agents · live on every channel
-          </p>
+          <Link href={`${hrefIn(region, "/products")}#voice-agent`} className="hh-announce">
+            <span className="hh-announce-tag">New</span>
+            Voice Agent — it answers the phone too
+            <span aria-hidden="true" className="hh-announce-arrow">→</span>
+          </Link>
 
           <h1 className="hh-title">
             <span className="sr-only">Never miss another customer message, call or lead.</span>
@@ -136,7 +139,29 @@ export default function HomeHero({ region }: { region: Region }) {
           </dl>
         </div>
 
-        <div className="hh-stage-wrap">
+        {/* The stage leans a few degrees toward the pointer — depth, not a
+            gimmick, and only for a mouse with motion allowed. */}
+        <div
+          className="hh-stage-wrap"
+          ref={stageRef}
+          onPointerMove={(e) => {
+            if (e.pointerType !== "mouse") return;
+            const el = stageRef.current;
+            if (!el) return;
+            const { clientX, clientY } = e;
+            cancelAnimationFrame(tiltFrame.current);
+            tiltFrame.current = requestAnimationFrame(() => {
+              const r = el.getBoundingClientRect();
+              el.style.setProperty("--tx", ((clientX - r.left) / r.width - 0.5).toFixed(3));
+              el.style.setProperty("--ty", ((clientY - r.top) / r.height - 0.5).toFixed(3));
+            });
+          }}
+          onPointerLeave={() => {
+            cancelAnimationFrame(tiltFrame.current);
+            stageRef.current?.style.setProperty("--tx", "0");
+            stageRef.current?.style.setProperty("--ty", "0");
+          }}
+        >
           <div className="hh-stage" role="img" aria-label="Messages from WhatsApp, Instagram, the website and the phone pass through the VantriqAI agent and become calendar bookings, CRM records, payments and handovers to your team.">
             <svg className="hh-wires" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
               <defs>
@@ -192,6 +217,19 @@ export default function HomeHero({ region }: { region: Region }) {
               <span className="hh-feed-time">{event.time}</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="hh-works">
+        <span className="hh-works-label">Works inside the tools you already run</span>
+        <div className="hh-works-track" aria-label={`Integrations: ${WORKS_WITH.join(", ")}`} role="img">
+          <Marquee duration={46}>
+            {WORKS_WITH.map((n) => (
+              <span key={n} className="hh-works-item">
+                {n}
+              </span>
+            ))}
+          </Marquee>
         </div>
       </div>
     </section>

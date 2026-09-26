@@ -8,6 +8,7 @@ import PosterCTA from "@/components/PosterCTA";
 import Marquee from "@/components/Marquee";
 import SpotlightGrid, { SpotlightItem } from "@/components/SpotlightGrid";
 import Counter from "@/components/Counter";
+import WorkspaceCards from "@/components/WorkspaceCards";
 import { STEPS, BMK, COMPARISON, HOOD } from "@/lib/content";
 import { hrefIn, type Region } from "@/lib/region";
 
@@ -201,6 +202,17 @@ export default function HowItWorksPage({ region }: { region: Region }) {
                 ))}
               </div>
             </div>
+          </div>
+        </section>
+
+        <section style={{ padding: "0 0 clamp(38px,5vw,66px)" }}>
+          <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 22 }}>
+            <Kicker label="The workspace" marginBottom="0" />
+            <div className="split-head" style={{ marginTop: 20 }}>
+              <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: 0, maxWidth: "22ch" }}>For work bigger than one inbox</h2>
+              <p data-anim="" style={{ fontSize: 16, lineHeight: "28px", margin: 0, maxWidth: "46ch", ...bodyMuted }}>Switch on the modules you need, watch one thread carry a customer to a booking, and read the week in a minute.</p>
+            </div>
+            <WorkspaceCards region={region} />
           </div>
         </section>
       </div>
