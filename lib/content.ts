@@ -65,13 +65,23 @@ export const BMK = [
   { claim: "Open rate on a WhatsApp business message, versus 20–25% for email", fig: "95–98%", src: "Mobilesquared / Infobip · industry estimate" },
 ];
 
+/**
+ * `over` is the Pakistan rate, `overUsd` the one the /global pages show.
+ *
+ * THE USD COLUMN IS A PLACEHOLDER. It is not a conversion of the PKR column —
+ * at the interbank rate PKR 2 is under a cent, which would price the global
+ * site below anyone's cost. It keeps the PKR column's shape (flat for the
+ * first two tiers, then stepping up) against a $0.05 base, which sits inside
+ * the usual range for per-conversation overage. Replace these six figures
+ * with the real ones before the global site is promoted anywhere.
+ */
 export const USAGE = [
-  { plan: "Starter", typical: "300–600 / mo", sessions: "1,500", perday: "50", head: "5.0×", over: "PKR 2 / session" },
-  { plan: "Growth", typical: "800–1,500 / mo", sessions: "4,000", perday: "133", head: "5.0×", over: "PKR 2 / session" },
-  { plan: "Scale", typical: "2,000–4,000 / mo", sessions: "9,000", perday: "300", head: "4.5×", over: "PKR 3 / session" },
-  { plan: "Pro", typical: "4,000–8,000 / mo", sessions: "15,000", perday: "500", head: "3.8×", over: "PKR 4 / session" },
-  { plan: "Enterprise", typical: "8,000–15,000 / mo", sessions: "25,000", perday: "833", head: "3.1×", over: "PKR 4 / session" },
-  { plan: "Enterprise+", typical: "15,000+ / mo", sessions: "40,000", perday: "1,333", head: "2.7×", over: "PKR 5 / session" },
+  { plan: "Starter", typical: "300–600 / mo", sessions: "1,500", perday: "50", head: "5.0×", over: "PKR 2 / session", overUsd: "US$ 0.05 / session" },
+  { plan: "Growth", typical: "800–1,500 / mo", sessions: "4,000", perday: "133", head: "5.0×", over: "PKR 2 / session", overUsd: "US$ 0.05 / session" },
+  { plan: "Scale", typical: "2,000–4,000 / mo", sessions: "9,000", perday: "300", head: "4.5×", over: "PKR 3 / session", overUsd: "US$ 0.08 / session" },
+  { plan: "Pro", typical: "4,000–8,000 / mo", sessions: "15,000", perday: "500", head: "3.8×", over: "PKR 4 / session", overUsd: "US$ 0.10 / session" },
+  { plan: "Enterprise", typical: "8,000–15,000 / mo", sessions: "25,000", perday: "833", head: "3.1×", over: "PKR 4 / session", overUsd: "US$ 0.10 / session" },
+  { plan: "Enterprise+", typical: "15,000+ / mo", sessions: "40,000", perday: "1,333", head: "2.7×", over: "PKR 5 / session", overUsd: "US$ 0.13 / session" },
 ];
 
 export const INCLUDED = [

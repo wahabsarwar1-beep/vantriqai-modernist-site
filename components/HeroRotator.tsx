@@ -6,6 +6,7 @@ import Magnetic from "@/components/Magnetic";
 import HeroChatCard, { type ChatBubble } from "@/components/HeroChatCard";
 import ResponseGapStrip from "@/components/ResponseGapStrip";
 import { waLink } from "@/lib/whatsapp";
+import { hrefIn, type Region } from "@/lib/region";
 
 const SCENES = [
   {
@@ -30,7 +31,7 @@ const SCENES = [
 
 /** One exchange per scene, so the card argues the same case the headline
  *  does instead of showing a generic chat. */
-const CHATS: { channel: string; time: string; bubbles: ChatBubble[]; speed: string; outcome: string[] }[] = [
+const CHATS = (region: Region): { channel: string; time: string; bubbles: ChatBubble[]; speed: string; outcome: string[] }[] => [
   {
     channel: "WhatsApp",
     time: "21:40",
@@ -59,11 +60,11 @@ const CHATS: { channel: string; time: string; bubbles: ChatBubble[]; speed: stri
       { from: "them", text: "Yes please, go ahead." },
     ],
     speed: "Reopened after 3 days",
-    outcome: ["Quote accepted · PKR value logged", "Deal moved to Negotiation"],
+    outcome: [region.quoteOutcome, "Deal moved to Negotiation"],
   },
 ];
 
-export default function HeroRotator() {
+export default function HeroRotator({ region }: { region: Region }) {
   const [scene, setScene] = useState(0);
 
   useEffect(() => {
@@ -120,7 +121,7 @@ export default function HeroRotator() {
               </a>
             </Magnetic>
             <Magnetic>
-              <Link className="btn btn-secondary" href="/how-it-works" style={{ minHeight: 38, paddingInline: 16 }}>
+              <Link className="btn btn-secondary" href={hrefIn(region, "/how-it-works")} style={{ minHeight: 38, paddingInline: 16 }}>
                 See how it works
               </Link>
             </Magnetic>
@@ -149,7 +150,7 @@ export default function HeroRotator() {
         {/* Keyed on the scene so the card remounts and its bubbles wave in
             again on every switch — the arrival is the point. */}
         <div style={{ position: "relative", justifySelf: "center", width: "min(100%,340px)", marginTop: 8 }}>
-          <HeroChatCard key={scene} {...CHATS[scene]} />
+          <HeroChatCard key={scene} {...CHATS(region)[scene]} />
           <div aria-hidden="true" style={{ position: "absolute", left: "50%", bottom: -16, transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 6, background: "color-mix(in srgb, var(--color-bg) 88%, transparent)", backdropFilter: "blur(6px)", borderRadius: 999, padding: "6px 11px", boxShadow: "var(--shadow-sm)", whiteSpace: "nowrap", pointerEvents: "none", zIndex: 5 }}>
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--color-accent)", animation: "blip 1.6s infinite" }} />
             <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 10.5, letterSpacing: "-0.01em" }}>{SCENES[scene].badge}</span>

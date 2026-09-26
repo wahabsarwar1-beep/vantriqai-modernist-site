@@ -6,10 +6,15 @@ import { usePathname } from "next/navigation";
 import Logo from "@/components/Logo";
 import Magnetic from "@/components/Magnetic";
 import { NAV_LINKS } from "@/lib/nav-links";
+import RegionSwitch from "@/components/RegionSwitch";
+import { hrefIn, regionFromPathname } from "@/lib/region";
 import { waLink } from "@/lib/whatsapp";
 
 export default function Nav() {
   const pathname = usePathname();
+  /* Every link in the bar stays in the region being read, so a visitor on
+     the US$ site never falls back to PKR by using the nav. */
+  const region = regionFromPathname(pathname);
   const [open, setOpen] = useState(false);
   const [openedForPathname, setOpenedForPathname] = useState(pathname);
   const [shrunk, setShrunk] = useState(false);
@@ -73,7 +78,7 @@ export default function Nav() {
           background: "var(--color-accent)",
         }}
       />
-      <Link href="/" style={{ display: "inline-flex", alignItems: "center", marginRight: "auto" }}>
+      <Link href={hrefIn(region, "/")} style={{ display: "inline-flex", alignItems: "center", marginRight: "auto" }}>
         <Logo height={shrunk ? 34 : 46} />
       </Link>
 
@@ -93,16 +98,16 @@ export default function Nav() {
         {NAV_LINKS.map((link) => (
           <Link
             key={link.href}
-            href={link.href}
+            href={hrefIn(region, link.href)}
             data-navlink=""
-            aria-current={pathname === link.href ? "page" : undefined}
+            aria-current={pathname === hrefIn(region, link.href) ? "page" : undefined}
             style={{
               fontFamily: "var(--font-heading)",
               fontWeight: 800,
               fontSize: 13,
               letterSpacing: "0.06em",
               textTransform: "uppercase",
-              color: pathname === link.href ? "var(--color-accent)" : "var(--color-text)",
+              color: pathname === hrefIn(region, link.href) ? "var(--color-accent)" : "var(--color-text)",
               whiteSpace: "nowrap",
             }}
           >
@@ -110,6 +115,10 @@ export default function Nav() {
           </Link>
         ))}
       </div>
+
+      <span className="nav-region-desktop">
+        <RegionSwitch />
+      </span>
 
       <span className="nav-whatsapp-desktop">
         <Magnetic>
@@ -130,13 +139,16 @@ export default function Nav() {
           {NAV_LINKS.map((link) => (
             <Link
               key={link.href}
-              href={link.href}
-              aria-current={pathname === link.href ? "page" : undefined}
-              style={pathname === link.href ? { color: "var(--color-accent)" } : undefined}
+              href={hrefIn(region, link.href)}
+              aria-current={pathname === hrefIn(region, link.href) ? "page" : undefined}
+              style={pathname === hrefIn(region, link.href) ? { color: "var(--color-accent)" } : undefined}
             >
               {link.label}
             </Link>
           ))}
+          <span style={{ display: "flex", padding: "14px 0 2px" }}>
+            <RegionSwitch full />
+          </span>
           <a
             className="btn btn-primary"
             href={waLink()}

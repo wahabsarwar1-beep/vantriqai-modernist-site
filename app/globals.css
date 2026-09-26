@@ -348,7 +348,7 @@ span[data-chev] { display: inline-block; transition: transform .2s ease; }
 .nav-toggle-btn { display: none; }
 .nav-mobile-panel { display: none; }
 @media (max-width: 1000px) {
-  .nav-links-desktop, .nav-whatsapp-desktop { display: none !important; }
+  .nav-links-desktop, .nav-whatsapp-desktop, .nav-region-desktop { display: none !important; }
   .nav-toggle-btn {
     display: flex; flex-direction: column; justify-content: center; gap: 5px;
     width: 46px; height: 46px; flex: none; padding: 0 11px; box-sizing: border-box;

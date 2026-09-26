@@ -3,10 +3,11 @@
 import { useState } from "react";
 import Magnetic from "@/components/Magnetic";
 import { waLink } from "@/lib/whatsapp";
+import type { Region } from "@/lib/region";
 
 type Status = "idle" | "sending" | "sent" | "error";
 
-export default function ContactForm() {
+export default function ContactForm({ region }: { region: Region }) {
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
 
@@ -31,6 +32,7 @@ export default function ContactForm() {
           whatsapp: data.get("whatsapp"),
           notes: data.get("notes"),
           company_website: data.get("company_website"),
+          region: region.key,
         }),
       });
 
@@ -76,7 +78,7 @@ export default function ContactForm() {
       </div>
       <div className="field">
         <label>WhatsApp number</label>
-        <input className="input" name="whatsapp" required placeholder="+92 341 1120049" style={{ minHeight: 44 }} />
+        <input className="input" name="whatsapp" required placeholder={region.phonePlaceholder} style={{ minHeight: 44 }} />
       </div>
       <div className="field">
         <label>What should the agent handle?</label>

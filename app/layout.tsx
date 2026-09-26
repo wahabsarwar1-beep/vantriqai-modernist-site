@@ -7,6 +7,7 @@ import BackToTop from "@/components/BackToTop";
 import ShopAIChat from "@/components/ShopAIChat";
 import RouteWipe from "@/components/RouteWipe";
 import SmoothScroll from "@/components/SmoothScroll";
+import { SITE_URL } from "@/lib/region";
 import "./globals.css";
 
 const sora = Sora({
@@ -22,6 +23,9 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
+  // Every page sets a relative canonical and its hreflang pair; those only
+  // resolve to absolute URLs once there is a base to resolve them against.
+  metadataBase: new URL(SITE_URL),
   title: "VantriqAI — Where Business Meets Intelligence",
   description: "VantriqAI — Where Business Meets Intelligence",
 };

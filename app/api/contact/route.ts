@@ -52,6 +52,11 @@ export async function POST(request: Request) {
   // older name the Sheet used, accepted so an older cached page still works.
   const whatsapp = str(body.whatsapp, MAX.contact) || str(body.contact, MAX.contact);
   const notes = str(body.notes, MAX.notes);
+  // Which site the brief came from. It decides the currency the quote is
+  // written in, so it has to reach whoever writes it — not be inferred later
+  // from a phone number.
+  const region = body.region === "global" ? "global" : "pk";
+  const regionLabel = region === "global" ? "Global (US$)" : "Pakistan (PKR)";
 
   // Without a name and a way to reply, the record is worthless.
   if (!name || !(whatsapp || email)) {
@@ -76,7 +81,7 @@ export async function POST(request: Request) {
   // row a human can merge costs far less than a brief nobody hears about.
   // The digits are in the ref so a human can recognise it in the pipeline.
   const digits = (whatsapp || email).replace(/\D/g, "").slice(-11) || "nodigits";
-  const externalRef = `brief-${digits}-${Date.now()}`;
+  const externalRef = `brief-${region}-${digits}-${Date.now()}`;
 
   try {
     const res = await fetch(`${endpoint.replace(/\/$/, "")}/api/webhooks/lead`, {
@@ -92,6 +97,7 @@ export async function POST(request: Request) {
         source: SOURCE,
         notes: [
           `Submitted via the "Send a brief" form on vantriqai.com`,
+          `Site: ${regionLabel} — quote in this currency`,
           `WhatsApp: ${whatsapp || "—"}`,
           `Email: ${email || "—"}`,
           "",
@@ -126,6 +132,7 @@ export async function POST(request: Request) {
           contact: whatsapp || email,
           notes,
           source: SOURCE,
+          region: regionLabel,
         }),
         // Apps Script redirects to googleusercontent.com to serve its
         // response; fetch follows that by default, which is what we want.

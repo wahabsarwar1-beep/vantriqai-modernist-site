@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import type { Region } from "@/lib/region";
 
 /** "{ The workspace }": three phone mockups, each on a rotated tinted
  *  backdrop with two stat tiles overhanging the bezel. The thread bubbles
@@ -9,20 +10,22 @@ const OUT = "calc(var(--tile-out) * -1)";
 
 type Tile = { label?: string; fig: string; sub: string; tone: "surface" | "ink" | "accent"; pos: CSSProperties };
 
-const CARDS: {
+/* A function of the region because the first card's header names where the
+   branches are, which is not the same claim on the global site. */
+const cards = (region: Region): {
   n: string;
   title: string;
   body: string;
   tint: string;
   head: [string, string];
   tiles: [Tile, Tile];
-}[] = [
+}[] => [
   {
     n: "01",
     title: "Organised by default",
     body: "Every module in one place, each switched on only when your day actually needs it.",
     tint: "var(--blob-peach)",
-    head: ["Your modules", "Karachi"],
+    head: ["Your modules", region.workspaceLocation],
     tiles: [
       { label: "Branches", fig: "3", sub: "all live", tone: "surface", pos: { top: "17%", right: OUT, transform: "rotate(4deg)" } },
       { fig: "0", sub: "bleed between", tone: "ink", pos: { bottom: "12%", left: OUT, transform: "rotate(-5deg)" } },
@@ -217,10 +220,10 @@ function Screen({ n }: { n: string }) {
   );
 }
 
-export default function WorkspaceCards() {
+export default function WorkspaceCards({ region }: { region: Region }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(288px,100%),1fr))", gap: "clamp(20px,2.6vw,32px)", alignItems: "stretch" }}>
-      {CARDS.map((c) => (
+      {cards(region).map((c) => (
         <div
           key={c.n}
           data-anim="rise"
