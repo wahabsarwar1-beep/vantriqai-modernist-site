@@ -240,6 +240,36 @@ function whenPageIsIdle(run: () => void): () => void {
   return cleanup;
 }
 
+const OFFLINE_REPLY =
+  "Sorry — I can't reach our assistant right now. Please message the team on WhatsApp at https://wa.me/923411120049 and they'll pick this up straight away.";
+
+/**
+ * If a message cannot reach n8n at all, answer with a human sentence and a
+ * way through instead of the widget's raw "Failed to fetch" error — the same
+ * wording the workflow itself uses when its model is unavailable.
+ *
+ * Only requests to the chat webhook are touched, and only when the network
+ * request itself fails; any response n8n actually sends passes through as is.
+ */
+function guardWebhookFetch(webhookUrl: string) {
+  const w = window as Window & { __vqFetchGuarded?: boolean };
+  if (w.__vqFetchGuarded) return;
+  w.__vqFetchGuarded = true;
+  const original = window.fetch.bind(window);
+  window.fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    if (!url.startsWith(webhookUrl)) return original(input, init);
+    try {
+      return await original(input, init);
+    } catch {
+      return new Response(JSON.stringify({ output: OFFLINE_REPLY }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  };
+}
+
 /** The VantriqAI assistant — @n8n/chat mounted in window mode, themed to the
  *  Modernist system via styles/chat-widget-theme.css. Backend is VantriqAI's
  *  own n8n workflow (persona/knowledge live there, not in this component);
@@ -285,10 +315,18 @@ export default function ShopAIChat() {
       if (!mounted) return;
       loadChatBundle().then(({ createChat }) => {
         if (!mounted) return;
+        guardWebhookFetch(webhookUrl);
         createChat({
           webhookUrl,
           mode: "window",
           showWelcomeScreen: false,
+          /* Off on purpose. With it on, the widget asks n8n for the previous
+             conversation before it will create a session — and if that one
+             request fails (n8n restarting, a network blip, a blocker), it
+             never creates one, so the panel opens with no input box at all.
+             The chat trigger has previous-session loading switched off
+             anyway, so the request could only ever return nothing. */
+          loadPreviousSession: false,
           initialMessages: [
             "Hi! I'm the VantriqAI assistant 👋 — ask me about our AI agents, packages, or how it works, or I can book you a quick discovery call.",
           ],
