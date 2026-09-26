@@ -1,221 +1,314 @@
-import Kicker from "@/components/Kicker";
-import PosterCTA from "@/components/PosterCTA";
-import HeroRotator from "@/components/HeroRotator";
+import type { CSSProperties } from "react";
+import Link from "next/link";
+import HomeHero from "@/components/HomeHero";
+import GlowGrid from "@/components/GlowGrid";
 import GapClock from "@/components/GapClock";
 import InteractiveDemo from "@/components/InteractiveDemo";
-import TileBand from "@/components/TileBand";
 import PinnedRail from "@/components/PinnedRail";
-import Marquee from "@/components/Marquee";
+import ProductMark, { type MarkId } from "@/components/ProductMark";
 import WorkspaceCards from "@/components/WorkspaceCards";
-import { AGENTS, JSTEPS, INTEGRATIONS, MARQUEE_ITEMS, WHY } from "@/lib/content";
+import Magnetic from "@/components/Magnetic";
+import { AGENTS, INTEGRATIONS, JSTEPS, WHY } from "@/lib/content";
+import { industries } from "@/lib/industries";
 import { hrefIn, type Region } from "@/lib/region";
+import { waLink } from "@/lib/whatsapp";
 
-const bodyMuted = { color: "color-mix(in srgb, var(--color-text) 78%, transparent)" };
+const wrap: CSSProperties = { maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" };
+const muted = { color: "color-mix(in srgb, var(--color-text) 72%, transparent)" };
+const h2: CSSProperties = { fontSize: "clamp(28px,3.6vw,50px)", lineHeight: 1, letterSpacing: "-0.035em", margin: 0 };
+
+/** The section label: a numbered, monospaced tag — the page's one "system" voice. */
+function Eyebrow({ n, label, dark }: { n: string; label: string; dark?: boolean }) {
+  return (
+    <p data-anim="" className={`eyebrow${dark ? " eyebrow-dark" : ""}`}>
+      <span className="eyebrow-n">{n}</span>
+      {label}
+    </p>
+  );
+}
+
+const AGENT_MARKS: Record<string, MarkId> = {
+  Reception: "whatsapp",
+  Booking: "booking",
+  Catalogue: "catalogue",
+  Qualifier: "lead",
+  "Follow-up": "followup",
+  Escalation: "escalation",
+  Outreach: "outreach",
+  Payments: "payments",
+  Insights: "insights",
+  Yours: "custom",
+};
+
+/* Bento sizes by agent: the front door gets the big tile, booking the wide
+   one, and the last two close the grid as a pair. */
+const BENTO: Record<string, string> = { Reception: "bento-xl", Booking: "bento-wide", Insights: "bento-wide", Yours: "bento-wide" };
 
 export default function HomePage({ region }: { region: Region }) {
+  const sectors = industries(region);
+
   return (
     <>
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" }}>
-        <section style={{ padding: "clamp(44px,6vw,78px) 0 clamp(30px,4.2vw,54px)", position: "relative" }}>
-          {/* Bleeds up behind the sticky nav, which sits at 90% opacity over a
-              blur — so the page opens in colour rather than against a hard
-              cream band above the wash. */}
-          <div aria-hidden="true" data-hero-texture="" style={{ position: "absolute", top: "calc(clamp(72px, 7vw, 92px) * -1)", bottom: 0, left: "50%", width: "calc(100vw + 24px)", marginLeft: "calc(-50vw - 12px)", zIndex: 0, pointerEvents: "none" }} />
-          <div style={{ position: "relative", zIndex: 1 }}>
-            <HeroRotator region={region} />
-          </div>
-        </section>
-      </div>
+      <HomeHero region={region} />
 
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(34px,4.4vw,58px) clamp(20px,5vw,64px) 0" }}>
-        <Kicker label="01 — The response gap" />
-        <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 clamp(28px,4vw,44px)", maxWidth: "26ch" }}>
-          Few businesses lose the sale on price. They lose it in the hours nobody answered.
+      {/* ---------- 01 The response gap ---------- */}
+      <section style={{ ...wrap, paddingTop: "clamp(64px,8vw,112px)" }}>
+        <Eyebrow n="01" label="The response gap" />
+        <h2 data-anim="" style={{ ...h2, maxWidth: "22ch", marginBottom: "clamp(28px,4vw,48px)" }}>
+          Few businesses lose the sale on price. They lose it in the hours <span className="grad-text">nobody answered.</span>
         </h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(320px,100%),1fr))", gap: 18 }}>
-          <div data-anim="" style={{ background: "var(--color-text)", color: "var(--color-bg)", borderRadius: 36, padding: "clamp(28px,3.6vw,48px) clamp(22px,3vw,42px)", display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "clamp(24px,4vw,40px)", minHeight: "clamp(300px,30vw,380px)" }}>
-            <div>
-              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", margin: 0, color: "var(--color-accent-400)" }}>Unanswered · live</p>
-              <GapClock />
-              <p style={{ fontSize: 15, lineHeight: "25px", margin: "18px 0 0", maxWidth: "38ch", color: "color-mix(in srgb, var(--color-bg) 72%, transparent)" }}>
-                This clock started when you scrolled here. It stands in for the message that arrived while the shop was shut.
-              </p>
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 32px", borderTop: "1px solid color-mix(in srgb, var(--color-bg) 30%, transparent)", paddingTop: 16, fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-              <span>Industry average first reply — 42 hrs</span>
-              <span style={{ color: "var(--color-accent-400)" }}>Your agent — 1.2 s</span>
-            </div>
-          </div>
-          <div style={{ display: "grid", gap: 18 }}>
-            <div data-anim="" className="hover-tint-solid" style={{ background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: 28, padding: "clamp(24px,3vw,38px) clamp(20px,2.6vw,36px)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(30px,3.4vw,48px)", lineHeight: 1, letterSpacing: "-0.04em", margin: 0 }}>23%</p>
-              <p style={{ fontSize: 14.5, lineHeight: "24px", margin: "12px 0 14px", maxWidth: "34ch", ...bodyMuted }}>Of audited firms never replied to the enquiry at all. Not late — never.</p>
-              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 10, lineHeight: "16px", letterSpacing: "0.1em", textTransform: "uppercase", margin: 0, color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>Harvard Business Review, 2011 · 2,241 firms</p>
-            </div>
-            <div data-anim="" className="hover-tint-solid" style={{ background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: 28, padding: "clamp(24px,3vw,38px) clamp(20px,2.6vw,36px)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(30px,3.4vw,48px)", lineHeight: 1, letterSpacing: "-0.04em", margin: 0 }}>83%</p>
-              <p style={{ fontSize: 14.5, lineHeight: "24px", margin: "12px 0 14px", maxWidth: "34ch", ...bodyMuted }}>Of customers expect to engage immediately when they contact a business.</p>
-              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 10, lineHeight: "16px", letterSpacing: "0.1em", textTransform: "uppercase", margin: 0, color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>Salesforce</p>
+
+        <GlowGrid className="gap-bento">
+          <div data-anim="" className="glow gap-clock-card">
+            <div aria-hidden="true" className="gap-clock-aura" />
+            <p className="gap-live">
+              <span aria-hidden="true" className="hh-live" />
+              Unanswered · live
+            </p>
+            <GapClock />
+            <p style={{ fontSize: 15, lineHeight: "25px", margin: "18px 0 0", maxWidth: "38ch", color: "rgba(255,255,255,.66)" }}>
+              This clock started when you scrolled here. It stands in for the message that arrived while the shop was shut.
+            </p>
+            <div className="gap-compare">
+              <span>
+                <em>Industry average first reply</em>42 hrs
+              </span>
+              <span className="gap-compare-us">
+                <em>Your agent</em>1.2 s
+              </span>
             </div>
           </div>
-        </div>
+          <div data-anim="" className="glow stat-card">
+            <p className="stat-fig">23%</p>
+            <p className="stat-body">Of audited firms never replied to the enquiry at all. Not late — never.</p>
+            <p className="stat-src">Harvard Business Review, 2011 · 2,241 firms</p>
+          </div>
+          <div data-anim="" className="glow stat-card">
+            <p className="stat-fig">83%</p>
+            <p className="stat-body">Of customers expect to engage immediately when they contact a business.</p>
+            <p className="stat-src">Salesforce</p>
+          </div>
+        </GlowGrid>
         <p data-anim="" style={{ fontSize: 12, lineHeight: "20px", margin: "16px 0 0", maxWidth: "74ch", color: "color-mix(in srgb, var(--color-text) 55%, transparent)" }}>
           Every figure on this page is a published third-party benchmark for messaging and lead response, cited where it appears. None of them are VantriqAI client results.
         </p>
-      </div>
-
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" }}>
-        <section style={{ padding: "clamp(38px,4.8vw,64px) 0 clamp(16px,2.2vw,28px)" }}>
-          <div className="stack-mobile" style={{ position: "relative", zIndex: 1, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(240px,100%),1fr))", gap: "20px clamp(24px,5vw,72px)", borderTop: "1px solid var(--color-divider)", paddingTop: 22 }}>
-            <p data-anim="" style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)", margin: 0 }}>{"{ Vantriq's advantage }"}</p>
-            <div>
-              <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px", maxWidth: "20ch" }}>The growth engine for local business.</h2>
-              <p data-anim="" style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 32px", maxWidth: "50ch", ...bodyMuted }}>One agent, plugged into your channels and your calendar, answering every hour you are closed. Below: pick a business, then send the messages a customer would.</p>
-            </div>
-            {/* Spans both columns: the demo is the point of this section, and
-                in the right-hand column it sat off-centre and collided with
-                the marquee running behind it. */}
-            <div data-anim="" style={{ gridColumn: "1 / -1" }}>
-                <div style={{ position: "relative", display: "grid", justifyItems: "center", alignContent: "center", padding: "clamp(18px,3vw,34px) 0" }}>
-                  <TileBand region={region} />
-                  <InteractiveDemo />
-                </div>
-                <div style={{ position: "relative", zIndex: 1, background: "var(--color-bg)", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(228px,100%),1fr))", gap: "0 clamp(24px,4vw,56px)", marginTop: "clamp(28px,4vw,44px)" }}>
-                  <div style={{ borderTop: "1px solid var(--color-divider)", padding: "16px 0" }}>
-                    <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "color-mix(in srgb, var(--color-text) 62%, transparent)", margin: "0 0 8px" }}>Checked stock</p>
-                    <p style={{ fontSize: 15, lineHeight: "25px", margin: 0 }}>Against live inventory, not a canned answer.</p>
-                  </div>
-                  <div style={{ borderTop: "1px solid var(--color-divider)", padding: "16px 0" }}>
-                    <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "color-mix(in srgb, var(--color-text) 62%, transparent)", margin: "0 0 8px" }}>Held the item</p>
-                    <p style={{ fontSize: 15, lineHeight: "25px", margin: 0 }}>A real action in your system, logged to the lead.</p>
-                  </div>
-                  <div style={{ borderTop: "1px solid var(--color-divider)", padding: "16px 0" }}>
-                    <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "color-mix(in srgb, var(--color-text) 62%, transparent)", margin: "0 0 8px" }}>Booked the visit</p>
-                    <p style={{ fontSize: 15, lineHeight: "25px", margin: 0 }}>Into the calendar, with the reminder scheduled.</p>
-                  </div>
-                </div>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px) clamp(28px,3.6vw,46px)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(280px,100%),1fr))", gap: "36px clamp(24px,4vw,64px)" }}>
-          <div data-anim="" style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 18 }}>
-            <h3 style={{ fontSize: 21, lineHeight: 1.15, letterSpacing: "-0.02em", margin: "0 0 12px" }}>Trained on real conversations</h3>
-            <p style={{ fontSize: 15.5, lineHeight: "27px", margin: 0, maxWidth: "44ch", ...bodyMuted }}>Vantriq is built on thousands of genuine customer threads — retail, clinics, schools, agencies — so it knows the questions that repeat and the answers that close.</p>
-          </div>
-          <div data-anim="" style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 18 }}>
-            <h3 style={{ fontSize: 21, lineHeight: 1.15, letterSpacing: "-0.02em", margin: "0 0 12px" }}>Modules in sync</h3>
-            <p style={{ fontSize: 15.5, lineHeight: "27px", margin: 0, maxWidth: "44ch", ...bodyMuted }}>Reception, booking, catalogue and follow-up run as one brain. What one module learns in a thread, the next one uses two messages later.</p>
-          </div>
-          <div data-anim="" style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 18 }}>
-            <h3 style={{ fontSize: 21, lineHeight: 1.15, letterSpacing: "-0.02em", margin: "0 0 12px" }}>Connected to your whole stack</h3>
-            <p style={{ fontSize: 15.5, lineHeight: "27px", margin: 0, maxWidth: "44ch", ...bodyMuted }}>WhatsApp, Instagram, your website, Google Calendar, your CRM and your payment links — wired up during onboarding, not months later.</p>
-          </div>
-        </div>
-      </div>
-
-
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(12px,2vw,22px) clamp(20px,5vw,64px) clamp(18px,2.4vw,30px)" }}>
-        <Kicker label="02 — The agents" />
-        <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: 0, maxWidth: "24ch" }}>
-          One brain, ten jobs. Switch on the ones your day actually needs — the rest stay quiet until you want them.
-        </h2>
-      </div>
-
-      <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)" }}>
-        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(22px,3vw,40px) clamp(20px,5vw,64px)", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(272px,100%),1fr))", gap: 18 }}>
-          {AGENTS.map((a) => (
-            <div key={a.n} data-anim="" className="card hover-lift-5" style={{ padding: "clamp(24px,3vw,38px) clamp(20px,2.5vw,34px)", boxShadow: "var(--shadow-sm)", display: "flex", flexDirection: "column" }}>
-              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", color: "var(--color-accent)", margin: "0 0 18px" }}>{a.n}</p>
-              <h3 style={{ fontSize: 23, lineHeight: 1.05, letterSpacing: "-0.025em", margin: "0 0 12px" }}>{a.name} Agent</h3>
-              <p style={{ fontSize: 14.5, lineHeight: "25px", margin: "0 0 22px", flex: 1, ...bodyMuted }}>{a.body}</p>
-              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", margin: 0, paddingTop: 14, borderTop: "1px solid var(--color-divider)", color: "var(--color-accent)" }}>{a.metric}</p>
-            </div>
-          ))}
-        </div>
       </section>
 
-      <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)" }}>
-        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(36px,4.6vw,62px) clamp(20px,5vw,64px)" }}>
-          <Kicker label="{ The workspace }" />
-          <div className="stack-mobile" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(320px,100%),1fr))", gap: "20px clamp(24px,4vw,56px)", alignItems: "end", marginBottom: "clamp(32px,4vw,52px)" }}>
-            <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: 0, maxWidth: "22ch" }}>For work that is bigger than one inbox.</h2>
-            <p data-anim="" style={{ fontSize: 16, lineHeight: "28px", margin: 0, maxWidth: "46ch", ...bodyMuted }}>Switch on the modules you need, watch one thread carry a customer to a booking, and read the week in a minute.</p>
-          </div>
-          <WorkspaceCards region={region} />
-        </div>
-      </section>
-
-      <PinnedRail steps={JSTEPS} />
-
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(12px,2vw,22px) clamp(20px,5vw,64px) clamp(18px,2.4vw,30px)" }}>
-        <Kicker label="04 — What it plugs into" />
-        <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: 0, maxWidth: "24ch" }}>It acts inside the tools you already pay for.</h2>
-      </div>
-
-      <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)" }}>
-        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(22px,3vw,40px) clamp(20px,5vw,64px)", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(240px,100%),1fr))", gap: 18 }}>
-          {INTEGRATIONS.map((g) => (
-            <div key={g.group} data-anim="" className="card" style={{ padding: "clamp(24px,3vw,38px) clamp(20px,2.5vw,32px)" }}>
-              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)", margin: "0 0 16px" }}>{g.group}</p>
-              <div style={{ display: "grid", gap: 0 }}>
-                {g.items.map((item) => (
-                  <span key={item} style={{ display: "block", borderTop: "1px solid var(--color-divider)", padding: "12px 0", fontSize: 15, lineHeight: "22px" }}>{item}</span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)", padding: "clamp(28px,4vw,48px) 0", overflow: "hidden" }}>
-        <p data-anim="" style={{ maxWidth: 1280, margin: "0 auto 22px", padding: "0 clamp(20px,5vw,64px)" }}>
-          <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--color-accent-700)", background: "var(--color-accent-100)", borderRadius: 999, padding: "7px 14px", display: "inline-block" }}>
-            05 — Where it applies
-          </span>
-        </p>
-        <Marquee duration={34}>
-          <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-            {MARQUEE_ITEMS.map((item) => (
-              <span key={item} style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(26px,3.6vw,50px)", letterSpacing: "-0.03em", padding: "0 26px", whiteSpace: "nowrap" }}>
-                {item}
-                <span style={{ color: "var(--color-accent)", paddingLeft: 26 }}>/</span>
-              </span>
-            ))}
-          </div>
-        </Marquee>
-      </section>
-
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" }}>
-        <section style={{ padding: "clamp(40px,5vw,68px) 0" }}>
-          <div className="stack-mobile" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(240px,100%),1fr))", gap: "20px clamp(24px,5vw,72px)", borderTop: "1px solid var(--color-divider)", paddingTop: 22 }}>
-            <p data-anim="" style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)", margin: 0 }}>
-              06 — Why Vantriq<span style={{ color: "var(--color-accent)" }}>AI</span>
+      {/* ---------- 02 Try it ---------- */}
+      <section style={{ ...wrap, paddingTop: "clamp(72px,9vw,120px)" }}>
+        <div className="demo-split">
+          <div>
+            <Eyebrow n="02" label="Try it yourself" />
+            <h2 data-anim="" style={{ ...h2, maxWidth: "14ch" }}>
+              Be the customer for <span className="grad-text">a minute.</span>
+            </h2>
+            <p data-anim="" style={{ fontSize: 17, lineHeight: "29px", margin: "22px 0 30px", maxWidth: "44ch", ...muted }}>
+              Pick a business, then send the messages a customer would. Watch the agent answer — and then do the work behind the answer.
             </p>
-            <div>
-              <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 44px", maxWidth: "22ch" }}>A local partner, not a faceless subscription</h2>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(280px,100%),1fr))", gap: "36px clamp(24px,4vw,64px)" }} data-stagger="">
-                {WHY.map((w) => (
-                  <div key={w.title} data-anim="" className="hover-border-lift" style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 18 }}>
-                    <h3 style={{ fontSize: 21, lineHeight: 1.15, letterSpacing: "-0.02em", margin: "0 0 12px" }}>{w.title}</h3>
-                    <p style={{ fontSize: 15.5, lineHeight: "27px", margin: 0, maxWidth: "44ch", ...bodyMuted }}>{w.body}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <ol className="demo-steps">
+              {[
+                ["Checked stock", "Against live inventory, not a canned answer."],
+                ["Held the item", "A real action in your system, logged to the lead."],
+                ["Booked the visit", "Into the calendar, with the reminder scheduled."],
+              ].map(([t, b], i) => (
+                <li key={t} data-anim="">
+                  <span className="demo-step-n">{String(i + 1).padStart(2, "0")}</span>
+                  <span>
+                    <strong>{t}</strong>
+                    {b}
+                  </span>
+                </li>
+              ))}
+            </ol>
           </div>
-        </section>
-      </div>
+          <div data-anim="" className="demo-stage">
+            <div aria-hidden="true" className="demo-stage-glow" />
+            <InteractiveDemo />
+          </div>
+        </div>
+      </section>
 
-      <PosterCTA
-        headline="Let's talk."
-        body="Send us a message and see the agent answer. A discovery call maps your customer workflow before anything is built."
-        primaryLabel="Message us on WhatsApp"
-        secondaryLabel="Request a quote"
-        secondaryHref={hrefIn(region, "/pricing")}
-      />
+      {/* ---------- 03 The agents ---------- */}
+      <section style={{ ...wrap, paddingTop: "clamp(72px,9vw,120px)" }}>
+        <div className="split-head">
+          <div>
+            <Eyebrow n="03" label="The agents" />
+            <h2 data-anim="" style={{ ...h2, maxWidth: "15ch" }}>
+              One brain. <span className="grad-text">Ten jobs.</span>
+            </h2>
+          </div>
+          <p data-anim="" style={{ fontSize: 17, lineHeight: "29px", margin: 0, maxWidth: "44ch", ...muted }}>
+            Switch on the ones your day actually needs — the rest stay quiet until you want them. What one learns in a thread, the next uses two messages later.
+          </p>
+        </div>
+
+        <GlowGrid className="bento">
+          {AGENTS.map((a) => (
+            <div key={a.n} data-anim="" className={`glow bento-card ${BENTO[a.name] ?? ""}`}>
+              <div className="bento-top">
+                <ProductMark id={AGENT_MARKS[a.name]} size={a.name === "Reception" ? 56 : 40} />
+                <span className="bento-n">{a.n}</span>
+              </div>
+              <h3 className="bento-title">{a.name === "Yours" ? "Your own agent" : `${a.name} Agent`}</h3>
+              <p className="bento-body">{a.body}</p>
+              {a.name === "Reception" ? (
+                <div className="bento-chat" aria-hidden="true">
+                  <span className="bento-bubble bento-them">Are you open on Sunday?</span>
+                  <span className="bento-bubble bento-us">We are, 11 to 6. Want me to book you in?</span>
+                  <span className="bento-typing">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                </div>
+              ) : null}
+              <p className="bento-metric">{a.metric}</p>
+            </div>
+          ))}
+        </GlowGrid>
+      </section>
+
+      {/* ---------- 04 Workspace ---------- */}
+      <section style={{ ...wrap, paddingTop: "clamp(72px,9vw,120px)", paddingBottom: "clamp(40px,5vw,64px)" }}>
+        <div className="split-head">
+          <div>
+            <Eyebrow n="04" label="The workspace" />
+            <h2 data-anim="" style={{ ...h2, maxWidth: "16ch" }}>
+              For work bigger than <span className="grad-text">one inbox.</span>
+            </h2>
+          </div>
+          <p data-anim="" style={{ fontSize: 17, lineHeight: "29px", margin: 0, maxWidth: "44ch", ...muted }}>
+            Switch on the modules you need, watch one thread carry a customer to a booking, and read the week in a minute.
+          </p>
+        </div>
+        <WorkspaceCards region={region} />
+      </section>
+
+      <PinnedRail steps={JSTEPS} label="05 — Step by step" />
+
+      {/* ---------- 06 Integrations ---------- */}
+      <section className="dark-band">
+        <div aria-hidden="true" className="dark-band-aurora" />
+        <div style={{ ...wrap, position: "relative", padding: "clamp(56px,7vw,100px) clamp(20px,5vw,64px)" }}>
+          <div className="split-head">
+            <div>
+              <Eyebrow n="06" label="What it plugs into" dark />
+              <h2 data-anim="" style={{ ...h2, maxWidth: "16ch", color: "#fff" }}>
+                It acts inside the tools <span className="grad-text-light">you already pay for.</span>
+              </h2>
+            </div>
+            <p data-anim="" style={{ fontSize: 17, lineHeight: "29px", margin: 0, maxWidth: "44ch", color: "rgba(255,255,255,.66)" }}>
+              Wired up during onboarding, not months later. The agent writes into your systems — it never keeps a second copy of the truth.
+            </p>
+          </div>
+
+          <div aria-hidden="true" className="bus">
+            <span className="bus-core">VantriqAI</span>
+          </div>
+
+          <GlowGrid className="int-grid">
+            {INTEGRATIONS.map((g) => (
+              <div key={g.group} data-anim="" className="glow int-card">
+                <p className="int-group">{g.group}</p>
+                <ul>
+                  {g.items.map((item) => (
+                    <li key={item}>
+                      <span aria-hidden="true" className="int-dot" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </GlowGrid>
+        </div>
+      </section>
+
+      {/* ---------- 07 Industries ---------- */}
+      <section style={{ ...wrap, paddingTop: "clamp(72px,9vw,120px)" }}>
+        <div className="split-head">
+          <div>
+            <Eyebrow n="07" label="Where it applies" />
+            <h2 data-anim="" style={{ ...h2, maxWidth: "16ch" }}>
+              Tuned to how <span className="grad-text">your sector</span> sells.
+            </h2>
+          </div>
+          <p data-anim="" style={{ fontSize: 17, lineHeight: "29px", margin: 0, maxWidth: "44ch", ...muted }}>
+            The same core agent, set up around your catalogue, your booking rules and your tone. Pick your sector to see it working.
+          </p>
+        </div>
+
+        <GlowGrid className="sector-grid">
+          {sectors.map((s) => (
+            <Link
+              key={s.slug}
+              href={hrefIn(region, `/industries/${s.slug}`)}
+              data-anim=""
+              className="glow sector-tile"
+              style={{ "--ind-a": s.theme.a, "--ind-b": s.theme.b } as CSSProperties}
+            >
+              <span aria-hidden="true" className="sector-tile-orb" />
+              <span className="sector-tile-name">{s.name}</span>
+              <span className="sector-tile-line">
+                {s.headline[0]} {s.headline[1]}
+              </span>
+              <span aria-hidden="true" className="sector-tile-arrow">→</span>
+            </Link>
+          ))}
+          <Link href={hrefIn(region, "/contact")} data-anim="" className="glow sector-tile sector-tile-other">
+            <span className="sector-tile-name">Something else?</span>
+            <span className="sector-tile-line">The list is where we have done it before, not a limit.</span>
+            <span aria-hidden="true" className="sector-tile-arrow">→</span>
+          </Link>
+        </GlowGrid>
+      </section>
+
+      {/* ---------- 08 Why ---------- */}
+      <section style={{ ...wrap, paddingTop: "clamp(72px,9vw,120px)", paddingBottom: "clamp(56px,7vw,96px)" }}>
+        <Eyebrow n="08" label="Why VantriqAI" />
+        <h2 data-anim="" style={{ ...h2, maxWidth: "18ch", marginBottom: "clamp(30px,4vw,52px)" }}>
+          A partner, not a <span className="grad-text">faceless subscription.</span>
+        </h2>
+        <div className="why-grid">
+          {WHY.map((w, i) => (
+            <div key={w.title} data-anim="" className="why-item">
+              <span className="why-n">{String(i + 1).padStart(2, "0")}</span>
+              <h3>{w.title}</h3>
+              <p>{w.body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ---------- CTA ---------- */}
+      <section className="future-cta">
+        <div aria-hidden="true" className="future-cta-aurora" />
+        <div aria-hidden="true" className="hh-grid" />
+        <div style={{ position: "relative", maxWidth: 900, margin: "0 auto", textAlign: "center", padding: "clamp(60px,8vw,112px) clamp(20px,5vw,48px)" }}>
+          <p className="hh-eyebrow" style={{ justifyContent: "center" }}>
+            <span aria-hidden="true" className="hh-live" />
+            Your next customer is typing
+          </p>
+          <h2 style={{ fontSize: "clamp(34px,5.4vw,72px)", lineHeight: 0.98, letterSpacing: "-0.04em", margin: "20px 0 0", color: "#fff" }}>
+            Answer them <span className="grad-text-light">in a second,</span> not a day.
+          </h2>
+          <p style={{ fontSize: 18, lineHeight: "30px", margin: "24px auto 36px", maxWidth: "48ch", color: "rgba(255,255,255,.7)" }}>
+            Send us a message and see the agent answer. A fifteen-minute discovery call maps your workflow before anything is built.
+          </p>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
+            <Magnetic>
+              <a className="btn hh-btn-primary" href={waLink()} target="_blank" rel="noopener">
+                Message us on WhatsApp <span aria-hidden="true">→</span>
+              </a>
+            </Magnetic>
+            <Magnetic>
+              <Link className="btn hh-btn-ghost" href={hrefIn(region, "/pricing")}>
+                See the packages
+              </Link>
+            </Magnetic>
+          </div>
+        </div>
+      </section>
     </>
   );
 }

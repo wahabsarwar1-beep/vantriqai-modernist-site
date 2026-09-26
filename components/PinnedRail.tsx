@@ -5,7 +5,7 @@ import { useScrollProgress } from "@/lib/use-scroll-progress";
 
 type JStep = { n: string; title: string; body: string; fig: string; figLabel: string };
 
-export default function PinnedRail({ steps }: { steps: JStep[] }) {
+export default function PinnedRail({ steps, label = "03 — Step by step" }: { steps: JStep[]; label?: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
@@ -50,7 +50,7 @@ export default function PinnedRail({ steps }: { steps: JStep[] }) {
         display: "inline-block",
       }}
     >
-      03 — Step by step
+      {label}
     </span>
   );
 
