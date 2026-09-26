@@ -24,6 +24,7 @@ const router = express.Router();
  *   "input_tokens": 812,
  *   "output_tokens": 340,
  *   "messages_count": 1,
+ *   "handoff": false,                    // optional — true if a human had to take over (drives AI containment)
  *   "occurred_at": "2026-08-16T10:32:00Z" // optional, defaults to now()
  * }
  *
@@ -34,7 +35,7 @@ const router = express.Router();
 router.post('/usage', async (req, res) => {
   const body = req.body || {};
   const { external_ref, client_id, agent_ref, agent_id, session_id, channel, ai_model,
-    input_tokens, output_tokens, messages_count, occurred_at } = body;
+    input_tokens, output_tokens, messages_count, occurred_at, handoff } = body;
 
   if (!session_id) return res.status(400).json({ error: 'session_id is required' });
   if (!external_ref && !client_id && !agent_ref && !agent_id) {
@@ -91,12 +92,15 @@ router.post('/usage', async (req, res) => {
   }
 
   const { rows: inserted } = await db.query(
-    `insert into usage_events (client_id, agent_id, session_id, channel, ai_model, input_tokens, output_tokens, messages_count, occurred_at, raw_payload)
-     values ($1,$2,$3,$4,$5,$6,$7,$8, coalesce($9, now()), $10) returning id`,
+    `insert into usage_events (client_id, agent_id, session_id, channel, ai_model, input_tokens, output_tokens, messages_count, occurred_at, raw_payload, handoff)
+     values ($1,$2,$3,$4,$5,$6,$7,$8, coalesce($9, now()), $10, $11) returning id`,
     [
       resolvedClientId, resolvedAgentId, session_id, resolvedChannel, ai_model || '',
       input_tokens || 0, output_tokens || 0, messages_count || 1,
       occurred_at || null, JSON.stringify(body),
+      // Left null unless the flow actually says, so containment is never
+      // claimed for an agent that does not report handoffs at all.
+      typeof handoff === 'boolean' ? handoff : null,
     ]
   );
 
@@ -371,5 +375,103 @@ router.post('/conversation', async (req, res) => {
 
   res.status(201).json({ ok: true, stored: messages.length, client_id: clientId });
 });
+
+/**
+ * POST /api/webhooks/csat
+ *
+ * A customer-satisfaction answer, from whatever asked the question — a
+ * WhatsApp button reply at the end of a conversation, a web form, or a
+ * separate survey app. One call per answer.
+ *
+ * Body:
+ * {
+ *   "external_ref": "923001234567",   // or client_id / agent_ref / agent_id, exactly as /usage
+ *   "session_id": "923009998888-2026-08-16", // optional — the conversation being rated
+ *   "channel": "whatsapp",
+ *   "score": 5,          // optional — CSAT, 1 to 5
+ *   "nps": 9,            // optional — 0 to 10
+ *   "resolved": true,    // optional — "did we sort out what you needed?"
+ *   "comment": "Quick and clear, thanks",
+ *   "source": "survey-app",
+ *   "external_id": "resp_8f2c", // optional — your id for this answer; a repeat is ignored, not double-counted
+ *   "responded_at": "2026-08-16T11:02:00Z" // optional, defaults to now()
+ * }
+ *
+ * At least one of score, nps or resolved is required.
+ */
+router.post('/csat', (req, res, next) => recordCsat(req, res).catch((err) => {
+  // A malformed uuid is the caller's mistake, not a server fault.
+  if (err.code === '22P02') return res.status(400).json({ error: 'client_id or agent_id is not a valid id' });
+  next(err);
+}));
+
+async function recordCsat(req, res) {
+  const body = req.body || {};
+  const { external_ref, client_id, agent_ref, agent_id } = body;
+  if (!external_ref && !client_id && !agent_ref && !agent_id) {
+    return res.status(400).json({ error: 'external_ref, client_id, agent_ref or agent_id is required' });
+  }
+
+  const intIn = (v, lo, hi) => {
+    if (v === undefined || v === null || v === '') return { ok: true, v: null };
+    const n = Number(v);
+    return Number.isInteger(n) && n >= lo && n <= hi ? { ok: true, v: n } : { ok: false };
+  };
+  const score = intIn(body.score, 1, 5);
+  if (!score.ok) return res.status(400).json({ error: 'score must be a whole number from 1 to 5' });
+  const nps = intIn(body.nps, 0, 10);
+  if (!nps.ok) return res.status(400).json({ error: 'nps must be a whole number from 0 to 10' });
+  if (body.resolved !== undefined && body.resolved !== null && typeof body.resolved !== 'boolean') {
+    return res.status(400).json({ error: 'resolved must be true or false' });
+  }
+  const resolved = typeof body.resolved === 'boolean' ? body.resolved : null;
+  if (score.v == null && nps.v == null && resolved == null) {
+    return res.status(400).json({ error: 'At least one of score, nps or resolved is required' });
+  }
+  let respondedAt = null;
+  if (body.responded_at) {
+    const d = new Date(body.responded_at);
+    if (Number.isNaN(d.getTime())) return res.status(400).json({ error: 'responded_at is not a valid date' });
+    respondedAt = d.toISOString();
+  }
+
+  // Same resolution order as /usage: a named agent first, then the client's
+  // own ref, then any agent's ref.
+  let resolvedClientId = client_id || null;
+  let resolvedAgentId = null;
+  if (agent_id || agent_ref) {
+    const { rows } = agent_id
+      ? await db.query(`select id, client_id from client_agents where id = $1`, [agent_id])
+      : await db.query(`select id, client_id from client_agents where external_ref = $1`, [String(agent_ref).trim()]);
+    if (!rows[0]) return res.status(404).json({ error: `No agent found for "${agent_id || agent_ref}".` });
+    resolvedAgentId = rows[0].id;
+    resolvedClientId = resolvedClientId || rows[0].client_id;
+  }
+  if (!resolvedClientId) {
+    const { rows } = await db.query(`select id from clients where external_ref = $1`, [external_ref]);
+    if (rows[0]) resolvedClientId = rows[0].id;
+    else {
+      const { rows: byAgent } = await db.query(`select id, client_id from client_agents where external_ref = $1`, [external_ref]);
+      if (!byAgent[0]) return res.status(404).json({ error: `No client or agent found with external_ref "${external_ref}".` });
+      resolvedAgentId = byAgent[0].id;
+      resolvedClientId = byAgent[0].client_id;
+    }
+  }
+
+  const text = (v, max) => String(v ?? '').trim().slice(0, max);
+  const externalId = text(body.external_id, 200) || null;
+  const { rows } = await db.query(
+    `insert into csat_responses (client_id, agent_id, session_id, channel, score, nps, resolved, comment, source, external_id, responded_at)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, coalesce($11::timestamptz, now()))
+     on conflict (client_id, external_id) where external_id is not null do nothing
+     returning id`,
+    [
+      resolvedClientId, resolvedAgentId, text(body.session_id, 200), text(body.channel, 40) || 'whatsapp',
+      score.v, nps.v, resolved, text(body.comment, 2000), text(body.source, 120), externalId, respondedAt,
+    ]
+  );
+  if (!rows[0]) return res.json({ ok: true, duplicate: true, client_id: resolvedClientId });
+  res.status(201).json({ ok: true, id: rows[0].id, client_id: resolvedClientId, agent_id: resolvedAgentId });
+}
 
 module.exports = router;

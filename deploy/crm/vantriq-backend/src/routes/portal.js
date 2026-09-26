@@ -9,6 +9,7 @@ const { buildTaxInvoice, getSettings } = require('../utils/billing');
 const { requirePortalSession } = require('../middleware/portalAuth');
 const { hashToken } = require('../middleware/clientApiAuth');
 const { effectivePackage } = require('../utils/pkg');
+const { clientAnalytics } = require('../utils/analytics');
 const { acceptQuote, buildQuoteDocument } = require('./quotes');
 const { renderInvoicePdf, invoiceFilename } = require('../utils/invoicePdf');
 const { renderWhtStatement, whtFilename } = require('../utils/whtCertificate');
@@ -202,6 +203,27 @@ router.get('/usage', async (req, res) => {
       period_month: r.period_month, sessions: +r.sessions || 0, messages: +r.messages || 0,
     })),
   });
+});
+
+/**
+ * GET /api/portal/analytics?grain=day|week|month|quarter|year
+ *
+ * The dashboard: conversations, contacts (new and returning), channels,
+ * agents, busiest hours, satisfaction, and a few plain-English findings.
+ * Only counts leave the server — never a session id or anything else that
+ * would identify one of this customer's own customers.
+ */
+router.get('/analytics', async (req, res, next) => {
+  try {
+    const client = req.portalClient;
+    let quota = null;
+    if (client.product_id) {
+      const { rows } = await db.query(`select * from products where id = $1`, [client.product_id]);
+      const eff = effectivePackage(client, rows[0]);
+      if (eff) quota = eff.quota;
+    }
+    res.json(await clientAnalytics(client.id, { grain: String(req.query.grain || 'month'), quota }));
+  } catch (err) { next(err); }
 });
 
 /* ---------------------------- Invoices ---------------------------- */

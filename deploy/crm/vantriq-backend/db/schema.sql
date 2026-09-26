@@ -1552,3 +1552,50 @@ create index if not exists idx_client_api_tokens_client on client_api_tokens(cli
 -- which refuses a token outright the instant this is turned back off,
 -- not only new ones being created.
 alter table clients add column if not exists api_access_enabled boolean not null default false;
+
+-- =====================================================================
+-- v9.13 — analytics and customer satisfaction
+--
+-- Two new facts the agents can report, so the dashboards have something
+-- better than volume to show:
+--
+--   1. csat_responses — one row per answered satisfaction survey. The
+--      survey itself (a WhatsApp button reply after a conversation, a web
+--      form, a separate survey app) is not the CRM's business; whatever
+--      asks the question posts the answer to /api/webhooks/csat. A
+--      response may carry any of a 1–5 CSAT score, a 0–10 NPS score and a
+--      "was it resolved?" yes/no — surveys differ, and forcing all three
+--      would make a one-tap survey impossible.
+--
+--   2. usage_events.handoff — whether a human had to take the
+--      conversation over. Null means "not reported", which is what every
+--      event before v9.13 reads, so containment is computed only over
+--      sessions whose agent actually reports it rather than claiming 100%
+--      for flows that never said.
+-- =====================================================================
+create table if not exists csat_responses (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  agent_id uuid references client_agents(id) on delete set null,
+  -- Kept for joining a response back to its conversation. Like
+  -- usage_events.session_id it is built from the end customer's phone
+  -- number, so it never leaves the CRM (not the portal, not the API).
+  session_id text not null default '',
+  channel text not null default 'whatsapp',
+  score smallint check (score between 1 and 5),
+  nps smallint check (nps between 0 and 10),
+  resolved boolean,
+  comment text not null default '',
+  source text not null default '',
+  -- The survey tool's own id for this answer, so a retried delivery is not
+  -- counted twice.
+  external_id text,
+  responded_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  check (score is not null or nps is not null or resolved is not null)
+);
+create index if not exists idx_csat_client_time on csat_responses(client_id, responded_at);
+create unique index if not exists idx_csat_external on csat_responses(client_id, external_id)
+  where external_id is not null;
+
+alter table usage_events add column if not exists handoff boolean;

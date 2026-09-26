@@ -22,6 +22,7 @@
      internet for a CDN neither they nor we control. Serving the file
      ourselves removes the dependency outright. -->
 <script src="/vendor/chart/chart.umd.js"></script>
+<script src="/analytics-view.js"></script>
 <script src="/invoice-print.js"></script>
 <style>
 /* The console is set in VantriqAI's own palette — the cream ground, ink
@@ -944,6 +945,7 @@ let kanbanDragId = null;
 const NAV = [
   {group:'Overview', items:[
     {id:'dashboard', label:'Dashboard', icon:iconGrid},
+    {id:'analytics', label:'Analytics', icon:iconTrend},
   ]},
   {group:'Revenue', items:[
     {id:'pipeline', label:'Pipeline', icon:iconFunnel},
@@ -987,6 +989,7 @@ function iconUsers(){ return icon('<circle cx="9" cy="8" r="3.2"/><path d="M2.5 
 function iconReceipt(){ return icon('<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>'); }
 function iconBox(){ return icon('<path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>'); }
 function iconTruck(){ return icon('<rect x="1" y="7" width="13" height="10" rx="1"/><path d="M14 10h4l3 3v4h-7z"/><circle cx="6" cy="19" r="1.6"/><circle cx="17.5" cy="19" r="1.6"/>'); }
+function iconTrend(){ return icon('<path d="M3 17l5-5 4 4 8-8"/><path d="M15 8h5v5"/>'); }
 function iconChart(){ return icon('<path d="M4 20V10M11 20V4M18 20v-7"/><path d="M2 20h20"/>'); }
 function iconGear(){ return icon('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1 1.55V21a2 2 0 11-4 0v-.09a1.7 1.7 0 00-1-1.55 1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.7 1.7 0 00.34-1.87 1.7 1.7 0 00-1.55-1H3a2 2 0 110-4h.09a1.7 1.7 0 001.55-1 1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06a1.7 1.7 0 001.87.34H9a1.7 1.7 0 001-1.55V3a2 2 0 114 0v.09a1.7 1.7 0 001 1.55 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06a1.7 1.7 0 00-.34 1.87V9a1.7 1.7 0 001.55 1H21a2 2 0 110 4h-.09a1.7 1.7 0 00-1.55 1z"/>'); }
 function iconPlus(size){ return icon('<path d="M12 5v14M5 12h14"/>', size); }
@@ -1144,6 +1147,7 @@ function sidebarPulseSVG(){
 
 const VIEW_TITLES = {
   dashboard:['Dashboard','Where the business stands right now'],
+  analytics:['Analytics','Leads, conversations and customer satisfaction — by day, week, month, quarter or year'],
   pipeline:['Pipeline','Move deals from lead to active client'],
   clients:['Clients','Every active and past account'],
   billing:['Billing & Invoices','Setup fees, retainers, and overage'],
@@ -1195,6 +1199,7 @@ function topbarAction(){
 function renderView(){
   switch(currentView){
     case 'dashboard': return renderDashboard();
+    case 'analytics': return renderAnalytics();
     case 'pipeline': return renderPipeline();
     case 'clients': return renderClients();
     case 'billing': return renderBilling();
@@ -1339,6 +1344,91 @@ function drawDashboardCharts(){
       options:{ plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}}} }
     }));
   }
+}
+
+/* ============================== ANALYTICS ============================== */
+/* Three views of one engine (src/utils/analytics.js), drawn by the same
+   /analytics-view.js the customer portal uses — so "One customer" here is
+   exactly the page that customer sees for themselves. */
+let analyticsTab = 'sales';          // 'sales' | 'platform' | 'client'
+let analyticsGrain = 'month';
+let analyticsClientId = null;
+let analyticsData = null;            // { key, data } | { key, error }
+let analyticsLoadingKey = null;
+
+const ANALYTICS_TABS = [
+  {id:'sales', label:'Sales & leads'},
+  {id:'platform', label:'All customer conversations'},
+  {id:'client', label:'One customer'},
+];
+function analyticsClients(){
+  return state.clients
+    .filter(c => c.stage==='active' || c.isInternal)
+    .sort((a,b)=> (b.isInternal?1:0)-(a.isInternal?1:0) || a.company.localeCompare(b.company));
+}
+function analyticsKey(){
+  return `${analyticsTab}|${analyticsGrain}|${analyticsTab==='client' ? analyticsClientId : ''}`;
+}
+function setAnalyticsTab(t){ analyticsTab = t; render(); }
+function setAnalyticsGrain(g){ analyticsGrain = g; render(); }
+function setAnalyticsClient(id){ analyticsClientId = id || null; render(); }
+
+async function loadAnalytics(){
+  const key = analyticsKey();
+  if(analyticsLoadingKey === key) return;
+  analyticsLoadingKey = key;
+  const path = analyticsTab==='sales' ? `/api/analytics/sales?grain=${analyticsGrain}`
+    : analyticsTab==='platform' ? `/api/analytics/platform?grain=${analyticsGrain}`
+    : `/api/analytics/clients/${encodeURIComponent(analyticsClientId)}?grain=${analyticsGrain}`;
+  try{
+    const data = await API.get(path);
+    if(analyticsKey() !== key) return;   // the user moved on while this loaded
+    analyticsData = { key, data };
+  }catch(e){
+    if(analyticsKey() !== key) return;
+    analyticsData = { key, error: e.message || 'Could not load analytics' };
+  }finally{
+    if(analyticsLoadingKey === key) analyticsLoadingKey = null;
+  }
+  if(currentView==='analytics') render();
+}
+
+function renderAnalytics(){
+  if(!window.VQA) return `<div class="card">The analytics script did not load in this browser.</div>`;
+  VQA.injectStyles();
+  if(analyticsTab==='client' && !analyticsClientId){
+    const first = analyticsClients().find(c=>!c.isInternal) || analyticsClients()[0];
+    analyticsClientId = first ? first.id : null;
+  }
+  const tabs = `<div class="stage-tabs" style="margin-bottom:16px;">
+    ${ANALYTICS_TABS.map(t=>`<button class="stage-tab ${analyticsTab===t.id?'active':''}" onclick="setAnalyticsTab('${t.id}')">${esc(t.label)}</button>`).join('')}
+  </div>`;
+  const picker = analyticsTab!=='client' ? '' : `
+    <div class="field" style="max-width:420px;margin-bottom:14px;">
+      <label>Customer</label>
+      <select onchange="setAnalyticsClient(this.value)">
+        ${analyticsClients().map(c=>`<option value="${c.id}" ${c.id===analyticsClientId?'selected':''}>${esc(c.company)}${c.isInternal?' (VantriqAI — our own agents)':''}</option>`).join('')}
+      </select>
+      <div class="footnote" style="margin-top:6px;">This is exactly what the customer sees on the Analytics tab of their portal.</div>
+    </div>`;
+  if(analyticsTab==='client' && !analyticsClientId){
+    return tabs + `<div class="card" style="text-align:center;color:var(--muted);padding:32px;">No active customers yet.</div>`;
+  }
+  const cur = analyticsData && analyticsData.key===analyticsKey() ? analyticsData : null;
+  if(!cur) return tabs + picker + `<div class="card" style="text-align:center;color:var(--muted);padding:32px;">Working out the numbers…</div>`;
+  if(cur.error) return tabs + picker + `<div class="card" style="color:var(--red);">${esc(cur.error)}
+    <button class="btn btn-ghost btn-sm" style="margin-left:8px;" onclick="analyticsData=null;render()">Try again</button></div>`;
+  const opts = { onGrain:'setAnalyticsGrain' };
+  if(analyticsTab==='sales') return tabs + VQA.salesHTML(cur.data, opts);
+  if(analyticsTab==='platform') return tabs + VQA.conversationsHTML(cur.data, { ...opts, audience:'platform', fileTag:'all-conversations' });
+  return tabs + picker + VQA.conversationsHTML(cur.data, { ...opts, audience:'crm', fileTag:'customer' });
+}
+
+function drawAnalytics(){
+  const cur = analyticsData && analyticsData.key===analyticsKey() ? analyticsData : null;
+  if(!cur){ loadAnalytics(); return; }
+  if(cur.error || !window.VQA) return;
+  if(analyticsTab==='sales') VQA.drawSales(cur.data); else VQA.drawConversations(cur.data);
 }
 
 /* ============================== PIPELINE (Kanban) ============================== */
@@ -6825,6 +6915,8 @@ function attachPostRenderHooks(){
   if(currentView==='dashboard'){
     requestAnimationFrame(drawDashboardCharts);
   }
+  if(currentView==='analytics') requestAnimationFrame(drawAnalytics);
+  else if(window.VQA) VQA.destroyCharts();
   // Views whose data is too heavy to pull on every page load fetch on first
   // sight and then keep what they have until something changes it.
   if(currentView==='agents' && agentsData===null) loadAgents();

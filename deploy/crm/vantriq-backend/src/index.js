@@ -12,6 +12,7 @@ const procurementRoutes = require('./routes/procurement');
 const expensesRoutes = require('./routes/expenses');
 const usageRoutes = require('./routes/usage');
 const dashboardRoutes = require('./routes/dashboard');
+const analyticsRoutes = require('./routes/analytics');
 const financialsRoutes = require('./routes/financials');
 const settingsRoutes = require('./routes/settings');
 const portalRoutes = require('./routes/portal');
@@ -104,6 +105,7 @@ app.use('/api/reps', requireScope('admin'), repsRoutes);
 app.use('/api/package-requests', requireScope('staff'), packageRequestsRoutes);
 app.use('/api/expenses', requireScope('admin'), expensesRoutes);
 app.use('/api/dashboard', requireScope('staff'), dashboardRoutes);
+app.use('/api/analytics', requireScope('staff'), analyticsRoutes);
 app.use('/api/quota', requireScope('staff'), quotaRoutes);
 app.use('/api/financials', requireScope('admin'), financialsRoutes);
 // The receipts ledger. Staff record what came in; they do not see the books.

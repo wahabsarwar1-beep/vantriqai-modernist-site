@@ -8,7 +8,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<!-- Served from this origin, like the CRM's — a CDN or network policy
+     blocking cdnjs should not take the charts with it. -->
+<script src="/vendor/chart/chart.umd.js"></script>
+<script src="/analytics-view.js"></script>
 <script src="/invoice-print.js"></script>
 <style>
 /* The portal is the only part of the CRM a customer ever sees, so it is set
@@ -151,6 +154,9 @@ tr.row-click:active{background:#FAF8F3;}
  * ==================================================================== */
 
 #app{max-width:760px;}
+/* Analytics needs the room: charts side by side on a desktop, stacked on a phone. */
+body.wide #app{max-width:1100px;}
+body.wide .topbar-inner{max-width:1060px;}
 
 /* ---------- Header ---------- */
 .topbar{
@@ -304,7 +310,9 @@ let SESSION = '';
 try { SESSION = localStorage.getItem(SESSION_KEY) || ''; } catch(e) { SESSION = ''; }
 
 let data = { account:null, usage:null, invoices:[], ledger:null, packages:null, activity:null,
-  agents:null, bundles:null, quotes:null, apiTokens:null };
+  agents:null, bundles:null, quotes:null, apiTokens:null, analytics:null };
+let analyticsGrain = 'month';
+let analyticsBusy = false;
 let apiTokenBusy = false;
 let bundleBusy = false;
 let passwordBusy = false;
@@ -374,7 +382,7 @@ async function boot(){
     // no agreements on file should still see the rest of its portal rather
     // than an error page.
     const contracts = await api('/contracts').catch(()=>[]);
-    data = { account, usage, invoices, ledger, packages, agents, bundles, quotes, contracts, activity: null };
+    data = { account, usage, invoices, ledger, packages, agents, bundles, quotes, contracts, activity: null, analytics: null };
     render();
   }catch(e){
     if(e.expired){ renderLogin('Your session has ended. Please sign in again.'); return; }
@@ -500,6 +508,7 @@ function render(){
     <div class="content">
       <div class="tabs">
         <div class="tab ${currentTab==='overview'?'active':''}" onclick="setTab('overview')">Overview</div>
+        <div class="tab ${currentTab==='analytics'?'active':''}" onclick="setTab('analytics')">Analytics</div>
         <div class="tab ${currentTab==='agents'?'active':''}" onclick="setTab('agents')">My agents${data.agents&&data.agents.length?` <span class="tab-n">${data.agents.length}</span>`:''}</div>
         <div class="tab ${currentTab==='usage'?'active':''}" onclick="setTab('usage')">Usage</div>
         <div class="tab ${currentTab==='activity'?'active':''}" onclick="setTab('activity')">Activity</div>
@@ -519,6 +528,11 @@ function render(){
     </div>
   `;
   if(currentTab==='usage') requestAnimationFrame(drawUsageChart);
+  document.body.classList.toggle('wide', currentTab==='analytics');
+  if(currentTab==='analytics'){
+    if(!data.analytics) loadAnalytics();
+    else if(!data.analytics.error) requestAnimationFrame(()=>VQA.drawConversations(data.analytics));
+  } else if(window.VQA) VQA.destroyCharts();
   renderInvoiceModal();
 }
 
@@ -531,6 +545,7 @@ function renderTab(){
 
 function tabBody(){
   if(currentTab==='overview') return renderOverview();
+  if(currentTab==='analytics') return renderAnalytics();
   if(currentTab==='usage') return renderUsage();
   if(currentTab==='invoices') return renderInvoices();
   if(currentTab==='ledger') return renderLedger();
@@ -599,6 +614,33 @@ function renderOverview(){
     <div class="kv"><span class="k">Client since</span><span class="v">${fmtDate(account.join_date)}</span></div>
   </div>
   `;
+}
+
+/* ---- Analytics: the dashboard, drawn by /analytics-view.js ---- */
+async function loadAnalytics(){
+  if(analyticsBusy) return;
+  analyticsBusy = true;
+  try{
+    data.analytics = await api('/analytics?grain='+encodeURIComponent(analyticsGrain));
+    analyticsBusy = false;
+    if(currentTab==='analytics') render();
+  }catch(e){
+    analyticsBusy = false;
+    if(e.expired){ renderLogin('Your session has ended. Please sign in again.'); return; }
+    data.analytics = { error: e.message || 'Could not load your analytics.' };
+    if(currentTab==='analytics') render();
+  }
+}
+function setAnalyticsGrain(g){ analyticsGrain = g; data.analytics = null; render(); }
+
+function renderAnalytics(){
+  const a = data.analytics;
+  if(!window.VQA) return `<div class="card"><div class="empty">The analytics page could not load in this browser.</div></div>`;
+  VQA.injectStyles();
+  if(!a) return `<div class="card" style="text-align:center;color:var(--muted);"><span class="loading-dot"></span>&nbsp; Working out your numbers…</div>`;
+  if(a.error) return `<div class="card"><div class="empty">${esc(a.error)}</div>
+    <button class="btn btn-ghost" style="margin-top:10px;" onclick="data.analytics=null;render()">Try again</button></div>`;
+  return VQA.conversationsHTML(a, { audience:'portal', onGrain:'setAnalyticsGrain', fileTag:'analytics' });
 }
 
 /* ---- Activity: the individual conversations behind the monthly number ---- */

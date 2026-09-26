@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "VantriqAI CRM API",
-    "version": "9.12.1",
+    "version": "9.13.0",
     "description": "The CRM behind VantriqAI: clients, invoices, payments, quotes and proposals,\ncontracts, statements, and the webhook surface the AI agents write through.\n\n## Authentication\n\nTwo ways in, and one of them is for people:\n\n- **Staff session** — `Authorization: Bearer <token>`, issued by `POST /api/auth/verify`\n  after a password and an emailed one-time code. A staff member's role decides reach.\n- **API key** — `x-api-key: <key>`, for machines. Keys are scoped.\n\n## Scopes\n\nLeast to most: `webhook` < `automation` < `staff` < `admin`. A scope opens everything\nbelow it. The admin key opens everything and is intended as break-glass only — set\n`ALLOW_API_KEY_LOGIN=false` once staff accounts exist.\n\n## Automation writes through this API, never to the database\n\nn8n and any other integration must use these endpoints rather than connecting to\nPostgres. Tenancy, quota and tax rules live here; a direct write bypasses all three."
   },
   "servers": [
@@ -34,6 +34,9 @@
     },
     {
       "name": "agents"
+    },
+    {
+      "name": "analytics"
     },
     {
       "name": "archive"
@@ -666,6 +669,135 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/analytics/clients/{id}": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "One customer's analytics — identical to what they see on their portal's Analytics tab.",
+        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/analytics/platform": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Every customer's conversations and satisfaction together, with the busiest customers.",
+        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/analytics/sales": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Our own leads, wins, losses, funnel, sources and what prospects ask the sales agent.",
+        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "parameters": [],
         "responses": {
           "200": {
             "description": "Success",
@@ -4046,6 +4178,46 @@
         ]
       }
     },
+    "/api/external/analytics": {
+      "get": {
+        "tags": [
+          "externalApi"
+        ],
+        "summary": "GET /api/external/analytics?grain=day|week|month|quarter|year — the same figures as the portal's dashboard, for a customer's own BI tool. Counts only; no session ids.",
+        "description": "Requires the **client-token** scope or higher.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
     "/api/external/invoices": {
       "get": {
         "tags": [
@@ -5270,6 +5442,39 @@
           "portal"
         ],
         "summary": "Every agent running under this company. A customer with a WhatsApp agent, an Instagram agent and a website assistant should see three things here, not one account and no detail. session_id is never exposed: it contains the end consumer's phone number, which belongs to our customer's customer and to nobody else.",
+        "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/portal/analytics": {
+      "get": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "GET /api/portal/analytics?grain=day|week|month|quarter|year The dashboard: conversations, contacts (new and returning), channels, agents, busiest hours, satisfaction, and a few plain-English findings. Only counts leave the server — never a session id or anything else that would identify one of this customer's own customers.",
         "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
         "parameters": [],
         "responses": {
@@ -9446,6 +9651,57 @@
         ]
       }
     },
+    "/api/webhooks/csat": {
+      "post": {
+        "tags": [
+          "usage"
+        ],
+        "summary": "POST /api/webhooks/csat A customer-satisfaction answer, from whatever asked the question — a WhatsApp button reply at the end of a conversation, a web form, or a separate survey app. One call per answer. Body: { \"external_ref\": \"923001234567\", // or client_id / agent_ref / agent_id, exactly as /usage \"session_id\": \"923009998888-2026-08-16\", // optional — the conversation being rated \"channel\": \"whatsapp\", \"score\": 5, // optional — CSAT, 1 to 5 \"nps\": 9, // optional — 0 to 10 \"resolved\": true, // optional — \"did we sort out what you needed?\" \"comment\": \"Quick and clear, thanks\", \"source\": \"survey-app\", \"external_id\": \"resp_8f2c\", // optional — your id for this answer; a repeat is ignored, not double-counted \"responded_at\": \"2026-08-16T11:02:00Z\" // optional, defaults to now() } At least one of score, nps or resolved is required.",
+        "description": "Requires the **webhook** scope or higher. Webhook key. The narrowest scope — usage, lead and conversation ingestion only.",
+        "parameters": [],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
     "/api/webhooks/lead": {
       "post": {
         "tags": [
@@ -9542,7 +9798,7 @@
         "tags": [
           "usage"
         ],
-        "summary": "POST /api/webhooks/usage Called by n8n (or any automation step) immediately after an AI model call returns, or when a WhatsApp 24-hour session closes. This is what makes usage numbers real-time instead of manually entered. Body: { \"external_ref\": \"923001234567\", // required unless client_id given — the client's ref, or one of its agents' refs \"client_id\": \"uuid\", // alternative to external_ref, if n8n already knows Vantriq's internal client id \"agent_ref\": \"instagram:@khantraders\", // optional — which of the client's agents handled this \"agent_id\": \"uuid\", // alternative to agent_ref \"session_id\": \"923009998888-2026-08-16\", // required — one id per 24h conversation window \"channel\": \"whatsapp\", // whatsapp | web | voice | instagram \"ai_model\": \"claude-sonnet-4-6\", \"input_tokens\": 812, \"output_tokens\": 340, \"messages_count\": 1, \"occurred_at\": \"2026-08-16T10:32:00Z\" // optional, defaults to now() } n8n gets input_tokens/output_tokens straight from the AI provider's response JSON (Claude, OpenAI, and DeepSeek all return a `usage` object on every completion) — no extra computation needed on the n8n side.",
+        "summary": "POST /api/webhooks/usage Called by n8n (or any automation step) immediately after an AI model call returns, or when a WhatsApp 24-hour session closes. This is what makes usage numbers real-time instead of manually entered. Body: { \"external_ref\": \"923001234567\", // required unless client_id given — the client's ref, or one of its agents' refs \"client_id\": \"uuid\", // alternative to external_ref, if n8n already knows Vantriq's internal client id \"agent_ref\": \"instagram:@khantraders\", // optional — which of the client's agents handled this \"agent_id\": \"uuid\", // alternative to agent_ref \"session_id\": \"923009998888-2026-08-16\", // required — one id per 24h conversation window \"channel\": \"whatsapp\", // whatsapp | web | voice | instagram \"ai_model\": \"claude-sonnet-4-6\", \"input_tokens\": 812, \"output_tokens\": 340, \"messages_count\": 1, \"handoff\": false, // optional — true if a human had to take over (drives AI containment) \"occurred_at\": \"2026-08-16T10:32:00Z\" // optional, defaults to now() } n8n gets input_tokens/output_tokens straight from the AI provider's response JSON (Claude, OpenAI, and DeepSeek all return a `usage` object on every completion) — no extra computation needed on the n8n side.",
         "description": "Requires the **webhook** scope or higher. Webhook key. The narrowest scope — usage, lead and conversation ingestion only.",
         "parameters": [],
         "requestBody": {

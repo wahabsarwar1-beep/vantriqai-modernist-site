@@ -4,6 +4,7 @@ const { effectivePackage } = require('../utils/pkg');
 const { buildTaxInvoice, getSettings } = require('../utils/billing');
 const { renderInvoicePdf, invoiceFilename } = require('../utils/invoicePdf');
 const { formatInvoice } = require('./portal');
+const { clientAnalytics } = require('../utils/analytics');
 
 const router = express.Router();
 
@@ -159,6 +160,24 @@ router.get('/agents', async (req, res) => {
     [req.apiClient.id]
   );
   res.json(rows);
+});
+
+/**
+ * GET /api/external/analytics?grain=day|week|month|quarter|year — the same
+ * figures as the portal's dashboard, for a customer's own BI tool. Counts
+ * only; no session ids.
+ */
+router.get('/analytics', async (req, res, next) => {
+  try {
+    const client = req.apiClient;
+    let quota = null;
+    if (client.product_id) {
+      const { rows } = await db.query(`select * from products where id = $1`, [client.product_id]);
+      const eff = effectivePackage(client, rows[0]);
+      if (eff) quota = eff.quota;
+    }
+    res.json(await clientAnalytics(client.id, { grain: String(req.query.grain || 'month'), quota }));
+  } catch (err) { next(err); }
 });
 
 module.exports = router;

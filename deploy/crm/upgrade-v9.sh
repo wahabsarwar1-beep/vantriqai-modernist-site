@@ -357,6 +357,9 @@ else
       and column_name in ('is_owner','totp_secret','totp_enabled','must_setup_totp')"
   chk "the database itself refuses a second owner (unique index present)" 1 \
     "select count(*) from pg_indexes where indexname='idx_internal_users_one_owner'"
+  chk "v9.13 satisfaction table and handoff flag" 2 \
+    "select (select count(*) from information_schema.tables where table_name='csat_responses')
+          + (select count(*) from information_schema.columns where table_name='usage_events' and column_name='handoff')"
   # Not a chk(): creating the owner account is a deliberate, one-time manual
   # step (see 6b above) precisely so its password never touches this log.
   # A fresh install legitimately has none yet — that must never fail a deploy.
