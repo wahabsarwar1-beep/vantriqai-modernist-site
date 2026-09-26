@@ -1,3 +1,5 @@
+import JsonLd from "@/components/JsonLd";
+import { breadcrumbSchema } from "@/lib/schema";
 import PageHero from "@/components/PageHero";
 import HeroChatCard from "@/components/HeroChatCard";
 import LineReveal from "@/components/LineReveal";
@@ -18,6 +20,7 @@ const CHANNEL_STATS = [
 export default function IndustriesPage({ region }: { region: Region }) {
   return (
     <>
+      <JsonLd schema={breadcrumbSchema(region, "/industries", "Industries")} />
       <PageHero
         kicker="Where it applies"
         heading={

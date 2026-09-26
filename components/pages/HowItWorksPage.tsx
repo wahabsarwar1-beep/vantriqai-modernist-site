@@ -1,3 +1,5 @@
+import JsonLd from "@/components/JsonLd";
+import { breadcrumbSchema } from "@/lib/schema";
 import PageHero from "@/components/PageHero";
 import HeroChatCard from "@/components/HeroChatCard";
 import LineReveal from "@/components/LineReveal";
@@ -24,6 +26,7 @@ const BENCHMARK_SOURCES = ["MIT / InsideSales.com", "Harvard Business Review", "
 export default function HowItWorksPage({ region }: { region: Region }) {
   return (
     <>
+      <JsonLd schema={breadcrumbSchema(region, "/how-it-works", "How It Works")} />
       <PageHero
         kicker="How it works"
         heading={

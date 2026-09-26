@@ -1,3 +1,5 @@
+import JsonLd from "@/components/JsonLd";
+import { breadcrumbSchema } from "@/lib/schema";
 import PageHero from "@/components/PageHero";
 import HeroChatCard from "@/components/HeroChatCard";
 import LineReveal from "@/components/LineReveal";
@@ -89,6 +91,7 @@ const products = (region: Region): Product[] => [
 export default function ProductsPage({ region }: { region: Region }) {
   return (
     <>
+      <JsonLd schema={breadcrumbSchema(region, "/products", "Products")} />
       <PageHero
         kicker="Products"
         maxWidthCh="17ch"

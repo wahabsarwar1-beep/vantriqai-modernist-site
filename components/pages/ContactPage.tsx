@@ -1,3 +1,5 @@
+import JsonLd from "@/components/JsonLd";
+import { breadcrumbSchema } from "@/lib/schema";
 import Kicker from "@/components/Kicker";
 import LineReveal from "@/components/LineReveal";
 import Magnetic from "@/components/Magnetic";
@@ -31,6 +33,7 @@ const INFO_ROWS = [
 export default function ContactPage({ region }: { region: Region }) {
   return (
     <>
+      <JsonLd schema={breadcrumbSchema(region, "/contact", "Contact")} />
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" }}>
         <section className="stack-mobile" style={{ padding: "clamp(34px,4.4vw,58px) 0 clamp(40px,5.2vw,68px)", position: "relative", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(340px,100%),1fr))", gap: "clamp(40px,6vw,88px)", alignItems: "start" }}>
           <div aria-hidden="true" data-hero-texture="" style={{ position: "absolute", top: "calc(clamp(72px, 7vw, 92px) * -1)", bottom: 0, left: "50%", width: "calc(100vw + 24px)", marginLeft: "calc(-50vw - 12px)", zIndex: 0, pointerEvents: "none" }} />

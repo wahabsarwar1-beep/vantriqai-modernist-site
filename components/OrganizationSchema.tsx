@@ -1,5 +1,7 @@
+import JsonLd from "@/components/JsonLd";
 import { SITE_URL } from "@/lib/region";
 import { DEFAULT_DESCRIPTION, SITE_NAME } from "@/lib/seo";
+import { ORG_ID, websiteSchema } from "@/lib/schema";
 import { WHATSAPP_DISPLAY } from "@/lib/whatsapp";
 
 /**
@@ -19,6 +21,7 @@ export default function OrganizationSchema() {
   const schema = {
     "@context": "https://schema.org",
     "@type": "Organization",
+    "@id": ORG_ID,
     name: SITE_NAME,
     url: SITE_URL,
     logo: `${SITE_URL}/ventriqai-lockup-cobalt.svg`,
@@ -38,9 +41,9 @@ export default function OrganizationSchema() {
   };
 
   return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema).replace(/</g, "\\u003c") }}
-    />
+    <>
+      <JsonLd schema={schema} />
+      <JsonLd schema={websiteSchema()} />
+    </>
   );
 }

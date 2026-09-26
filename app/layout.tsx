@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Sora, Manrope } from "next/font/google";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
@@ -48,6 +48,12 @@ export const metadata: Metadata = {
     title: DEFAULT_TITLE,
     description: DEFAULT_DESCRIPTION,
   },
+};
+
+/* The cream the page actually opens on, so the browser chrome on a phone
+   does not sit as a white band above it. */
+export const viewport: Viewport = {
+  themeColor: "#fbf9f6",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

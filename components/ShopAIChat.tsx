@@ -130,7 +130,20 @@ function brandFragment(prefix: string, suffix: string): DocumentFragment {
  *  everywhere else on the site. */
 function brandifyHeader() {
   const h1 = document.querySelector<HTMLElement>("#n8n-chat .chat-heading h1");
-  if (!h1 || h1.dataset.branded) return;
+  if (!h1) return;
+
+  /* @n8n/chat titles its panel with an h1, so the widget was claiming the
+     top-level heading of whatever page it sat on — "VantriqAI Assistant"
+     competing with the page's own h1 on all twelve routes. ARIA overrides the
+     native tag, so this keeps it a heading for assistive tech and drops it to
+     level 2. Rewriting the element itself is not an option: Vue owns that
+     node and would re-render over it. */
+  if (h1.getAttribute("aria-level") !== "2") {
+    h1.setAttribute("role", "heading");
+    h1.setAttribute("aria-level", "2");
+  }
+
+  if (h1.dataset.branded) return;
   const match = h1.textContent?.match(/^Vantriq\s*AI\s*(.*)$/i);
   if (!match) return;
   h1.textContent = "";
@@ -182,6 +195,51 @@ function syncChatWindowOpenClass() {
   });
 }
 
+/**
+ * Hold the chat bundle back until the page has stopped being busy.
+ *
+ * @n8n/chat is 1.7 MB of JavaScript, and it was being fetched and parsed on
+ * every page view whether or not anybody opened it — competing for bandwidth
+ * and main thread with the content someone actually came to read. Nothing
+ * about it is needed for first paint.
+ *
+ * So: load once the browser goes idle, or the moment the visitor does
+ * anything at all, whichever comes first. Someone reaching for the launcher
+ * has already moved a pointer or touched the screen, so in practice it is
+ * loading before they arrive, and a slow device stops paying for it up front.
+ */
+function whenPageIsIdle(run: () => void): () => void {
+  const EVENTS = ["pointerdown", "keydown", "touchstart", "wheel", "scroll"] as const;
+  const OPTS = { passive: true, capture: true } as const;
+
+  let fired = false;
+  let idleHandle: number | undefined;
+
+  const cleanup = () => {
+    EVENTS.forEach((e) => window.removeEventListener(e, fire, OPTS));
+    if (idleHandle === undefined) return;
+    if (typeof window.cancelIdleCallback === "function") window.cancelIdleCallback(idleHandle);
+    else window.clearTimeout(idleHandle);
+  };
+
+  function fire() {
+    if (fired) return;
+    fired = true;
+    cleanup();
+    run();
+  }
+
+  EVENTS.forEach((e) => window.addEventListener(e, fire, OPTS));
+  // The timeout is the backstop: on a page nobody touches, idle may never be
+  // declared, and the launcher still has to appear.
+  idleHandle =
+    typeof window.requestIdleCallback === "function"
+      ? window.requestIdleCallback(fire, { timeout: 3000 })
+      : window.setTimeout(fire, 1500);
+
+  return cleanup;
+}
+
 /** The VantriqAI assistant — @n8n/chat mounted in window mode, themed to the
  *  Modernist system via styles/chat-widget-theme.css. Backend is VantriqAI's
  *  own n8n workflow (persona/knowledge live there, not in this component);
@@ -223,44 +281,48 @@ export default function ShopAIChat() {
       return;
     }
 
-    loadChatBundle().then(({ createChat }) => {
+    const cancelIdle = whenPageIsIdle(() => {
       if (!mounted) return;
-      createChat({
-        webhookUrl,
-        mode: "window",
-        showWelcomeScreen: false,
-        initialMessages: [
-          "Hi! I'm the VantriqAI assistant 👋 — ask me about our AI agents, packages, or how it works, or I can book you a quick discovery call.",
-        ],
-        i18n: {
-          en: {
-            title: "VantriqAI Assistant",
-            subtitle: "We're here to help.",
-            inputPlaceholder: "Type your message...",
-            getStarted: "New Conversation",
-            footer: "",
-            closeButtonTooltip: "Close chat",
+      loadChatBundle().then(({ createChat }) => {
+        if (!mounted) return;
+        createChat({
+          webhookUrl,
+          mode: "window",
+          showWelcomeScreen: false,
+          initialMessages: [
+            "Hi! I'm the VantriqAI assistant 👋 — ask me about our AI agents, packages, or how it works, or I can book you a quick discovery call.",
+          ],
+          i18n: {
+            en: {
+              title: "VantriqAI Assistant",
+              subtitle: "We're here to help.",
+              inputPlaceholder: "Type your message...",
+              getStarted: "New Conversation",
+              footer: "",
+              closeButtonTooltip: "Close chat",
+            },
           },
-        },
-      });
+        });
 
-      const runInjections = () => {
-        brandifyHeader();
-        injectLauncherLabel();
-        injectQuickReplies();
-        syncChatWindowOpenClass();
-      };
-      runInjections();
-      observer = new MutationObserver(runInjections);
-      observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["style"] });
-    }).catch((err) => {
-      // The site must not break because the assistant could not load — the
-      // WhatsApp route is on every page and is the primary contact channel.
-      console.error("[chat] widget unavailable:", err);
+        const runInjections = () => {
+          brandifyHeader();
+          injectLauncherLabel();
+          injectQuickReplies();
+          syncChatWindowOpenClass();
+        };
+        runInjections();
+        observer = new MutationObserver(runInjections);
+        observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["style"] });
+      }).catch((err) => {
+        // The site must not break because the assistant could not load — the
+        // WhatsApp route is on every page and is the primary contact channel.
+        console.error("[chat] widget unavailable:", err);
+      });
     });
 
     return () => {
       mounted = false;
+      cancelIdle();
       observer?.disconnect();
     };
   }, []);

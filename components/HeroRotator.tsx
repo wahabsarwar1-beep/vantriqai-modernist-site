@@ -106,7 +106,16 @@ export default function HeroRotator({ region }: { region: Region }) {
                 }}
                 aria-hidden={i === scene ? undefined : true}
               >
-                <h1 style={{ fontSize: "clamp(34px,5vw,64px)", lineHeight: 0.98, letterSpacing: "-0.03em", margin: 0, maxWidth: "16ch", overflowWrap: "break-word" }}>
+                {/* Three headings share this cell so they can cross-fade, but
+                    a page has one top-level heading, so only the scene on
+                    screen is level 1 and the two waiting behind it are level
+                    2. ARIA overrides the tag, which keeps the element — and
+                    so the transition — exactly as it was. */}
+                <h1
+                  role="heading"
+                  aria-level={i === scene ? 1 : 2}
+                  style={{ fontSize: "clamp(34px,5vw,64px)", lineHeight: 0.98, letterSpacing: "-0.03em", margin: 0, maxWidth: "16ch", overflowWrap: "break-word" }}
+                >
                   <span style={{ display: "block" }}>{s.lines[0]}</span>
                   <span style={{ display: "block", color: "var(--color-accent)" }}>{s.lines[1]}</span>
                 </h1>

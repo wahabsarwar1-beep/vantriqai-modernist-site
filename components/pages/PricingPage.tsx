@@ -1,3 +1,5 @@
+import JsonLd from "@/components/JsonLd";
+import { breadcrumbSchema, faqSchema, serviceSchema } from "@/lib/schema";
 import PageHero from "@/components/PageHero";
 import HeroChatCard from "@/components/HeroChatCard";
 import LineReveal from "@/components/LineReveal";
@@ -15,6 +17,9 @@ const mutedLabel = { color: "color-mix(in srgb, var(--color-text) 62%, transpare
 export default function PricingPage({ region }: { region: Region }) {
   return (
     <>
+      <JsonLd schema={breadcrumbSchema(region, "/pricing", "Pricing")} />
+      <JsonLd schema={serviceSchema(region)} />
+      <JsonLd schema={faqSchema()} />
       <PageHero
         kicker="Packages"
         maxWidthCh="17ch"

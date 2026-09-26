@@ -84,10 +84,12 @@ export const DEFAULT_REGION = REGIONS.pk;
  * canonicals, hreflang and the sitemap may name. The live site runs on www,
  * so pointing canonicals at the apex would point them at a redirect.
  *
- * If that ever flips, this is the one line to change — and the other host
- * must 301 to this one, or the two are duplicates of each other.
+ * If that ever flips, set NEXT_PUBLIC_SITE_URL at BUILD time and rebuild —
+ * a restart will not pick it up, since NEXT_PUBLIC_* is inlined at compile.
+ * Whichever host wins, the other must 301 to it, or the two are duplicates
+ * of each other and the canonical tag alone will not settle it.
  */
-export const SITE_URL = "https://www.vantriqai.com";
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.vantriqai.com").replace(/\/$/, "");
 
 /** The paths each region publishes, in nav order. */
 export const REGION_PATHS = ["/", "/how-it-works", "/products", "/industries", "/pricing", "/contact"] as const;
