@@ -273,6 +273,11 @@ echo "  Meters the site chat and the WhatsApp agent as an internal customer."
 echo "  Idempotent — safe if it has already been done."
 run docker exec "$APP_CONTAINER" npm run seed-internal
 
+bold "6b. Creating the protected owner account"
+echo "  ceo@vantriqai.com (or \$OWNER_EMAIL) — the one login nobody else can"
+echo "  deactivate, demote or password-reset. Idempotent — safe on every deploy."
+run docker exec "$APP_CONTAINER" npm run seed-owner
+
 # ---------------------------------------------------------------- 7. verify
 bold "7. Verifying"
 if [ "$DRY" = 1 ]; then
@@ -341,6 +346,13 @@ else
     "select count(*) from usage_rates r join clients c on c.id=r.client_id
       where c.is_internal and r.metric in ('input_token','output_token')
         and r.unit_size = 1000000 and r.effective_to is null"
+  chk "v9.11 owner-account columns" 4 \
+    "select count(*) from information_schema.columns where table_name='internal_users'
+      and column_name in ('is_owner','totp_secret','totp_enabled','must_setup_totp')"
+  chk "exactly one protected owner account exists" 1 \
+    "select count(*) from internal_users where is_owner"
+  chk "the database itself refuses a second owner (unique index present)" 1 \
+    "select count(*) from pg_indexes where indexname='idx_internal_users_one_owner'"
 
   AFTER=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
     -c "select count(*) from information_schema.tables where table_schema='public'")

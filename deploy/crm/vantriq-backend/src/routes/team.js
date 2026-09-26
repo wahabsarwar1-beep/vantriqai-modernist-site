@@ -1,15 +1,34 @@
 const express = require('express');
 const db = require('../db');
 const { hashPassword, generatePassword } = require('../utils/password');
+const { alertOwner } = require('../utils/securityAlerts');
 const router = express.Router();
 
 const COMPANY_DOMAIN = (process.env.COMPANY_EMAIL_DOMAIN || 'vantriqai.com').toLowerCase();
 
 /** Admin-only management of internal employee logins. */
 
-const PUBLIC_COLS = `id, email, name, role, active, must_change_password, created_at, last_login_at, password_set_by`;
+const PUBLIC_COLS = `id, email, name, role, active, must_change_password, is_owner, totp_enabled, must_setup_totp, created_at, last_login_at, password_set_by`;
 
 const MIN_PASSWORD = 10;
+
+/**
+ * The owner row (see db/schema.sql v9.11 — is_owner, enforced unique by
+ * Postgres) can only ever be changed by itself, through auth.js's own
+ * routes (change-password, totp/*). Every route here acts on SOMEONE
+ * ELSE's account, so any of them landing on the owner's row is by
+ * definition someone other than the owner trying to touch it — worth an
+ * immediate alert whether that's a mistake or an attack.
+ */
+async function refuseIfOwner(row, res, action) {
+  if (!row.is_owner) return false;
+  alertOwner(`Blocked: an attempt to ${action} the owner account`, [
+    `Target: ${row.email}`, `Time: ${new Date().toISOString()}`,
+    'This was refused automatically. If you did not just do this yourself through your own account, treat it as a live attempt to lock you out.',
+  ]);
+  res.status(403).json({ error: 'This is the protected owner account. It can only change its own password or two-factor settings, and cannot be deactivated, demoted or reset by anyone else.' });
+  return true;
+}
 
 /**
  * An admin may type the password themselves, or leave it blank and have one
@@ -70,6 +89,10 @@ router.post('/', async (req, res) => {
 // Set an employee's password: type one in `password`, or leave it out for a
 // generated one. Either way every session they had open is closed.
 router.post('/:id/reset-password', async (req, res) => {
+  const { rows: found } = await db.query(`select id, is_owner, email from internal_users where id = $1`, [req.params.id]);
+  if (!found[0]) return res.status(404).json({ error: 'User not found' });
+  if (await refuseIfOwner(found[0], res, 'reset the password of')) return;
+
   const chosen = resolvePassword(req.body);
   if (chosen.error) return res.status(400).json({ error: chosen.error });
   const { rows } = await db.query(
@@ -105,6 +128,7 @@ router.post('/:id/deactivate', async (req, res) => {
   const { rows: found } = await db.query(`select * from internal_users where id = $1`, [req.params.id]);
   if (!found[0]) return res.status(404).json({ error: 'User not found' });
   if (req.user && req.user.id === req.params.id) return res.status(400).json({ error: 'You cannot deactivate your own account.' });
+  if (await refuseIfOwner(found[0], res, 'deactivate')) return;
   if (found[0].role === 'admin' && (await activeAdminCount(req.params.id)) === 0) {
     return res.status(409).json({ error: 'This is the last active admin. Promote someone else first.' });
   }
@@ -124,6 +148,7 @@ router.post('/:id/role', async (req, res) => {
   if (!['admin', 'staff'].includes(role)) return res.status(400).json({ error: 'Role must be admin or staff.' });
   const { rows: found } = await db.query(`select * from internal_users where id = $1`, [req.params.id]);
   if (!found[0]) return res.status(404).json({ error: 'User not found' });
+  if (await refuseIfOwner(found[0], res, 'change the role of')) return;
   if (found[0].role === 'admin' && role !== 'admin' && (await activeAdminCount(req.params.id)) === 0) {
     return res.status(409).json({ error: 'This is the last active admin. Promote someone else first.' });
   }

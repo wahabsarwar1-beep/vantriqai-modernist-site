@@ -1478,3 +1478,39 @@ alter table products add column if not exists extra_agent_price numeric not null
 alter table invoice_lines drop constraint if exists invoice_lines_kind_check;
 alter table invoice_lines add constraint invoice_lines_kind_check
   check (kind in ('retainer','setup','bundle','bundle_setup','overage','addon','discount','extra_agents','other'));
+
+-- =====================================================================
+-- v9.11 — an owner account nothing else in the system can touch
+--
+-- Every admin so far has been equally an admin: any one of them can
+-- deactivate, demote or reset the password of any other, including the
+-- last one standing being the only thing team.js already protects. That
+-- is enough to stop an accident. It is not enough to stop a hijack — an
+-- attacker who gets admin access can promote a second account, then use
+-- it to lock out a SPECIFIC admin (the real owner) while leaving the
+-- "last admin" rule satisfied by the account they just created.
+--
+-- is_owner marks the one row nobody else — not another admin, not a
+-- compromised admin session — can touch. See routes/team.js for the
+-- guard; this index is what makes it true even if that guard were ever
+-- bypassed: Postgres itself refuses a second row with is_owner set.
+alter table internal_users add column if not exists is_owner boolean not null default false;
+create unique index if not exists idx_internal_users_one_owner
+  on internal_users (is_owner) where is_owner;
+
+-- A second factor that does not depend on the same inbox a password
+-- reset would also use. Email OTP protects every other account; the
+-- owner account additionally supports an authenticator app (TOTP,
+-- RFC 6238), so a compromised mailbox alone cannot complete a sign-in
+-- to this one account. Available to any user who sets it up — the
+-- owner is the one for whom must_setup_totp starts true.
+alter table internal_users add column if not exists totp_secret text;
+alter table internal_users add column if not exists totp_enabled boolean not null default false;
+alter table internal_users add column if not exists must_setup_totp boolean not null default false;
+
+-- A totp challenge has no emailed code to hash, so code_hash must be
+-- nullable; method says which kind a given row is and how /auth/verify
+-- should check it.
+alter table login_challenges alter column code_hash drop not null;
+alter table login_challenges add column if not exists method text not null default 'email'
+  check (method in ('email','totp'));

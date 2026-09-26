@@ -1785,21 +1785,28 @@ function renderTeam(){
     <table>
       <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last signed in</th><th></th></tr></thead>
       <tbody>
-      ${teamUsers.map(u=>`
+      ${teamUsers.map(u=>{
+        const isSelf = authUser && authUser.id===u.id;
+        return `
         <tr style="${u.active?'':'opacity:.55;'}">
-          <td><strong>${esc(u.name)}</strong>${u.must_change_password?' <span class="pill pill-pending" style="margin-left:6px;">must change password</span>':''}</td>
+          <td><strong>${esc(u.name)}</strong>${u.is_owner?' <span class="pill pill-active" style="margin-left:6px;background:var(--ink,#16151a);color:#fff;">owner</span>':''}${u.must_change_password?' <span class="pill pill-pending" style="margin-left:6px;">must change password</span>':''}${u.is_owner&&u.must_setup_totp?' <span class="pill pill-pending" style="margin-left:6px;">must set up two-factor</span>':''}</td>
           <td class="mono" style="font-size:12px;">${esc(u.email)}</td>
           <td><span class="tag">${u.role==='admin'?'Admin':'Staff'}</span></td>
           <td>${u.active?'<span class="pill pill-active"><span class="pill-dot"></span>Active</span>':'<span class="pill pill-pending"><span class="pill-dot"></span>Deactivated</span>'}</td>
           <td>${u.last_login_at?fmtDate(u.last_login_at):'—'}</td>
           <td style="white-space:nowrap;">
+            ${isSelf ? (u.totp_enabled
+              ? `<button class="btn btn-ghost btn-sm" onclick="disableTotp()">Two-factor: on (turn off)</button>`
+              : `<button class="btn btn-ghost btn-sm" onclick="openTotpSetup()">Set up two-factor</button>`) : ''}
+            ${u.is_owner ? `<span class="footnote" style="font-size:11px;">Protected — only this account can change its own password or role.</span>` : `
             <button class="btn btn-ghost btn-sm" onclick="resetUserPassword('${u.id}')">Reset password</button>
             <button class="btn btn-ghost btn-sm" onclick="setUserRole('${u.id}','${u.role==='admin'?'staff':'admin'}')">Make ${u.role==='admin'?'staff':'admin'}</button>
             ${u.active
               ? `<button class="btn btn-danger-ghost btn-sm" onclick="setUserActive('${u.id}',false)">Deactivate</button>`
               : `<button class="btn btn-ghost btn-sm" onclick="setUserActive('${u.id}',true)">Reactivate</button>`}
+            `}
           </td>
-        </tr>`).join('')}
+        </tr>`;}).join('')}
       </tbody>
     </table>
   </div>`;
@@ -1858,6 +1865,72 @@ async function setUserActive(id, active){
   if(!active && !confirm('Deactivate this employee?\n\nThey are signed out immediately and cannot sign back in.')) return;
   try{ await API.post(`/api/team/${id}/${active?'activate':'deactivate'}`, {}); teamUsers=null; render(); showToast(active?'Reactivated':'Deactivated'); }
   catch(e){ showToast(e.message||'Could not update the account','warn'); }
+}
+
+/* ====================== TWO-FACTOR (authenticator app) — self-service only ====================== */
+// Every account can add this to itself; nothing here ever acts on anyone
+// else's account, matching what the API actually allows.
+let totpSetup = null;   // { secret, otpauth_url } once /totp/setup has answered
+
+function openTotpSetup(){
+  totpSetup = null; openModal = {type:'totpSetup'}; render();
+  API.post('/api/auth/totp/setup', {}).then(r=>{ totpSetup = r; if(openModal&&openModal.type==='totpSetup') render(); })
+    .catch(e=>{ showToast(e.message||'Could not start two-factor setup','warn'); closeModal(); });
+}
+
+function totpSetupModalHTML(){
+  if(!totpSetup){
+    return `<div class="modal"><div class="modal-head"><h3>Two-factor sign-in</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
+      <div class="modal-body"><div class="empty"><span class="loading-dot"></span> Generating a secret…</div></div></div>`;
+  }
+  return `
+  <div class="modal">
+    <div class="modal-head"><h3>Two-factor sign-in</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
+    <div class="modal-body">
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;line-height:1.6;">
+        Add this to an authenticator app (Google Authenticator, Authy, 1Password, ...). Once confirmed,
+        signing in asks for the 6-digit code the app shows instead of emailing you one — so a compromised
+        inbox alone can no longer be enough to sign in as you.
+      </p>
+      <div class="field"><label>Secret (enter manually — most apps also accept the URL below as a QR alternative)</label>
+        <input readonly class="mono" style="font-size:14px;letter-spacing:1px;" value="${esc(totpSetup.secret)}" onclick="this.select()"></div>
+      <div class="field"><label>Setup URL</label>
+        <input readonly class="mono" style="font-size:11px;" value="${esc(totpSetup.otpauth_url)}" onclick="this.select()"></div>
+      <div class="field"><label>6-digit code from the app</label>
+        <input id="totp_confirm_code" inputmode="numeric" maxlength="6"
+               style="letter-spacing:6px;font-size:19px;font-family:var(--f-mono);text-align:center;"
+               onkeydown="if(event.key==='Enter')confirmTotpSetup()"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmTotpSetup()">${iconCheck(14)} Confirm and turn on</button>
+    </div>
+  </div>`;
+}
+
+async function confirmTotpSetup(){
+  const code = ((document.getElementById('totp_confirm_code')||{}).value||'').trim();
+  if(!/^\d{6}$/.test(code)){ showToast('Enter the 6-digit code your app is showing','warn'); return; }
+  try{
+    await API.post('/api/auth/totp/confirm', { code });
+    closeModal();
+    const me = await fetch(API.base+'/api/auth/me',{headers:{'Authorization':'Bearer '+API.session}});
+    if(me.ok) authUser = await me.json();
+    teamUsers = null; render();
+    showToast('Two-factor is on. Email codes will no longer be used for this account.');
+  }catch(e){ showToast(e.message||'That code was not accepted','warn'); }
+}
+
+async function disableTotp(){
+  const password = (prompt('Enter your current password to turn two-factor off:') || '');
+  if(!password) return;
+  try{
+    await API.post('/api/auth/totp/disable', { password });
+    const me = await fetch(API.base+'/api/auth/me',{headers:{'Authorization':'Bearer '+API.session}});
+    if(me.ok) authUser = await me.json();
+    teamUsers = null; render();
+    showToast('Two-factor is off. Email codes will be used again.');
+  }catch(e){ showToast(e.message||'Could not turn it off','warn'); }
 }
 
 /* ====================== PACKAGE REQUESTS (from the portal) ====================== */
@@ -5035,6 +5108,7 @@ function renderModal(){
   else if(openModal.type==='contract') html = contractModalHTML();
   else if(openModal.type==='clientDoc') html = clientDocModalHTML();
   else if(openModal.type==='identity') html = identityModalHTML();
+  else if(openModal.type==='totpSetup') html = totpSetupModalHTML();
   root.innerHTML = `<div class="modal-overlay" onmousedown="if(event.target===this){openModal=null;render();}">${html}</div>`;
   if(openModal.type==='invoice') requestAnimationFrame(prefillInvoiceAmount);
   if(openModal.type==='bundle') requestAnimationFrame(bundleProductChanged);
@@ -6798,8 +6872,9 @@ function renderConnectScreen(){
     return;
   }
   if(loginStep === 'otp'){
+    const isTotp = loginChallenge && loginChallenge.method === 'totp';
     app.innerHTML = shell(`
-      <h3 style="margin:0 0 4px;font-size:15px;">Check your email</h3>
+      <h3 style="margin:0 0 4px;font-size:15px;">${isTotp ? 'Your authenticator app' : 'Check your email'}</h3>
       <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">${esc((loginChallenge&&loginChallenge.message)||'We sent you a 6-digit code.')}</p>
       <div class="field"><label>6-digit code</label>
         <input id="otp_code" inputmode="numeric" autocomplete="one-time-code" maxlength="6"
@@ -6863,7 +6938,7 @@ async function submitPassword(){
 async function submitOtp(){
   if(loginBusy) return;
   const code = (document.getElementById('otp_code')||{}).value || '';
-  if(!code.trim()){ connectError='Enter the code from your email.'; renderConnectScreen(); return; }
+  if(!code.trim()){ connectError = (loginChallenge&&loginChallenge.method==='totp') ? 'Enter the code from your authenticator app.' : 'Enter the code from your email.'; renderConnectScreen(); return; }
   loginBusy = true;
   try{
     const res = await fetch((API.base||window.location.origin)+'/api/auth/verify', {

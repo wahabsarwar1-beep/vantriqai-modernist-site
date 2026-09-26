@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const db = require('../db');
+const { alertOwner } = require('../utils/securityAlerts');
 
 function hashKey(plaintextKey) {
   return crypto.createHash('sha256').update(plaintextKey).digest('hex');
@@ -69,7 +70,7 @@ function requireScope(minScope) {
         return res.status(401).json({ error: 'Please sign in.' });
       }
       const { rows } = await db.query(
-        `select id, scope, revoked from api_keys where key_hash = $1 limit 1`,
+        `select id, name, scope, revoked, last_used_at from api_keys where key_hash = $1 limit 1`,
         [hashKey(provided)]
       );
       const key = rows[0];
@@ -82,6 +83,29 @@ function requireScope(minScope) {
       }
       if (ROLE_RANK[key.scope] < ROLE_RANK[minScope]) {
         return res.status(403).json({ error: `This endpoint requires ${minScope} access` });
+      }
+
+      // The admin key opens everything with no attribution — whoever holds
+      // it IS an admin. That's exactly what "break-glass" means, and exactly
+      // why every use of it gets emailed to the owner immediately: a
+      // legitimate emergency and a leaked key both need to be seen the
+      // moment they happen, not discovered later in last_used_at. Throttled
+      // to once an hour per key so a burst of automated calls through it
+      // sends one email, not one per request.
+      if (key.scope === 'admin') {
+        const staleMs = 60 * 60 * 1000;
+        if (!key.last_used_at || Date.now() - new Date(key.last_used_at).getTime() > staleMs) {
+          alertOwner(
+            'The break-glass admin API key was just used',
+            [
+              `Key: ${key.name}`,
+              `Path: ${req.method} ${req.originalUrl}`,
+              `Time: ${new Date().toISOString()}`,
+              '',
+              'If this was not you or an emergency you arranged, rotate this key now and check what it was used for.',
+            ]
+          );
+        }
       }
 
       db.query(`update api_keys set last_used_at = now() where id = $1`, [key.id]).catch(() => {});
