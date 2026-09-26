@@ -734,3 +734,17 @@ span[data-chev] { display: inline-block; transition: transform .2s ease; }
 /* A card whose title is its link: the link's box stretches over the whole
    card so any tap on it lands, while the accessible name stays the title. */
 .card-link::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+
+/* The hover bridge. The mega panel hangs from the bottom of the whole bar,
+   so between the word and the panel there is a strip of bar that belongs to
+   neither — cross it and the menu closed. While a panel is open, the trigger
+   grows an invisible tail down over that strip; it is part of the trigger,
+   so the pointer never leaves the menu on its way down. It runs the full
+   width of the screen, because a cursor heading for the far corner of a
+   1120px panel crosses empty bar well to the side of the word; it starts
+   below the row of words, not over them, so it cannot block moving along
+   the bar. html clips overflow-x, so the overhang never scrolls. */
+.mega-trigger { position: relative; }
+.mega-trigger[aria-expanded="true"]::after {
+  content: ""; position: absolute; top: 100%; left: -100vw; right: -100vw; height: 56px;
+}

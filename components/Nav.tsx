@@ -123,6 +123,7 @@ export default function Nav() {
                 active={isCurrent}
                 currentSection={currentSection}
                 open={panel === link.label}
+                switching={panel !== null && panel !== link.label}
                 onOpen={() => setPanel(link.label)}
                 onClose={() => setPanel((cur) => (cur === link.label ? null : cur))}
               />

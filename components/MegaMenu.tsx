@@ -48,6 +48,7 @@ export default function MegaMenu({
   onOpen,
   onClose,
   active,
+  switching,
   currentSection,
 }: {
   panel: MenuPanel;
@@ -55,6 +56,8 @@ export default function MegaMenu({
   onOpen: () => void;
   onClose: () => void;
   active: boolean;
+  /** Another panel is open: hovering this one should switch only on intent. */
+  switching: boolean;
   /** The anchored section the reader is on, so the panel can mark it. */
   currentSection: string | null;
 }) {
@@ -63,6 +66,30 @@ export default function MegaMenu({
   const triggerRef = useRef<HTMLAnchorElement>(null);
   const hoverable = useHoverable();
   const pathname = usePathname();
+  /* A short grace period before closing on mouse-out: the panel sits below
+     the whole bar, not flush under the word, and a cursor heading for it
+     diagonally clips the edge of the trigger on the way. */
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelClose = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = null;
+  };
+  /* Opening is instant, switching is not. With one panel already open, a
+     cursor travelling diagonally to the far side of it passes over the next
+     words along the bar; switching only after a short rest stops those from
+     snatching the menu away mid-reach. */
+  const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelOpen = () => {
+    if (openTimer.current) clearTimeout(openTimer.current);
+    openTimer.current = null;
+  };
+  useEffect(
+    () => () => {
+      cancelClose();
+      cancelOpen();
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -86,8 +113,25 @@ export default function MegaMenu({
     <div
       ref={wrapRef}
       style={{ display: "flex", alignItems: "center" }}
-      onMouseEnter={hoverable ? onOpen : undefined}
-      onMouseLeave={hoverable ? onClose : undefined}
+      onMouseEnter={
+        hoverable
+          ? () => {
+              cancelClose();
+              cancelOpen();
+              if (switching) openTimer.current = setTimeout(onOpen, 150);
+              else onOpen();
+            }
+          : undefined
+      }
+      onMouseLeave={
+        hoverable
+          ? () => {
+              cancelClose();
+              cancelOpen();
+              closeTimer.current = setTimeout(onClose, 180);
+            }
+          : undefined
+      }
       onFocus={onOpen}
       onBlur={(e) => {
         if (!wrapRef.current?.contains(e.relatedTarget as Node)) onClose();
@@ -97,6 +141,7 @@ export default function MegaMenu({
         ref={triggerRef}
         href={panel.href}
         data-navlink=""
+        className="mega-trigger"
         aria-expanded={open}
         aria-controls={id}
         onClick={(e) => {
