@@ -1,5 +1,6 @@
 export type MarkId =
   | "whatsapp"
+  | "voice"
   | "social"
   | "website"
   | "booking"
@@ -16,6 +17,7 @@ export type MarkId =
 /** Channels sit on an accent field; capabilities and deployment sit on ink. */
 const FIELD_BG: Record<MarkId, string> = {
   whatsapp: "var(--color-accent)",
+  voice: "var(--color-accent)",
   social: "var(--color-accent)",
   website: "var(--color-accent)",
   booking: "var(--color-text)",
@@ -37,6 +39,14 @@ function MarkGlyph({ id }: { id: MarkId }) {
         <>
           <path d="M6 6h36v24H22l-9 9v-9H6z" fill="var(--color-bg)" />
           <rect x="13" y="14" width="9" height="9" fill="var(--color-text)" />
+        </>
+      );
+    case "voice":
+      return (
+        <>
+          <rect x="18" y="5" width="12" height="22" rx="6" fill="var(--color-bg)" />
+          <path d="M13 23a11 11 0 0022 0" stroke="var(--color-bg)" strokeWidth="4" fill="none" strokeLinecap="round" />
+          <rect x="21" y="36" width="6" height="7" fill="var(--color-bg)" />
         </>
       );
     case "social":
@@ -142,23 +152,29 @@ function MarkGlyph({ id }: { id: MarkId }) {
   }
 }
 
-/** One of the thirteen product marks: a 76x76 rounded field with a 44px filled-SVG glyph. */
-export default function ProductMark({ id }: { id: MarkId }) {
+/**
+ * One of the thirteen product marks: a rounded field with a filled-SVG glyph.
+ *
+ * `size` exists for the navigation menu, which wants the same mark at a third
+ * of the size and without the card's bottom margin.
+ */
+export default function ProductMark({ id, size = 76 }: { id: MarkId; size?: number }) {
+  const small = size < 48;
   return (
     <span
-      className="product-mark"
+      className={small ? undefined : "product-mark"}
       style={{
         display: "grid",
         placeItems: "center",
-        width: 76,
-        height: 76,
+        width: size,
+        height: size,
         flex: "none",
         background: FIELD_BG[id],
-        borderRadius: 24,
-        marginBottom: 24,
+        borderRadius: Math.round(size * 0.32),
+        marginBottom: small ? 0 : 24,
       }}
     >
-      <svg data-icon="" width="44" height="44" viewBox="0 0 48 48" aria-hidden="true" style={{ display: "block" }}>
+      <svg data-icon="" width={Math.round(size * 0.58)} height={Math.round(size * 0.58)} viewBox="0 0 48 48" aria-hidden="true" style={{ display: "block" }}>
         <MarkGlyph id={id} />
       </svg>
     </span>

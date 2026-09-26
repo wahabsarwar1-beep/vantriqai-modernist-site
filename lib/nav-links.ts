@@ -5,9 +5,10 @@
  * duplicate content the canonical tags work to avoid.
  */
 export const NAV_LINKS = [
-  { href: "/", label: "Home" },
-  { href: "/how-it-works", label: "How it works" },
-  { href: "/products", label: "Products" },
+  /* Home is the wordmark, and How it works opens the Platform panel — both
+     were costing width in a bar that has wrapped three times, and neither
+     needed a slot of its own. */
+  { href: "/products", label: "Platform" },
   { href: "/industries", label: "Industries" },
   { href: "/pricing", label: "Packages" },
   { href: "/resources", label: "Resources", regionless: true },

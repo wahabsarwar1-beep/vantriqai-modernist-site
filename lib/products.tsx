@@ -20,8 +20,6 @@ export type Product = {
   icon?: ReactNode;
 };
 
-const bg = "var(--color-bg)";
-
 /* A function of the region: the WhatsApp module names the languages it
    answers in, and that claim is not the same one abroad. */
 export const products = (region: Region): Product[] => [
@@ -38,9 +36,8 @@ export const products = (region: Region): Product[] => [
     body: "The embedded assistant on your own site — the widget in the corner of this page. Same brain, same actions, no app to download.",
   },
   {
-    kicker: "Channel", name: "Voice Agent", tier: "From Growth", tint: "accent",
+    kicker: "Channel", name: "Voice Agent", tier: "From Growth", tint: "accent", mark: "voice",
     body: "Answers your business phone in a natural voice, handles the same reception and booking as the chat agent, and hands off cleanly when a call needs a person.",
-    icon: (<svg width="44" height="44" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 6c-5 0-9 4-9 9v9c0 5 4 9 9 9s9-4 9-9v-9c0-5-4-9-9-9z" fill={bg} /><path d="M14 24c0 6 4.5 10.6 10 11s10-5 10-11" stroke={bg} strokeWidth={4} fill="none" /><rect x="17" y="41" width="14" height="4" fill={bg} /></svg>),
   },
   {
     kicker: "Capability", name: "Booking Agent", tier: "Add-on module", tint: "dark", mark: "booking",
