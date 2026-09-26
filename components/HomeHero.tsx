@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Magnetic from "@/components/Magnetic";
 import Marquee from "@/components/Marquee";
+import VantriqMark from "@/components/VantriqMark";
 import { waLink } from "@/lib/whatsapp";
 import { hrefIn, type Region } from "@/lib/region";
 
@@ -202,9 +203,7 @@ export default function HomeHero({ region }: { region: Region }) {
               <span className="hh-core-ring hh-core-ring-2" />
               <span className="hh-core-spin" />
               <span className="hh-core-orb">
-                <svg width="30" height="30" viewBox="0 0 24 24" fill="#fff">
-                  <path d="M12 2.5l1.9 5.6 5.6 1.9-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.9zM18.5 15l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9z" />
-                </svg>
+                <VantriqMark size={40} frame="#ffffff" notch="#141a52" className="hh-core-mark" />
               </span>
             </div>
           </div>
