@@ -5,12 +5,7 @@ import { regionMetadata } from "@/lib/seo";
 
 const region = REGIONS.pk;
 
-export const metadata: Metadata = regionMetadata(
-  region,
-  "/contact",
-  "Contact — VantriqAI",
-  "Message us on WhatsApp and watch the agent answer, or send a brief and we will come back with a fixed quote.",
-);
+export const metadata: Metadata = regionMetadata(region, "/contact");
 
 export default function Page() {
   return <ContactPage region={region} />;

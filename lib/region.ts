@@ -68,7 +68,15 @@ export const REGIONS: Record<RegionKey, Region> = {
 
 export const DEFAULT_REGION = REGIONS.pk;
 
-export const SITE_URL = "https://vantriqai.com";
+/**
+ * The host the site is actually served from, and therefore the only host
+ * canonicals, hreflang and the sitemap may name. The live site runs on www,
+ * so pointing canonicals at the apex would point them at a redirect.
+ *
+ * If that ever flips, this is the one line to change — and the other host
+ * must 301 to this one, or the two are duplicates of each other.
+ */
+export const SITE_URL = "https://www.vantriqai.com";
 
 /** The paths each region publishes, in nav order. */
 export const REGION_PATHS = ["/", "/how-it-works", "/products", "/industries", "/pricing", "/contact"] as const;

@@ -16,7 +16,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     REGION_PATHS.map((path) => ({
       url: SITE_URL + hrefIn(region, path),
       lastModified,
-      changeFrequency: "monthly" as const,
+      changeFrequency: path === "/" ? ("weekly" as const) : ("monthly" as const),
       priority: path === "/" ? 1 : 0.8,
       alternates: {
         languages: {

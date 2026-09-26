@@ -5,12 +5,7 @@ import { regionMetadata } from "@/lib/seo";
 
 const region = REGIONS.pk;
 
-export const metadata: Metadata = regionMetadata(
-  region,
-  "/",
-  "VantriqAI — Where Business Meets Intelligence",
-  "AI agents that reply, qualify and book on WhatsApp, Instagram and your website — 24 hours a day, in seconds, at any volume.",
-);
+export const metadata: Metadata = regionMetadata(region, "/");
 
 export default function Page() {
   return <HomePage region={region} />;

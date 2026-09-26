@@ -5,12 +5,7 @@ import { regionMetadata } from "@/lib/seo";
 
 const region = REGIONS.pk;
 
-export const metadata: Metadata = regionMetadata(
-  region,
-  "/products",
-  "Products — VantriqAI",
-  "Three channels, eight capabilities, two ways to deploy. Start with one module and add as volume grows.",
-);
+export const metadata: Metadata = regionMetadata(region, "/products");
 
 export default function Page() {
   return <ProductsPage region={region} />;
