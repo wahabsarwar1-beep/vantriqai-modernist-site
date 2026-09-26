@@ -3,6 +3,7 @@ import { hrefIn, REGIONS, REGION_PATHS, SITE_URL } from "@/lib/region";
 import { RESOURCES } from "@/lib/resources";
 import { INDUSTRY_SLUGS } from "@/lib/industries";
 import { MODULE_SLUGS } from "@/lib/modules";
+import { PACKAGE_SLUGS } from "@/lib/packages";
 
 /**
  * Both regions, with each entry naming its counterpart.
@@ -49,6 +50,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...REGION_PATHS,
     ...INDUSTRY_SLUGS.map((slug) => `/industries/${slug}`),
     ...MODULE_SLUGS(REGIONS.pk).map((slug) => `/products/${slug}`),
+    ...PACKAGE_SLUGS().map((slug) => `/pricing/${slug}`),
   ];
 
   const regions = Object.values(REGIONS).flatMap((region) =>
@@ -59,7 +61,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       // The Pakistan tree is the default one, so its home page is the single
       // highest-priority URL; the global home sits just under it rather than
       // tying with it.
-      priority: path === "/" ? (region.key === "pk" ? 1 : 0.9) : path.startsWith("/industries/") || path.startsWith("/products/") ? 0.7 : 0.8,
+      priority: path === "/" ? (region.key === "pk" ? 1 : 0.9) : path.startsWith("/industries/") || path.startsWith("/products/") || path.startsWith("/pricing/") ? 0.7 : 0.8,
       alternates: {
         languages: {
           "en-PK": SITE_URL + hrefIn(REGIONS.pk, path),

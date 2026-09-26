@@ -112,6 +112,16 @@ export function moduleMetadata(region: Region, slug: string, name: string, descr
   });
 }
 
+/** A package page, from lib/packages. */
+export function packageMetadata(region: Region, slug: string, name: string, audience: string, lede: string): Metadata {
+  const currency = region.key === "global" ? "US$" : "PKR";
+  return pageMetadata(region, `/pricing/${slug}`, {
+    title: `${name} AI Agent Package · ${audience}`,
+    globalTitle: `${name} AI Agent Package (${currency}) · ${audience}`,
+    description: `${lede} Quoted in ${currency} after a discovery call.`,
+  });
+}
+
 function pageMetadata(region: Region, path: string, page: PageSeo): Metadata {
 
   const isGlobal = region.key === "global";

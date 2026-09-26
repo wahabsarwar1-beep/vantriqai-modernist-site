@@ -135,7 +135,7 @@ export function menuPanels(region: Region): MenuPanel[] {
           title: "Tiers",
           icon: "tiers",
           links: TIERS.map((t) => ({
-            href: `${hrefIn(region, "/pricing")}#${productSlug(t.name)}`,
+            href: hrefIn(region, `/pricing/${productSlug(t.name)}`),
             label: t.name,
             note: t.audience,
           })),
@@ -144,7 +144,8 @@ export function menuPanels(region: Region): MenuPanel[] {
           title: "Before you buy",
           icon: "guides",
           links: [
-            { href: `${hrefIn(region, "/pricing")}#what-each-tier-carries`, label: "What each tier carries", note: "Sessions, headroom, overage" },
+            { href: `${hrefIn(region, "/pricing")}#find`, label: "Find your package", note: "Volume, channels, needs" },
+            { href: `${hrefIn(region, "/pricing")}#compare`, label: "Compare every package", note: "Modules, features, capacity" },
             { href: `${hrefIn(region, "/pricing")}#questions`, label: "Common questions", note: "Seven, answered plainly" },
           ],
         },

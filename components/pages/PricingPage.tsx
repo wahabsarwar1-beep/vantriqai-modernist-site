@@ -6,17 +6,40 @@ import LineReveal from "@/components/LineReveal";
 import Kicker from "@/components/Kicker";
 import PosterCTA from "@/components/PosterCTA";
 import Counter from "@/components/Counter";
-import Magnetic from "@/components/Magnetic";
 import Link from "next/link";
 import GlowGrid from "@/components/GlowGrid";
-import { TIERS, USAGE, FAQS } from "@/lib/content";
-import { productSlug } from "@/lib/products";
+import PackageFinder from "@/components/PackageFinder";
+import PackageCompare from "@/components/PackageCompare";
+import { modulesFor, packages } from "@/lib/packages";
+import { products } from "@/lib/products";
+import { FAQS } from "@/lib/content";
 import { hrefIn, type Region } from "@/lib/region";
 
 const bodyMuted = { color: "color-mix(in srgb, var(--color-text) 78%, transparent)" };
 const mutedLabel = { color: "color-mix(in srgb, var(--color-text) 62%, transparent)" };
 
 export default function PricingPage({ region }: { region: Region }) {
+  const pkgs = packages();
+  // What a package brings over the one below it. Starter's own lines already
+  // describe its one module, so it lists those alone.
+  const highlightsOf = (index: number) => {
+    const p = pkgs[index];
+    return (index === 0 ? p.adds : [...p.adds, ...modulesFor(region, index).newHere.map((x) => x.name)]).slice(0, 4);
+  };
+  const tierOf = (name: string) => pkgs.findIndex((p) => products(region).find((x) => x.name === name)?.tier === `From ${p.name}`);
+  const channelOptions = [
+    { key: "whatsapp", label: "WhatsApp", from: Math.max(0, tierOf("WhatsApp Agent")) },
+    { key: "social", label: "Instagram & Facebook", from: Math.max(0, tierOf("Social Agent")) },
+    { key: "voice", label: "Phone calls", from: Math.max(0, tierOf("Voice Agent")) },
+    { key: "website", label: "Our website", from: Math.max(0, tierOf("Website Agent")) },
+  ];
+  const needOptions = [
+    { key: "crm", label: "Leads synced to our CRM", from: 1 },
+    { key: "locations", label: "More than one location", from: 2 },
+    { key: "models", label: "Complex, detailed questions", from: 3 },
+    { key: "onprem", label: "Data must stay on our servers", from: 4 },
+    { key: "sla", label: "Custom SLA or integrations", from: 5 },
+  ];
   return (
     <>
       <JsonLd schema={breadcrumbSchema(region, "/pricing", "Pricing")} />
@@ -49,73 +72,106 @@ export default function PricingPage({ region }: { region: Region }) {
         }
       />
 
+      {/* ---------- The six packages ---------- */}
       <section style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(56px,7vw,96px) clamp(20px,5vw,64px) 0" }}>
         <GlowGrid className="tier-grid">
-          {TIERS.map((t, i) => {
-            const featured = t.tier.includes("Recommended");
+          {pkgs.map((p) => {
+            const highlights = highlightsOf(p.index);
             return (
-              <div key={t.name} id={productSlug(t.name)} data-anim="" className={`glow tier-card anchor-target${featured ? " tier-card-featured" : ""}`}>
+              <div key={p.slug} id={p.slug} data-anim="" className={`glow tier-card anchor-target${p.recommended ? " tier-card-featured" : ""}`}>
                 <div className="tier-top">
-                  <span className="tier-n">{String(i + 1).padStart(2, "0")}</span>
-                  {featured ? <span className="tier-badge">Recommended</span> : null}
+                  <span className="tier-n">{String(p.index + 1).padStart(2, "0")}</span>
+                  {p.recommended ? <span className="tier-badge">Recommended</span> : null}
                 </div>
-                <h2 className="tier-name">{t.name}</h2>
-                <p className="tier-audience">{t.audience}</p>
-                {/* Six bars, this tier's filled: where it sits on the path. */}
+                <h2 className="tier-name">
+                  <Link href={hrefIn(region, `/pricing/${p.slug}`)} className="card-link" style={{ color: "inherit" }}>
+                    {p.name}
+                  </Link>
+                </h2>
+                <p className="tier-audience">{p.audience}</p>
                 <span aria-hidden="true" className="tier-meter">
-                  {TIERS.map((_, j) => (
-                    <i key={j} data-on={j <= i ? "" : undefined} />
+                  {pkgs.map((_, j) => (
+                    <i key={j} data-on={j <= p.index ? "" : undefined} />
                   ))}
                 </span>
-                <p className="tier-body">{t.body}</p>
-                <Magnetic>
-                  <Link className={`btn ${featured ? "hh-btn-primary" : "btn-secondary"} tier-cta`} href={hrefIn(region, "/contact")}>
-                    Request a quote <span aria-hidden="true">→</span>
-                  </Link>
-                </Magnetic>
+                <p className="tier-body">{p.line}</p>
+                <p className="tier-inc-k">{p.index === 0 ? "Includes" : `Everything in ${pkgs[p.index - 1].name}, plus`}</p>
+                <ul className="tier-inc">
+                  {highlights.map((h) => (
+                    <li key={h}>{h}</li>
+                  ))}
+                </ul>
+                <dl className="tier-cap">
+                  <div>
+                    <dt>Sized for</dt>
+                    <dd>{p.usage.typical}</dd>
+                  </div>
+                  <div>
+                    <dt>Included</dt>
+                    <dd>{p.usage.sessions} sessions</dd>
+                  </div>
+                </dl>
+                <span className="tier-view">
+                  View {p.name} <span aria-hidden="true">→</span>
+                </span>
               </div>
             );
           })}
         </GlowGrid>
       </section>
 
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" }}>
-        <section style={{ padding: "clamp(34px,4.4vw,58px) 0 0" }}>
-          <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 22 }}>
-            <span id="what-each-tier-carries" className="anchor-target" />
-            <Kicker label="What each tier carries" marginBottom="0" />
-            <div style={{ marginTop: 20 }}>
-              <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px", maxWidth: "24ch" }}>The same table your quote is built from</h2>
-              <p data-anim="" style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 36px", maxWidth: "54ch", ...bodyMuted }}>Every plan carries several times the sessions a business its size normally uses, so ordinary months never touch the overage rate. Your quote confirms the tier against your real message history.</p>
-              <p className="scroll-hint" aria-hidden="true">Swipe the table to see every column &rarr;</p>
-              <div data-anim="" style={{ overflowX: "auto" }}>
-                <table className="table" style={{ minWidth: 840, fontSize: 15 }}>
-                  <thead>
-                    <tr>
-                      <th style={{ fontSize: 12, letterSpacing: "0.1em", padding: "12px 10px" }}>Plan</th>
-                      <th style={{ fontSize: 12, letterSpacing: "0.1em", padding: "12px 10px" }}>Sized for</th>
-                      <th style={{ fontSize: 12, letterSpacing: "0.1em", padding: "12px 10px" }}>Sessions included</th>
-                      <th style={{ fontSize: 12, letterSpacing: "0.1em", padding: "12px 10px" }}>Sessions / day</th>
-                      <th style={{ fontSize: 12, letterSpacing: "0.1em", padding: "12px 10px" }}>Headroom</th>
-                      <th style={{ fontSize: 12, letterSpacing: "0.1em", padding: "12px 10px" }}>Overage</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {USAGE.map((r) => (
-                      <tr key={r.plan}>
-                        <td style={{ padding: "14px 10px", fontFamily: "var(--font-heading)", fontWeight: 800 }}>{r.plan}</td>
-                        <td style={{ padding: "14px 10px", whiteSpace: "nowrap", ...bodyMuted }}>{r.typical}</td>
-                        <td style={{ padding: "14px 10px", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: "var(--color-accent-700)", fontFamily: "var(--font-heading)", fontWeight: 800 }}>{r.sessions}</td>
-                        <td style={{ padding: "14px 10px", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", ...bodyMuted }}>{r.perday}</td>
-                        <td style={{ padding: "14px 10px", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", fontFamily: "var(--font-heading)", fontWeight: 800 }}>{r.head}</td>
-                        <td style={{ padding: "14px 10px", whiteSpace: "nowrap", ...bodyMuted }}>{r[region.overageKey]}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+      {/* ---------- Find your package ---------- */}
+      <section className="dark-band">
+        <div aria-hidden="true" className="dark-band-aurora" />
+        <div style={{ maxWidth: 1280, margin: "0 auto", position: "relative", padding: "clamp(56px,7vw,96px) clamp(20px,5vw,64px)" }}>
+          <span id="find" className="anchor-target" />
+          <div className="split-head">
+            <div>
+              <p data-anim="" className="eyebrow eyebrow-dark">
+                <span className="eyebrow-n">01</span>
+                Find your package
+              </p>
+              <h2 data-anim="" style={{ fontSize: "clamp(28px,3.6vw,48px)", lineHeight: 1, letterSpacing: "-0.035em", margin: 0, maxWidth: "15ch", color: "#fff" }}>
+                Three questions. <span className="grad-text-light">One clear answer.</span>
+              </h2>
             </div>
+            <p data-anim="" style={{ fontSize: 17, lineHeight: "29px", margin: 0, maxWidth: "44ch", color: "rgba(255,255,255,.66)" }}>
+              Tell us roughly how busy you are, where customers reach you and what else you need. The package is the one that carries all of it.
+            </p>
           </div>
+          <PackageFinder
+            packages={pkgs.map((p) => ({
+              slug: p.slug,
+              name: p.name,
+              audience: p.audience,
+              typical: p.usage.typical,
+              href: hrefIn(region, `/pricing/${p.slug}`),
+              previous: p.index > 0 ? pkgs[p.index - 1].name : undefined,
+              highlights: highlightsOf(p.index),
+            }))}
+            channels={channelOptions}
+            needs={needOptions}
+            contactHref={hrefIn(region, "/contact")}
+          />
+        </div>
+      </section>
+
+      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" }}>
+        {/* ---------- Compare ---------- */}
+        <section style={{ padding: "clamp(64px,8vw,112px) 0 0" }}>
+          <span id="compare" className="anchor-target" />
+          <span id="what-each-tier-carries" className="anchor-target" />
+          <p data-anim="" className="eyebrow">
+            <span className="eyebrow-n">02</span>
+            Compare every package
+          </p>
+          <h2 data-anim="" style={{ fontSize: "clamp(28px,3.6vw,48px)", lineHeight: 1, letterSpacing: "-0.035em", margin: "0 0 16px", maxWidth: "20ch" }}>
+            Every module, feature and allowance, <span className="grad-text">side by side.</span>
+          </h2>
+          <p data-anim="" style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 32px", maxWidth: "60ch", ...bodyMuted }}>
+            Every plan carries several times the sessions a business its size normally uses, so ordinary months never touch the overage rate. Your quote confirms the package against your real message history.
+          </p>
+          <PackageCompare region={region} />
         </section>
 
         <section style={{ padding: "clamp(34px,4.4vw,58px) 0 clamp(28px,3.4vw,44px)" }}>
