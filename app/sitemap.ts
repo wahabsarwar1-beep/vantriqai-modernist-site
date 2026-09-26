@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { hrefIn, REGIONS, REGION_PATHS, SITE_URL } from "@/lib/region";
+import { RESOURCES } from "@/lib/resources";
 
 /**
  * Both regions, with each entry naming its counterpart.
@@ -12,7 +13,20 @@ import { hrefIn, REGIONS, REGION_PATHS, SITE_URL } from "@/lib/region";
 export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date();
 
-  return Object.values(REGIONS).flatMap((region) =>
+  // The guides exist once, not once per region, so they carry no alternates —
+  // and lastModified is the article's own date, not the build's, so a crawler
+  // is not told every guide changed every time the site is deployed.
+  const resources: MetadataRoute.Sitemap = [
+    { url: `${SITE_URL}/resources`, lastModified, changeFrequency: "weekly" as const, priority: 0.7 },
+    ...RESOURCES.map((resource) => ({
+      url: `${SITE_URL}/resources/${resource.slug}`,
+      lastModified: new Date(resource.updated ?? resource.published),
+      changeFrequency: "yearly" as const,
+      priority: 0.6,
+    })),
+  ];
+
+  const regions = Object.values(REGIONS).flatMap((region) =>
     REGION_PATHS.map((path) => ({
       url: SITE_URL + hrefIn(region, path),
       lastModified,
@@ -26,4 +40,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       },
     })),
   );
+
+  return [...regions, ...resources];
 }

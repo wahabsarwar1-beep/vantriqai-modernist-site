@@ -7,7 +7,7 @@ import Logo from "@/components/Logo";
 import Magnetic from "@/components/Magnetic";
 import { NAV_LINKS } from "@/lib/nav-links";
 import RegionSwitch from "@/components/RegionSwitch";
-import { hrefIn, regionFromPathname } from "@/lib/region";
+import { hrefIn, navHref, regionFromPathname } from "@/lib/region";
 import { waLink } from "@/lib/whatsapp";
 
 export default function Nav() {
@@ -98,16 +98,16 @@ export default function Nav() {
         {NAV_LINKS.map((link) => (
           <Link
             key={link.href}
-            href={hrefIn(region, link.href)}
+            href={navHref(region, link)}
             data-navlink=""
-            aria-current={pathname === hrefIn(region, link.href) ? "page" : undefined}
+            aria-current={pathname === navHref(region, link) ? "page" : undefined}
             style={{
               fontFamily: "var(--font-heading)",
               fontWeight: 800,
               fontSize: 13,
               letterSpacing: "0.06em",
               textTransform: "uppercase",
-              color: pathname === hrefIn(region, link.href) ? "var(--color-accent)" : "var(--color-text)",
+              color: pathname === navHref(region, link) ? "var(--color-accent)" : "var(--color-text)",
               whiteSpace: "nowrap",
             }}
           >
@@ -139,9 +139,9 @@ export default function Nav() {
           {NAV_LINKS.map((link) => (
             <Link
               key={link.href}
-              href={hrefIn(region, link.href)}
-              aria-current={pathname === hrefIn(region, link.href) ? "page" : undefined}
-              style={pathname === hrefIn(region, link.href) ? { color: "var(--color-accent)" } : undefined}
+              href={navHref(region, link)}
+              aria-current={pathname === navHref(region, link) ? "page" : undefined}
+              style={pathname === navHref(region, link) ? { color: "var(--color-accent)" } : undefined}
             >
               {link.label}
             </Link>

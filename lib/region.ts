@@ -111,3 +111,8 @@ export function pathInRegion(pathname: string, region: Region): string {
   const bare = current.base ? pathname.slice(current.base.length) || "/" : pathname;
   return hrefIn(region, bare);
 }
+
+/** A nav entry's href: region-prefixed unless the page lives outside the trees. */
+export function navHref(region: Region, link: { href: string; regionless?: boolean }): string {
+  return link.regionless ? link.href : hrefIn(region, link.href);
+}

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import Wordmark from "@/components/Wordmark";
 import { NAV_LINKS } from "@/lib/nav-links";
 import RegionSwitch from "@/components/RegionSwitch";
-import { hrefIn, regionFromPathname } from "@/lib/region";
+import { navHref, regionFromPathname } from "@/lib/region";
 import { waLink, WHATSAPP_DISPLAY } from "@/lib/whatsapp";
 
 export default function Footer() {
@@ -39,7 +39,7 @@ export default function Footer() {
         </span>
         <span style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "center" }}>
           {NAV_LINKS.map((link) => (
-            <Link key={link.href} href={hrefIn(region, link.href)}>
+            <Link key={link.href} href={navHref(region, link)}>
               {link.label}
             </Link>
           ))}

@@ -135,3 +135,30 @@ export function regionMetadata(region: Region, path: string): Metadata {
     },
   };
 }
+
+/**
+ * Metadata for a page that exists once, not once per region.
+ *
+ * The guides are the same words whichever currency a reader came in on, so
+ * publishing them twice would manufacture the duplicate content the rest of
+ * this file works to avoid. One copy, one canonical, no hreflang pair —
+ * linked from both trees.
+ */
+export function resourceMetadata(path: string, title: string, description: string): Metadata {
+  const fullTitle = `${title} | ${SITE_NAME}`;
+  return {
+    title,
+    description,
+    alternates: { canonical: path },
+    openGraph: {
+      title: fullTitle,
+      description,
+      url: path,
+      siteName: SITE_NAME,
+      locale: "en",
+      type: "website",
+      images: [OG_IMAGE],
+    },
+    twitter: { card: "summary_large_image", title: fullTitle, description, images: [OG_IMAGE] },
+  };
+}

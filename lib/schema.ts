@@ -1,6 +1,7 @@
 import { hrefIn, SITE_URL, type Region } from "@/lib/region";
 import { DEFAULT_DESCRIPTION, SITE_NAME } from "@/lib/seo";
 import { FAQS, TIERS } from "@/lib/content";
+import { RESOURCES, type Resource } from "@/lib/resources";
 
 /**
  * schema.org graphs for the pages that have something concrete to declare.
@@ -40,10 +41,18 @@ export function websiteSchema() {
  * Home is always the first crumb, in whichever region the page belongs to, so
  * the US$ tree's breadcrumbs stay inside the US$ tree.
  */
-export function breadcrumbSchema(region: Region, path: string, label: string) {
+export function breadcrumbSchema(
+  region: Region,
+  path: string,
+  label: string,
+  parentLabel?: string,
+  parentPath?: string,
+) {
   const items = [
     { name: region.key === "global" ? "Home (US$)" : "Home", item: abs(region, "/") },
-    { name: label, item: abs(region, path) },
+    // An article sits under Resources, so the trail has to say so.
+    ...(parentLabel && parentPath ? [{ name: parentLabel, item: SITE_URL + parentPath }] : []),
+    { name: label, item: path.startsWith("/resources") ? SITE_URL + path : abs(region, path) },
   ];
 
   return {
@@ -114,3 +123,43 @@ export function faqSchema() {
 }
 
 export { ORG_ID };
+
+/**
+ * A guide, as an Article.
+ *
+ * Dated and attributed, because the thing that makes these worth publishing
+ * is that they are sourced — and the thing a reader most wants to know about
+ * an article full of benchmarks is how old it is.
+ */
+export function articleSchema(resource: Resource) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: resource.heading,
+    name: resource.title,
+    description: resource.description,
+    datePublished: resource.published,
+    dateModified: resource.updated ?? resource.published,
+    author: { "@id": ORG_ID },
+    publisher: { "@id": ORG_ID },
+    isPartOf: { "@id": SITE_ID },
+    inLanguage: "en",
+    mainEntityOfPage: { "@type": "WebPage", "@id": `${SITE_URL}/resources/${resource.slug}` },
+    url: `${SITE_URL}/resources/${resource.slug}`,
+  };
+}
+
+/** The index, so the collection is discoverable as a set and not six loose pages. */
+export function resourceListSchema() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: "VantriqAI resources",
+    itemListElement: RESOURCES.map((resource, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: resource.heading,
+      url: `${SITE_URL}/resources/${resource.slug}`,
+    })),
+  };
+}
