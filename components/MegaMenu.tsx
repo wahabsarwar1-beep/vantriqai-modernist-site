@@ -76,8 +76,8 @@ export default function MegaMenu({
   };
   /* Opening is instant, switching is not. With one panel already open, a
      cursor travelling diagonally to the far side of it passes over the next
-     words along the bar; switching only after a short rest stops those from
-     snatching the menu away mid-reach. */
+     words along the bar; switching only once the pointer comes to rest on one
+     (see onMouseMove) stops those from snatching the menu away mid-reach. */
   const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelOpen = () => {
     if (openTimer.current) clearTimeout(openTimer.current);
@@ -123,6 +123,18 @@ export default function MegaMenu({
             }
           : undefined
       }
+      onMouseMove={
+        hoverable && switching
+          ? () => {
+              /* Hover intent: while the pointer keeps moving across this
+                 item on its way somewhere else, the switch keeps being put
+                 off. It happens once the pointer rests here. */
+              if (!openTimer.current) return;
+              clearTimeout(openTimer.current);
+              openTimer.current = setTimeout(onOpen, 150);
+            }
+          : undefined
+      }
       onMouseLeave={
         hoverable
           ? () => {
@@ -141,7 +153,8 @@ export default function MegaMenu({
         ref={triggerRef}
         href={panel.href}
         data-navlink=""
-        className="mega-trigger"
+        className="mega-trigger bn-link"
+        data-active={active ? "" : undefined}
         aria-expanded={open}
         aria-controls={id}
         onClick={(e) => {
@@ -152,28 +165,16 @@ export default function MegaMenu({
             onOpen();
           }
         }}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 4,
-          fontFamily: "var(--font-heading)",
-          fontWeight: 800,
-          fontSize: 12.5,
-          letterSpacing: "0.04em",
-          textTransform: "uppercase",
-          whiteSpace: "nowrap",
-          color: active || open ? "var(--color-accent)" : "var(--color-text)",
-        }}
       >
         {panel.label}
-        <svg width="8" height="5" viewBox="0 0 10 6" aria-hidden="true" style={{ flex: "none", transform: open ? "rotate(180deg)" : "none", transition: "transform .2s ease" }}>
+        <svg width="9" height="6" viewBox="0 0 10 6" aria-hidden="true" className="bn-chev" style={{ transform: open ? "rotate(180deg)" : "none" }}>
           <path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
         </svg>
       </Link>
 
-      {/* Positioned against the nav, not the trigger: the nav is full width
-          and sticky, so the panel centres on the viewport and follows the bar
-          as it shrinks. Centred on the trigger, a 1120px panel ran off the
+      {/* Positioned against the bar's capsule, not the trigger: the capsule
+          is centred on the page, so the panel centres on the viewport and
+          follows the bar as it shrinks. Centred on the trigger, a 1120px panel ran off the
           left edge at 1260 and 1440.
 
           top is 100% with the gap as padding, so the pointer never crosses
@@ -195,10 +196,14 @@ export default function MegaMenu({
       >
       <div
         style={{
+          /* Solid, not glass: it hangs inside the capsule, which is already
+             a backdrop-filter root, and a blur nested in another does not
+             blur in Chromium — any transparency showed the hero's heading
+             through the panel as crisp ghost letters. */
           background: "var(--color-bg)",
-          border: "1px solid var(--color-divider)",
-          borderRadius: 24,
-          boxShadow: "var(--shadow-lg)",
+          border: "1px solid color-mix(in srgb, var(--color-text) 9%, transparent)",
+          borderRadius: 26,
+          boxShadow: "0 30px 80px -30px rgba(22,21,26,.35), 0 0 0 1px rgba(255,255,255,.6) inset",
           padding: "clamp(20px,2vw,26px)",
           maxHeight: "calc(100vh - 120px)",
           overflowY: "auto",
