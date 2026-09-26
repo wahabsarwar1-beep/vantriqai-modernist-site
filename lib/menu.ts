@@ -116,7 +116,7 @@ export function menuPanels(region: Region): MenuPanel[] {
       feature: {
         kicker: "Anything else",
         title: "Your sector not listed?",
-        body: "The agent is configured to your workflow, not to an industry template. The list is where we have done it before, not a limit.",
+        body: "The agent is configured to your workflow, not to an industry template. The list is where we start, not a limit.",
         href: navHref(region, { href: "/contact" }),
         cta: "Talk to us",
       },

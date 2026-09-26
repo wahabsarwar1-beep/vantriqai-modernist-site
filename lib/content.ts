@@ -20,7 +20,7 @@ export const ANSWERED = [
 ];
 
 export const AGENTS = [
-  { n: "01", name: "Reception", metric: "First reply in ~1.2s", body: "Greets, understands the question, and answers it — on WhatsApp, Instagram, or your site, in the language your customer used." },
+  { n: "01", name: "Reception", metric: "Replies in seconds", body: "Greets, understands the question, and answers it — on WhatsApp, Instagram, or your site, in the language your customer used." },
   { n: "02", name: "Booking", metric: "Writes to your calendar", body: "Checks real availability, books the slot, sends the reminder, and handles the reschedule when it comes." },
   { n: "03", name: "Catalogue", metric: "Answers against live stock", body: "Price, size, variant and availability from your actual inventory — and holds the item while the customer decides." },
   { n: "04", name: "Qualifier", metric: "Scored before a human reads it", body: "Asks what your sales team would ask, scores the lead, and writes it to your CRM with the transcript attached." },
@@ -34,7 +34,7 @@ export const AGENTS = [
 
 export const JSTEPS = [
   { n: "01", title: "Tell us how you work", body: "Fifteen minutes on how customers message you today: the questions that repeat, the ones that need a person, the hours nobody is watching.", fig: "15 min", figLabel: "discovery call" },
-  { n: "02", title: "The agent gets built", body: "We configure the modules your workflow actually needs and test them against your real message history before a single customer sees it.", fig: "2–4 weeks", figLabel: "typical build to live" },
+  { n: "02", title: "The agent gets built", body: "We configure the modules your workflow actually needs and test them against your real message history before a single customer sees it.", fig: "2–4 weeks", figLabel: "planned build to live" },
   { n: "03", title: "It plugs into your tools", body: "Calendar, CRM, inventory, payments, sheets. The agent acts inside the systems you already run — it does not keep a second copy of the truth.", fig: "8+", figLabel: "systems it can act in" },
   { n: "04", title: "It answers, every hour", body: "WhatsApp, Instagram, website. No queue, no office hours, no ceiling on volume when a post lands or the season peaks.", fig: "1.2 s", figLabel: "first reply, demo above" },
   { n: "05", title: "You keep the judgement calls", body: "Edge cases arrive with the transcript attached. Every escalation is reviewed monthly by a local team and folded back into the agent.", fig: "monthly", figLabel: "tuning, by people you can call" },
@@ -139,7 +139,7 @@ export const SECTORS = [
 export const TIERS = [
   { tier: "Tier 01", name: "Starter", audience: "Small business", body: "WhatsApp only. One agent, your catalogue and FAQs, replying around the clock." },
   { tier: "Tier 02", name: "Growth", audience: "Medium corporate", body: "Everything in Starter, plus CRM sync so every lead lands in your pipeline." },
-  { tier: "Tier 03 · Most chosen", name: "Scale", audience: "Multi-location business", body: "Adds your website as a channel, with location-aware routing and availability." },
+  { tier: "Tier 03 · Recommended", name: "Scale", audience: "Multi-location business", body: "Adds your website as a channel, with location-aware routing and availability." },
   { tier: "Tier 04", name: "Pro", audience: "Established corporate", body: "Top-tier AI models across every channel your customers already use." },
   { tier: "Tier 05", name: "Enterprise", audience: "Large enterprise", body: "Adds a private on-premise deployment option for strict data residency." },
   { tier: "Tier 06", name: "Enterprise+", audience: "Highest volume, custom", body: "Custom SLA, custom integrations, and capacity for the highest message volumes." },
@@ -147,10 +147,10 @@ export const TIERS = [
 
 export const FAQS = [
   { n: "01", q: "Why don't you list prices?", a: "Because the setup fee depends on what the agent has to connect to. We quote a fixed setup fee and a fixed monthly plan in writing after a fifteen-minute discovery call — nothing is estimated after that." },
-  { n: "02", q: "How long until it is live?", a: "Most agents are built, tested alongside your team, and live within a few weeks of scope sign-off. Complex integrations and on-premise deployments take longer, and we say so up front." },
+  { n: "02", q: "How long until it is live?", a: "We plan for an agent to be built, tested alongside your team and live within two to four weeks of scope sign-off. Complex integrations and on-premise deployments take longer, and we say so up front." },
   { n: "03", q: "Will it answer in our customers' language?", a: "Yes — customers write the way they normally write, and the agent replies in kind across the languages your business needs. Tone and vocabulary are tuned to your brand during configuration." },
   { n: "04", q: "What happens when it doesn't know?", a: "It escalates to your team with the full conversation attached, rather than guessing or looping. Recurring escalations are folded into the next monthly tuning round." },
   { n: "05", q: "Where does our data live?", a: "From simple catalogues to enterprise databases, we match handling to your sensitivity — including fully private, self-hosted deployment for strict data-residency requirements." },
-  { n: "06", q: "Can we move up a tier later?", a: "Yes. Tiers are a path, not a lock-in — most clients start on the channel that matters most and add CRM, website, or extra channels as volume grows." },
-  { n: "07", q: "Where do the figures on this site come from?", a: "Every benchmark is published third-party research — MIT/InsideSales.com, Harvard Business Review, SuperOffice, Salesforce, HubSpot, Meta and Mobilesquared — cited on the line where it appears. They describe the category, not our client results." },
+  { n: "06", q: "Can we move up a tier later?", a: "Yes. Tiers are a path, not a lock-in — we suggest starting on the channel that matters most and adding CRM, website, or extra channels as volume grows." },
+  { n: "07", q: "Where do the figures on this site come from?", a: "Every benchmark is published third-party research — MIT/InsideSales.com, Harvard Business Review, SuperOffice, Salesforce, HubSpot, Meta and Mobilesquared — cited on the line where it appears. They describe the category, not results achieved by VantriqAI. Numbers inside product screens and example conversations are illustrative." },
 ];

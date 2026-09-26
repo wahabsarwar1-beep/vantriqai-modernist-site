@@ -52,12 +52,12 @@ export default function PricingPage({ region }: { region: Region }) {
       <section style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(56px,7vw,96px) clamp(20px,5vw,64px) 0" }}>
         <GlowGrid className="tier-grid">
           {TIERS.map((t, i) => {
-            const featured = t.tier.includes("Most chosen");
+            const featured = t.tier.includes("Recommended");
             return (
               <div key={t.name} id={productSlug(t.name)} data-anim="" className={`glow tier-card anchor-target${featured ? " tier-card-featured" : ""}`}>
                 <div className="tier-top">
                   <span className="tier-n">{String(i + 1).padStart(2, "0")}</span>
-                  {featured ? <span className="tier-badge">Most chosen</span> : null}
+                  {featured ? <span className="tier-badge">Recommended</span> : null}
                 </div>
                 <h2 className="tier-name">{t.name}</h2>
                 <p className="tier-audience">{t.audience}</p>
@@ -93,7 +93,7 @@ export default function PricingPage({ region }: { region: Region }) {
                   <thead>
                     <tr>
                       <th style={{ fontSize: 12, letterSpacing: "0.1em", padding: "12px 10px" }}>Plan</th>
-                      <th style={{ fontSize: 12, letterSpacing: "0.1em", padding: "12px 10px" }}>Typical use</th>
+                      <th style={{ fontSize: 12, letterSpacing: "0.1em", padding: "12px 10px" }}>Sized for</th>
                       <th style={{ fontSize: 12, letterSpacing: "0.1em", padding: "12px 10px" }}>Sessions included</th>
                       <th style={{ fontSize: 12, letterSpacing: "0.1em", padding: "12px 10px" }}>Sessions / day</th>
                       <th style={{ fontSize: 12, letterSpacing: "0.1em", padding: "12px 10px" }}>Headroom</th>
@@ -153,7 +153,7 @@ export default function PricingPage({ region }: { region: Region }) {
               Pricing and taxes. All figures are indicative and provided for reference only. Prices and currency vary by location, and any PKR or USD amount shown is illustrative and not an offer. Quoted amounts exclude taxes, duties and payment-processing charges, which are applied according to your billing address. The binding price is the one shown on the purchase page before payment is completed. VantriqAI may revise tier pricing, allowances, overage rates and package contents at any time, at its sole discretion and without notice or obligation to give reasons; changes take effect from your next billing period.
             </p>
             <p style={{ fontSize: 11, lineHeight: "19px", margin: 0, maxWidth: "104ch", ...mutedLabel }}>
-              Performance and third parties. Response times, volumes, conversion figures and any other metrics on this site are illustrative examples drawn from past deployments. They are not warranties, forecasts or guarantees of results for your business. Service delivery depends on third parties outside our control, including messaging platforms, business solution providers, calendar and CRM vendors and AI model providers; their pricing, policies, availability or model behaviour may change, and such changes pass through to you. Unless a separate written agreement states otherwise, the service is provided without service-level guarantees and our aggregate liability is limited to fees you paid in the three months preceding a claim.
+              Performance and third parties. Statistics on this site are published third-party research, attributed where they appear; they describe the industry, not results achieved by VantriqAI. Response times, volumes and other figures shown in product illustrations and example conversations are illustrative only. None of them are warranties, forecasts or guarantees of results for your business. Service delivery depends on third parties outside our control, including messaging platforms, business solution providers, calendar and CRM vendors and AI model providers; their pricing, policies, availability or model behaviour may change, and such changes pass through to you. Unless a separate written agreement states otherwise, the service is provided without service-level guarantees and our aggregate liability is limited to fees you paid in the three months preceding a claim.
             </p>
             <p style={{ fontSize: 11, lineHeight: "19px", margin: 0, maxWidth: "104ch", ...mutedLabel }}>
               General. Nothing on this page constitutes a contract, an offer capable of acceptance, professional advice, or a commitment to supply. Scope, fees, term and support are governed solely by the written agreement signed with VantriqAI, which prevails over anything stated here. Trademarks, product names and materials on this site remain the property of VantriqAI or their respective owners. VantriqAI reserves all rights not expressly granted.

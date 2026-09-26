@@ -48,7 +48,7 @@ const PAGES: Record<string, PageSeo> = {
     title: "How It Works",
     globalTitle: "How It Works — Global",
     description:
-      "How VantriqAI builds and deploys your AI agent: discovery, build, integration with your tools, and go-live — typically 2–4 weeks.",
+      "How VantriqAI builds and deploys your AI agent: discovery, build, integration with your tools, and go-live — planned at 2–4 weeks from sign-off.",
   },
   "/products": {
     title: "Products",

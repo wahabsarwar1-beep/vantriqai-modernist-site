@@ -358,7 +358,7 @@ export default function InteractiveDemo() {
 
       {/* Said out loud, because someone will try to break it. */}
       <p style={{ margin: 0, maxWidth: "46ch", textAlign: "center", fontSize: 13, lineHeight: "21px", color: "color-mix(in srgb, var(--color-text) 58%, transparent)" }}>
-        A scripted walkthrough of a real deployment.{" "}
+        A scripted walkthrough of how the agent works.{" "}
         <button
           type="button"
           onClick={openLiveAgent}

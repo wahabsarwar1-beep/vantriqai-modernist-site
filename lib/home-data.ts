@@ -57,7 +57,7 @@ export const AGENTS = [
 
 export const JSTEPS = [
   { n: "01", title: "Tell us how you work", body: "Fifteen minutes on how customers message you today: the questions that repeat, the ones that need a person, the hours nobody is watching.", fig: "15 min", figLabel: "discovery call" },
-  { n: "02", title: "The agent gets built", body: "We configure the modules your workflow actually needs and test them against your real message history before a single customer sees it.", fig: "2–4 weeks", figLabel: "typical build to live" },
+  { n: "02", title: "The agent gets built", body: "We configure the modules your workflow actually needs and test them against your real message history before a single customer sees it.", fig: "2–4 weeks", figLabel: "planned build to live" },
   { n: "03", title: "It plugs into your tools", body: "Calendar, CRM, inventory, payments, sheets. The agent acts inside the systems you already run — it does not keep a second copy of the truth.", fig: "8+", figLabel: "systems it can act in" },
   { n: "04", title: "It answers, every hour", body: "WhatsApp, Instagram, website. No queue, no office hours, no ceiling on volume when a post lands or the season peaks.", fig: "1.2 s", figLabel: "first reply, demo above" },
   { n: "05", title: "You keep the judgement calls", body: "Edge cases arrive with the transcript attached. Every escalation is reviewed monthly by a local team and folded back into the agent.", fig: "monthly", figLabel: "tuning, by people you can call" },

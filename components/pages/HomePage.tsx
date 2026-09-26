@@ -74,7 +74,7 @@ export default function HomePage({ region }: { region: Region }) {
                 <em>Industry average first reply</em>42 hrs
               </span>
               <span className="gap-compare-us">
-                <em>Your agent</em>1.2 s
+                <em>Your agent</em>Seconds
               </span>
             </div>
           </div>
@@ -90,7 +90,7 @@ export default function HomePage({ region }: { region: Region }) {
           </div>
         </GlowGrid>
         <p data-anim="" style={{ fontSize: 12, lineHeight: "20px", margin: "16px 0 0", maxWidth: "74ch", color: "color-mix(in srgb, var(--color-text) 55%, transparent)" }}>
-          Every figure on this page is a published third-party benchmark for messaging and lead response, cited where it appears. None of them are VantriqAI client results.
+          Every statistic on this page is a published third-party benchmark for messaging and lead response, cited where it appears — none are VantriqAI results. Numbers inside product screens and example conversations are illustrative.
         </p>
       </section>
 
@@ -257,7 +257,7 @@ export default function HomePage({ region }: { region: Region }) {
           ))}
           <Link href={hrefIn(region, "/contact")} data-anim="" className="glow sector-tile sector-tile-other">
             <span className="sector-tile-name">Something else?</span>
-            <span className="sector-tile-line">The list is where we have done it before, not a limit.</span>
+            <span className="sector-tile-line">The list is where we start, not a limit.</span>
             <span aria-hidden="true" className="sector-tile-arrow">→</span>
           </Link>
         </GlowGrid>

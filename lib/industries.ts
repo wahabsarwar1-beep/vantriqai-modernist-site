@@ -492,7 +492,7 @@ export const industries = (region: Region): Industry[] => {
     systems: ["HR system or employee records", "Payroll calendar", "Approval workflow", "Policy handbook"],
     faqs: [
       { q: "Is this for customers or staff?", a: "Staff. The same agent that serves customers can be pointed inward, answering your team from your own policies and records." },
-      { q: "Can it see salary information?", a: "Only what you agree it can. Most deployments answer policy and dates, with individual pay questions routed to HR." },
+      { q: "Can it see salary information?", a: "Only what you agree it can. We recommend it answers policy and dates, with individual pay questions routed to HR." },
       { q: "What about sensitive issues?", a: "Grievances, health and anything personal go straight to a named person in HR — the agent does not attempt to handle them." },
     ],
     seoTitle: "AI Agents for HR & Internal Operations",
