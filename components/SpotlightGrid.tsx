@@ -17,11 +17,14 @@ export default function SpotlightGrid({ gridStyle, children }: { gridStyle: CSSP
 }
 
 export function SpotlightItem({
+  id,
   index,
   className,
   style,
   children,
 }: {
+  /** Anchor for the navigation menu to link to. */
+  id?: string;
   index: number;
   className?: string;
   style?: CSSProperties;
@@ -34,6 +37,7 @@ export function SpotlightItem({
 
   return (
     <div
+      id={id}
       data-spot-item=""
       data-on={on ? "" : undefined}
       data-dim={dim ? "" : undefined}

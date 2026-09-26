@@ -7,6 +7,7 @@ import Kicker from "@/components/Kicker";
 import PosterCTA from "@/components/PosterCTA";
 import SpotlightGrid, { SpotlightItem } from "@/components/SpotlightGrid";
 import { SECTORS } from "@/lib/content";
+import { productSlug } from "@/lib/products";
 import { hrefIn, type Region } from "@/lib/region";
 
 const bodyMuted = { color: "color-mix(in srgb, var(--color-text) 78%, transparent)" };
@@ -77,8 +78,9 @@ export default function IndustriesPage({ region }: { region: Region }) {
           {SECTORS.map((s, i) => (
             <SpotlightItem
               key={s.name}
+              id={productSlug(s.name)}
               index={i}
-              className="spot-tint"
+              className="spot-tint anchor-target"
               style={{
                 background: "var(--color-surface)",
                 padding: "clamp(26px,3vw,40px) clamp(20px,2.5vw,36px)",

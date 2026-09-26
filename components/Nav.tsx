@@ -7,6 +7,8 @@ import Logo from "@/components/Logo";
 import Magnetic from "@/components/Magnetic";
 import { NAV_LINKS } from "@/lib/nav-links";
 import RegionSwitch from "@/components/RegionSwitch";
+import MegaMenu from "@/components/MegaMenu";
+import { menuPanels } from "@/lib/menu";
 import { hrefIn, navHref, regionFromPathname } from "@/lib/region";
 import { waLink } from "@/lib/whatsapp";
 
@@ -16,6 +18,10 @@ export default function Nav() {
      the US$ site never falls back to PKR by using the nav. */
   const region = regionFromPathname(pathname);
   const [open, setOpen] = useState(false);
+  /** Which mega panel is showing, by label. One at a time. */
+  const [panel, setPanel] = useState<string | null>(null);
+  const panels = menuPanels(region);
+  const panelFor = (label: string) => panels.find((p) => p.label === label);
   const [openedForPathname, setOpenedForPathname] = useState(pathname);
   const [shrunk, setShrunk] = useState(false);
   const [scrollPct, setScrollPct] = useState(0);
@@ -23,6 +29,7 @@ export default function Nav() {
   if (pathname !== openedForPathname) {
     setOpenedForPathname(pathname);
     setOpen(false);
+    setPanel(null);
   }
 
   const ticking = useRef(false);
@@ -59,7 +66,7 @@ export default function Nav() {
         display: "flex",
         alignItems: "center",
         flexWrap: "wrap",
-        gap: "clamp(10px,1.2vw,20px)",
+        gap: "clamp(9px,1vw,18px)",
         padding: shrunk ? "8px clamp(20px,5vw,64px)" : "16px clamp(20px,5vw,64px)",
         borderBottom: "1px solid var(--color-divider)",
         // At rest the bar is mostly transparent so the hero wash carries up
@@ -101,26 +108,43 @@ export default function Nav() {
         <span className="nav-burger-line" style={open ? { transform: "translateY(-7px) rotate(-45deg)" } : undefined} />
       </button>
 
-      <div className="nav-links-desktop" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "10px clamp(10px,1.15vw,18px)" }}>
-        {NAV_LINKS.map((link) => (
-          <Link
-            key={link.href}
-            href={navHref(region, link)}
-            data-navlink=""
-            aria-current={pathname === navHref(region, link) ? "page" : undefined}
-            style={{
-              fontFamily: "var(--font-heading)",
-              fontWeight: 800,
-              fontSize: 12.5,
-              letterSpacing: "0.04em",
-              textTransform: "uppercase",
-              color: pathname === navHref(region, link) ? "var(--color-accent)" : "var(--color-text)",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {link.label}
-          </Link>
-        ))}
+      <div className="nav-links-desktop" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "10px clamp(9px,1vw,16px)" }}>
+        {NAV_LINKS.map((link) => {
+          const href = navHref(region, link);
+          const isCurrent = pathname === href;
+          const mega = panelFor(link.label);
+          if (mega) {
+            return (
+              <MegaMenu
+                key={link.href}
+                panel={mega}
+                active={isCurrent}
+                open={panel === link.label}
+                onOpen={() => setPanel(link.label)}
+                onClose={() => setPanel((cur) => (cur === link.label ? null : cur))}
+              />
+            );
+          }
+          return (
+            <Link
+              key={link.href}
+              href={href}
+              data-navlink=""
+              aria-current={isCurrent ? "page" : undefined}
+              style={{
+                fontFamily: "var(--font-heading)",
+                fontWeight: 800,
+                fontSize: 12.5,
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+                color: isCurrent ? "var(--color-accent)" : "var(--color-text)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {link.label}
+            </Link>
+          );
+        })}
       </div>
 
       {/* Always in the bar, at every width. On a phone the burger sits
@@ -146,16 +170,43 @@ export default function Nav() {
 
       {open && (
         <div className={`nav-mobile-panel${open ? " open" : ""}`}>
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={navHref(region, link)}
-              aria-current={pathname === navHref(region, link) ? "page" : undefined}
-              style={pathname === navHref(region, link) ? { color: "var(--color-accent)" } : undefined}
-            >
-              {link.label}
-            </Link>
-          ))}
+          {/* On a phone the sub-links are a disclosure, not a hover panel:
+              <details> gives the open/close behaviour, the keyboard handling
+              and the semantics without a line of state. */}
+          {NAV_LINKS.map((link) => {
+            const href = navHref(region, link);
+            const current = pathname === href;
+            const mega = panelFor(link.label);
+
+            if (!mega) {
+              return (
+                <Link key={link.href} href={href} aria-current={current ? "page" : undefined} style={current ? { color: "var(--color-accent)" } : undefined}>
+                  {link.label}
+                </Link>
+              );
+            }
+
+            return (
+              <details key={link.href} className="nav-mobile-group">
+                <summary aria-current={current ? "page" : undefined} style={current ? { color: "var(--color-accent)" } : undefined}>
+                  {link.label}
+                  <svg width="11" height="7" viewBox="0 0 10 6" aria-hidden="true" style={{ flex: "none" }}>
+                    <path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                  </svg>
+                </summary>
+                <div className="nav-mobile-sub">
+                  {mega.columns.flatMap((col) => col.links).map((l) => (
+                    <Link key={l.href} href={l.href}>
+                      {l.label}
+                    </Link>
+                  ))}
+                  <Link href={mega.footer.href} style={{ color: "var(--color-accent)" }}>
+                    {mega.footer.label} &rarr;
+                  </Link>
+                </div>
+              </details>
+            );
+          })}
           <a
             className="btn btn-primary"
             href={waLink()}
