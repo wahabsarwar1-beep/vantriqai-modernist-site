@@ -2,7 +2,7 @@ import Kicker from "@/components/Kicker";
 import PosterCTA from "@/components/PosterCTA";
 import HeroRotator from "@/components/HeroRotator";
 import GapClock from "@/components/GapClock";
-import ConversationDemo, { ReplayButton } from "@/components/ConversationDemo";
+import InteractiveDemo from "@/components/InteractiveDemo";
 import TileBand from "@/components/TileBand";
 import PinnedSteps from "@/components/PinnedSteps";
 import PinnedRail from "@/components/PinnedRail";
@@ -113,11 +113,15 @@ export default function HomePage({ region }: { region: Region }) {
             <p data-anim="" style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)", margin: 0 }}>{"{ Vantriq's advantage }"}</p>
             <div>
               <h2 data-anim="" style={{ fontSize: "clamp(24px,3vw,42px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 16px", maxWidth: "20ch" }}>The growth engine for local business.</h2>
-              <p data-anim="" style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 32px", maxWidth: "50ch", ...bodyMuted }}>One agent, plugged into your channels and your calendar, answering every hour you are closed. Below: a real exchange replayed at the speed it actually runs.</p>
-              <div data-anim="">
-                <div style={{ position: "relative", display: "grid", justifyItems: "center", alignContent: "center", minHeight: "clamp(400px,42vw,520px)" }}>
+              <p data-anim="" style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 32px", maxWidth: "50ch", ...bodyMuted }}>One agent, plugged into your channels and your calendar, answering every hour you are closed. Below: pick a business, then send the messages a customer would.</p>
+            </div>
+            {/* Spans both columns: the demo is the point of this section, and
+                in the right-hand column it sat off-centre and collided with
+                the marquee running behind it. */}
+            <div data-anim="" style={{ gridColumn: "1 / -1" }}>
+                <div style={{ position: "relative", display: "grid", justifyItems: "center", alignContent: "center", padding: "clamp(18px,3vw,34px) 0" }}>
                   <TileBand region={region} />
-                  <ConversationDemo />
+                  <InteractiveDemo />
                 </div>
                 <div style={{ position: "relative", zIndex: 1, background: "var(--color-bg)", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(228px,100%),1fr))", gap: "0 clamp(24px,4vw,56px)", marginTop: "clamp(28px,4vw,44px)" }}>
                   <div style={{ borderTop: "1px solid var(--color-divider)", padding: "16px 0" }}>
@@ -132,9 +136,7 @@ export default function HomePage({ region }: { region: Region }) {
                     <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "color-mix(in srgb, var(--color-text) 62%, transparent)", margin: "0 0 8px" }}>Booked the visit</p>
                     <p style={{ fontSize: 15, lineHeight: "25px", margin: 0 }}>Into the calendar, with the reminder scheduled.</p>
                   </div>
-                  <ReplayButton />
                 </div>
-              </div>
             </div>
           </div>
         </section>
