@@ -444,3 +444,36 @@ span[data-chev] { display: inline-block; transition: transform .2s ease; }
 /* product icon field: scale + tilt on card hover */
 .product-mark { transition: transform .35s cubic-bezier(.16,1,.3,1); }
 .product-mark:hover { transform: scale(1.1) rotate(-4deg); }
+
+/* ── footer ── */
+.footer-grid {
+  display: grid;
+  grid-template-columns: minmax(min(270px, 100%), 1.4fr) repeat(auto-fit, minmax(min(185px, 100%), 1fr));
+  gap: clamp(30px, 4vw, 56px);
+}
+/* auto-fit keeps adding 185px tracks next to a 270px brand block long after
+   they stop fitting, so the last column was being cut off the right edge on a
+   phone. Below these widths the count is fixed instead of inferred. */
+@media (max-width: 980px) {
+  .footer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .footer-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+.footer-bottom { padding-bottom: clamp(26px, 3vw, 36px); }
+/* The back-to-top button and the chat launcher are fixed to the bottom
+   corners, so on a phone the last row of the footer has to end above them. */
+@media (max-width: 760px) {
+  .footer-bottom { padding-bottom: 104px; }
+}
+.footer-link { transition: color .18s ease; }
+.footer-social { transition: color .18s ease, border-color .18s ease, background-color .18s ease; }
+@media (hover: hover) and (pointer: fine) {
+  .footer-link:hover { color: var(--color-accent) !important; }
+  .footer-social:hover {
+    color: var(--color-bg) !important;
+    background: var(--color-accent) !important;
+    border-color: var(--color-accent) !important;
+  }
+}
