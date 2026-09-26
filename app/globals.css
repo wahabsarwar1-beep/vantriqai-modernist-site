@@ -345,10 +345,15 @@ span[data-chev] { display: inline-block; transition: transform .2s ease; }
 [data-navlink][aria-current="page"] { color: var(--color-accent); }
 
 /* ── mobile nav ── */
+/* 1260, not 1000: the bar carries a logo, seven links, the region control and
+   the WhatsApp button. Measured, it needs 1240px to hold them on one line, so
+   the menu button takes over just above that. It used to be 1000, which put
+   the WhatsApp button on a row of its own on every laptop between 1024 and
+   1366 — a broken bar is worse than a menu button. */
 .nav-toggle-btn { display: none; }
 .nav-mobile-panel { display: none; }
-@media (max-width: 1000px) {
-  .nav-links-desktop, .nav-whatsapp-desktop, .nav-region-desktop { display: none !important; }
+@media (max-width: 1259px) {
+  .nav-links-desktop, .nav-whatsapp-desktop { display: none !important; }
   .nav-toggle-btn {
     display: flex; flex-direction: column; justify-content: center; gap: 5px;
     width: 46px; height: 46px; flex: none; padding: 0 11px; box-sizing: border-box;
@@ -397,6 +402,15 @@ span[data-chev] { display: inline-block; transition: transform .2s ease; }
 
 @media (max-width: 760px) {
   .chat-launcher-label { display: none !important; }
+}
+
+/* On the narrowest phones the bar holds the wordmark, the region control and
+   the menu button, and at 320px those do not fit at full size — the bar wrapped
+   to two rows. The wordmark gives up the height and the control tightens its
+   padding; both stay legible, and the row stays a row. */
+@media (max-width: 420px) {
+  .nav-logo img { height: 32px !important; }
+  .nav-region a { padding: 0 6px !important; }
 }
 
 /* !important on background throughout this block: several cards these classes

@@ -32,7 +32,14 @@ export default function Nav() {
       ticking.current = true;
       requestAnimationFrame(() => {
         ticking.current = false;
-        setShrunk(window.scrollY > 40);
+        /* Two thresholds, not one. The bar is sticky, so it takes up space
+           in the flow: shrinking it removes 16px of padding, the document
+           gets shorter, the page slides up, and scrollY drops back below a
+           single threshold — which un-shrinks it, which puts the 16px back.
+           That loop is the shudder you see if you stop scrolling right at
+           the trigger point. The gap between 72 and 24 is far wider than the
+           16px the bar moves, so no layout change can cross it. */
+        setShrunk((was) => (was ? window.scrollY > 24 : window.scrollY > 72));
         const doc = document.documentElement;
         const max = (doc.scrollHeight || document.body.scrollHeight) - window.innerHeight;
         setScrollPct(max > 0 ? Math.min(100, Math.max(0, (window.scrollY / max) * 100)) : 0);
@@ -52,7 +59,7 @@ export default function Nav() {
         display: "flex",
         alignItems: "center",
         flexWrap: "wrap",
-        gap: "clamp(14px,2vw,30px)",
+        gap: "clamp(10px,1.2vw,20px)",
         padding: shrunk ? "8px clamp(20px,5vw,64px)" : "16px clamp(20px,5vw,64px)",
         borderBottom: "1px solid var(--color-divider)",
         // At rest the bar is mostly transparent so the hero wash carries up
@@ -78,7 +85,7 @@ export default function Nav() {
           background: "var(--color-accent)",
         }}
       />
-      <Link href={hrefIn(region, "/")} style={{ display: "inline-flex", alignItems: "center", marginRight: "auto" }}>
+      <Link href={hrefIn(region, "/")} className="nav-logo" style={{ display: "inline-flex", alignItems: "center", marginRight: "auto" }}>
         <Logo height={shrunk ? 34 : 46} />
       </Link>
 
@@ -94,7 +101,7 @@ export default function Nav() {
         <span className="nav-burger-line" style={open ? { transform: "translateY(-7px) rotate(-45deg)" } : undefined} />
       </button>
 
-      <div className="nav-links-desktop" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "10px clamp(14px,2vw,26px)" }}>
+      <div className="nav-links-desktop" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "10px clamp(10px,1.15vw,18px)" }}>
         {NAV_LINKS.map((link) => (
           <Link
             key={link.href}
@@ -104,8 +111,8 @@ export default function Nav() {
             style={{
               fontFamily: "var(--font-heading)",
               fontWeight: 800,
-              fontSize: 13,
-              letterSpacing: "0.06em",
+              fontSize: 12.5,
+              letterSpacing: "0.04em",
               textTransform: "uppercase",
               color: pathname === navHref(region, link) ? "var(--color-accent)" : "var(--color-text)",
               whiteSpace: "nowrap",
@@ -116,7 +123,10 @@ export default function Nav() {
         ))}
       </div>
 
-      <span className="nav-region-desktop">
+      {/* Always in the bar, at every width. On a phone the burger sits
+          after it (CSS order: 3), so the marks stay visible without the menu
+          having to be opened to find them. */}
+      <span className="nav-region">
         <RegionSwitch />
       </span>
 
@@ -146,9 +156,6 @@ export default function Nav() {
               {link.label}
             </Link>
           ))}
-          <span style={{ display: "flex", padding: "14px 0 2px" }}>
-            <RegionSwitch full />
-          </span>
           <a
             className="btn btn-primary"
             href={waLink()}
