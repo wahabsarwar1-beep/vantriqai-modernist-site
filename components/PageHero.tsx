@@ -1,6 +1,14 @@
 import type { ReactNode } from "react";
-import Kicker from "@/components/Kicker";
 
+/**
+ * The opening stage of every inner page: the home page's dark aurora, so a
+ * visitor clicking through from the home page stays in the same world.
+ *
+ * Headings keep passing `var(--color-accent)` for their highlighted words;
+ * the stage re-points that variable at the light cobalt inside the h1 only,
+ * where the brand cobalt would sit too dark on the ground. The chat card on
+ * the right keeps the real brand colour.
+ */
 export default function PageHero({
   kicker,
   heading,
@@ -15,21 +23,24 @@ export default function PageHero({
   maxWidthCh?: string;
 }) {
   return (
-    <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" }}>
-      <section style={{ padding: "clamp(36px,4.6vw,62px) 0 clamp(28px,4vw,50px)", position: "relative" }}>
-        {/* Same upward bleed as the Home hero, so the wash runs behind the
-            translucent nav on every page instead of starting at a seam
-            under it. */}
-        <div aria-hidden="true" data-hero-texture="" style={{ position: "absolute", top: "calc(clamp(72px, 7vw, 92px) * -1)", bottom: 0, left: "50%", width: "calc(100vw + 24px)", marginLeft: "calc(-50vw - 12px)", zIndex: 0, pointerEvents: "none" }} />
-        <div className="hero-split" style={{ position: "relative", zIndex: 1, alignItems: "center" }}>
-          <div>
-            <Kicker label={kicker} marginBottom="clamp(24px,4vw,44px)" />
-            <h1 style={{ fontSize: "clamp(30px,4.4vw,58px)", lineHeight: 1, letterSpacing: "-0.03em", margin: 0, maxWidth: maxWidthCh, overflowWrap: "break-word" }}>{heading}</h1>
-            <p data-anim="" style={{ fontSize: 18, lineHeight: "30px", maxWidth: "52ch", margin: "32px 0 0" }}>{body}</p>
-          </div>
-          {orbit}
+    <section className="ph">
+      <div aria-hidden="true" className="hh-aurora" />
+      <div aria-hidden="true" className="hh-grid" />
+      <div className="hero-split ph-inner">
+        <div>
+          <p className="hh-eyebrow">
+            <span aria-hidden="true" className="ph-dot" />
+            {kicker}
+          </p>
+          <h1 className="ph-title" style={{ maxWidth: maxWidthCh }}>
+            {heading}
+          </h1>
+          <p data-anim="" className="ph-body">
+            {body}
+          </p>
         </div>
-      </section>
-    </div>
+        <div className="ph-orbit">{orbit}</div>
+      </div>
+    </section>
   );
 }

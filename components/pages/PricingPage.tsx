@@ -8,6 +8,7 @@ import PosterCTA from "@/components/PosterCTA";
 import Counter from "@/components/Counter";
 import Magnetic from "@/components/Magnetic";
 import Link from "next/link";
+import GlowGrid from "@/components/GlowGrid";
 import { TIERS, USAGE, FAQS } from "@/lib/content";
 import { productSlug } from "@/lib/products";
 import { hrefIn, type Region } from "@/lib/region";
@@ -48,49 +49,37 @@ export default function PricingPage({ region }: { region: Region }) {
         }
       />
 
-      <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)" }}>
-        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(22px,3vw,40px) clamp(20px,5vw,64px)", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(300px,100%),1fr))", gap: 18 }}>
-          {TIERS.map((t) => (
-            <div
-              key={t.name}
-              id={productSlug(t.name)}
-              data-anim=""
-              className="hover-lift anchor-target"
-              style={{ background: "var(--color-surface)", padding: "clamp(28px,3vw,40px) clamp(20px,2.5vw,36px)", display: "flex", flexDirection: "column", borderRadius: 28, border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-sm)" }}
-            >
-              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)", margin: "0 0 16px" }}>{t.tier}</p>
-              <h2 style={{ fontSize: 28, lineHeight: 1.05, letterSpacing: "-0.03em", margin: "0 0 8px" }}>{t.name}</h2>
-              <p style={{ fontSize: 12, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 18px", ...mutedLabel }}>{t.audience}</p>
-              <p style={{ fontSize: 15, lineHeight: "26px", margin: "0 0 24px", flex: 1, ...bodyMuted }}>{t.body}</p>
-              <Magnetic>
-                <Link className="btn btn-secondary" href={hrefIn(region, "/contact")} style={{ alignSelf: "start", minHeight: 44, paddingInline: 18, justifyContent: "center", borderWidth: 1 }}>
-                  Request a quote
-                </Link>
-              </Magnetic>
-            </div>
-          ))}
-        </div>
+      <section style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(56px,7vw,96px) clamp(20px,5vw,64px) 0" }}>
+        <GlowGrid className="tier-grid">
+          {TIERS.map((t, i) => {
+            const featured = t.tier.includes("Most chosen");
+            return (
+              <div key={t.name} id={productSlug(t.name)} data-anim="" className={`glow tier-card anchor-target${featured ? " tier-card-featured" : ""}`}>
+                <div className="tier-top">
+                  <span className="tier-n">{String(i + 1).padStart(2, "0")}</span>
+                  {featured ? <span className="tier-badge">Most chosen</span> : null}
+                </div>
+                <h2 className="tier-name">{t.name}</h2>
+                <p className="tier-audience">{t.audience}</p>
+                {/* Six bars, this tier's filled: where it sits on the path. */}
+                <span aria-hidden="true" className="tier-meter">
+                  {TIERS.map((_, j) => (
+                    <i key={j} data-on={j <= i ? "" : undefined} />
+                  ))}
+                </span>
+                <p className="tier-body">{t.body}</p>
+                <Magnetic>
+                  <Link className={`btn ${featured ? "hh-btn-primary" : "btn-secondary"} tier-cta`} href={hrefIn(region, "/contact")}>
+                    Request a quote <span aria-hidden="true">→</span>
+                  </Link>
+                </Magnetic>
+              </div>
+            );
+          })}
+        </GlowGrid>
       </section>
 
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" }}>
-        <div style={{ padding: "clamp(18px,2.2vw,28px) 0 0" }}>
-          <div data-anim="" style={{ display: "grid", gap: 9, borderBottom: "1px solid var(--color-divider)", paddingBottom: "clamp(18px,2.2vw,26px)" }}>
-            <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 9.5, letterSpacing: "0.16em", textTransform: "uppercase", margin: "0 0 2px", color: "color-mix(in srgb, var(--color-text) 45%, transparent)" }}>Terms &amp; conditions</p>
-            <p style={{ fontSize: 11, lineHeight: "19px", margin: 0, maxWidth: "104ch", ...mutedLabel }}>
-              Usage and credits. Every action performed by an agent or tool consumes AI credits. The amount is determined by VantriqAI after the action completes, based on its complexity and the tool used, and is not quoted in advance. Credits are allocated monthly, expire at the end of each billing period, do not roll over, and are neither refundable nor exchangeable for cash or service. Sessions, session counts and headroom figures describe expected capacity, not a guaranteed entitlement; usage beyond the included allowance is billed at the stated overage rate.
-            </p>
-            <p style={{ fontSize: 11, lineHeight: "19px", margin: 0, maxWidth: "104ch", ...mutedLabel }}>
-              Pricing and taxes. All figures are indicative and provided for reference only. Prices and currency vary by location, and any PKR or USD amount shown is illustrative and not an offer. Quoted amounts exclude taxes, duties and payment-processing charges, which are applied according to your billing address. The binding price is the one shown on the purchase page before payment is completed. VantriqAI may revise tier pricing, allowances, overage rates and package contents at any time, at its sole discretion and without notice or obligation to give reasons; changes take effect from your next billing period.
-            </p>
-            <p style={{ fontSize: 11, lineHeight: "19px", margin: 0, maxWidth: "104ch", ...mutedLabel }}>
-              Performance and third parties. Response times, volumes, conversion figures and any other metrics on this site are illustrative examples drawn from past deployments. They are not warranties, forecasts or guarantees of results for your business. Service delivery depends on third parties outside our control, including messaging platforms, business solution providers, calendar and CRM vendors and AI model providers; their pricing, policies, availability or model behaviour may change, and such changes pass through to you. Unless a separate written agreement states otherwise, the service is provided without service-level guarantees and our aggregate liability is limited to fees you paid in the three months preceding a claim.
-            </p>
-            <p style={{ fontSize: 11, lineHeight: "19px", margin: 0, maxWidth: "104ch", ...mutedLabel }}>
-              General. Nothing on this page constitutes a contract, an offer capable of acceptance, professional advice, or a commitment to supply. Scope, fees, term and support are governed solely by the written agreement signed with VantriqAI, which prevails over anything stated here. Trademarks, product names and materials on this site remain the property of VantriqAI or their respective owners. VantriqAI reserves all rights not expressly granted.
-            </p>
-          </div>
-        </div>
-
         <section style={{ padding: "clamp(34px,4.4vw,58px) 0 0" }}>
           <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 22 }}>
             <span id="what-each-tier-carries" className="anchor-target" />
@@ -129,7 +118,7 @@ export default function PricingPage({ region }: { region: Region }) {
           </div>
         </section>
 
-        <section style={{ padding: "clamp(34px,4.4vw,58px) 0 clamp(40px,5.2vw,68px)" }}>
+        <section style={{ padding: "clamp(34px,4.4vw,58px) 0 clamp(28px,3.4vw,44px)" }}>
           <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 22 }}>
             <span id="questions" className="anchor-target" />
             <Kicker label="Questions" marginBottom="0" />
@@ -154,6 +143,24 @@ export default function PricingPage({ region }: { region: Region }) {
             </div>
           </div>
         </section>
+        <div style={{ padding: "0 0 clamp(40px,5.2vw,68px)" }}>
+          <div data-anim="" style={{ display: "grid", gap: 9, borderBottom: "1px solid var(--color-divider)", paddingBottom: "clamp(18px,2.2vw,26px)" }}>
+            <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 9.5, letterSpacing: "0.16em", textTransform: "uppercase", margin: "0 0 2px", color: "color-mix(in srgb, var(--color-text) 45%, transparent)" }}>Terms &amp; conditions</p>
+            <p style={{ fontSize: 11, lineHeight: "19px", margin: 0, maxWidth: "104ch", ...mutedLabel }}>
+              Usage and credits. Every action performed by an agent or tool consumes AI credits. The amount is determined by VantriqAI after the action completes, based on its complexity and the tool used, and is not quoted in advance. Credits are allocated monthly, expire at the end of each billing period, do not roll over, and are neither refundable nor exchangeable for cash or service. Sessions, session counts and headroom figures describe expected capacity, not a guaranteed entitlement; usage beyond the included allowance is billed at the stated overage rate.
+            </p>
+            <p style={{ fontSize: 11, lineHeight: "19px", margin: 0, maxWidth: "104ch", ...mutedLabel }}>
+              Pricing and taxes. All figures are indicative and provided for reference only. Prices and currency vary by location, and any PKR or USD amount shown is illustrative and not an offer. Quoted amounts exclude taxes, duties and payment-processing charges, which are applied according to your billing address. The binding price is the one shown on the purchase page before payment is completed. VantriqAI may revise tier pricing, allowances, overage rates and package contents at any time, at its sole discretion and without notice or obligation to give reasons; changes take effect from your next billing period.
+            </p>
+            <p style={{ fontSize: 11, lineHeight: "19px", margin: 0, maxWidth: "104ch", ...mutedLabel }}>
+              Performance and third parties. Response times, volumes, conversion figures and any other metrics on this site are illustrative examples drawn from past deployments. They are not warranties, forecasts or guarantees of results for your business. Service delivery depends on third parties outside our control, including messaging platforms, business solution providers, calendar and CRM vendors and AI model providers; their pricing, policies, availability or model behaviour may change, and such changes pass through to you. Unless a separate written agreement states otherwise, the service is provided without service-level guarantees and our aggregate liability is limited to fees you paid in the three months preceding a claim.
+            </p>
+            <p style={{ fontSize: 11, lineHeight: "19px", margin: 0, maxWidth: "104ch", ...mutedLabel }}>
+              General. Nothing on this page constitutes a contract, an offer capable of acceptance, professional advice, or a commitment to supply. Scope, fees, term and support are governed solely by the written agreement signed with VantriqAI, which prevails over anything stated here. Trademarks, product names and materials on this site remain the property of VantriqAI or their respective owners. VantriqAI reserves all rights not expressly granted.
+            </p>
+          </div>
+        </div>
+
       </div>
 
       <PosterCTA

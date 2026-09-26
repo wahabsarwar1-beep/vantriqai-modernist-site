@@ -1,6 +1,5 @@
 import JsonLd from "@/components/JsonLd";
 import { breadcrumbSchema } from "@/lib/schema";
-import Kicker from "@/components/Kicker";
 import LineReveal from "@/components/LineReveal";
 import Magnetic from "@/components/Magnetic";
 import ContactForm from "@/components/ContactForm";
@@ -38,10 +37,13 @@ export default function ContactPage({ region }: { region: Region }) {
         <section className="stack-mobile" style={{ padding: "clamp(34px,4.4vw,58px) 0 clamp(40px,5.2vw,68px)", position: "relative", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(340px,100%),1fr))", gap: "clamp(40px,6vw,88px)", alignItems: "start" }}>
           <div aria-hidden="true" data-hero-texture="" style={{ position: "absolute", top: "calc(clamp(72px, 7vw, 92px) * -1)", bottom: 0, left: "50%", width: "calc(100vw + 24px)", marginLeft: "calc(-50vw - 12px)", zIndex: 0, pointerEvents: "none" }} />
           <div style={{ position: "relative", zIndex: 1 }}>
-            <Kicker label="Contact" />
+            <p className="eyebrow">
+              <span aria-hidden="true" className="hh-live" />
+              Contact
+            </p>
             <h1 style={{ fontSize: "clamp(32px,4.8vw,60px)", lineHeight: 0.96, letterSpacing: "-0.03em", margin: 0 }}>
               <LineReveal>
-                Let&rsquo;s <span style={{ color: "var(--color-accent)" }}>talk.</span>
+                Let&rsquo;s <span className="grad-text">talk.</span>
               </LineReveal>
             </h1>
             <p data-anim="" style={{ fontSize: 18, lineHeight: "30px", maxWidth: "44ch", margin: "28px 0 0" }}>
