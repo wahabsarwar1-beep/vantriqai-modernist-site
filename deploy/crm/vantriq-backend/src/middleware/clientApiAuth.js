@@ -24,6 +24,12 @@ async function requireClientApiToken(req, res, next) {
   );
   const row = rows[0];
   if (!row || row.revoked) return res.status(401).json({ error: 'Invalid or revoked API token.' });
+  // Checked on every call, not only at creation: an admin turning this off
+  // for a client is a kill switch, not just a lock on issuing new ones —
+  // any token already out there stops working the same instant.
+  if (!row.api_access_enabled) {
+    return res.status(403).json({ error: 'API access is not enabled on this account.' });
+  }
 
   db.query(`update client_api_tokens set last_used_at = now() where id = $1`, [row.token_id]).catch(() => {});
 

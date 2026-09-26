@@ -1540,3 +1540,15 @@ create table if not exists client_api_tokens (
   last_used_at timestamptz
 );
 create index if not exists idx_client_api_tokens_client on client_api_tokens(client_id);
+
+-- Off by default for every client — this was shipped, then reconsidered:
+-- most customers will never ask for API access, and self-service token
+-- creation open to every portal account is a bigger blast radius than it
+-- needs to be for a feature only a few will use. An admin turns it on for
+-- one client at a time, the moment that client actually asks, the same
+-- way Enterprise+ custom pricing is opt-in per client rather than a
+-- standing capability everyone has. See routes/clients.js's
+-- PATCH /:id/api-access (admin-only) and middleware/clientApiAuth.js,
+-- which refuses a token outright the instant this is turned back off,
+-- not only new ones being created.
+alter table clients add column if not exists api_access_enabled boolean not null default false;

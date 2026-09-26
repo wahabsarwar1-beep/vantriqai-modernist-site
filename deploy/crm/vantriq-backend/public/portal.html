@@ -1357,10 +1357,14 @@ function renderSecurity(){
     <button class="btn btn-ghost" onclick="doLogout()">Sign out</button>
   </div>
 
-  ${renderApiTokens()}`;
+  ${(data.account&&data.account.api_access_enabled) ? renderApiTokens() : ''}`;
 }
 
 /* ---------------------------- API access (self-service) ---------------------------- */
+// Only ever shown once an admin has turned this on for the account — see
+// clients.js's PATCH /:id/api-access. Most customers never ask for this,
+// so the section stays entirely absent rather than showing everyone a
+// button for a feature almost none of them will use.
 function renderApiTokens(){
   if(data.apiTokens === null){ requestAnimationFrame(loadApiTokens); }
   const tokens = data.apiTokens || [];

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "VantriqAI CRM API",
-    "version": "9.12.0",
+    "version": "9.12.1",
     "description": "The CRM behind VantriqAI: clients, invoices, payments, quotes and proposals,\ncontracts, statements, and the webhook surface the AI agents write through.\n\n## Authentication\n\nTwo ways in, and one of them is for people:\n\n- **Staff session** — `Authorization: Bearer <token>`, issued by `POST /api/auth/verify`\n  after a password and an emailed one-time code. A staff member's role decides reach.\n- **API key** — `x-api-key: <key>`, for machines. Keys are scoped.\n\n## Scopes\n\nLeast to most: `webhook` < `automation` < `staff` < `admin`. A scope opens everything\nbelow it. The admin key opens everything and is intended as break-glass only — set\n`ALLOW_API_KEY_LOGIN=false` once staff accounts exist.\n\n## Automation writes through this API, never to the database\n\nn8n and any other integration must use these endpoints rather than connecting to\nPostgres. Tenancy, quota and tax rules live here; a direct write bypasses all three."
   },
   "servers": [
@@ -2434,6 +2434,66 @@
           "clients"
         ],
         "summary": "PUT /api/clients/:id",
+        "description": "Requires the **automation** scope or higher. Automation key or any staff session. Clients, invoices, packages, agents.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/clients/{id}/api-access": {
+      "patch": {
+        "tags": [
+          "clients"
+        ],
+        "summary": "PATCH /api/clients/:id/api-access { enabled: true|false } Off by default for every client. The read-only external API and the portal's self-service token generation only exist for a client once an admin turns this on — the moment they actually ask for it, not as a standing capability everyone has to notice, ignore, or worry about. Turning it off is a kill switch, not just a lock on new tokens: middleware/clientApiAuth.js checks it on every call, so an existing token stops working the instant this flips, without anyone having to separately revoke it.",
         "description": "Requires the **automation** scope or higher. Automation key or any staff session. Clients, invoices, packages, agents.",
         "parameters": [
           {

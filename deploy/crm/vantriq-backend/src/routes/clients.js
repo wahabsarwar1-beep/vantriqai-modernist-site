@@ -4,7 +4,7 @@ const db = require('../db');
 const { hashPassword, generatePassword } = require('../utils/password');
 const { billOnActivation } = require('../utils/billing');
 const { quotaStatus } = require('../utils/quota');
-const { blockAutomation } = require('../middleware/auth');
+const { blockAutomation, isAdminRequest } = require('../middleware/auth');
 const router = express.Router();
 
 const FIELDS = [
@@ -449,6 +449,29 @@ router.delete('/:id/portal-credentials', blockAutomation, async (req, res) => {
   );
   await db.query(`delete from portal_sessions where client_id = $1`, [req.params.id]);
   res.status(204).end();
+});
+
+/**
+ * PATCH /api/clients/:id/api-access  { enabled: true|false }
+ *
+ * Off by default for every client. The read-only external API and the
+ * portal's self-service token generation only exist for a client once an
+ * admin turns this on — the moment they actually ask for it, not as a
+ * standing capability everyone has to notice, ignore, or worry about.
+ * Turning it off is a kill switch, not just a lock on new tokens:
+ * middleware/clientApiAuth.js checks it on every call, so an existing
+ * token stops working the instant this flips, without anyone having to
+ * separately revoke it.
+ */
+router.patch('/:id/api-access', async (req, res) => {
+  if (!isAdminRequest(req)) return res.status(403).json({ error: 'Only an admin can change API access.' });
+  const enabled = !!(req.body || {}).enabled;
+  const { rows } = await db.query(
+    `update clients set api_access_enabled = $2 where id = $1 returning id, company, api_access_enabled`,
+    [req.params.id, enabled]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Client not found' });
+  res.json(rows[0]);
 });
 
 /**

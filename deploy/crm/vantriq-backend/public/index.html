@@ -707,7 +707,8 @@ function clientFromApi(c){ return { id:c.id, name:c.name, company:c.company, ema
   customSetupFee:c.custom_setup_fee, customRetainer:c.custom_retainer, customQuota:c.custom_quota,
   customOverageRate:c.custom_overage_rate, customMsgsPerSession:c.custom_msgs_per_session,
   customAutomation:c.custom_automation||'', customDataLayer:c.custom_data_layer||'',
-  customAiModel:c.custom_ai_model||'', customChannels:c.custom_channels||'' }; }
+  customAiModel:c.custom_ai_model||'', customChannels:c.custom_channels||'',
+  apiAccessEnabled:!!c.api_access_enabled }; }
 function clientToApi(c){
   const out = { name:c.name, company:c.company, email:c.email, phone:c.phone, external_ref:c.externalRef||null,
     product_id:c.productId||null, stage:c.stage, est_value:c.estValue, source:c.source, notes:c.notes,
@@ -5429,6 +5430,16 @@ async function revokePortalCredentials(clientId){
   }catch(e){ showToast(e.message||'Could not revoke access','warn'); }
 }
 
+async function setClientApiAccess(clientId, enabled){
+  try{
+    await API.patch(`/api/clients/${clientId}/api-access`, { enabled });
+    const client = state.clients.find(c=>c.id===clientId);
+    if(client) client.apiAccessEnabled = enabled;
+    render();
+    showToast(enabled?'API access turned on for this customer':'API access turned off — any of their tokens stop working now');
+  }catch(e){ showToast(e.message||'Could not change that','warn'); render(); }
+}
+
 async function generatePortalLink_unused(clientId, regenerate){
   const area = document.getElementById('portal-link-area');
   if(area) area.innerHTML = '<span class="loading-dot"></span> Generating…';
@@ -6074,6 +6085,20 @@ function clientPanelHTML(id){
       ${c.portalEnabled?`<button class="btn btn-danger-ghost btn-sm" onclick="revokePortalCredentials('${c.id}')">Revoke access</button>`:''}
       <div style="margin-top:8px;font-size:11.5px;">The customer can also reset it themselves from the portal's "Forgot password" link — whatever they choose becomes their password here too.</div>
     </div>
+
+    ${authUser&&authUser.role==='admin'?`
+    <div class="divider"></div>
+    <h4 style="font-size:13px;margin-bottom:8px;">API access</h4>
+    <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">
+      Off by default. Turn this on only once this customer actually asks for a way to pull their
+      own data into their own systems — it adds a "Generate token" option to their portal's
+      Security tab. Turning it back off stops any token they already made from working, immediately.
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+      <input type="checkbox" ${c.apiAccessEnabled?'checked':''} onchange="setClientApiAccess('${c.id}',this.checked)">
+      API access enabled for this account
+    </label>
+    `:''}
 
     <div class="divider"></div>
     <h4 style="font-size:13px;margin-bottom:8px;">Invoice history</h4>

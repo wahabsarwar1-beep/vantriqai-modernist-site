@@ -15,6 +15,7 @@
 const fs = require('fs');
 const B = 'http://127.0.0.1:8099';
 const ADMIN_KEY = fs.readFileSync('/tmp/adminkey', 'utf8').trim();
+const AUTOMATION_KEY = fs.readFileSync('/tmp/automationkey', 'utf8').trim();
 const AH = { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY };
 const [PORTAL_USER, PORTAL_PASS] = fs.readFileSync('/tmp/cred.txt', 'utf8').trim().split('\n');
 
@@ -23,6 +24,7 @@ const ok = (c, m, x = '') => { c ? pass++ : fail++; console.log((c ? '  PASS ' :
 const J = async (r) => { try { return await r.json(); } catch { return null; } };
 const aget = (p) => fetch(B + p, { headers: AH }).then(async (r) => ({ status: r.status, body: await J(r) }));
 const apost = (p, b) => fetch(B + p, { method: 'POST', headers: AH, body: JSON.stringify(b || {}) }).then(async (r) => ({ status: r.status, body: await J(r) }));
+const apatch = (p, b) => fetch(B + p, { method: 'PATCH', headers: AH, body: JSON.stringify(b || {}) }).then(async (r) => ({ status: r.status, body: await J(r) }));
 const adel = (p) => fetch(B + p, { method: 'DELETE', headers: AH }).then(async (r) => ({ status: r.status, body: await J(r) }));
 
 const portalHeaders = (session) => ({ Authorization: `Bearer ${session}`, 'Content-Type': 'application/json' });
@@ -36,6 +38,27 @@ const cget = (token, p) => fetch(B + p, { headers: { 'x-client-api-key': token }
   const login = await fetch(`${B}/api/portal/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: PORTAL_USER, password: PORTAL_PASS }) }).then((r) => r.json());
   ok(!!login.session, 'portal login succeeds', JSON.stringify(login));
   const session = login.session;
+
+  const allClients = (await aget('/api/clients')).body;
+  const deltaClient = allClients.find((c) => c.portal_username === PORTAL_USER);
+  ok(!!deltaClient, 'the standing test customer\'s client record is found', PORTAL_USER);
+  const deltaId = deltaClient.id;
+
+  console.log('\n== off by default: nobody gets this until an admin turns it on ==');
+  const notAdmin = await fetch(`${B}/api/clients/${deltaId}/api-access`, {
+    method: 'PATCH', headers: { 'x-api-key': AUTOMATION_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: true }),
+  });
+  ok(notAdmin.status === 403, 'an automation key cannot flip this switch — only a real admin can', String(notAdmin.status));
+
+  // Reset explicitly rather than assuming the fixture's current state — a
+  // previous run of this exact test may have left it enabled.
+  const reset = await apatch(`/api/clients/${deltaId}/api-access`, { enabled: false });
+  ok(reset.body.api_access_enabled === false, 'reset to off before proving the refusal', JSON.stringify(reset.body));
+  const refused = await ppost(session, '/api/portal/api-tokens', { name: 'Should not be allowed yet' });
+  ok(refused.status === 403, 'generating a token is refused while it is off', JSON.stringify(refused.body));
+
+  const enable = await apatch(`/api/clients/${deltaId}/api-access`, { enabled: true });
+  ok(enable.status === 200 && enable.body.api_access_enabled === true, 'an admin turns it on for this one client', JSON.stringify(enable.body));
 
   console.log('\n== generating a token from the portal, self-service ==');
   const created = await ppost(session, '/api/portal/api-tokens', { name: 'Regression test token' });
@@ -89,6 +112,7 @@ const cget = (token, p) => fetch(B + p, { headers: { 'x-client-api-key': token }
   });
   ok(iso.status === 201, 'the isolation-test client is created', JSON.stringify(iso.body).slice(0, 150));
   const isoId = iso.body.id;
+  await apatch(`/api/clients/${isoId}/api-access`, { enabled: true });
   const isoUsername = 'client-api-iso-portal-' + Date.now();
   await apost(`/api/clients/${isoId}/portal-credentials`, { username: isoUsername, password: 'IsoTokenTestPass123' });
 
@@ -101,6 +125,14 @@ const cget = (token, p) => fetch(B + p, { headers: { 'x-client-api-key': token }
   const crossCheck = await cget(token, '/api/external/account');
   ok(crossCheck.body.company !== 'Isolation Test Co', 'and the first client\'s original token still sees only its own', JSON.stringify(crossCheck.body));
 
+  console.log('\n== turning API access off is a kill switch, not just a lock on new tokens ==');
+  await apatch(`/api/clients/${isoId}/api-access`, { enabled: false });
+  const killed = await cget(isoToken, '/api/external/account');
+  ok(killed.status === 403, 'a perfectly valid, unrevoked token stops working the instant access is turned off', JSON.stringify(killed.body));
+  await apatch(`/api/clients/${isoId}/api-access`, { enabled: true });
+  const restored = await cget(isoToken, '/api/external/account');
+  ok(restored.status === 200, 'and turning it back on brings the same token back to life — nothing about the token itself changed', JSON.stringify(restored.body).slice(0, 150));
+
   console.log('\n== revoking a token actually stops it ==');
   const revoke = await ppost(session, `/api/portal/api-tokens/${tokenId}/revoke`, {});
   ok(revoke.status === 200, 'revoking succeeds');
@@ -111,6 +143,9 @@ const cget = (token, p) => fetch(B + p, { headers: { 'x-client-api-key': token }
   await adel(`/api/clients/${isoId}`);
   const gone = await aget(`/api/clients/${isoId}`);
   ok(gone.status === 404, 'the isolation-test client is gone, nothing left on the real books');
+  await apatch(`/api/clients/${deltaId}/api-access`, { enabled: false });
+  const deltaAfter = (await aget(`/api/clients/${deltaId}`)).body;
+  ok(deltaAfter.api_access_enabled === false, 'the standing test customer is back to API access off, as found');
 
   console.log(`\n==== ${pass} passed, ${fail} failed ====\n`);
   process.exit(fail ? 1 : 0);

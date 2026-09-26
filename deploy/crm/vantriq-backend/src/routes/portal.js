@@ -136,6 +136,11 @@ router.get('/account', async (req, res) => {
     // Their own billing details, so a wrong NTN is visible to them before it
     // ends up on an invoice.
     billing: { ntn: client.ntn || '', strn: client.strn || '', address: client.billing_address || '' },
+    // Off by default, on only where an admin has turned it on for this one
+    // account — see routes/clients.js's PATCH /:id/api-access. The portal's
+    // API-access section stays entirely hidden until then, rather than
+    // showing every customer a feature almost none of them asked for.
+    api_access_enabled: !!client.api_access_enabled,
     // ai_model is intentionally omitted — internal delivery detail.
     package: eff ? {
       name: eff.name, retainer: eff.retainer, setup_fee: eff.setup_fee,
@@ -767,6 +772,9 @@ router.get('/api-tokens', async (req, res) => {
 
 /** POST /api/portal/api-tokens { name } — shown once, hashed immediately after. */
 router.post('/api-tokens', async (req, res) => {
+  if (!req.portalClient.api_access_enabled) {
+    return res.status(403).json({ error: 'API access is not enabled on your account. Contact us to turn it on.' });
+  }
   const name = String((req.body || {}).name || '').trim().slice(0, 120) || 'API token';
   const { rows: existing } = await db.query(
     `select count(*)::int as n from client_api_tokens where client_id = $1 and revoked = false`,
