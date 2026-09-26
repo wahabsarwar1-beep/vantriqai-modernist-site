@@ -7,6 +7,7 @@ const { issueReset, redeemReset, RESET_MINUTES } = require('../utils/resets');
 const { quotaStatus } = require('../utils/quota');
 const { buildTaxInvoice, getSettings } = require('../utils/billing');
 const { requirePortalSession } = require('../middleware/portalAuth');
+const { hashToken } = require('../middleware/clientApiAuth');
 const { effectivePackage } = require('../utils/pkg');
 const { acceptQuote, buildQuoteDocument } = require('./quotes');
 const { renderInvoicePdf, invoiceFilename } = require('../utils/invoicePdf');
@@ -744,6 +745,61 @@ router.post('/change-password', async (req, res) => {
   res.json({ ok: true, message: 'Your password has been changed. Other devices have been signed out.' });
 });
 
+/* ---------------------------- API access (self-service) ---------------------------- */
+/**
+ * A read-only token this customer can generate for THEIR OWN systems to
+ * call — see src/routes/externalApi.js and src/middleware/clientApiAuth.js.
+ * Deliberately self-service: nobody at VantriqAI has to run a script for a
+ * customer to get one, and nothing here can create, change, or delete
+ * anything — it can only unlock the read-only routes under /api/external.
+ */
+const CLIENT_TOKEN_MAX = 5;
+
+/** GET /api/portal/api-tokens — list this account's tokens, never the plaintext. */
+router.get('/api-tokens', async (req, res) => {
+  const { rows } = await db.query(
+    `select id, name, created_at, last_used_at, revoked from client_api_tokens
+      where client_id = $1 order by created_at desc`,
+    [req.portalClient.id]
+  );
+  res.json(rows);
+});
+
+/** POST /api/portal/api-tokens { name } — shown once, hashed immediately after. */
+router.post('/api-tokens', async (req, res) => {
+  const name = String((req.body || {}).name || '').trim().slice(0, 120) || 'API token';
+  const { rows: existing } = await db.query(
+    `select count(*)::int as n from client_api_tokens where client_id = $1 and revoked = false`,
+    [req.portalClient.id]
+  );
+  if (existing[0].n >= CLIENT_TOKEN_MAX) {
+    return res.status(409).json({ error: `You already have ${CLIENT_TOKEN_MAX} active tokens. Revoke one before creating another.` });
+  }
+
+  const plaintext = 'vqc_' + crypto.randomBytes(24).toString('hex');
+  const tokenHash = hashToken(plaintext);
+  const { rows } = await db.query(
+    `insert into client_api_tokens (client_id, name, token_hash) values ($1,$2,$3)
+       returning id, name, created_at`,
+    [req.portalClient.id, name, tokenHash]
+  );
+  res.status(201).json({
+    ...rows[0],
+    token: plaintext,
+    message: 'Copy this now — it will not be shown again. Read-only: it can pull your account, invoices and usage, and nothing else.',
+  });
+});
+
+/** POST /api/portal/api-tokens/:id/revoke — immediate, irreversible. */
+router.post('/api-tokens/:id/revoke', async (req, res) => {
+  const { rows } = await db.query(
+    `update client_api_tokens set revoked = true where id = $1 and client_id = $2 returning id`,
+    [req.params.id, req.portalClient.id]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Token not found' });
+  res.json({ ok: true, message: 'That token no longer works. Anything using it will need a new one.' });
+});
+
 /* ---------------------------- Agents ---------------------------- */
 /**
  * Every agent running under this company. A customer with a WhatsApp agent,
@@ -989,3 +1045,4 @@ router.post('/quotes/:id/decline', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.formatInvoice = formatInvoice;

@@ -304,7 +304,8 @@ let SESSION = '';
 try { SESSION = localStorage.getItem(SESSION_KEY) || ''; } catch(e) { SESSION = ''; }
 
 let data = { account:null, usage:null, invoices:[], ledger:null, packages:null, activity:null,
-  agents:null, bundles:null, quotes:null };
+  agents:null, bundles:null, quotes:null, apiTokens:null };
+let apiTokenBusy = false;
 let bundleBusy = false;
 let passwordBusy = false;
 let activityMonth = '';   // '' = current month
@@ -461,7 +462,7 @@ async function doLogout(){
   try{ await fetch('/api/portal/logout', { method:'POST', headers:{'Authorization':'Bearer '+SESSION} }); }catch(e){}
   setSession('');
   data = { account:null, usage:null, invoices:[], ledger:null, packages:null,
-    agents:null, bundles:null, quotes:null, activity:null };
+    agents:null, bundles:null, quotes:null, activity:null, apiTokens:null };
   currentTab = 'overview';
   renderLogin('You have been signed out.');
 }
@@ -1354,7 +1355,91 @@ function renderSecurity(){
       so nobody can redirect it.
     </p>
     <button class="btn btn-ghost" onclick="doLogout()">Sign out</button>
+  </div>
+
+  ${renderApiTokens()}`;
+}
+
+/* ---------------------------- API access (self-service) ---------------------------- */
+function renderApiTokens(){
+  if(data.apiTokens === null){ requestAnimationFrame(loadApiTokens); }
+  const tokens = data.apiTokens || [];
+  return `
+  <div class="card" style="margin-top:14px;">
+    <h3 style="margin-top:0;font-size:15px;">API access</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;line-height:1.6;">
+      A read-only key for your own systems — an accounting tool, a dashboard — to pull your
+      account, invoices and usage automatically. It can never change anything, and it can
+      never see anyone else's account. Give it to a developer the same way you would any
+      other password: once, over a channel you trust.
+    </p>
+    ${data.apiTokens === null
+      ? `<div class="empty"><span class="loading-dot"></span> Loading…</div>`
+      : tokens.length
+        ? `<div class="table-wrap"><table>
+            <thead><tr><th>Name</th><th>Created</th><th>Last used</th><th></th></tr></thead>
+            <tbody>${tokens.filter(t=>!t.revoked).map(t=>`
+              <tr>
+                <td><strong>${esc(t.name)}</strong></td>
+                <td>${fmtDate(t.created_at)}</td>
+                <td>${t.last_used_at?fmtDate(t.last_used_at):'Never'}</td>
+                <td style="text-align:right;"><button class="btn btn-ghost btn-sm" onclick="revokeApiToken('${t.id}')">Revoke</button></td>
+              </tr>`).join('')}
+            </tbody>
+          </table></div>`
+        : `<div class="empty" style="padding:14px 0;">No API tokens yet.</div>`}
+    <div id="new-token-box" style="margin-top:12px;"></div>
+    <button class="btn btn-primary" style="margin-top:12px;" onclick="createApiToken()" ${apiTokenBusy?'disabled':''}>
+      ${apiTokenBusy?'Generating…':'Generate a new token'}
+    </button>
   </div>`;
+}
+
+async function loadApiTokens(){
+  try{ data.apiTokens = await api('/api-tokens'); render(); }
+  catch(e){ if(e.expired) return renderLogin('Your session has ended. Please sign in again.'); data.apiTokens = []; render(); }
+}
+
+async function createApiToken(){
+  const name = (prompt('What is this token for? (e.g. "Accounting software")') || '').trim();
+  if(!name) return;
+  apiTokenBusy = true; render();
+  try{
+    const r = await api('/api-tokens', { method:'POST', body: JSON.stringify({ name }) });
+    apiTokenBusy = false;
+    // Refreshed inline, in one render, rather than nulling data.apiTokens and
+    // letting the lazy-loader's own later render overwrite the token box
+    // underneath it a moment after it appears.
+    data.apiTokens = await api('/api-tokens');
+    render();
+    const box = document.getElementById('new-token-box');
+    if(box) box.innerHTML = `
+      <div class="card" style="background:var(--teal-light);border-color:#BFE3D8;">
+        <div style="font-weight:600;color:var(--teal-dark);margin-bottom:8px;">Token created</div>
+        <div class="mono" style="font-size:13px;word-break:break-all;background:#fff;border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-bottom:10px;">${esc(r.token)}</div>
+        <button class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText('${esc(r.token)}').then(()=>toast('Copied'))">Copy</button>
+        <div style="margin-top:10px;background:var(--amber-light);color:#8A5F17;padding:8px 10px;border-radius:8px;font-size:11.5px;">
+          Shown once — it will not be shown again. Send it as x-client-api-key on requests to
+          ${esc(location.origin)}/api/external/... — for example GET /api/external/invoices.
+        </div>
+      </div>`;
+  }catch(e){
+    apiTokenBusy = false; render();
+    if(e.expired) return renderLogin('Your session has ended. Please sign in again.');
+    toast(e.message || 'Could not create that token', true);
+  }
+}
+
+async function revokeApiToken(id){
+  if(!confirm('Revoke this token?\n\nAnything using it stops working immediately — this cannot be undone.')) return;
+  try{
+    await api(`/api-tokens/${id}/revoke`, { method:'POST' });
+    data.apiTokens = null; render();
+    toast('Token revoked.');
+  }catch(e){
+    if(e.expired) return renderLogin('Your session has ended. Please sign in again.');
+    toast(e.message || 'Could not revoke that token', true);
+  }
 }
 
 function checkPasswordStrength(){

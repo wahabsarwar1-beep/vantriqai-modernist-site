@@ -15,6 +15,8 @@ const dashboardRoutes = require('./routes/dashboard');
 const financialsRoutes = require('./routes/financials');
 const settingsRoutes = require('./routes/settings');
 const portalRoutes = require('./routes/portal');
+const externalApiRoutes = require('./routes/externalApi');
+const { requireClientApiToken } = require('./middleware/clientApiAuth');
 const repsRoutes = require('./routes/reps');
 const repPortalRoutes = require('./routes/repPortal');
 const packageRequestsRoutes = require('./routes/packageRequests');
@@ -67,6 +69,13 @@ app.use('/api/portal', portalRoutes);
 // src/middleware/repAuth.js. Same mount-order reasoning as the customer
 // portal above: must come before the generic '/api' admin mount.
 app.use('/api/rep', requireRep, repPortalRoutes);
+
+// A customer's own read-only token (client_api_tokens, x-client-api-key) for
+// THEIR systems to pull THEIR data — generated and revoked by the customer
+// themselves via POST/GET/DELETE /api/portal/api-tokens. See
+// src/routes/externalApi.js and src/middleware/clientApiAuth.js. Same
+// mount-order reasoning as the portals above.
+app.use('/api/external', requireClientApiToken, externalApiRoutes);
 
 // Everything else under /api/* requires an admin key EXCEPT the usage webhook,
 // which accepts a lower-privileged 'webhook' scoped key so n8n never

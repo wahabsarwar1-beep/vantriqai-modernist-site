@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "VantriqAI CRM API",
-    "version": "9.11.1",
+    "version": "9.12.0",
     "description": "The CRM behind VantriqAI: clients, invoices, payments, quotes and proposals,\ncontracts, statements, and the webhook surface the AI agents write through.\n\n## Authentication\n\nTwo ways in, and one of them is for people:\n\n- **Staff session** — `Authorization: Bearer <token>`, issued by `POST /api/auth/verify`\n  after a password and an emailed one-time code. A staff member's role decides reach.\n- **API key** — `x-api-key: <key>`, for machines. Keys are scoped.\n\n## Scopes\n\nLeast to most: `webhook` < `automation` < `staff` < `admin`. A scope opens everything\nbelow it. The admin key opens everything and is intended as break-glass only — set\n`ALLOW_API_KEY_LOGIN=false` once staff accounts exist.\n\n## Automation writes through this API, never to the database\n\nn8n and any other integration must use these endpoints rather than connecting to\nPostgres. Tenancy, quota and tax rules live here; a direct write bypasses all three."
   },
   "servers": [
@@ -61,6 +61,9 @@
     },
     {
       "name": "exportBase"
+    },
+    {
+      "name": "externalApi"
     },
     {
       "name": "financials"
@@ -651,7 +654,7 @@
         "tags": [
           "agents"
         ],
-        "summary": "GET /api/agents/:id/usage — that one agent's month-by-month history. */",
+        "summary": "GET /api/agents/:id/usage — that one agent's month-by-month history.",
         "description": "Requires the **automation** scope or higher. Automation key or any staff session. Clients, invoices, packages, agents.",
         "parameters": [
           {
@@ -700,7 +703,7 @@
         "tags": [
           "archive"
         ],
-        "summary": "GET /api/archive — what is live, what has been archived, and past runs. */",
+        "summary": "GET /api/archive — what is live, what has been archived, and past runs.",
         "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
         "parameters": [],
         "responses": {
@@ -780,7 +783,7 @@
         "tags": [
           "archive"
         ],
-        "summary": "GET /api/archive/preview?months=12 — what a run would take, and nothing else. */",
+        "summary": "GET /api/archive/preview?months=12 — what a run would take, and nothing else.",
         "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
         "parameters": [],
         "responses": {
@@ -1596,7 +1599,7 @@
         "tags": [
           "billingOps"
         ],
-        "summary": "Matching one by hand, when the rules would not commit to an answer. */",
+        "summary": "Matching one by hand, when the rules would not commit to an answer.",
         "description": "Requires the **automation** scope or higher. Automation key or any staff session. Clients, invoices, packages, agents.",
         "parameters": [
           {
@@ -1747,7 +1750,7 @@
         "tags": [
           "billingOps"
         ],
-        "summary": "Installs a sensible default schedule so nobody starts from a blank page. */",
+        "summary": "Installs a sensible default schedule so nobody starts from a blank page.",
         "description": "Requires the **automation** scope or higher. Automation key or any staff session. Clients, invoices, packages, agents.",
         "parameters": [],
         "requestBody": {
@@ -2490,7 +2493,7 @@
         "tags": [
           "clientDocuments"
         ],
-        "summary": "GET /api/clients/:id/documents */",
+        "summary": "GET /api/clients/:id/documents",
         "description": "Requires the **automation** scope or higher. Automation key or any staff session. Clients, invoices, packages, agents.",
         "parameters": [
           {
@@ -2537,7 +2540,7 @@
         "tags": [
           "clientDocuments"
         ],
-        "summary": "POST /api/clients/:id/documents { doc_type, title, filename, content_type, data } */",
+        "summary": "POST /api/clients/:id/documents { doc_type, title, filename, content_type, data }",
         "description": "Requires the **automation** scope or higher. Automation key or any staff session. Clients, invoices, packages, agents.",
         "parameters": [
           {
@@ -2597,7 +2600,7 @@
         "tags": [
           "clientDocuments"
         ],
-        "summary": "DELETE /api/clients/:id/documents/:docId */",
+        "summary": "DELETE /api/clients/:id/documents/:docId",
         "description": "Requires the **automation** scope or higher. Automation key or any staff session. Clients, invoices, packages, agents.",
         "parameters": [
           {
@@ -2652,7 +2655,7 @@
         "tags": [
           "clientDocuments"
         ],
-        "summary": "PATCH /api/clients/:id/documents/:docId — retitle or reclassify. */",
+        "summary": "PATCH /api/clients/:id/documents/:docId — retitle or reclassify.",
         "description": "Requires the **automation** scope or higher. Automation key or any staff session. Clients, invoices, packages, agents.",
         "parameters": [
           {
@@ -2720,7 +2723,7 @@
         "tags": [
           "clientDocuments"
         ],
-        "summary": "GET /api/clients/:id/documents/:docId/download */",
+        "summary": "GET /api/clients/:id/documents/:docId/download",
         "description": "Requires the **automation** scope or higher. Automation key or any staff session. Clients, invoices, packages, agents.",
         "parameters": [
           {
@@ -3249,7 +3252,7 @@
         "tags": [
           "contracts"
         ],
-        "summary": "GET /api/contracts[?client_id=&status=&expiring=true] */",
+        "summary": "GET /api/contracts[?client_id=&status=&expiring=true]",
         "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
         "parameters": [],
         "responses": {
@@ -3287,7 +3290,7 @@
         "tags": [
           "contracts"
         ],
-        "summary": "POST /api/contracts */",
+        "summary": "POST /api/contracts",
         "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
         "parameters": [],
         "requestBody": {
@@ -3338,7 +3341,7 @@
         "tags": [
           "contracts"
         ],
-        "summary": "DELETE /api/contracts/:id */",
+        "summary": "DELETE /api/contracts/:id",
         "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
         "parameters": [
           {
@@ -3385,7 +3388,7 @@
         "tags": [
           "contracts"
         ],
-        "summary": "GET /api/contracts/:id */",
+        "summary": "GET /api/contracts/:id",
         "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
         "parameters": [
           {
@@ -3432,7 +3435,7 @@
         "tags": [
           "contracts"
         ],
-        "summary": "PATCH /api/contracts/:id */",
+        "summary": "PATCH /api/contracts/:id",
         "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
         "parameters": [
           {
@@ -3903,6 +3906,264 @@
         ]
       }
     },
+    "/api/external/account": {
+      "get": {
+        "tags": [
+          "externalApi"
+        ],
+        "summary": "GET /api/external/account — company, package, service status.",
+        "description": "Requires the **client-token** scope or higher.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/external/agents": {
+      "get": {
+        "tags": [
+          "externalApi"
+        ],
+        "summary": "GET /api/external/agents — this account's agents (channels/numbers).",
+        "description": "Requires the **client-token** scope or higher.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/external/invoices": {
+      "get": {
+        "tags": [
+          "externalApi"
+        ],
+        "summary": "GET /api/external/invoices — every invoice on this account.",
+        "description": "Requires the **client-token** scope or higher.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/external/invoices/{id}": {
+      "get": {
+        "tags": [
+          "externalApi"
+        ],
+        "summary": "GET /api/external/invoices/:id — one invoice, with its line items.",
+        "description": "Requires the **client-token** scope or higher.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/external/invoices/{id}/pdf": {
+      "get": {
+        "tags": [
+          "externalApi"
+        ],
+        "summary": "GET /api/external/invoices/:id/pdf — the same PDF the portal downloads.",
+        "description": "Requires the **client-token** scope or higher.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/external/usage": {
+      "get": {
+        "tags": [
+          "externalApi"
+        ],
+        "summary": "GET /api/external/usage[?month=YYYY-MM] — session-level usage, the same unit the invoice is billed on. Mirrors portal.js's GET /activity exactly, including what it deliberately leaves out: the raw session_id.",
+        "description": "Requires the **client-token** scope or higher.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
     "/api/financials": {
       "get": {
         "tags": [
@@ -4117,7 +4378,7 @@
         "tags": [
           "invoices"
         ],
-        "summary": "One invoice with its printed body and its ledger. */",
+        "summary": "One invoice with its printed body and its ledger.",
         "description": "Requires the **automation** scope or higher. Automation key or any staff session. Clients, invoices, packages, agents.",
         "parameters": [
           {
@@ -4166,7 +4427,7 @@
         "tags": [
           "invoices"
         ],
-        "summary": "What has been emailed about this invoice, and when. */",
+        "summary": "What has been emailed about this invoice, and when.",
         "description": "Requires the **automation** scope or higher. Automation key or any staff session. Clients, invoices, packages, agents.",
         "parameters": [
           {
@@ -4384,7 +4645,7 @@
         "tags": [
           "invoices"
         ],
-        "summary": "The printable tax invoice — see buildTaxInvoice in src/utils/billing.js. */",
+        "summary": "The printable tax invoice — see buildTaxInvoice in src/utils/billing.js.",
         "description": "Requires the **automation** scope or higher. Automation key or any staff session. Clients, invoices, packages, agents.",
         "parameters": [
           {
@@ -4695,7 +4956,7 @@
         "tags": [
           "payments"
         ],
-        "summary": "GET /api/payments?client_id=&invoice_id=&from=&to=&kind= */",
+        "summary": "GET /api/payments?client_id=&invoice_id=&from=&to=&kind=",
         "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
         "parameters": [],
         "responses": {
@@ -4733,7 +4994,7 @@
         "tags": [
           "payments"
         ],
-        "summary": "POST /api/payments — record one ledger row against one invoice. */",
+        "summary": "POST /api/payments — record one ledger row against one invoice.",
         "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
         "parameters": [],
         "requestBody": {
@@ -4784,7 +5045,7 @@
         "tags": [
           "payments"
         ],
-        "summary": "Deleting a ledger row is a correction, so the invoice restates itself. */",
+        "summary": "Deleting a ledger row is a correction, so the invoice restates itself.",
         "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
         "parameters": [
           {
@@ -4976,6 +5237,134 @@
         "security": []
       }
     },
+    "/api/portal/api-tokens": {
+      "get": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "GET /api/portal/api-tokens — list this account's tokens, never the plaintext.",
+        "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": []
+      },
+      "post": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "POST /api/portal/api-tokens { name } — shown once, hashed immediately after.",
+        "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
+        "parameters": [],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/portal/api-tokens/{id}/revoke": {
+      "post": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "POST /api/portal/api-tokens/:id/revoke — immediate, irreversible.",
+        "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": []
+      }
+    },
     "/api/portal/bundles": {
       "get": {
         "tags": [
@@ -5056,7 +5445,7 @@
         "tags": [
           "portal"
         ],
-        "summary": "Ending a bundle. It runs to the end of the month already paid for. */",
+        "summary": "Ending a bundle. It runs to the end of the month already paid for.",
         "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
         "parameters": [
           {
@@ -5336,7 +5725,7 @@
         "tags": [
           "portal"
         ],
-        "summary": "The same printable tax invoice the CRM produces, for the customer's own records. */",
+        "summary": "The same printable tax invoice the CRM produces, for the customer's own records.",
         "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
         "parameters": [
           {
@@ -5565,7 +5954,7 @@
         "tags": [
           "portal"
         ],
-        "summary": "Quotes we have sent this customer, and the ones they have decided on. */",
+        "summary": "Quotes we have sent this customer, and the ones they have decided on.",
         "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
         "parameters": [],
         "responses": {
@@ -5598,7 +5987,7 @@
         "tags": [
           "portal"
         ],
-        "summary": "The customer accepting their own quote — this is what makes it real. */",
+        "summary": "The customer accepting their own quote — this is what makes it real.",
         "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
         "parameters": [
           {
@@ -5704,7 +6093,7 @@
         "tags": [
           "portal"
         ],
-        "summary": "The printable quotation, same document the CRM produces. */",
+        "summary": "The printable quotation, same document the CRM produces.",
         "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
         "parameters": [
           {
@@ -6512,7 +6901,7 @@
         "tags": [
           "quotes"
         ],
-        "summary": "A quote with its body, or a list of them. */",
+        "summary": "A quote with its body, or a list of them.",
         "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
         "parameters": [],
         "responses": {
@@ -6924,7 +7313,7 @@
         "tags": [
           "quotes"
         ],
-        "summary": "The proposal as JSON, for the CRM to preview without rendering a PDF. */",
+        "summary": "The proposal as JSON, for the CRM to preview without rendering a PDF.",
         "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
         "parameters": [
           {
@@ -6973,7 +7362,7 @@
         "tags": [
           "quotes"
         ],
-        "summary": "The proposal as a PDF, ready to send. */",
+        "summary": "The proposal as a PDF, ready to send.",
         "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
         "parameters": [
           {
@@ -7022,7 +7411,7 @@
         "tags": [
           "quotes"
         ],
-        "summary": "Marks it sent. The customer sees it in their portal from this point. */",
+        "summary": "Marks it sent. The customer sees it in their portal from this point.",
         "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
         "parameters": [
           {
@@ -7825,7 +8214,7 @@
         "tags": [
           "settings"
         ],
-        "summary": "Idempotent: creates what is missing, leaves what exists alone. */",
+        "summary": "Idempotent: creates what is missing, leaves what exists alone.",
         "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
         "parameters": [],
         "requestBody": {
@@ -8132,7 +8521,7 @@
         "tags": [
           "subscriptions"
         ],
-        "summary": "What this client would be billed for a month, without billing them. */",
+        "summary": "What this client would be billed for a month, without billing them.",
         "description": "Requires the **automation** scope or higher. Automation key or any staff session. Clients, invoices, packages, agents.",
         "parameters": [
           {

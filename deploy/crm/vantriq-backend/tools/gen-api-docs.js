@@ -56,7 +56,8 @@ for (const line of indexSrc.split('\n')) {
   const file = varToFile[varName];
   if (!file) continue;                       // express.json() and friends
   const scope = (rest.match(/requireScope\('(\w+)'\)/) || [])[1]
-    || (/requireRep/.test(rest) ? 'rep-session' : null);
+    || (/requireRep/.test(rest) ? 'rep-session' : null)
+    || (/requireClientApiToken/.test(rest) ? 'client-token' : null);
   mounts.push({ mountPath, file, scope, varName });
 }
 
@@ -72,7 +73,11 @@ function commentAbove(src, index) {
     if (!l) { if (out.length) break; continue; }
     if (l.startsWith('*/')) continue;
     if (l.startsWith('*') || l.startsWith('/**') || l.startsWith('//')) {
-      out.unshift(l.replace(/^\/\*\*|^\*\/|^\*|^\/\//, '').trim());
+      // A one-line /** ... */ comment carries both markers on the same line;
+      // the anchored regex below only ever strips one end of it, leaving a
+      // literal trailing */ in the rendered docs. Stripped separately so
+      // both single- and multi-line comment styles come out clean.
+      out.unshift(l.replace(/^\/\*\*|^\*\/|^\*|^\/\//, '').replace(/\*\/\s*$/, '').trim());
       continue;
     }
     break;
@@ -338,8 +343,8 @@ fs.writeFileSync(path.join(OUT, 'README.md'), md.join('\n'));
 console.log(`${endpoints.length} endpoints across ${Object.keys(byModule).length} modules`);
 console.log(`  docs/api/openapi.json  (${Object.keys(paths).length} paths)`);
 console.log('  docs/api/README.md');
-const unscoped = endpoints.filter((e) => !e.scope && !['portal', 'auth', 'index', 'repPortal'].includes(e.module));
+const unscoped = endpoints.filter((e) => !e.scope && !['portal', 'auth', 'index', 'repPortal', 'externalApi'].includes(e.module));
 if (unscoped.length) {
-  console.log('\nWARNING — endpoints with no scope that are not portal/auth/health:');
+  console.log('\nWARNING — endpoints with no scope that are not portal/auth/externalApi/health:');
   for (const e of unscoped) console.log(`  ${e.method.toUpperCase()} ${e.path}`);
 }

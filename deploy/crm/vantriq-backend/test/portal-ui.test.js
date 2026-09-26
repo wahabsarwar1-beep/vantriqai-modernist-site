@@ -57,6 +57,17 @@ const ok=(c,m,x='')=>{ c?pass++:fail++; console.log((c?'  PASS ':'  FAIL ')+m+(c
   await page.reload({ waitUntil:'networkidle' });
   ok(await page.locator('#lg_user').count()===1, 'still signed out after reload');
 
+  // Cleanup: step 6 above deliberately leaves a pending package_request (to
+  // prove it hides the "Request this package" buttons) — reject it here
+  // rather than leaving it to block the next run of this exact test, the
+  // way it silently has more than once.
+  try {
+    const key = fs.readFileSync('/tmp/adminkey', 'utf8').trim();
+    const list = await fetch(`${B}/api/package-requests`, { headers: { 'x-api-key': key } }).then((r) => r.json());
+    const pending = (list || []).find((r) => r.status === 'pending');
+    if (pending) await fetch(`${B}/api/package-requests/${pending.id}/reject`, { method: 'POST', headers: { 'x-api-key': key, 'Content-Type': 'application/json' }, body: '{}' });
+  } catch (e) { console.log('  (cleanup skipped:', e.message, ')'); }
+
   if(errs.length) console.log('  page errors:', errs.slice(0,3));
   console.log(`\n==== portal UI: ${pass} passed, ${fail} failed ====`);
   await browser.close();
