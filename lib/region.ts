@@ -31,8 +31,15 @@ export type Region = {
   /** Hero card outcomes and asks that would otherwise name PKR or a PK city. */
   quoteOutcome: string;
   propertyAsk: string;
-  workspaceLocation: string;
   phonePlaceholder: string;
+  /**
+   * The language claim. Roman Urdu is a selling point at home and a
+   * narrowing one abroad, where naming one country's language reads as a
+   * limit rather than a feature.
+   */
+  languagesFigure: string;
+  languagesLabel: string;
+  languagesPhrase: string;
 };
 
 export const REGIONS: Record<RegionKey, Region> = {
@@ -47,8 +54,10 @@ export const REGIONS: Record<RegionKey, Region> = {
       "A one-time setup fee plus a simple monthly plan, quoted in PKR after we scope your workflow. No hidden surprises, and no charge for normal business volume.",
     quoteOutcome: "Quote accepted · PKR value logged",
     propertyAsk: "Looking for a 2-bed in DHA, under 3 crore.",
-    workspaceLocation: "Karachi",
     phonePlaceholder: "+92 341 1120049",
+    languagesFigure: "EN·UR",
+    languagesLabel: "english & roman urdu",
+    languagesPhrase: "English or Roman Urdu",
   },
   global: {
     key: "global",
@@ -61,8 +70,10 @@ export const REGIONS: Record<RegionKey, Region> = {
       "A one-time setup fee plus a simple monthly plan, quoted in US dollars after we scope your workflow. No hidden surprises, and no charge for normal business volume.",
     quoteOutcome: "Quote accepted · US$ value logged",
     propertyAsk: "Looking for a 2-bed downtown, under $400k.",
-    workspaceLocation: "Worldwide",
     phonePlaceholder: "+1 555 0143",
+    languagesFigure: "ANY",
+    languagesLabel: "language they write in",
+    languagesPhrase: "whatever language they write in",
   },
 };
 

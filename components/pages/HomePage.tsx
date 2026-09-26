@@ -116,7 +116,7 @@ export default function HomePage({ region }: { region: Region }) {
               <p data-anim="" style={{ fontSize: 16, lineHeight: "28px", margin: "0 0 32px", maxWidth: "50ch", ...bodyMuted }}>One agent, plugged into your channels and your calendar, answering every hour you are closed. Below: a real exchange replayed at the speed it actually runs.</p>
               <div data-anim="">
                 <div style={{ position: "relative", display: "grid", justifyItems: "center", alignContent: "center", minHeight: "clamp(400px,42vw,520px)" }}>
-                  <TileBand />
+                  <TileBand region={region} />
                   <ConversationDemo />
                 </div>
                 <div style={{ position: "relative", zIndex: 1, background: "var(--color-bg)", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(228px,100%),1fr))", gap: "0 clamp(24px,4vw,56px)", marginTop: "clamp(28px,4vw,44px)" }}>

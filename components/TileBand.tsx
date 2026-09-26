@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import type { Region } from "@/lib/region";
 import Marquee from "@/components/Marquee";
 
 function Tile({ w, h, bg, color, border, padding = 20, children }: { w: number; h: number; bg: string; color?: string; border?: string; padding?: number; children: ReactNode }) {
@@ -88,7 +89,7 @@ function FrontRow() {
   );
 }
 
-function BackRow() {
+function BackRow({ region }: { region: Region }) {
   return (
     <>
       <Stat w={172} h={172} bg="var(--color-surface)" border="1px solid var(--color-divider)" value="3m" label="message to booked" />
@@ -98,12 +99,12 @@ function BackRow() {
       <Stat w={172} h={172} bg="var(--color-neutral-900)" color="var(--color-bg)" value="0" label="missed nights" />
       <Stat w={172} h={172} bg="var(--color-neutral-100)" value="68%" label="messages after hours" />
       <Message w={250} h={172} bg="var(--color-neutral-100)" badge="Follow-up" text="Nudged 14 quiet leads this week" />
-      <Stat w={172} h={172} bg="var(--color-surface)" border="1px solid var(--color-divider)" value="EN·UR" label="english & roman urdu" />
+      <Stat w={172} h={172} bg="var(--color-surface)" border="1px solid var(--color-divider)" value={region.languagesFigure} label={region.languagesLabel} />
     </>
   );
 }
 
-export default function TileBand() {
+export default function TileBand({ region }: { region: Region }) {
   return (
     <div
       aria-hidden="true"
@@ -132,7 +133,7 @@ export default function TileBand() {
         <div style={{ opacity: 0.6, filter: "saturate(.9)" }}>
           <Marquee duration={82} reverse>
             <div style={{ display: "flex", gap: 16, marginRight: 16 }}>
-              <BackRow />
+              <BackRow region={region} />
             </div>
           </Marquee>
         </div>

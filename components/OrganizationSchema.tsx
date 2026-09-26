@@ -23,17 +23,16 @@ export default function OrganizationSchema() {
     url: SITE_URL,
     logo: `${SITE_URL}/ventriqai-lockup-cobalt.svg`,
     description: DEFAULT_DESCRIPTION,
-    address: {
-      "@type": "PostalAddress",
-      addressLocality: "Islamabad",
-      addressCountry: "PK",
-    },
+    // No postal address on purpose. The handoff put a city here and the site
+    // named a different one; rather than pick, the company is described by
+    // where it works instead of where it sits. Schema.org does not require an
+    // address, and a wrong one is worse than none.
     areaServed: "Worldwide",
     contactPoint: {
       "@type": "ContactPoint",
       contactType: "sales",
       telephone: WHATSAPP_DISPLAY,
-      availableLanguage: ["en", "ur"],
+      availableLanguage: ["en"],
       areaServed: "Worldwide",
     },
   };

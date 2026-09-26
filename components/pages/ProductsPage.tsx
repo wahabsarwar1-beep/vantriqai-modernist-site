@@ -24,10 +24,12 @@ type Product = {
 
 const bg = "var(--color-bg)";
 
-const PRODUCTS: Product[] = [
+/* A function of the region: the WhatsApp module names the languages it
+   answers in, and that claim is not the same one abroad. */
+const products = (region: Region): Product[] => [
   {
     kicker: "Channel", name: "WhatsApp Agent", tier: "From Starter", tint: "accent", featured: true, mark: "whatsapp",
-    body: "The core module. Answers, qualifies and books on the channel your customers already open twenty times a day — English or Roman Urdu, any hour.",
+    body: `The core module. Answers, qualifies and books on the channel your customers already open twenty times a day — in ${region.languagesPhrase}, any hour.`,
   },
   {
     kicker: "Channel", name: "Social Agent", tier: "From Growth", tint: "accent", mark: "social",
@@ -116,7 +118,7 @@ export default function ProductsPage({ region }: { region: Region }) {
 
       <section style={{ borderTop: "1px solid var(--color-divider)", borderBottom: "1px solid var(--color-divider)" }}>
         <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(22px,3vw,40px) clamp(20px,5vw,64px)", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(300px,100%),1fr))", gap: 18 }}>
-          {PRODUCTS.map((p) => (
+          {products(region).map((p) => (
             <div key={p.name} data-anim="" data-tilt="" className="card hover-lift-5" style={{ padding: "clamp(26px,3vw,40px) clamp(20px,2.5vw,36px)", boxShadow: "var(--shadow-sm)", display: "flex", flexDirection: "column", ...(p.featured ? { background: "var(--color-accent-100)" } : {}) }}>
               {p.mark ? (
                 <ProductMark id={p.mark} />

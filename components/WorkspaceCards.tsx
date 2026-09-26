@@ -10,8 +10,8 @@ const OUT = "calc(var(--tile-out) * -1)";
 
 type Tile = { label?: string; fig: string; sub: string; tone: "surface" | "ink" | "accent"; pos: CSSProperties };
 
-/* A function of the region because the first card's header names where the
-   branches are, which is not the same claim on the global site. */
+/* Still a function of the region so a region-specific string can be dropped
+   in without restructuring, though nothing needs one today. */
 const cards = (region: Region): {
   n: string;
   title: string;
@@ -25,7 +25,7 @@ const cards = (region: Region): {
     title: "Organised by default",
     body: "Every module in one place, each switched on only when your day actually needs it.",
     tint: "var(--blob-peach)",
-    head: ["Your modules", region.workspaceLocation],
+    head: ["Your modules", "All branches"],
     tiles: [
       { label: "Branches", fig: "3", sub: "all live", tone: "surface", pos: { top: "17%", right: OUT, transform: "rotate(4deg)" } },
       { fig: "0", sub: "bleed between", tone: "ink", pos: { bottom: "12%", left: OUT, transform: "rotate(-5deg)" } },
@@ -64,7 +64,7 @@ const MODULES: [string, boolean][] = [
 ];
 
 const THREAD = [
-  { mine: false, text: "Do you deliver to Clifton?" },
+  { mine: false, text: "Do you deliver to my area?" },
   { mine: true, text: "Yes — same day before 4pm." },
   { mine: false, text: "Please do. Tomorrow works." },
   { mine: true, text: "Booked. I've sent the confirmation." },
