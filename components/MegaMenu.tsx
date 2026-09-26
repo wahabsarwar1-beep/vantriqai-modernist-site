@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useSyncExternalStore } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import ColumnIcon from "@/components/ColumnIcon";
 import ProductMark from "@/components/ProductMark";
 import type { MenuPanel } from "@/lib/menu";
@@ -61,6 +62,7 @@ export default function MegaMenu({
   const wrapRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLAnchorElement>(null);
   const hoverable = useHoverable();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!open) return;
@@ -204,13 +206,13 @@ export default function MegaMenu({
               </p>
               <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 2 }}>
                 {col.links.map((l) => {
-                  const here = !!currentSection && l.href.endsWith(`#${currentSection}`);
+                  const here = l.href === pathname || (!!currentSection && l.href.endsWith(`#${currentSection}`));
                   return (
                   <li key={l.href}>
                     <Link
                       href={l.href}
                       className="mega-link"
-                      aria-current={here ? "location" : undefined}
+                      aria-current={here ? (l.href === pathname ? "page" : "location") : undefined}
                       onClick={onClose}
                       style={{
                         display: "block",

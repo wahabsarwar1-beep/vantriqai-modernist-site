@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { hrefIn, REGIONS, REGION_PATHS, SITE_URL } from "@/lib/region";
 import { RESOURCES } from "@/lib/resources";
+import { INDUSTRY_SLUGS } from "@/lib/industries";
 
 /**
  * Both regions, with each entry naming its counterpart.
@@ -43,15 +44,17 @@ export default function sitemap(): MetadataRoute.Sitemap {
     })),
   ];
 
+  const paths = [...REGION_PATHS, ...INDUSTRY_SLUGS.map((slug) => `/industries/${slug}`)];
+
   const regions = Object.values(REGIONS).flatMap((region) =>
-    REGION_PATHS.map((path) => ({
+    paths.map((path) => ({
       url: SITE_URL + hrefIn(region, path),
       lastModified: PAGES_UPDATED,
       changeFrequency: path === "/" ? ("weekly" as const) : ("monthly" as const),
       // The Pakistan tree is the default one, so its home page is the single
       // highest-priority URL; the global home sits just under it rather than
       // tying with it.
-      priority: path === "/" ? (region.key === "pk" ? 1 : 0.9) : 0.8,
+      priority: path === "/" ? (region.key === "pk" ? 1 : 0.9) : path.startsWith("/industries/") ? 0.7 : 0.8,
       alternates: {
         languages: {
           "en-PK": SITE_URL + hrefIn(REGIONS.pk, path),

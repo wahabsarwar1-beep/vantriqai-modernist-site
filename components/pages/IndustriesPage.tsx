@@ -1,3 +1,4 @@
+import Link from "next/link";
 import JsonLd from "@/components/JsonLd";
 import { breadcrumbSchema } from "@/lib/schema";
 import PageHero from "@/components/PageHero";
@@ -8,6 +9,7 @@ import PosterCTA from "@/components/PosterCTA";
 import SpotlightGrid, { SpotlightItem } from "@/components/SpotlightGrid";
 import { SECTORS } from "@/lib/content";
 import { productSlug } from "@/lib/products";
+import { sectorSlug } from "@/lib/industries";
 import { hrefIn, type Region } from "@/lib/region";
 
 const bodyMuted = { color: "color-mix(in srgb, var(--color-text) 78%, transparent)" };
@@ -87,12 +89,21 @@ export default function IndustriesPage({ region }: { region: Region }) {
                 borderRadius: 28,
                 border: "1px solid var(--color-divider)",
                 boxShadow: "var(--shadow-sm)",
+                position: "relative",
+                cursor: "pointer",
               }}
             >
               <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)", margin: "0 0 18px" }}>{s.kicker}</p>
-              <h2 style={{ fontSize: 24, lineHeight: 1.05, letterSpacing: "-0.025em", margin: "0 0 12px" }}>{s.name}</h2>
+              <h2 style={{ fontSize: 24, lineHeight: 1.05, letterSpacing: "-0.025em", margin: "0 0 12px" }}>
+                <Link href={hrefIn(region, `/industries/${sectorSlug(s.name)}`)} className="card-link" style={{ color: "inherit" }}>
+                  {s.name}
+                </Link>
+              </h2>
               <p style={{ fontSize: 15, lineHeight: "26px", margin: 0, ...bodyMuted }}>{s.body}</p>
               <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 10.5, lineHeight: "16px", letterSpacing: "0.1em", textTransform: "uppercase", margin: "20px 0 0", paddingTop: 12, borderTop: "1px solid var(--color-divider)", color: "color-mix(in srgb, var(--color-text) 55%, transparent)" }}>{s.data}</p>
+              <span aria-hidden="true" style={{ display: "inline-block", marginTop: 16, fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--color-accent)" }}>
+                Explore {s.name} &rarr;
+              </span>
             </SpotlightItem>
           ))}
         </SpotlightGrid>

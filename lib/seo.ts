@@ -91,6 +91,19 @@ const PAGES: Record<string, PageSeo> = {
 export function regionMetadata(region: Region, path: string): Metadata {
   const page = PAGES[path];
   if (!page) throw new Error(`No SEO entry for ${path}`);
+  return pageMetadata(region, path, page);
+}
+
+/** A sector page: same pairing and canonical rules, title and copy from lib/industries. */
+export function industryMetadata(region: Region, slug: string, title: string, description: string): Metadata {
+  return pageMetadata(region, `/industries/${slug}`, {
+    title,
+    globalTitle: `${title} — Global`,
+    description,
+  });
+}
+
+function pageMetadata(region: Region, path: string, page: PageSeo): Metadata {
 
   const isGlobal = region.key === "global";
   const isHome = path === "/";

@@ -124,6 +124,7 @@ export const HOOD = [
 
 export const SECTORS = [
   { name: "E-commerce & Retail", kicker: "Catalogue, cart recovery", data: "Peak driver — campaign launches and sale weekends", body: "Shares products, answers sizing and stock questions, and follows up on abandoned carts before the customer buys elsewhere." },
+  { name: "Banking, Finance & Insurance", kicker: "Onboarding, reminders", data: "Peak driver — month-end due dates and product launches", body: "Answers eligibility and product questions, collects applications and documents, and sends instalment and renewal reminders with a person on hand." },
   { name: "Real Estate", kicker: "Matching, site visits", data: "Peak driver — new listing drops and portal enquiries", body: "Qualifies budget and area, matches listings to the enquiry, and books site visits straight into an agent's calendar." },
   { name: "Healthcare", kicker: "Booking, follow-up care", data: "Peak driver — Monday mornings and post-clinic follow-ups", body: "Handles appointment booking and rescheduling, sends follow-up reminders, and escalates anything clinical to your staff." },
   { name: "Education", kicker: "Admissions, fee reminders", data: "Peak driver — admission and fee-deadline windows", body: "Answers admission queries at scale during intake season and reminds parents about fees and deadlines." },

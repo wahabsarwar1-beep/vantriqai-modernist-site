@@ -4,6 +4,7 @@ import { SECTORS, TIERS } from "@/lib/content";
 import { PRODUCT_GROUPS, productSlug, products } from "@/lib/products";
 import { hrefIn, navHref, type Region } from "@/lib/region";
 import { RESOURCES } from "@/lib/resources";
+import { sectorSlug } from "@/lib/industries";
 
 /**
  * The navigation menus, built from the same arrays the pages render.
@@ -87,7 +88,7 @@ export function menuPanels(region: Region): MenuPanel[] {
       label: "Industries",
       href: navHref(region, { href: "/industries" }),
       hero: {
-        title: "Ten sectors, one agent",
+        title: `${SECTORS.length} sectors, one agent`,
         body: "The same core agent, tuned to how your sector actually sells and supports — your catalogue, your booking rules, your tone.",
         href: navHref(region, { href: "/industries" }),
         cta: "Browse every sector",
@@ -96,16 +97,16 @@ export function menuPanels(region: Region): MenuPanel[] {
         {
           title: "By sector",
           icon: "sectors",
-          links: SECTORS.slice(0, 5).map((s) => ({
-            href: `${hrefIn(region, "/industries")}#${productSlug(s.name)}`,
+          links: SECTORS.slice(0, 6).map((s) => ({
+            href: hrefIn(region, `/industries/${sectorSlug(s.name)}`),
             label: s.name,
             note: s.kicker,
           })),
         },
         {
           title: " ",
-          links: SECTORS.slice(5).map((s) => ({
-            href: `${hrefIn(region, "/industries")}#${productSlug(s.name)}`,
+          links: SECTORS.slice(6).map((s) => ({
+            href: hrefIn(region, `/industries/${sectorSlug(s.name)}`),
             label: s.name,
             note: s.kicker,
           })),
@@ -117,7 +118,7 @@ export function menuPanels(region: Region): MenuPanel[] {
         title: "Your sector not listed?",
         body: "The agent is configured to your workflow, not to an industry template. The list is where we have done it before, not a limit.",
         href: navHref(region, { href: "/contact" }),
-        cta: "Tell us how you work",
+        cta: "Talk to us",
       },
     },
     {
