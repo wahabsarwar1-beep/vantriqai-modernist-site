@@ -9,6 +9,7 @@ import { NAV_LINKS } from "@/lib/nav-links";
 import RegionSwitch from "@/components/RegionSwitch";
 import MegaMenu from "@/components/MegaMenu";
 import { menuPanels } from "@/lib/menu";
+import { useActiveSection } from "@/lib/use-active-section";
 import { hrefIn, navHref, regionFromPathname } from "@/lib/region";
 import { waLink } from "@/lib/whatsapp";
 
@@ -21,6 +22,7 @@ export default function Nav() {
   /** Which mega panel is showing, by label. One at a time. */
   const [panel, setPanel] = useState<string | null>(null);
   const panels = menuPanels(region);
+  const currentSection = useActiveSection(pathname);
   const panelFor = (label: string) => panels.find((p) => p.label === label);
   const [openedForPathname, setOpenedForPathname] = useState(pathname);
   const [shrunk, setShrunk] = useState(false);
@@ -119,6 +121,7 @@ export default function Nav() {
                 key={link.href}
                 panel={mega}
                 active={isCurrent}
+                currentSection={currentSection}
                 open={panel === link.label}
                 onOpen={() => setPanel(link.label)}
                 onClose={() => setPanel((cur) => (cur === link.label ? null : cur))}

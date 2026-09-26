@@ -501,3 +501,15 @@ span[data-chev] { display: inline-block; transition: transform .2s ease; }
   min-height: 42px; display: flex; align-items: center; font-size: 14px;
   border-bottom: none; color: color-mix(in srgb, var(--color-text) 72%, transparent);
 }
+
+/* The logo's auto margin pushed every remaining group hard right, so at 1920
+   there was a 642px void after the wordmark and 18px between the link row,
+   the region control and the WhatsApp button. A second auto margin after the
+   links splits that space, centring the links and separating the three
+   groups instead of stacking them against the edge.
+
+   No extra margin on the region control: the split alone gives it 72px of
+   clearance at the narrowest desktop width, and adding more pushed the bar
+   back over its limit at 1260 — the third time something added to this bar
+   has wrapped it. */
+.nav-links-desktop { margin-left: auto; margin-right: auto; }

@@ -23,12 +23,15 @@ export default function MegaMenu({
   onOpen,
   onClose,
   active,
+  currentSection,
 }: {
   panel: MenuPanel;
   open: boolean;
   onOpen: () => void;
   onClose: () => void;
   active: boolean;
+  /** The anchored section the reader is on, so the panel can mark it. */
+  currentSection: string | null;
 }) {
   const id = useId();
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -124,20 +127,30 @@ export default function MegaMenu({
           overflowY: "auto",
         }}
       >
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${panel.columns.length}, minmax(180px, 1fr))`, gap: "0 clamp(18px,2vw,30px)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${panel.columns.length}, minmax(180px, 1fr))${panel.feature ? " minmax(210px, 240px)" : ""}`, gap: "0 clamp(18px,2vw,30px)" }}>
           {panel.columns.map((col) => (
             <div key={col.title}>
               <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)", margin: "0 0 12px", minHeight: 14 }}>
                 {col.title}
               </p>
               <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 2 }}>
-                {col.links.map((l) => (
+                {col.links.map((l) => {
+                  const here = !!currentSection && l.href.endsWith(`#${currentSection}`);
+                  return (
                   <li key={l.href}>
                     <Link
                       href={l.href}
                       className="mega-link"
+                      aria-current={here ? "location" : undefined}
                       onClick={onClose}
-                      style={{ display: "block", borderRadius: 12, padding: "8px 10px", color: "var(--color-text)" }}
+                      style={{
+                        display: "block",
+                        borderRadius: 12,
+                        padding: "8px 10px",
+                        color: here ? "var(--color-accent-800)" : "var(--color-text)",
+                        background: here ? "var(--color-accent-100)" : undefined,
+                        boxShadow: here ? "inset 3px 0 0 var(--color-accent)" : undefined,
+                      }}
                     >
                       <span style={{ display: "block", fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 13.5, letterSpacing: "-0.01em", lineHeight: "19px" }}>
                         {l.label}
@@ -149,10 +162,43 @@ export default function MegaMenu({
                       ) : null}
                     </Link>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             </div>
           ))}
+
+          {panel.feature ? (
+            <Link
+              href={panel.feature.href}
+              onClick={onClose}
+              className="mega-feature"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                /* Hug the content. A grid item stretches to the tallest
+                   column by default, which left this card 300px taller than
+                   its text with the call to action stranded at the bottom. */
+                alignSelf: "start",
+                background: "var(--color-accent-100)",
+                border: "1px solid var(--color-accent-200)",
+                borderRadius: 18,
+                padding: "16px 18px",
+                color: "var(--color-accent-800)",
+              }}
+            >
+              <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 14.5, letterSpacing: "-0.01em", lineHeight: "20px" }}>
+                {panel.feature.title}
+              </span>
+              <span style={{ fontSize: 12.5, lineHeight: "19px", color: "color-mix(in srgb, var(--color-text) 70%, transparent)" }}>
+                {panel.feature.body}
+              </span>
+              <span style={{ paddingTop: 4, fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11.5, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--color-accent)" }}>
+                {panel.feature.cta} &rarr;
+              </span>
+            </Link>
+          ) : null}
         </div>
 
         <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--color-divider)" }}>

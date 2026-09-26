@@ -16,6 +16,9 @@ import { RESOURCES } from "@/lib/resources";
 
 export type MenuLink = { href: string; label: string; note?: string };
 export type MenuColumn = { title: string; links: MenuLink[] };
+/** The promoted card at the end of a panel — one next step, not a link list. */
+export type MenuFeature = { title: string; body: string; href: string; cta: string };
+
 export type MenuPanel = {
   /** The nav item that opens it. */
   label: string;
@@ -24,6 +27,7 @@ export type MenuPanel = {
   columns: MenuColumn[];
   /** The panel's closing line, pointing at the whole page. */
   footer: MenuLink;
+  feature?: MenuFeature;
 };
 
 const GROUP_TITLES: Record<string, string> = {
@@ -50,6 +54,12 @@ export function menuPanels(region: Region): MenuPanel[] {
           })),
       })),
       footer: { href: navHref(region, { href: "/products" }), label: `All ${all.length} modules` },
+      feature: {
+        title: "Not sure which you need?",
+        body: "Describe how customers reach you today and we will say which modules that actually takes.",
+        href: navHref(region, { href: "/contact" }),
+        cta: "Send a brief",
+      },
     },
     {
       label: "Industries",
@@ -73,6 +83,12 @@ export function menuPanels(region: Region): MenuPanel[] {
         },
       ],
       footer: { href: navHref(region, { href: "/industries" }), label: "Every sector we work in" },
+      feature: {
+        title: "Your sector not listed?",
+        body: "The agent is configured to your workflow, not to an industry template. The list is where we have done it before, not a limit.",
+        href: navHref(region, { href: "/contact" }),
+        cta: "Tell us how you work",
+      },
     },
     {
       label: "Packages",
@@ -95,6 +111,12 @@ export function menuPanels(region: Region): MenuPanel[] {
         },
       ],
       footer: { href: navHref(region, { href: "/pricing" }), label: "Compare every package" },
+      feature: {
+        title: "Not sure which tier?",
+        body: "Send us a month of message volume and we will confirm the tier in writing, with the setup fee.",
+        href: navHref(region, { href: "/contact" }),
+        cta: "Get it in writing",
+      },
     },
     {
       label: "Resources",
@@ -110,6 +132,12 @@ export function menuPanels(region: Region): MenuPanel[] {
         },
       ],
       footer: { href: "/resources", label: "All guides" },
+      feature: {
+        title: RESOURCES[0].heading,
+        body: RESOURCES[0].summary,
+        href: `/resources/${RESOURCES[0].slug}`,
+        cta: "Read the guide",
+      },
     },
   ];
 }
