@@ -273,10 +273,16 @@ echo "  Meters the site chat and the WhatsApp agent as an internal customer."
 echo "  Idempotent — safe if it has already been done."
 run docker exec "$APP_CONTAINER" npm run seed-internal
 
-bold "6b. Creating the protected owner account"
-echo "  ceo@vantriqai.com (or \$OWNER_EMAIL) — the one login nobody else can"
-echo "  deactivate, demote or password-reset. Idempotent — safe on every deploy."
-run docker exec "$APP_CONTAINER" npm run seed-owner
+bold "6b. The protected owner account"
+echo "  Deliberately NOT run automatically here. seed-owner prints a real password"
+echo "  to stdout on first creation, and this script's whole output is captured into"
+echo "  a GitHub Actions log — exactly the kind of place a credential must never sit."
+echo "  Run it BY HAND, once, over your own SSH session, the same way create-user"
+echo "  already has to be:"
+echo "    ssh you@your-server"
+echo "    docker exec -it $APP_CONTAINER npm run seed-owner"
+echo "  Safe to run on every install regardless — idempotent, and a no-op once the"
+echo "  owner account already exists. Step 7 below only checks that it does."
 
 # ---------------------------------------------------------------- 7. verify
 bold "7. Verifying"
@@ -349,10 +355,18 @@ else
   chk "v9.11 owner-account columns" 4 \
     "select count(*) from information_schema.columns where table_name='internal_users'
       and column_name in ('is_owner','totp_secret','totp_enabled','must_setup_totp')"
-  chk "exactly one protected owner account exists" 1 \
-    "select count(*) from internal_users where is_owner"
   chk "the database itself refuses a second owner (unique index present)" 1 \
     "select count(*) from pg_indexes where indexname='idx_internal_users_one_owner'"
+  # Not a chk(): creating the owner account is a deliberate, one-time manual
+  # step (see 6b above) precisely so its password never touches this log.
+  # A fresh install legitimately has none yet — that must never fail a deploy.
+  OWNER_COUNT=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
+    -c "select count(*) from internal_users where is_owner" 2>/dev/null || echo '?')
+  if [ "$OWNER_COUNT" = "1" ]; then
+    ok "a protected owner account exists"
+  else
+    warn "no protected owner account yet — run 'docker exec -it $APP_CONTAINER npm run seed-owner' by hand, over SSH, not through this pipeline"
+  fi
 
   AFTER=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
     -c "select count(*) from information_schema.tables where table_schema='public'")
