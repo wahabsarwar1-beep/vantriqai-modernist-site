@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useScrollProgress } from "@/lib/use-scroll-progress";
 
 type JStep = { n: string; title: string; body: string; fig: string; figLabel: string };
 
@@ -12,30 +13,27 @@ export default function PinnedRail({ steps }: { steps: JStep[] }) {
   const bodyMuted = { color: "color-mix(in srgb, var(--color-text) 78%, transparent)" };
 
   useEffect(() => {
-    const checkMobile = () => setMobile(window.innerWidth < 900);
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
+    /* Stacked on a narrow screen, and for anyone who asked for less motion —
+       pinning takes the scroll away from the reader, which is precisely what
+       that preference is asking you not to do. */
+    const check = () =>
+      setMobile(window.innerWidth < 900 || window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
   }, []);
 
-  useEffect(() => {
-    if (mobile) return;
-    const onScroll = () => {
-      const el = containerRef.current;
+  const onProgress = useCallback(
+    (progress: number) => {
+      const index = Math.min(steps.length - 1, Math.round(progress * (steps.length - 1)));
+      setActive((prev) => (prev === index ? prev : index));
       const track = trackRef.current;
-      if (!el || !track) return;
-      const rect = el.getBoundingClientRect();
-      const total = rect.height - window.innerHeight;
-      if (total <= 0) return;
-      const progress = Math.min(1, Math.max(0, -rect.top / total));
-      const idx = Math.min(steps.length - 1, Math.round(progress * (steps.length - 1)));
-      setActive(idx);
-      track.style.transform = `translateX(-${progress * (steps.length - 1) * 100}vw)`;
-    };
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [mobile, steps.length]);
+      if (track) track.style.transform = `translateX(-${progress * (steps.length - 1) * 100}vw)`;
+    },
+    [steps.length],
+  );
+
+  useScrollProgress(containerRef, !mobile, onProgress);
 
   const kicker = (
     <span

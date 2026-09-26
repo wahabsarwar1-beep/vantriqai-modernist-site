@@ -1,42 +1,58 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Kicker from "@/components/Kicker";
+import { useScrollProgress } from "@/lib/use-scroll-progress";
 
 type Step = { n: string; title: string; body: string };
 
 export default function PinnedSteps({ steps }: { steps: Step[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLSpanElement>(null);
+  /** One fill per card, written to directly so they can track the scroll. */
+  const fillRefs = useRef<(HTMLSpanElement | null)[]>([]);
   const [active, setActive] = useState(0);
-  const [mobile, setMobile] = useState(false);
+  const [stacked, setStacked] = useState(false);
 
   useEffect(() => {
-    const checkMobile = () => setMobile(window.innerWidth < 760);
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
+    /* Stacked on a phone, and for anyone who asked for less motion: pinning
+       takes the scroll away from the reader, which is the one thing a reduced
+       motion preference is most clearly asking you not to do. */
+    const check = () =>
+      setStacked(window.innerWidth < 760 || window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
   }, []);
 
-  useEffect(() => {
-    if (mobile) return;
-    const onScroll = () => {
-      const el = containerRef.current;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      const total = rect.height - window.innerHeight;
-      if (total <= 0) return;
-      const progress = Math.min(1, Math.max(0, -rect.top / total));
-      const idx = Math.min(steps.length - 1, Math.floor(progress * steps.length));
-      setActive(idx);
-    };
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [mobile, steps.length]);
+  const onProgress = useCallback(
+    (progress: number) => {
+      const exact = progress * steps.length;
+      const index = Math.min(steps.length - 1, Math.floor(exact));
+      /* How far through the current step, so the indicators move with the
+         scroll instead of jumping a third at a time. The panel copy still
+         changes in one step — sliding body text under someone mid-sentence
+         is not polish. */
+      const within = Math.min(1, Math.max(0, exact - index));
+
+      setActive((prev) => (prev === index ? prev : index));
+
+      if (barRef.current) {
+        barRef.current.style.transform = `scaleX(${(index + within) / steps.length})`;
+      }
+      fillRefs.current.forEach((el, i) => {
+        if (!el) return;
+        el.style.transform = `scaleX(${i < index ? 1 : i === index ? within : 0})`;
+      });
+    },
+    [steps.length],
+  );
+
+  useScrollProgress(containerRef, !stacked, onProgress);
 
   const bodyMuted = { color: "color-mix(in srgb, var(--color-text) 78%, transparent)" };
 
-  if (mobile) {
+  if (stacked) {
     return (
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(28px,5vw,52px) clamp(20px,5vw,64px)" }}>
         <Kicker label="02 — What it does" />
@@ -91,6 +107,8 @@ export default function PinnedSteps({ steps }: { steps: Step[] }) {
                 <div
                   key={s.n}
                   style={{
+                    position: "relative",
+                    overflow: "hidden",
                     background: active === i ? "var(--color-accent)" : "var(--color-surface)",
                     color: active === i ? "var(--color-bg)" : "var(--color-text)",
                     border: "1px solid var(--color-divider)",
@@ -104,20 +122,42 @@ export default function PinnedSteps({ steps }: { steps: Step[] }) {
                 >
                   <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.12em" }}>{s.n}</span>
                   <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(20px,2.4vw,30px)", letterSpacing: "-0.02em" }}>{s.title}</span>
+                  {/* The card fills as you scroll through its step, so the
+                      rail shows where you are inside a step and not only
+                      which step you are on. */}
+                  <span
+                    aria-hidden="true"
+                    style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 3, background: "color-mix(in srgb, var(--color-text) 10%, transparent)" }}
+                  >
+                    <span
+                      ref={(el) => {
+                        fillRefs.current[i] = el;
+                      }}
+                      style={{
+                        display: "block",
+                        height: "100%",
+                        background: active === i ? "var(--color-bg)" : "var(--color-accent)",
+                        transformOrigin: "left",
+                        transform: "scaleX(0)",
+                      }}
+                    />
+                  </span>
                 </div>
               ))}
               <div style={{ padding: "18px 4px" }}>
-                <span
-                  style={{
-                    display: "block",
-                    height: 4,
-                    borderRadius: 999,
-                    background: "var(--color-accent)",
-                    transformOrigin: "left",
-                    transform: `scaleX(${(active + 1) / steps.length})`,
-                    transition: "transform .35s ease",
-                  }}
-                />
+                <span style={{ display: "block", height: 4, borderRadius: 999, background: "var(--color-neutral-200)", overflow: "hidden" }}>
+                  <span
+                    ref={barRef}
+                    style={{
+                      display: "block",
+                      height: "100%",
+                      borderRadius: 999,
+                      background: "var(--color-accent)",
+                      transformOrigin: "left",
+                      transform: "scaleX(0)",
+                    }}
+                  />
+                </span>
               </div>
             </div>
           </div>
