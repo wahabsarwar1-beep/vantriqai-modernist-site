@@ -31,6 +31,14 @@ function inline(text: string): ReactNode[] {
   return out;
 }
 
+/** The id a section heading carries — shared with the contents list. */
+export function headingId(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 const P = { fontSize: 17, lineHeight: "30px", margin: "0 0 22px", maxWidth: "68ch", ...bodyMuted };
 
 export default function ArticleBody({ body }: { body: Block[] }) {
@@ -38,12 +46,17 @@ export default function ArticleBody({ body }: { body: Block[] }) {
     <div>
       {body.map((block, i) => {
         switch (block.t) {
-          case "h2":
+          case "h2": {
+            const id = headingId(block.text);
             return (
-              <h2 key={i} data-anim="" style={{ fontSize: "clamp(22px,2.6vw,32px)", lineHeight: 1.1, letterSpacing: "-0.03em", margin: "clamp(34px,4vw,50px) 0 18px", maxWidth: "28ch" }}>
+              <h2 key={i} id={id} data-anim="" className="art-h2 anchor-target">
+                <a href={`#${id}`} className="art-h2-link" aria-label={`Link to this section: ${block.text}`}>
+                  #
+                </a>
                 {block.text}
               </h2>
             );
+          }
           case "h3":
             return (
               <h3 key={i} style={{ fontSize: 19, lineHeight: 1.2, letterSpacing: "-0.02em", margin: "30px 0 14px" }}>

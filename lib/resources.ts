@@ -43,6 +43,12 @@ export type Resource = {
   body: Block[];
   /** Internal links out, which is half the point of publishing at all. */
   related: { href: string; label: string; note: string }[];
+  /** The shelf it sits on in the index. */
+  topic: string;
+  /** Three lines a skimmer can leave with — each one said in the body. */
+  takeaways: string[];
+  /** The card's cover: a word, not a statistic, on the guide's two colours. */
+  cover: { word: string; a: string; b: string };
 };
 
 /** Rough reading time from the body, so it cannot drift from the text. */
@@ -59,6 +65,13 @@ export const RESOURCES: Resource[] = [
   {
     slug: "lead-response-time-benchmarks",
     kind: "Guide",
+    topic: "Research",
+    cover: { word: "Speed", a: "#2f56d9", b: "#e0854f" },
+    takeaways: [
+      "The research shows the odds of qualifying a lead fall steeply within minutes, not hours — the first five minutes do most of the work.",
+      "Measured business behaviour is far slower than what customers expect, and a meaningful share of enquiries never get a reply at all.",
+      "The gap is structural — out-of-hours, spiky, multi-channel demand — so the fix is a fast first response, not better salespeople.",
+    ],
     title: "Lead response time: what the research actually says",
     heading: "The response gap, in the numbers",
     description:
@@ -190,6 +203,13 @@ export const RESOURCES: Resource[] = [
   {
     slug: "whatsapp-business-app-vs-platform",
     kind: "Guide",
+    topic: "WhatsApp",
+    cover: { word: "App or API", a: "#15907f", b: "#2f56d9" },
+    takeaways: [
+      "The app and the Platform are different products: the app is for people reading every message, the Platform is for software that answers and acts.",
+      "The Platform brings rules — templates, opt-in, a customer-service window and Meta-set pricing — that you should understand before committing.",
+      "If a person cannot read every message quickly, or answers depend on data in another system, you have outgrown the app.",
+    ],
     title: "WhatsApp Business app vs Platform: which do you need?",
     heading: "WhatsApp Business app, or the Platform?",
     description:
@@ -282,6 +302,13 @@ export const RESOURCES: Resource[] = [
   {
     slug: "choosing-an-ai-agent-checklist",
     kind: "Guide",
+    topic: "Buying guide",
+    cover: { word: "12 questions", a: "#6a4fd1", b: "#e0854f" },
+    takeaways: [
+      "Judge an agent on its unhappy paths: what it does when it does not know, when a system is down, and when you want to leave.",
+      "Insist it takes real actions from approved sources, and escalates with the conversation attached instead of guessing.",
+      "Get volume, overage, setup scope, data ownership and number portability in writing before you sign.",
+    ],
     title: "A buyer's checklist for AI customer agents",
     heading: "Twelve questions to ask before you buy an AI agent",
     description:

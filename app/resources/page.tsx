@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import PageHero from "@/components/PageHero";
+import GuideCover from "@/components/GuideCover";
 import HeroChatCard from "@/components/HeroChatCard";
 import LineReveal from "@/components/LineReveal";
 import PosterCTA from "@/components/PosterCTA";
@@ -10,7 +11,6 @@ import { breadcrumbSchema, resourceListSchema } from "@/lib/schema";
 import { DEFAULT_REGION } from "@/lib/region";
 import { resourceMetadata } from "@/lib/seo";
 
-const bodyMuted = { color: "color-mix(in srgb, var(--color-text) 78%, transparent)" };
 const mutedLabel = { color: "color-mix(in srgb, var(--color-text) 55%, transparent)" };
 
 export const metadata: Metadata = resourceMetadata(
@@ -20,6 +20,7 @@ export const metadata: Metadata = resourceMetadata(
 );
 
 export default function Resources() {
+  const [featured, ...rest] = RESOURCES;
   return (
     <>
       <JsonLd schema={breadcrumbSchema(DEFAULT_REGION, "/resources", "Resources")} />
@@ -51,31 +52,45 @@ export default function Resources() {
         }
       />
 
-      <section style={{ borderTop: "1px solid var(--color-divider)" }}>
-        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(28px,3.6vw,48px) clamp(20px,5vw,64px)", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(320px,100%),1fr))", gap: 18 }} data-stagger="">
-          {RESOURCES.map((r) => (
-            <article
-              key={r.slug}
-              data-anim=""
-              className="hover-lift"
-              style={{ background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: 28, boxShadow: "var(--shadow-sm)", padding: "clamp(26px,3vw,38px) clamp(22px,2.6vw,34px)", display: "flex", flexDirection: "column" }}
-            >
-              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)", margin: "0 0 16px" }}>
-                {r.kind} · {readingMinutes(r)} min read
-              </p>
-              <h2 style={{ fontSize: 23, lineHeight: 1.1, letterSpacing: "-0.025em", margin: "0 0 14px" }}>
-                <Link href={`/resources/${r.slug}`} style={{ color: "inherit" }}>
-                  {r.heading}
-                </Link>
-              </h2>
-              <p style={{ fontSize: 15, lineHeight: "26px", margin: "0 0 24px", flex: 1, ...bodyMuted }}>{r.summary}</p>
-              <Link
-                href={`/resources/${r.slug}`}
-                style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12.5, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--color-accent)", paddingTop: 16, borderTop: "1px solid var(--color-divider)" }}
-              >
-                Read the guide &rarr;
-              </Link>
-            </article>
+      {/* The newest guide leads as a banner; the rest follow as cover cards. */}
+      <section className="res-wrap">
+        <Link href={`/resources/${featured.slug}`} className="res-featured">
+          <GuideCover resource={featured} large />
+          <span className="res-featured-copy">
+            <span className="res-featured-tag">Featured guide · {readingMinutes(featured)} min read</span>
+            <strong>{featured.heading}</strong>
+            <span className="res-featured-sum">{featured.summary}</span>
+            <span className="res-featured-cta">
+              Read the guide <span aria-hidden="true">→</span>
+            </span>
+          </span>
+        </Link>
+
+        <div className="res-bar">
+          <p className="eyebrow" style={{ margin: 0 }}>
+            <span className="eyebrow-n">{String(RESOURCES.length).padStart(2, "0")}</span>
+            All guides
+          </p>
+          <ul className="res-topics" aria-label="Topics">
+            {[...new Set(RESOURCES.map((r) => r.topic))].map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="guide-grid">
+          {rest.map((r) => (
+            <Link key={r.slug} href={`/resources/${r.slug}`} className="guide-card">
+              <GuideCover resource={r} />
+              <span className="guide-meta">
+                {r.kind} · {r.topic} · {readingMinutes(r)} min read
+              </span>
+              <strong className="guide-title">{r.heading}</strong>
+              <span className="guide-sum">{r.summary}</span>
+              <span className="guide-read">
+                Read the guide <span aria-hidden="true">→</span>
+              </span>
+            </Link>
           ))}
         </div>
       </section>

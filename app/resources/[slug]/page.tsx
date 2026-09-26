@@ -1,17 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import Kicker from "@/components/Kicker";
-import ArticleBody from "@/components/ArticleBody";
+import ArticleBody, { headingId } from "@/components/ArticleBody";
+import ArticleToc from "@/components/ArticleToc";
+import GuideCover from "@/components/GuideCover";
+import ShareBar from "@/components/ShareBar";
 import PosterCTA from "@/components/PosterCTA";
 import JsonLd from "@/components/JsonLd";
 import { RESOURCES, getResource, readingMinutes } from "@/lib/resources";
 import { articleSchema, breadcrumbSchema } from "@/lib/schema";
-import { DEFAULT_REGION } from "@/lib/region";
+import { DEFAULT_REGION, SITE_URL } from "@/lib/region";
 import { resourceMetadata } from "@/lib/seo";
 
-const bodyMuted = { color: "color-mix(in srgb, var(--color-text) 78%, transparent)" };
-const mutedLabel = { color: "color-mix(in srgb, var(--color-text) 55%, transparent)" };
 
 export function generateStaticParams() {
   return RESOURCES.map((r) => ({ slug: r.slug }));
@@ -44,59 +44,128 @@ export default async function ResourcePage({ params }: { params: Promise<{ slug:
   const resource = getResource(slug);
   if (!resource) notFound();
 
+  const toc = resource.body.flatMap((b) => (b.t === "h2" ? [{ id: headingId(b.text), text: b.text }] : []));
+  const others = RESOURCES.filter((r) => r.slug !== resource.slug);
+  const url = `${SITE_URL}/resources/${resource.slug}`;
+
   return (
     <>
       <JsonLd schema={breadcrumbSchema(DEFAULT_REGION, `/resources/${resource.slug}`, resource.title, "Resources", "/resources")} />
       <JsonLd schema={articleSchema(resource)} />
 
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" }}>
-        <section style={{ padding: "clamp(36px,4.6vw,62px) 0 clamp(24px,3vw,40px)", position: "relative" }}>
-          <div aria-hidden="true" data-hero-texture="" style={{ position: "absolute", top: "calc(clamp(72px, 7vw, 92px) * -1)", bottom: 0, left: "50%", width: "calc(100vw + 24px)", marginLeft: "calc(-50vw - 12px)", zIndex: 0, pointerEvents: "none" }} />
-          <div style={{ position: "relative", zIndex: 1, maxWidth: "76ch" }}>
-            <Kicker label={resource.kind} marginBottom="clamp(22px,3.4vw,38px)" />
-            <h1 style={{ fontSize: "clamp(30px,4.2vw,54px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: 0, maxWidth: "20ch", overflowWrap: "break-word" }}>
+      {/* ---------- Hero ---------- */}
+      <section className="ph">
+        <div aria-hidden="true" className="hh-aurora" />
+        <div aria-hidden="true" className="hh-grid" />
+        <div className="ph-inner art-hero">
+          <div>
+            <nav aria-label="Breadcrumb" className="mod-crumbs">
+              <ol>
+                <li>
+                  <Link href="/resources">Resources</Link>
+                </li>
+                <li aria-hidden="true">/</li>
+                <li>{resource.topic}</li>
+              </ol>
+            </nav>
+            <p className="hh-eyebrow">
+              <span aria-hidden="true" className="ph-dot" />
+              {resource.kind} · {readingMinutes(resource)} min read
+            </p>
+            <h1 className="ph-title" style={{ maxWidth: "20ch" }}>
               {resource.heading}
             </h1>
-            <p data-anim="" style={{ fontSize: 18.5, lineHeight: "32px", margin: "28px 0 0", maxWidth: "58ch" }}>
+            <p data-anim="" className="ph-body">
               {resource.summary}
             </p>
-            <p style={{ fontSize: 12, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "var(--font-heading)", fontWeight: 800, margin: "26px 0 0", ...mutedLabel }}>
-              <time dateTime={resource.published}>{dateLabel(resource.published)}</time> · {readingMinutes(resource)} min read
+            <p className="art-meta">
+              <span>By the VantriqAI team</span>
+              <span aria-hidden="true">·</span>
+              <time dateTime={resource.published}>{dateLabel(resource.published)}</time>
+              {resource.updated ? (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span>
+                    Updated <time dateTime={resource.updated}>{dateLabel(resource.updated)}</time>
+                  </span>
+                </>
+              ) : null}
             </p>
           </div>
-        </section>
-      </div>
+          <GuideCover resource={resource} large />
+        </div>
+      </section>
 
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px)" }}>
-        <section style={{ borderTop: "1px solid var(--color-divider)", padding: "clamp(28px,3.6vw,46px) 0 0" }}>
+      {/* ---------- Body ---------- */}
+      <div className="art-layout">
+        <aside className="art-side">
+          <ArticleToc items={toc} />
+        </aside>
+        <article className="art-main">
+          <aside className="takeaways" aria-label="Key takeaways">
+            <p className="takeaways-title">
+              <span aria-hidden="true" className="takeaways-icon">
+                ✦
+              </span>
+              Key takeaways
+            </p>
+            <ol>
+              {resource.takeaways.map((t) => (
+                <li key={t}>{t}</li>
+              ))}
+            </ol>
+          </aside>
           <ArticleBody body={resource.body} />
-        </section>
+          <ShareBar url={url} title={resource.title} />
 
-        <section style={{ padding: "clamp(30px,4vw,50px) 0 clamp(36px,4.6vw,60px)" }}>
-          <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 22 }}>
-            <Kicker label="Where to go next" marginBottom="0" />
-            <div style={{ marginTop: 20, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(260px,100%),1fr))", gap: 18 }}>
+          <div className="art-next">
+            <p className="industry-panel-kicker">Where to go next</p>
+            <div className="art-next-grid">
               {resource.related.map((r) => (
-                <Link
-                  key={r.href}
-                  href={r.href}
-                  data-anim=""
-                  className="hover-lift"
-                  style={{ background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: 24, boxShadow: "var(--shadow-sm)", padding: "clamp(20px,2.4vw,28px)", display: "block", color: "inherit" }}
-                >
-                  <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 17, letterSpacing: "-0.02em", margin: "0 0 8px" }}>{r.label}</p>
-                  <p style={{ fontSize: 14, lineHeight: "23px", margin: 0, ...bodyMuted }}>{r.note}</p>
+                <Link key={r.href} href={r.href} className="art-next-card">
+                  <strong>{r.label}</strong>
+                  <span>{r.note}</span>
+                  <span aria-hidden="true" className="art-next-arrow">
+                    →
+                  </span>
                 </Link>
               ))}
             </div>
-            <p style={{ marginTop: 26 }}>
-              <Link href="/resources" style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12.5, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--color-accent)" }}>
-                &larr; All resources
-              </Link>
-            </p>
           </div>
-        </section>
+        </article>
       </div>
+
+      {/* ---------- More guides ---------- */}
+      <section className="art-more">
+        <div className="split-head" style={{ marginBottom: 28 }}>
+          <div>
+            <p className="eyebrow">
+              <span className="eyebrow-n">＋</span>
+              Keep reading
+            </p>
+            <h2 style={{ fontSize: "clamp(26px,3.2vw,42px)", lineHeight: 1.02, letterSpacing: "-0.035em", margin: 0 }}>
+              More from <span className="grad-text">Resources</span>
+            </h2>
+          </div>
+          <p style={{ margin: 0 }}>
+            <Link href="/resources" className="mod-more">
+              All guides →
+            </Link>
+          </p>
+        </div>
+        <div className="guide-grid">
+          {others.map((r) => (
+            <Link key={r.slug} href={`/resources/${r.slug}`} className="guide-card">
+              <GuideCover resource={r} />
+              <span className="guide-meta">
+                {r.kind} · {readingMinutes(r)} min read
+              </span>
+              <strong className="guide-title">{r.heading}</strong>
+              <span className="guide-sum">{r.summary}</span>
+            </Link>
+          ))}
+        </div>
+      </section>
 
       <PosterCTA
         headline="Ask us the hard version."
