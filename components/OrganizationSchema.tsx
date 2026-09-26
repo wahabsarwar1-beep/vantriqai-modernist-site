@@ -2,6 +2,7 @@ import JsonLd from "@/components/JsonLd";
 import { SITE_URL } from "@/lib/region";
 import { DEFAULT_DESCRIPTION, SITE_NAME } from "@/lib/seo";
 import { ORG_ID, websiteSchema } from "@/lib/schema";
+import { SOCIAL_PROFILES } from "@/lib/social";
 import { WHATSAPP_DISPLAY } from "@/lib/whatsapp";
 
 /**
@@ -13,9 +14,8 @@ import { WHATSAPP_DISPLAY } from "@/lib/whatsapp";
  * sanitise, and a stray "</script>" inside any of these strings would close
  * the tag early.
  *
- * sameAs is deliberately absent rather than empty — an empty array tells a
- * crawler nothing. Add the real LinkedIn / Instagram / Facebook / X profile
- * URLs here and it becomes a claim worth making.
+ * sameAs is omitted while there are no profiles rather than emitted empty —
+ * an empty array tells a crawler nothing. The list lives in lib/social.ts.
  */
 export default function OrganizationSchema() {
   const schema = {
@@ -31,6 +31,9 @@ export default function OrganizationSchema() {
     // where it works instead of where it sits. Schema.org does not require an
     // address, and a wrong one is worse than none.
     areaServed: "Worldwide",
+    // Spread, not assigned: while the list is empty the key should not
+    // appear at all.
+    ...(SOCIAL_PROFILES.length ? { sameAs: SOCIAL_PROFILES } : {}),
     contactPoint: {
       "@type": "ContactPoint",
       contactType: "sales",
