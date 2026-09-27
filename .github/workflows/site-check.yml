@@ -18,6 +18,23 @@ jobs:
           for h in vantriqai.com www.vantriqai.com crm.vantriqai.com portal.vantriqai.com n8n.vantriqai.com; do
             echo "== $h"; dig +short "$h" A; dig +short "$h" CNAME
           done
+      - name: Host seen by the app
+        run: |
+          # Temporary, with the report-only proxy.ts: which Host and
+          # X-Forwarded-Host the app is handed on each spelling, and whether a
+          # client can forge one. Waits up to five minutes for that deploy.
+          for i in $(seq 1 30); do
+            curl -sS --max-time 20 -o /dev/null -D h.txt https://www.vantriqai.com/ \
+              && grep -qi '^x-vantriq-host-check' h.txt && break
+            echo "waiting for the deploy ($i)"; sleep 10
+          done
+          for u in https://vantriqai.com/ https://www.vantriqai.com/ https://vantriqai.com/pricing?x=1; do
+            echo "== $u"
+            curl -sS --max-time 20 -o /dev/null -D - "$u" | grep -i '^x-vantriq-host-check' || echo "(header absent)"
+            echo "== $u with a forged X-Forwarded-Host"
+            curl -sS --max-time 20 -o /dev/null -D - -H 'X-Forwarded-Host: forged.invalid' "$u" \
+              | grep -i '^x-vantriq-host-check' || echo "(header absent)"
+          done
       - name: HTTP
         run: |
           for u in https://vantriqai.com https://www.vantriqai.com http://vantriqai.com \
