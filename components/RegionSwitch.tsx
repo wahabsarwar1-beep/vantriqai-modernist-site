@@ -53,6 +53,7 @@ export default function RegionSwitch({ full = false }: { full?: boolean }) {
             aria-current={active ? "true" : undefined}
             aria-label={label}
             title={label}
+            className="rs-opt"
             style={{
               display: "inline-flex",
               alignItems: "center",

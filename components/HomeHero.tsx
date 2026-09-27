@@ -7,6 +7,7 @@ import Marquee from "@/components/Marquee";
 import VantriqMark from "@/components/VantriqMark";
 import { waLink } from "@/lib/whatsapp";
 import { hrefIn, type Region } from "@/lib/region";
+import { products } from "@/lib/products";
 
 /**
  * The home page's opening: the agent, visibly working.
@@ -131,7 +132,7 @@ export default function HomeHero({ region }: { region: Region }) {
             </div>
             <div>
               <dt>Modules</dt>
-              <dd>14</dd>
+              <dd>{products(region).length}</dd>
             </div>
             <div>
               <dt>Live in</dt>

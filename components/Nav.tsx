@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Logo from "@/components/Logo";
@@ -8,6 +8,7 @@ import Magnetic from "@/components/Magnetic";
 import { NAV_LINKS } from "@/lib/nav-links";
 import RegionSwitch from "@/components/RegionSwitch";
 import MegaMenu from "@/components/MegaMenu";
+import MobileMenu from "@/components/MobileMenu";
 import { menuPanels } from "@/lib/menu";
 import { useActiveSection } from "@/lib/use-active-section";
 import { hrefIn, navHref, regionFromPathname } from "@/lib/region";
@@ -27,6 +28,7 @@ export default function Nav() {
      the US$ site never falls back to PKR by using the nav. */
   const region = regionFromPathname(pathname);
   const [open, setOpen] = useState(false);
+  const closeMenu = useCallback(() => setOpen(false), []);
   /** Which mega panel is showing, by label. One at a time. */
   const [panel, setPanel] = useState<string | null>(null);
   const panels = menuPanels(region);
@@ -102,7 +104,7 @@ export default function Nav() {
   };
 
   return (
-    <nav className="bn" data-shrunk={shrunk ? "" : undefined}>
+    <nav className="bn" data-shrunk={shrunk ? "" : undefined} data-menu={open ? "" : undefined}>
       <div className="bn-capsule" ref={capsuleRef}>
         <span aria-hidden="true" className="bn-progress" ref={progressRef} />
         <span aria-hidden="true" className="bn-hover" ref={hoverRef} />
@@ -111,7 +113,7 @@ export default function Nav() {
           <Logo height={shrunk ? 32 : 38} />
         </Link>
 
-        <button type="button" className="nav-toggle-btn" onClick={() => setOpen((o) => !o)} aria-label="Menu" aria-expanded={open}>
+        <button type="button" className="nav-toggle-btn" onClick={() => setOpen((o) => !o)} aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open}>
           <span className="nav-burger-line" style={open ? { transform: "translateY(7px) rotate(45deg)" } : undefined} />
           <span className="nav-burger-line" style={open ? { opacity: 0 } : undefined} />
           <span className="nav-burger-line" style={open ? { transform: "translateY(-7px) rotate(-45deg)" } : undefined} />
@@ -172,52 +174,7 @@ export default function Nav() {
           </Magnetic>
         </span>
 
-        {open && (
-          <div className="nav-mobile-panel open">
-            {/* On a phone the sub-links are a disclosure, not a hover panel:
-                <details> gives the open/close behaviour, the keyboard handling
-                and the semantics without a line of state. */}
-            {NAV_LINKS.map((link) => {
-              const href = navHref(region, link);
-              const current = pathname === href || pathname.startsWith(`${href}/`);
-              const mega = panelFor(link.label);
-
-              if (!mega) {
-                return (
-                  <Link key={link.href} href={href} aria-current={current ? "page" : undefined}>
-                    {link.label}
-                  </Link>
-                );
-              }
-
-              return (
-                <details key={link.href} className="nav-mobile-group">
-                  <summary aria-current={current ? "page" : undefined}>
-                    {link.label}
-                    <svg width="11" height="7" viewBox="0 0 10 6" aria-hidden="true" style={{ flex: "none" }}>
-                      <path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                    </svg>
-                  </summary>
-                  <div className="nav-mobile-sub">
-                    {mega.columns.flatMap((col) => col.links).map((l) => (
-                      <Link key={l.href} href={l.href}>
-                        {l.label}
-                      </Link>
-                    ))}
-                    <Link href={mega.footer.href} className="nav-mobile-all">
-                      {mega.footer.label} &rarr;
-                    </Link>
-                  </div>
-                </details>
-              );
-            })}
-            <a className="bn-cta bn-cta-block" href={waLink()} target="_blank" rel="noopener">
-              <span aria-hidden="true" className="bn-cta-dot" />
-              Try the agent on WhatsApp
-              <span aria-hidden="true" className="bn-cta-arrow">→</span>
-            </a>
-          </div>
-        )}
+        <MobileMenu open={open} onClose={closeMenu} panels={panels} region={region} pathname={pathname} currentSection={currentSection} />
       </div>
     </nav>
   );

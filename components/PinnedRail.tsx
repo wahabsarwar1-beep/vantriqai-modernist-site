@@ -61,19 +61,22 @@ export default function PinnedRail({ steps, label = "03 — Step by step" }: { s
           {kicker}
           <span style={{ flex: 1, height: 1, background: "var(--color-divider)" }} />
         </div>
-        <div style={{ display: "grid", gap: 32 }}>
+        {/* A swipeable deck on a phone: one step per card, the next one
+            peeking in so it is obvious there is more. */}
+        <ol className="swipe step-deck">
           {steps.map((s) => (
-            <div key={s.n} data-anim="" style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 20 }}>
-              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(40px,10vw,64px)", lineHeight: 0.84, letterSpacing: "-0.05em", margin: 0, color: "var(--color-accent)" }}>{s.n}</p>
-              <h2 style={{ fontSize: "clamp(22px,6vw,32px)", lineHeight: 1.05, letterSpacing: "-0.03em", margin: "10px 0 0" }}>{s.title}</h2>
-              <p style={{ fontSize: 16, lineHeight: "26px", margin: "14px 0 0", ...bodyMuted }}>{s.body}</p>
-              <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 12, marginTop: 14 }}>
-                <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: "clamp(22px,2.6vw,34px)", lineHeight: 1, letterSpacing: "-0.03em", margin: 0 }}>{s.fig}</p>
-                <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", margin: "8px 0 0", color: "color-mix(in srgb, var(--color-text) 55%, transparent)" }}>{s.figLabel}</p>
+            <li key={s.n} data-anim="" className="step-card">
+              <span className="step-card-n">{s.n}</span>
+              <h2>{s.title}</h2>
+              <p className="step-card-body">{s.body}</p>
+              <div className="step-card-fig">
+                <strong>{s.fig}</strong>
+                <span>{s.figLabel}</span>
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ol>
+        <p aria-hidden="true" className="swipe-hint">Swipe through all {steps.length} steps →</p>
       </div>
     );
   }

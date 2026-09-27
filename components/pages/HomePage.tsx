@@ -280,6 +280,9 @@ export default function HomePage({ region }: { region: Region }) {
               </li>
             ))}
           </ul>
+          <p aria-hidden="true" className="swipe-hint" style={{ color: "rgba(255,255,255,.45)" }}>
+            Swipe through all {GUARDRAILS.length} guardrails →
+          </p>
         </div>
       </section>
 
