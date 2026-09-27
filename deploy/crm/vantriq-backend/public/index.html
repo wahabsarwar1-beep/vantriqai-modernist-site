@@ -878,6 +878,7 @@ async function loadState(){
       defaultAitRate:settings.default_ait_rate!=null?+settings.default_ait_rate:0,
       usdPkrRate:settings.usd_pkr_rate!=null?+settings.usd_pkr_rate:0,
       internalInvoiceEmail:settings.internal_invoice_email||'',
+      androidPackage:settings.android_package||'com.vantriqai.app', androidSha256:settings.android_sha256||'',
       openingCash:settings.opening_cash!=null?+settings.opening_cash:0,
       openingCashDate:settings.opening_cash_date||'',
       internalCostLabel:settings.internal_cost_label||'Internal AI usage (own agents)',
@@ -4724,6 +4725,7 @@ async function saveRate(){
 /* ============================== SETTINGS ============================== */
 function renderSettings(){
   return `
+  ${appSettingsCard()}
   <div class="card" style="max-width:520px;">
     <h3 style="margin-top:0;font-size:14.5px;">Company</h3>
     <div class="field"><label>Company name</label><input id="setCompanyName" value="${esc(state.company.name)}"></div>
@@ -4938,6 +4940,7 @@ function applySettings(updated){
     defaultAitRate:updated.default_ait_rate!=null?+updated.default_ait_rate:0,
     usdPkrRate:updated.usd_pkr_rate!=null?+updated.usd_pkr_rate:0,
     internalInvoiceEmail:updated.internal_invoice_email||'',
+    androidPackage:updated.android_package||'com.vantriqai.app', androidSha256:updated.android_sha256||'',
     openingCash:updated.opening_cash!=null?+updated.opening_cash:0,
     openingCashDate:updated.opening_cash_date||'',
     internalCostLabel:updated.internal_cost_label||'Internal AI usage (own agents)',
@@ -4989,6 +4992,38 @@ async function saveAccountingSettings(){
 }
 
 /** Says whether email is working, without sending anything. */
+// The VantriqAI app (v9.15): the customer portal, installable on phones and
+// packaged for the Play Store. Android only opens it full screen once
+// portal.vantriqai.com vouches for it (/.well-known/assetlinks.json), built
+// from these two values. See deploy/crm/ANDROID-APP.md.
+function appSettingsCard(){
+  const c = state.company || {};
+  const set = !!String(c.androidSha256||'').trim();
+  return `<div class="card" style="max-width:520px;margin-bottom:16px;">
+    <h3 style="margin-top:0;font-size:14.5px;">The VantriqAI app</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:0;">
+      Customers install the portal as an app from <strong>portal.vantriqai.com</strong> (the Overview tab offers it).
+      For the <strong>Play Store</strong> version, paste the app's signing fingerprints from Play Console
+      (Test and release → App integrity → App signing key certificate, SHA-256) so it opens full screen.
+      ${set ? '<span class="pill pill-active"><span class="pill-dot"></span>Play Store app verified</span>' : ''}
+    </p>
+    <div class="field"><label>Package name</label><input id="setAndroidPackage" value="${esc(c.androidPackage||'com.vantriqai.app')}"></div>
+    <div class="field"><label>SHA-256 fingerprints (one per line)</label>
+      <textarea id="setAndroidSha" rows="3" style="font-family:var(--f-mono);font-size:11.5px;" placeholder="AB:CD:EF:…">${esc(c.androidSha256||'')}</textarea></div>
+    <button class="btn btn-primary" onclick="saveAppSettings()">Save app settings</button>
+    <a class="btn btn-ghost" href="/.well-known/assetlinks.json" target="_blank" rel="noopener">View what Android sees</a>
+  </div>`;
+}
+async function saveAppSettings(){
+  try{
+    const updated = await API.put('/api/settings', {
+      android_package: document.getElementById('setAndroidPackage').value.trim(),
+      android_sha256: document.getElementById('setAndroidSha').value,
+    });
+    applySettings(updated); render(); showToast('App settings saved');
+  }catch(e){ showToast(e.message||'Could not save','warn'); }
+}
+
 async function refreshEmailCard(){
   const host = document.getElementById('email-state');
   if(!host) return;

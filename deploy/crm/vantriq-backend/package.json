@@ -16,6 +16,7 @@
     "survey-smoke": "node src/utils/surveySmokeTest.js",
     "docs:api": "node tools/gen-api-docs.js",
     "test:proposal": "node test/proposal.test.js",
+    "test:app": "node test/app.test.js",
     "test:surveys": "node test/surveys.test.js && node test/survey-access.test.js && node test/after-chat.test.js && node test/own-survey.test.js && node test/surveys-ui.test.js"
   },
   "dependencies": {

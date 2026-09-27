@@ -1766,3 +1766,13 @@ begin
      where is_internal;
   end if;
 end $$;
+
+-- v9.15 — The VantriqAI app in the Play Store. The Android app opens the
+-- customer portal full screen (a Trusted Web Activity), which Android only
+-- allows once portal.vantriqai.com vouches for the app at
+-- /.well-known/assetlinks.json. That file is built from these two settings:
+-- the app's package name, and the SHA-256 fingerprint(s) of the key(s) Google
+-- Play signs it with (Play Console → Test and release → App integrity). Set
+-- them in CRM → Settings → The VantriqAI app. See deploy/crm/ANDROID-APP.md.
+alter table settings add column if not exists android_package text not null default 'com.vantriqai.app';
+alter table settings add column if not exists android_sha256 text not null default '';

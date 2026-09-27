@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vantriq AI — Account Portal</title>
 <link rel="icon" href="/brand/mark.svg" type="image/svg+xml">
+<!-- The VantriqAI app (v9.15): installable from the browser, and what the
+     Play Store app opens. See deploy/crm/ANDROID-APP.md. -->
+<link rel="manifest" href="/app/manifest.webmanifest">
+<meta name="theme-color" content="#2f56d9">
+<link rel="apple-touch-icon" href="/app/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="VantriqAI">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -361,6 +370,55 @@ async function refreshBilling(){
   ]);
   Object.assign(data, { account, bundles, usage, invoices });
 }
+/* ---- The app: install the portal on a phone or tablet ----
+ * Android and desktop Chrome/Edge offer an install prompt, which the Overview
+ * turns into an "Install the app" button. iPhones have no prompt, so they get
+ * the two taps instead (Share, then Add to Home Screen). Nothing shows once
+ * it is running as an installed app, or after the customer dismisses it. */
+let installPrompt = null;
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(()=>{}); });
+}
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  installPrompt = e;
+  if(data && data.account && currentTab==='overview') render();
+});
+window.addEventListener('appinstalled', () => {
+  installPrompt = null;
+  try{ localStorage.setItem('vq:app-card', 'installed'); }catch(e){}
+  if(data && data.account) render();
+});
+function runningAsApp(){
+  return (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true
+    || document.referrer.startsWith('android-app://');
+}
+function isIOS(){ return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+function appCardDismissed(){ try{ return !!localStorage.getItem('vq:app-card'); }catch(e){ return false; } }
+function dismissAppCard(){ try{ localStorage.setItem('vq:app-card', 'dismissed'); }catch(e){} render(); }
+async function installApp(){
+  if(!installPrompt) return;
+  const prompt = installPrompt;
+  installPrompt = null;
+  prompt.prompt();
+  try{ await prompt.userChoice; }catch(e){}
+  render();
+}
+function appCard(){
+  if(runningAsApp() || appCardDismissed() || (!installPrompt && !isIOS())) return '';
+  return `<div class="card" style="display:flex;gap:14px;align-items:center;">
+    <img src="/app/icon-192.png" alt="" style="width:48px;height:48px;border-radius:12px;flex-shrink:0;">
+    <div style="flex:1;min-width:0;">
+      <div style="font-weight:600;">Get the VantriqAI app</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:2px;">${installPrompt
+        ? 'Your account on your home screen: full screen, one tap away, and it opens straight to your dashboards.'
+        : 'On iPhone or iPad: tap <b>Share</b> <span aria-hidden="true">⎋</span> at the bottom of Safari, then <b>Add to Home Screen</b>.'}</div>
+    </div>
+    ${installPrompt ? `<button class="btn btn-primary" style="padding:8px 16px;font-size:13px;" onclick="installApp()">Install</button>` : ''}
+    <button class="btn btn-ghost" style="padding:8px 12px;font-size:13px;" onclick="dismissAppCard()">Not now</button>
+  </div>`;
+}
+
 function toast(msg, warn){
   const el = document.createElement('div');
   el.textContent = msg;
@@ -601,6 +659,7 @@ function renderOverview(){
   const { account, ledger } = data;
   const p = account.package;
   return `
+  ${appCard()}
   ${ledger.total_outstanding > 0 ? `
   <div class="card" style="background:var(--amber-light);border-color:#F0D9A8;">
     <div style="display:flex;justify-content:space-between;align-items:center;">

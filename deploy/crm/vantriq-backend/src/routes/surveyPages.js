@@ -95,6 +95,7 @@ router.get('/:slug', async (req, res) => {
     THEME: S.escapeHtml((survey && survey.brand_color) || '#2f56d9'),
     URL: S.escapeHtml(survey ? `${base}/s/${survey.slug}` : base),
     OG_IMAGE: survey && survey.logo_url ? `<meta property="og:image" content="${S.escapeHtml(survey.logo_url)}">` : '',
+    KIOSK_APP: kioskApp(req, survey, state),
     DATA: scriptJson({ state, preview, survey: pub, invite, slug: survey ? survey.slug : null }),
   });
   res.status(state === 'not_found' ? 404 : 200)
@@ -102,6 +103,51 @@ router.get('/:slug', async (req, res) => {
     .set('X-Content-Type-Options', 'nosniff')
     .set('Referrer-Policy', 'strict-origin-when-cross-origin')
     .type('html').send(html);
+});
+
+/**
+ * A kiosk can be installed on the tablet it runs on, as its own full-screen
+ * app ("Add to Home screen" / "Install app"): the survey's kiosk link, in the
+ * business's name and colour, opening straight into the kiosk. Only the kiosk
+ * link offers it — a customer answering on their own phone is never asked to
+ * install anything.
+ */
+function kioskApp(req, survey, state) {
+  if (!survey || state !== 'ok' || req.query.kiosk !== '1') return '';
+  const loc = locationOf(survey, req.query.loc);
+  const href = `/s/${encodeURIComponent(survey.slug)}/app.webmanifest${loc ? `?loc=${encodeURIComponent(loc.id)}` : ''}`;
+  return `<link rel="manifest" href="${S.escapeHtml(href)}">
+<link rel="apple-touch-icon" href="/app/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="${S.escapeHtml((survey.display_name || survey.company || 'Feedback').slice(0, 30))}">
+<script>if('serviceWorker' in navigator) addEventListener('load', function(){ navigator.serviceWorker.register('/sw.js').catch(function(){}); });</script>`;
+}
+
+/** The kiosk's app manifest: it opens full screen, straight into this survey's kiosk. */
+router.get('/:slug/app.webmanifest', async (req, res) => {
+  const survey = await S.getSurveyBySlug(req.params.slug);
+  if (!survey) return res.status(404).type('text/plain').send('Survey not found');
+  const loc = locationOf(survey, req.query.loc);
+  const name = survey.display_name || survey.company || 'Feedback';
+  const start = `/s/${survey.slug}?kiosk=1${loc ? `&loc=${encodeURIComponent(loc.id)}` : ''}`;
+  res.set('Cache-Control', 'no-cache').type('application/manifest+json').send(JSON.stringify({
+    id: start,
+    name: `${name} — feedback${loc ? ` (${loc.name})` : ''}`,
+    short_name: name.slice(0, 12),
+    description: `Tell ${name} how they did.`,
+    start_url: start,
+    scope: `/s/${survey.slug}`,
+    display: 'fullscreen',
+    orientation: 'any',
+    background_color: '#ffffff',
+    theme_color: /^#[0-9a-f]{6}$/i.test(survey.brand_color) ? survey.brand_color : '#2f56d9',
+    icons: [
+      { src: '/app/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/app/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: '/app/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+    ],
+  }, null, 2));
 });
 
 function locationOf(survey, id) {
