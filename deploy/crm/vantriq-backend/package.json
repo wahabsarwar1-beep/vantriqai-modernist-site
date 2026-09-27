@@ -1,6 +1,6 @@
 {
   "name": "vantriq-crm-backend",
-  "version": "9.13.1",
+  "version": "9.14.0",
   "description": "Vantriq AI \u2014 CRM, billing, procurement, and usage-ingestion API backed by Postgres/Supabase",
   "main": "src/index.js",
   "type": "commonjs",
@@ -14,7 +14,8 @@
     "seed-internal": "node src/utils/seedInternal.js",
     "seed-owner": "node src/utils/seedOwner.js",
     "docs:api": "node tools/gen-api-docs.js",
-    "test:proposal": "node test/proposal.test.js"
+    "test:proposal": "node test/proposal.test.js",
+    "test:surveys": "node test/surveys.test.js && node test/surveys-ui.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -22,7 +23,8 @@
     "exceljs": "^4.4.0",
     "express": "^4.19.2",
     "pdfkit": "^0.20.2",
-    "pg": "^8.12.0"
+    "pg": "^8.12.0",
+    "qrcode-generator": "^1.5.2"
   },
   "engines": {
     "node": ">=18"

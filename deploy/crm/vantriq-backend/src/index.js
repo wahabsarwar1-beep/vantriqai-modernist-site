@@ -1,4 +1,9 @@
 require('dotenv').config();
+// First, before any router below is built: a rejected promise in any async
+// handler becomes a failed request instead of a crashed server (and a 502 for
+// everyone while Docker restarts it). See the file for the whole story.
+const { errorHandler, installProcessGuards } = require('./utils/asyncErrors');
+installProcessGuards();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -33,12 +38,19 @@ const quotesRoutes = require('./routes/quotes');
 const contractsRoutes = require('./routes/contracts');
 const archiveRoutes = require('./routes/archive');
 const billingOpsRoutes = require('./routes/billingOps');
+const surveysRoutes = require('./routes/surveys');
+const publicSurveyApiRoutes = require('./routes/publicSurveyApi');
+const surveyPagesRoutes = require('./routes/surveyPages');
 
 const app = express();
 
 const corsOrigin = process.env.CORS_ORIGIN && process.env.CORS_ORIGIN !== '*'
   ? process.env.CORS_ORIGIN.split(',').map((s) => s.trim())
   : true;
+// The public survey API answers any origin: a customer may post answers from
+// their own website or app. Registered BEFORE the app-wide rule below, which
+// would otherwise answer a foreign origin's preflight with a refusal.
+app.use('/api/public', cors({ origin: true }));
 app.use(cors({ origin: corsOrigin }));
 // Document uploads arrive base64-encoded in JSON, so this route needs room
 // for a 10 MB file plus a third for the encoding. Everything else stays at
@@ -78,6 +90,11 @@ app.use('/api/rep', requireRep, repPortalRoutes);
 // mount-order reasoning as the portals above.
 app.use('/api/external', requireClientApiToken, externalApiRoutes);
 
+// Surveys, as respondents reach them: read a survey, send answers. No sign-in
+// by design — see src/routes/publicSurveyApi.js for what protects it instead.
+// Before the bare '/api' admin mount, for the same reason as the portals.
+app.use('/api/public', publicSurveyApiRoutes);
+
 // Everything else under /api/* requires an admin key EXCEPT the usage webhook,
 // which accepts a lower-privileged 'webhook' scoped key so n8n never
 // holds credentials that can read/edit clients, invoices, or pricing.
@@ -106,6 +123,9 @@ app.use('/api/package-requests', requireScope('staff'), packageRequestsRoutes);
 app.use('/api/expenses', requireScope('admin'), expensesRoutes);
 app.use('/api/dashboard', requireScope('staff'), dashboardRoutes);
 app.use('/api/analytics', requireScope('staff'), analyticsRoutes);
+// Every client's surveys, their results and follow-ups. The same router is
+// mounted for customers at /api/portal/surveys, scoped to their own.
+app.use('/api/surveys', requireScope('staff'), surveysRoutes);
 app.use('/api/quota', requireScope('staff'), quotaRoutes);
 app.use('/api/financials', requireScope('admin'), financialsRoutes);
 // The receipts ledger. Staff record what came in; they do not see the books.
@@ -146,6 +166,10 @@ const PORTAL_HOSTS = (process.env.PORTAL_HOSTS || 'portal.vantriqai.com')
 const isPortalHost = (req) => PORTAL_HOSTS.includes(String(req.hostname || '').toLowerCase());
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 
+// The survey app, its QR codes and posters: /s/<survey address>. Ahead of the
+// static files and the catch-all below, on every host.
+app.use('/s', surveyPagesRoutes);
+
 app.get(['/', '/index.html'], (req, res, next) => {
   if (!isPortalHost(req)) return next();
   res.sendFile(path.join(PUBLIC_DIR, 'portal.html'));
@@ -156,10 +180,9 @@ app.get('*', (req, res, next) => {
   res.sendFile(path.join(PUBLIC_DIR, isPortalHost(req) ? 'portal.html' : 'index.html'));
 });
 
-app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ error: 'Internal server error' });
-});
+// Every failure lands here, async ones included (utils/asyncErrors.js). A
+// value the caller got wrong answers 4xx with a reason; anything else is 500.
+app.use(errorHandler);
 
 const port = process.env.PORT || 8080;
 app.listen(port, () => {

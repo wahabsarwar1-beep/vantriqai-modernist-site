@@ -11,6 +11,7 @@ const { hashToken } = require('../middleware/clientApiAuth');
 const { effectivePackage } = require('../utils/pkg');
 const { clientAnalytics } = require('../utils/analytics');
 const { acceptQuote, buildQuoteDocument } = require('./quotes');
+const surveysRoutes = require('./surveys');
 const { renderInvoicePdf, invoiceFilename } = require('../utils/invoicePdf');
 const { renderWhtStatement, whtFilename } = require('../utils/whtCertificate');
 const ExcelJS = require('exceljs');
@@ -107,6 +108,12 @@ router.post('/reset-password', async (req, res) => {
 
 /* -------- Everything below requires a signed-in customer session -------- */
 router.use(requirePortalSession);
+
+/* ---------------------------- Surveys ---------------------------- */
+// The customer's own surveys: build from an industry template, share, read
+// the results, follow up. The very router the CRM uses at /api/surveys — it
+// sees req.portalClient and pins every read and write to this one client.
+router.use('/surveys', surveysRoutes);
 
 /* ---------------------------- Account overview ---------------------------- */
 router.get('/account', async (req, res) => {

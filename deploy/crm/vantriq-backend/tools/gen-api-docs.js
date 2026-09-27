@@ -111,10 +111,11 @@ for (const mount of mounts) {
 }
 
 // Sub-routers mounted inside a route module rather than in index.js are
-// invisible to the scan above, so they are declared here by hand. Only one
-// exists; if a second appears, this list is where it goes.
+// invisible to the scan above, so they are declared here by hand.
 const NESTED = [
   { file: 'clientDocuments', mountPath: '/api/clients/:id/documents', scope: 'automation' },
+  // The staff survey router, mounted again inside the portal for customers.
+  { file: 'surveys', mountPath: '/api/portal/surveys', scope: null },
 ];
 for (const n of NESTED) {
   const src = fs.readFileSync(path.join(ROOT, 'src', 'routes', `${n.file}.js`), 'utf8');

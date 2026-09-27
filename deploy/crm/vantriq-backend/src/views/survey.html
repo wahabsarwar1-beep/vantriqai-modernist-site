@@ -1,0 +1,1005 @@
+<!doctype html>
+<html lang="{{LANG}}" dir="{{DIR}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{TITLE}}</title>
+<meta name="description" content="{{DESCRIPTION}}">
+<meta name="theme-color" content="{{THEME}}">
+<meta name="robots" content="noindex, nofollow">
+<meta property="og:type" content="website">
+<meta property="og:title" content="{{TITLE}}">
+<meta property="og:description" content="{{DESCRIPTION}}">
+<meta property="og:url" content="{{URL}}">
+{{OG_IMAGE}}
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2316151a'/%3E%3Cpath d='M18 33l9 9 19-20' fill='none' stroke='%23fff' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!--
+  VantriqAI survey app. One page, no build step, no dependencies: the survey
+  arrives inside the HTML (window.__VQS__), so it paints on the first
+  response. Everything a respondent sees is escaped here as well as validated
+  on the server, and every answer is checked again when it arrives.
+-->
+<style>
+:root{
+  --brand:#2f56d9; --brand-ink:#1f3a95; --on-brand:#fff;
+  --brand-soft:rgba(47,86,217,.14); --brand-softer:rgba(47,86,217,.06);
+  --ink:#16151a; --ink-2:#3a3640; --muted:#6b645b; --muted-2:#8d857a;
+  --line:#e7e2da; --line-2:#f0ece5; --paper:#f7f5f1; --card:#fff;
+  --star:#f5a524;
+  --radius:24px;
+  --shadow:0 1px 2px rgba(22,21,26,.04), 0 30px 70px -34px rgba(22,21,26,.32);
+  --f:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif;
+  --f-ur:"Noto Nastaliq Urdu","Jameel Noori Nastaleeq","Urdu Typesetting","Noto Naskh Arabic",serif;
+  --ease:cubic-bezier(.2,.8,.2,1);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;}
+body{
+  font-family:var(--f);color:var(--ink);min-height:100vh;min-height:100dvh;
+  background:
+    radial-gradient(1100px 620px at 108% -12%, var(--brand-soft), transparent 62%),
+    radial-gradient(900px 520px at -12% 112%, var(--brand-softer), transparent 62%),
+    var(--paper);
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  -webkit-tap-highlight-color:transparent;
+}
+html[lang=ur] body{font-family:var(--f-ur);}
+button,input,textarea{font:inherit;color:inherit;}
+button{cursor:pointer;}
+:focus{outline:none;}
+:focus-visible{outline:3px solid var(--brand);outline-offset:3px;border-radius:12px;}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+/* The honeypot: present for a bot, invisible and untouchable for a person, and
+   out of the layout in both directions (a -9999px offset scrolls an RTL page). */
+.hp{position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden;clip-path:inset(50%);border:0;padding:0;margin:0;}
+
+/* ---------- frame ---------- */
+.app{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;
+  padding:max(14px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom));}
+.shell{width:100%;max-width:580px;flex:1;display:flex;flex-direction:column;}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid rgba(22,21,26,.05);
+  padding:18px 18px 18px;flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;}
+@media (min-width:640px){
+  .app{justify-content:center;padding:36px 24px;}
+  .shell{flex:0 0 auto;}
+  .card{padding:30px 34px 26px;min-height:600px;flex:0 0 auto;}
+}
+.ribbon{background:#fff4dc;color:#7a4b08;font-size:13px;font-weight:700;text-align:center;padding:9px 12px;border-radius:14px;margin-bottom:12px;border:1px solid #f3dfb3;}
+
+/* ---------- header ---------- */
+.head{display:flex;align-items:center;gap:10px;min-height:40px;}
+.brandmark{width:36px;height:36px;border-radius:11px;flex:0 0 36px;display:grid;place-items:center;overflow:hidden;
+  background:var(--brand);color:var(--on-brand);font-weight:800;font-size:17px;font-family:var(--f);}
+.brandmark img{width:100%;height:100%;object-fit:contain;background:#fff;}
+.bname{font-weight:700;font-size:15px;line-height:1.2;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+html[lang=ur] .bname{line-height:1.9;}
+.lang{display:inline-flex;background:var(--line-2);border-radius:999px;padding:3px;gap:2px;flex:0 0 auto;}
+.lang button{border:0;background:transparent;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;color:var(--muted);min-height:32px;}
+.lang button[aria-pressed=true]{background:var(--ink);color:#fff;}
+.lang .ur{font-family:var(--f-ur);font-weight:600;font-size:13px;line-height:1;}
+.progress{height:5px;background:var(--line-2);border-radius:99px;overflow:hidden;margin:14px 0 4px;}
+.progress>i{display:block;height:100%;background:var(--brand);border-radius:99px;transition:width .45s var(--ease);}
+
+/* ---------- screens ---------- */
+.stage{flex:1;display:flex;flex-direction:column;}
+.screen{flex:1;display:flex;flex-direction:column;animation:in .42s var(--ease) both;}
+.screen.back{animation-name:inback;}
+.screen.still{animation:none;}
+@keyframes in{from{opacity:0;transform:translateX(calc(26px * var(--dir,1)));}to{opacity:1;transform:none;}}
+@keyframes inback{from{opacity:0;transform:translateX(calc(-26px * var(--dir,1)));}to{opacity:1;transform:none;}}
+html[dir=rtl]{--dir:-1;}
+@media (prefers-reduced-motion:reduce){.screen,.screen.back{animation:fade .2s both;}@keyframes fade{from{opacity:0}to{opacity:1}}.progress>i{transition:none;}}
+
+.qnum{font-size:13px;font-weight:700;color:var(--brand-ink);letter-spacing:.02em;margin-top:18px;}
+.qtitle{font-size:clamp(21px, 5.6vw, 27px);line-height:1.28;font-weight:750;letter-spacing:-.018em;margin:8px 0 6px;}
+html[lang=ur] .qtitle{font-weight:700;letter-spacing:0;line-height:2.05;font-size:clamp(20px, 5.2vw, 25px);}
+.qhelp{font-size:14.5px;color:var(--muted);line-height:1.5;margin:0 0 4px;}
+html[lang=ur] .qhelp{line-height:2.1;font-size:14px;}
+.opt-tag{display:inline-block;font-size:11.5px;font-weight:700;color:var(--muted-2);background:var(--line-2);border-radius:99px;padding:2px 9px;margin-inline-start:8px;vertical-align:middle;letter-spacing:.02em;}
+.answer{margin-top:22px;}
+.err{color:#b4402f;font-size:14px;font-weight:600;min-height:20px;margin-top:10px;}
+
+/* ---------- faces (CSAT) ---------- */
+.faces{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
+.face{border:0;background:transparent;padding:4px 0 6px;border-radius:18px;display:flex;flex-direction:column;align-items:center;gap:6px;
+  transition:transform .18s var(--ease);}
+.face svg{width:100%;max-width:64px;aspect-ratio:1;display:block;}
+.face .bg{fill:var(--c);fill-opacity:.16;transition:fill-opacity .2s;}
+.face .ft{stroke:var(--c);fill:none;stroke-width:3;stroke-linecap:round;}
+.face .ey{fill:var(--c);}
+.face:hover{transform:translateY(-2px);}
+.face[aria-checked=true]{transform:scale(1.08);}
+.face[aria-checked=true] .bg{fill-opacity:1;}
+.face[aria-checked=true] .ft{stroke:#fff;}
+.face[aria-checked=true] .ey{fill:#fff;}
+.face .lb{font-size:11.5px;color:var(--muted);font-weight:600;line-height:1.25;text-align:center;min-height:2.5em;}
+html[lang=ur] .face .lb{line-height:1.9;font-size:11px;}
+.face[aria-checked=true] .lb{color:var(--ink);}
+@media (max-width:420px){.face .lb{display:none;}}
+.pick{text-align:center;font-weight:700;font-size:16px;margin-top:14px;min-height:24px;color:var(--ink-2);}
+html[lang=ur] .pick{line-height:2;}
+
+/* ---------- stars ---------- */
+.stars{display:flex;gap:6px;justify-content:center;}
+.star{border:0;background:transparent;padding:4px;border-radius:12px;line-height:0;transition:transform .15s var(--ease);}
+.star svg{width:46px;height:46px;}
+.star path{fill:var(--line);transition:fill .15s;}
+.star.on path{fill:var(--star);}
+.star:hover{transform:scale(1.08);}
+.stars.sm .star svg{width:30px;height:30px;}
+.stars.sm .star{padding:3px;}
+
+/* ---------- number scales (NPS, effort) ---------- */
+.scale{display:grid;gap:6px;}
+.scale.n11{grid-template-columns:repeat(11,1fr);}
+.scale.n7{grid-template-columns:repeat(7,1fr);}
+@media (max-width:460px){.scale.n11{grid-template-columns:repeat(6,1fr);}}
+.pt{min-height:50px;border-radius:13px;border:1.5px solid var(--line);background:#fff;font-weight:750;font-size:17px;font-family:var(--f);
+  transition:background .15s,border-color .15s,color .15s,transform .15s;}
+.pt:hover{border-color:var(--brand);}
+.pt[aria-checked=true]{background:var(--sel,var(--brand));border-color:var(--sel,var(--brand));color:#fff;transform:translateY(-1px);}
+.ends{display:flex;justify-content:space-between;gap:12px;font-size:12.5px;color:var(--muted);margin-top:10px;font-weight:600;}
+html[lang=ur] .ends{line-height:2;}
+
+/* ---------- rating grid ---------- */
+.grow{display:flex;align-items:center;justify-content:space-between;gap:10px 14px;padding:12px 0;border-bottom:1px solid var(--line-2);flex-wrap:wrap;}
+.grow:last-child{border-bottom:0;}
+.grow .gl{font-weight:650;font-size:15.5px;flex:1 1 160px;}
+html[lang=ur] .grow .gl{line-height:2;}
+.grow .stars{justify-content:flex-end;}
+
+/* ---------- options ---------- */
+.opts{display:flex;flex-direction:column;gap:10px;}
+.opt{display:flex;align-items:center;gap:12px;width:100%;text-align:start;padding:14px 16px;border-radius:16px;border:1.5px solid var(--line);
+  background:#fff;font-size:16px;font-weight:650;min-height:56px;transition:border-color .15s,background .15s,box-shadow .15s;}
+html[lang=ur] .opt{line-height:2;padding-block:10px;}
+.opt:hover{border-color:var(--brand);}
+.opt[aria-checked=true]{border-color:var(--brand);background:var(--brand-softer);box-shadow:0 0 0 3px var(--brand-soft);}
+.ind{width:24px;height:24px;flex:0 0 24px;border-radius:50%;border:2px solid #cfc9bf;display:grid;place-items:center;transition:all .15s;}
+.multi .ind{border-radius:7px;}
+.opt[aria-checked=true] .ind{border-color:var(--brand);background:var(--brand);}
+.ind svg{width:14px;height:14px;opacity:0;}
+.opt[aria-checked=true] .ind svg{opacity:1;}
+.other-in{margin-top:4px;}
+
+/* ---------- yes / no ---------- */
+.yn{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.yn button{min-height:128px;border-radius:22px;border:1.5px solid var(--line);background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;font-size:18px;font-weight:750;transition:all .18s var(--ease);}
+.yn button:hover{border-color:var(--brand);transform:translateY(-2px);}
+.yn svg{width:40px;height:40px;}
+.yn .y svg{color:#16a34a;}.yn .n svg{color:#dc2626;}
+.yn button[aria-checked=true]{border-color:var(--brand);background:var(--brand-softer);box-shadow:0 0 0 3px var(--brand-soft);}
+
+/* ---------- inputs ---------- */
+.field{display:block;margin-bottom:12px;}
+.field span{display:block;font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px;}
+.in,textarea{width:100%;border-radius:15px;border:1.5px solid var(--line);background:#fff;padding:14px 16px;font-size:16px;line-height:1.5;
+  transition:border-color .15s, box-shadow .15s;}
+html[lang=ur] textarea,html[lang=ur] .in{line-height:2;}
+textarea{min-height:150px;resize:vertical;}
+.in:focus,textarea:focus{border-color:var(--brand);box-shadow:0 0 0 4px var(--brand-soft);outline:none;}
+.count{font-size:12px;color:var(--muted-2);text-align:end;margin-top:6px;font-family:var(--f);}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:14.5px;font-weight:600;color:var(--ink-2);margin-top:6px;cursor:pointer;}
+.check input{width:22px;height:22px;flex:0 0 22px;margin:1px 0 0;accent-color:var(--brand);}
+html[lang=ur] .check{line-height:2;}
+
+/* ---------- footer navigation ---------- */
+.nav{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:auto;padding-top:22px;}
+.btn{appearance:none;border:0;border-radius:999px;padding:13px 24px;font-weight:750;font-size:16px;min-height:52px;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:transform .15s var(--ease), box-shadow .15s, background .15s, opacity .15s;}
+.btn.primary{background:var(--brand);color:var(--on-brand);box-shadow:0 14px 28px -16px var(--brand);}
+.btn.primary:hover{transform:translateY(-1px);}
+.btn.primary:disabled{opacity:.4;transform:none;box-shadow:none;cursor:not-allowed;}
+.btn.ghost{background:transparent;color:var(--muted);padding-inline:10px;}
+.btn.ghost:hover{color:var(--ink);}
+.btn.soft{background:var(--line-2);color:var(--ink);}
+.btn.block{width:100%;}
+.btn svg{width:18px;height:18px;}
+html[dir=rtl] .btn .arrow{transform:scaleX(-1);}
+.spin{width:18px;height:18px;border-radius:50%;border:2.5px solid currentColor;border-inline-end-color:transparent;animation:rot .7s linear infinite;}
+@keyframes rot{to{transform:rotate(360deg);}}
+.hint{font-size:12px;color:var(--muted-2);text-align:center;margin-top:10px;font-family:var(--f);}
+@media (hover:none){.hint.keys{display:none;}}
+
+/* ---------- intro / done / states ---------- */
+.center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:18px 4px;}
+.logo-xl{width:84px;height:84px;border-radius:24px;display:grid;place-items:center;background:var(--brand);color:var(--on-brand);
+  font-size:38px;font-weight:800;overflow:hidden;box-shadow:0 18px 40px -20px var(--brand);font-family:var(--f);}
+.logo-xl img{width:100%;height:100%;object-fit:contain;background:#fff;}
+.center h1{font-size:clamp(25px, 6.6vw, 32px);letter-spacing:-.025em;margin:18px 0 8px;line-height:1.2;}
+html[lang=ur] .center h1{letter-spacing:0;line-height:2;font-size:clamp(23px, 6vw, 29px);}
+.lead{font-size:17px;color:var(--ink-2);line-height:1.55;max-width:440px;margin:0;}
+html[lang=ur] .lead{line-height:2.1;font-size:16px;}
+.meta{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;font-size:13.5px;color:var(--muted);font-weight:650;margin:18px 0 26px;}
+.meta span{display:inline-flex;align-items:center;gap:6px;}
+.meta svg{width:16px;height:16px;}
+.fine{font-size:12.5px;color:var(--muted-2);margin-top:16px;line-height:1.5;}
+html[lang=ur] .fine{line-height:2;}
+.tick{width:92px;height:92px;}
+.tick circle{fill:var(--brand);transform-origin:center;animation:pop .45s var(--ease) both;}
+.tick path{stroke:var(--on-brand);stroke-width:6;fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:60;stroke-dashoffset:60;animation:draw .5s .25s var(--ease) forwards;}
+@keyframes pop{from{transform:scale(.4);opacity:0;}to{transform:scale(1);opacity:1;}}
+@keyframes draw{to{stroke-dashoffset:0;}}
+.panel{margin-top:22px;border-radius:18px;padding:16px 18px;background:var(--line-2);text-align:start;width:100%;max-width:440px;font-size:15px;line-height:1.55;}
+html[lang=ur] .panel{line-height:2.1;}
+.panel.good{background:#ecf8f0;}
+.panel.sorry{background:#fdf1ec;}
+.panel .btn{margin-top:12px;}
+.ring{width:54px;height:54px;margin:18px auto 0;}
+.ring circle{fill:none;stroke-width:5;}
+.ring .t{stroke:var(--line-2);}
+.ring .p{stroke:var(--brand);stroke-linecap:round;transform:rotate(-90deg);transform-origin:center;}
+.state-ic{width:64px;height:64px;border-radius:20px;display:grid;place-items:center;background:var(--line-2);color:var(--muted);font-size:30px;}
+
+.foot{text-align:center;font-size:12px;color:var(--muted-2);padding:14px 0 2px;font-family:var(--f);}
+.foot a{color:var(--muted);font-weight:700;text-decoration:none;}
+.foot a:hover{color:var(--ink);}
+.toast{position:fixed;left:50%;bottom:max(20px, env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:#fff;
+  padding:12px 18px;border-radius:14px;font-size:14px;font-weight:600;box-shadow:0 12px 30px rgba(0,0,0,.25);z-index:10;max-width:calc(100vw - 32px);
+  animation:up .3s var(--ease) both;}
+html[lang=ur] .toast{line-height:2;}
+@keyframes up{from{opacity:0;transform:translate(-50%,10px);}to{opacity:1;transform:translate(-50%,0);}}
+</style>
+</head>
+<body>
+<div id="app" class="app"></div>
+<noscript><p style="font-family:sans-serif;text-align:center;padding:40px;">This survey needs JavaScript switched on.</p></noscript>
+<input class="hp" id="hp_website" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+<script>window.__VQS__ = {{DATA}};</script>
+<script>
+(function(){
+  'use strict';
+
+  /* ================================================================ */
+  /* Boot                                                              */
+  /* ================================================================ */
+  var BOOT = window.__VQS__ || {};
+  var params = new URLSearchParams(location.search);
+  var S = BOOT.survey || null;
+  var STATE = BOOT.state || (S ? 'ok' : 'not_found');
+  var PREVIEW = !!BOOT.preview;
+  var INVITE = BOOT.invite || null;
+  var KIOSK = params.get('kiosk') === '1';
+  var CHANNELS = ['link','qr','whatsapp','sms','email','kiosk','embed','web'];
+  var CHANNEL = KIOSK ? 'kiosk' : (CHANNELS.indexOf(params.get('ch')) >= 0 ? params.get('ch') : (INVITE ? 'whatsapp' : 'link'));
+  var OTHER = '__other';
+  var app = document.getElementById('app');
+
+  /* ================================================================ */
+  /* Words                                                             */
+  /* ================================================================ */
+  var T = {
+    en: {
+      start:'Start', next:'Next', back:'Back', submit:'Submit', skip:'Skip', sending:'Sending…',
+      of:'Question {n} of {t}', about:'About {m} min', questions:'{n} questions', oneQ:'1 question',
+      required:'Please answer this question to continue.', optional:'Optional',
+      csat:['Very dissatisfied','Dissatisfied','Neutral','Satisfied','Very satisfied'],
+      tapFace:'Tap a face', tapStar:'Tap a star',
+      stars:['Poor','Fair','Good','Very good','Excellent'],
+      npsLow:'Not at all likely', npsHigh:'Extremely likely', cesLow:'Very difficult', cesHigh:'Very easy',
+      yes:'Yes', no:'No', other:'Other', otherPh:'Please tell us…', selectAll:'Choose all that apply',
+      typeHere:'Type your answer…', name:'Your name', company:'Business name', phone:'Phone or WhatsApp', email:'Email',
+      consent:'{business} may contact me about my feedback', location:'Which branch did you visit?',
+      thanks:'Thank you!', thanksDefault:'Your feedback goes straight to our team.',
+      reviewAsk:'So glad you had a great experience! Would you share it on Google? It really helps us.',
+      reviewBtn:'Leave a Google review',
+      sorry:'We are sorry we let you down. Our team will look into this.', willContact:'We will be in touch soon.',
+      again:'Start a new response', restartIn:'Starting again in {s}s',
+      offline:'You are offline. Your answers are saved and will be sent as soon as you are back online.',
+      failed:'Your answers could not be sent. Please try again.', retry:'Try again',
+      preview:'Preview — answers are not saved', privacy:'Your answers go only to {business}.',
+      powered:'Powered by', resume:'Welcome back — carry on where you left off.',
+      invalidEmail:'That email address does not look right.', invalidPhone:'That phone number does not look right.',
+      keys:'Tip: press Enter to continue', language:'Language'
+    },
+    ur: {
+      start:'شروع کریں', next:'آگے', back:'پیچھے', submit:'جمع کرائیں', skip:'چھوڑ دیں', sending:'بھیجا جا رہا ہے…',
+      of:'سوال {n} از {t}', about:'تقریباً {m} منٹ', questions:'{n} سوالات', oneQ:'1 سوال',
+      required:'آگے بڑھنے کے لیے براہِ کرم اس سوال کا جواب دیں۔', optional:'اختیاری',
+      csat:['بہت غیر مطمئن','غیر مطمئن','درمیانہ','مطمئن','بہت مطمئن'],
+      tapFace:'کسی چہرے پر ٹیپ کریں', tapStar:'کسی ستارے پر ٹیپ کریں',
+      stars:['خراب','مناسب','اچھا','بہت اچھا','بہترین'],
+      npsLow:'بالکل امکان نہیں', npsHigh:'بہت زیادہ امکان', cesLow:'بہت مشکل', cesHigh:'بہت آسان',
+      yes:'جی ہاں', no:'جی نہیں', other:'دیگر', otherPh:'براہِ کرم بتائیں…', selectAll:'جو بھی لاگو ہوں منتخب کریں',
+      typeHere:'اپنا جواب یہاں لکھیں…', name:'آپ کا نام', company:'کاروبار کا نام', phone:'فون یا واٹس ایپ', email:'ای میل',
+      consent:'{business} میری رائے کے بارے میں مجھ سے رابطہ کر سکتا ہے', location:'آپ کس برانچ میں تشریف لائے؟',
+      thanks:'شکریہ!', thanksDefault:'آپ کی رائے براہِ راست ہماری ٹیم تک پہنچتی ہے۔',
+      reviewAsk:'ہمیں خوشی ہے کہ آپ کا تجربہ اچھا رہا! کیا آپ اسے گوگل پر شیئر کریں گے؟ اس سے ہمیں بہت مدد ملتی ہے۔',
+      reviewBtn:'گوگل پر ریویو دیں',
+      sorry:'ہمیں افسوس ہے کہ ہم آپ کی توقعات پر پورا نہیں اترے۔ ہماری ٹیم اس کا جائزہ لے گی۔', willContact:'ہم جلد آپ سے رابطہ کریں گے۔',
+      again:'نیا جواب شروع کریں', restartIn:'{s} سیکنڈ میں دوبارہ شروع ہو گا',
+      offline:'آپ آف لائن ہیں۔ آپ کے جوابات محفوظ ہیں اور انٹرنیٹ بحال ہوتے ہی بھیج دیے جائیں گے۔',
+      failed:'آپ کے جوابات نہیں بھیجے جا سکے۔ براہِ کرم دوبارہ کوشش کریں۔', retry:'دوبارہ کوشش کریں',
+      preview:'پیش منظر — جوابات محفوظ نہیں ہوتے', privacy:'آپ کے جوابات صرف {business} تک پہنچتے ہیں۔',
+      powered:'پاورڈ بائی', resume:'خوش آمدید — جہاں چھوڑا تھا وہیں سے جاری رکھیں۔',
+      invalidEmail:'یہ ای میل ایڈریس درست نہیں لگتا۔', invalidPhone:'یہ فون نمبر درست نہیں لگتا۔',
+      keys:'', language:'زبان'
+    }
+  };
+  // What a respondent sees when there is no survey to show. The survey's own
+  // languages are unknown here, so both are said, one after the other.
+  var STATES = {
+    not_found:['🔍','Survey not found','This link may be incomplete. Please check it and try again.','سروے نہیں ملا','ہو سکتا ہے یہ لنک نامکمل ہو۔ براہِ کرم اسے چیک کر کے دوبارہ کوشش کریں۔'],
+    draft:['🛠️','This survey is not open yet','Please check back soon.','یہ سروے ابھی شروع نہیں ہوا','براہِ کرم کچھ دیر بعد دوبارہ دیکھیں۔'],
+    paused:['⏸️','This survey is paused','Please try again a little later.','یہ سروے عارضی طور پر بند ہے','براہِ کرم کچھ دیر بعد کوشش کریں۔'],
+    closed:['📭','This survey has closed','Thank you for your interest.','یہ سروے بند ہو چکا ہے','آپ کی دلچسپی کا شکریہ۔'],
+    answered:['✅','You have already answered','Thank you — we have your feedback.','آپ پہلے ہی جواب دے چکے ہیں','شکریہ — آپ کی رائے ہمیں مل چکی ہے۔'],
+    limited:['⏳','Please try again shortly','Too many answers have come from this device just now.','براہِ کرم تھوڑی دیر بعد کوشش کریں','اس ڈیوائس سے ابھی بہت زیادہ جوابات آئے ہیں۔']
+  };
+
+  /* ================================================================ */
+  /* Helpers                                                           */
+  /* ================================================================ */
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function fmt(s, v){ return String(s).replace(/\{(\w+)\}/g, function(m, k){ return v && v[k] != null ? v[k] : m; }); }
+  var lang = 'en';
+  function t(key, v){ var d = T[lang] || T.en; var s = d[key] != null && d[key] !== '' ? d[key] : T.en[key]; return v ? fmt(s, v) : s; }
+  function business(){ return (S && S.display_name) || ''; }
+  /** A survey text in the respondent's language, falling back sensibly, with {business} filled in. */
+  function L(o){
+    if (!o) return '';
+    var s = o[lang] || o[S.default_language] || o.en || Object.keys(o).map(function(k){ return o[k]; })[0] || '';
+    return String(s).replace(/\{business\}/g, business());
+  }
+  function store(k, v){ try { if (v === undefined) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function load(k){ try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+  function uid(){
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    var a = new Uint8Array(16); (window.crypto || {}).getRandomValues ? crypto.getRandomValues(a) : a.forEach(function(_, i){ a[i] = Math.random() * 256; });
+    return Array.prototype.map.call(a, function(b){ return ('0' + b.toString(16)).slice(-2); }).join('');
+  }
+  var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  var PHONE_RE = /^\+?[0-9(][0-9 ()-]{5,19}$/;
+
+  function toast(msg, ms){
+    var old = document.querySelector('.toast'); if (old) old.remove();
+    var el = document.createElement('div'); el.className = 'toast'; el.setAttribute('role', 'status'); el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(function(){ el.remove(); }, ms || 3600);
+  }
+
+  /* ---------- colour: the survey wears the business's brand ---------- */
+  function hexRgb(h){ var m = /^#?([0-9a-f]{6})$/i.exec(h || ''); if (!m) return [47,86,217]; var n = parseInt(m[1], 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+  function lum(rgb){ var c = rgb.map(function(v){ v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); }); return .2126 * c[0] + .7152 * c[1] + .0722 * c[2]; }
+  function contrast(a, b){ var x = Math.max(a, b), y = Math.min(a, b); return (x + .05) / (y + .05); }
+  function hex(rgb){ return '#' + rgb.map(function(v){ return ('0' + Math.round(v).toString(16)).slice(-2); }).join(''); }
+  function applyBrand(color){
+    var rgb = hexRgb(color), L0 = lum(rgb);
+    var onBrand = contrast(L0, 1) >= contrast(L0, lum([22,21,26])) ? '#ffffff' : '#16151a';
+    // A text-safe shade for words in the brand colour on white: darkened until it reads.
+    var ink = rgb.slice(), guard = 0;
+    while (contrast(lum(ink), 1) < 4.5 && guard++ < 30) ink = ink.map(function(v){ return v * .9; });
+    var r = document.documentElement.style;
+    r.setProperty('--brand', hex(rgb));
+    r.setProperty('--brand-ink', hex(ink));
+    r.setProperty('--on-brand', onBrand);
+    r.setProperty('--brand-soft', 'rgba(' + rgb.join(',') + ',.16)');
+    r.setProperty('--brand-softer', 'rgba(' + rgb.join(',') + ',.07)');
+  }
+
+  function useUrduFont(){
+    if (document.getElementById('urdu-font')) return;
+    var l = document.createElement('link');
+    l.id = 'urdu-font'; l.rel = 'stylesheet';
+    l.href = 'https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;600;700&display=swap';
+    document.head.appendChild(l);
+  }
+  function setLang(l, silent){
+    if (!S || S.languages.indexOf(l) < 0) return;
+    lang = l;
+    document.documentElement.lang = l;
+    document.documentElement.dir = l === 'ur' ? 'rtl' : 'ltr';
+    if (l === 'ur') useUrduFont();
+    store('vqs:lang', l);
+    if (!silent) { save(); still = true; render(0); still = false; }
+  }
+
+  /* ================================================================ */
+  /* Branching — the same rules the server applies                     */
+  /* ================================================================ */
+  function met(c, ans){
+    if (!c) return true;
+    var a = ans[c.q];
+    if (c.op === 'answered') return a !== undefined;
+    if (a === undefined) return false;
+    var obj = a !== null && typeof a === 'object';
+    switch (c.op) {
+      case 'lte': return typeof a === 'number' && a <= c.v;
+      case 'gte': return typeof a === 'number' && a >= c.v;
+      case 'eq': return obj ? a.choice === c.v : a === c.v;
+      case 'neq': return obj ? a.choice !== c.v : a !== c.v;
+      case 'in': return obj && Array.isArray(c.v) && c.v.indexOf(a.choice) >= 0;
+      case 'includes': return obj && Array.isArray(a.choices) && a.choices.indexOf(c.v) >= 0;
+    }
+    return false;
+  }
+
+  /* ================================================================ */
+  /* State                                                             */
+  /* ================================================================ */
+  var answers = {}, pos = -1, startedAt = Date.now(), submissionId = uid(), result = null, sending = false, dirBack = false;
+  var still = false, lastProgress = 0, pendingSubmit = false;
+  var locParam = params.get('loc');
+  var locationId = '';
+  var SAVE_KEY = S ? 'vqs:' + BOOT.slug + ':' + (INVITE ? INVITE.token : '') + ':' + (locParam || '') : '';
+  var LOCQ = { id:'__location', type:'location', required:true };
+
+  function needLocation(){ return S && S.locations.length > 1 && !locationId; }
+
+  /** The screens this respondent will see, given what they have answered so far. */
+  function flow(){
+    var eff = {}, list = needLocationQ ? [LOCQ] : [];
+    S.questions.forEach(function(q){
+      if (q.show_if && !met(q.show_if, eff)) return;
+      list.push(q);
+      if (answers[q.id] !== undefined) eff[q.id] = answers[q.id];
+    });
+    return { list:list, answers:eff };
+  }
+  var needLocationQ = false;
+
+  function save(){
+    if (!S || KIOSK || PREVIEW || !SAVE_KEY) return;
+    store(SAVE_KEY, { answers:answers, pos:pos, lang:lang, startedAt:startedAt, submissionId:submissionId, locationId:locationId, t:Date.now(), pending:pendingSubmit });
+  }
+
+  /* ================================================================ */
+  /* Rendering                                                         */
+  /* ================================================================ */
+  var ICON = {
+    arrow:'<svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+    back:'<svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>',
+    check:'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    list:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.2" fill="currentColor"/><circle cx="4.5" cy="12" r="1.2" fill="currentColor"/><circle cx="4.5" cy="18" r="1.2" fill="currentColor"/></svg>',
+    lock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 118 0v3"/></svg>',
+    up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 11v9H4a1 1 0 01-1-1v-7a1 1 0 011-1h3zm0 0l4-8a2.5 2.5 0 012.5 2.5V9h5.2a2 2 0 012 2.3l-1.3 7A2 2 0 0117.4 20H7"/></svg>',
+    down:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M17 13V4h3a1 1 0 011 1v7a1 1 0 01-1 1h-3zm0 0l-4 8a2.5 2.5 0 01-2.5-2.5V15H5.3a2 2 0 01-2-2.3l1.3-7A2 2 0 016.6 4H17"/></svg>',
+    star:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.3l-5.6 2.9 1.1-6.3L2.9 9.5l6.3-.9z"/></svg>'
+  };
+  var FACE_COLORS = ['#e5484d','#f76b15','#e2a336','#46a758','#1d9e5a'];
+  var MOUTHS = ['M17 40c4-7 14-7 18 0','M18 38c3-4 13-4 16 0','M18 36h16','M17 33c4 5 14 5 18 0','M15 31c4 9 18 9 22 0'];
+  function faceSvg(i){
+    return '<svg viewBox="0 0 52 52" aria-hidden="true"><circle class="bg" cx="26" cy="26" r="24"/>'
+      + '<circle class="ey" cx="18.5" cy="21" r="3"/><circle class="ey" cx="33.5" cy="21" r="3"/>'
+      + '<path class="ft" d="' + MOUTHS[i] + '"/></svg>';
+  }
+  function npsColor(v){ return v <= 6 ? '#e5484d' : v <= 8 ? '#e2a336' : '#1d9e5a'; }
+
+  function brandMark(cls){
+    if (S.logo_url) return '<div class="' + cls + '"><img src="' + esc(S.logo_url) + '" alt="" referrerpolicy="no-referrer"></div>';
+    return '<div class="' + cls + '" aria-hidden="true">' + esc((business() || '★').trim().charAt(0).toUpperCase()) + '</div>';
+  }
+  function langSwitch(){
+    if (!S || S.languages.length < 2) return '';
+    return '<div class="lang" role="group" aria-label="' + esc(t('language')) + '">' + S.languages.map(function(l){
+      return '<button type="button" data-lang="' + l + '" aria-pressed="' + (l === lang) + '" class="' + (l === 'ur' ? 'ur' : '') + '" lang="' + l + '">' + (l === 'ur' ? 'اردو' : 'English') + '</button>';
+    }).join('') + '</div>';
+  }
+  function foot(){
+    return '<div class="foot">' + esc(t('powered')) + ' <a href="https://vantriqai.com/?utm_source=survey&amp;utm_medium=referral&amp;utm_campaign=powered_by" target="_blank" rel="noopener">VantriqAI</a></div>';
+  }
+
+  function frame(inner, opts){
+    opts = opts || {};
+    return '<div class="shell">'
+      + (PREVIEW ? '<div class="ribbon" role="note">' + esc(t('preview')) + '</div>' : '')
+      + '<div class="card">'
+      + (opts.head === false ? '' : '<div class="head">' + brandMark('brandmark') + '<div class="bname">' + esc(business()) + '</div>' + langSwitch() + '</div>')
+      + (opts.progress != null ? '<div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + opts.progress + '"><i id="bar" data-to="' + opts.progress + '" style="width:' + lastProgress + '%"></i></div>' : '')
+      + '<div class="stage"><div class="screen' + (still ? ' still' : dirBack ? ' back' : '') + '">' + inner + '</div></div>'
+      + '</div>' + foot() + '</div>';
+  }
+
+  function renderState(key){
+    var s = STATES[key] || STATES.not_found;
+    document.title = s[1];
+    app.innerHTML = '<div class="shell"><div class="card"><div class="center">'
+      + '<div class="state-ic" aria-hidden="true">' + s[0] + '</div>'
+      + '<h1>' + esc(s[1]) + '</h1><p class="lead">' + esc(s[2]) + '</p>'
+      + '<p class="lead" lang="ur" dir="rtl" style="font-family:var(--f-ur);line-height:2.1;margin-top:14px;">' + esc(s[3]) + '<br>' + esc(s[4]) + '</p>'
+      + '</div></div>' + foot() + '</div>';
+    useUrduFont();
+  }
+
+  function renderIntro(){
+    var n = S.questions.length;
+    app.innerHTML = frame(
+      '<div class="center">'
+      + brandMark('logo-xl')
+      + '<h1 id="focus" tabindex="-1">' + esc(business()) + '</h1>'
+      + (S.content.intro ? '<p class="lead">' + esc(L(S.content.intro)) + '</p>' : '')
+      + '<div class="meta"><span>' + ICON.clock + esc(t('about', { m:S.estimated_minutes })) + '</span><span>' + ICON.list + esc(n === 1 ? t('oneQ') : t('questions', { n:n })) + '</span></div>'
+      + '<button class="btn primary block" type="button" data-act="start" style="max-width:340px;">' + esc(t('start')) + ICON.arrow + '</button>'
+      + '<p class="fine">' + ICON.lock.replace('<svg', '<svg style="width:13px;height:13px;vertical-align:-2px;margin-inline-end:5px;"') + esc(t('privacy', { business:business() })) + '</p>'
+      + '</div>', {});
+  }
+
+  function answered(q){
+    var a = q.type === 'location' ? (locationId || undefined) : answers[q.id];
+    if (a === undefined || a === null || a === '') return false;
+    switch (q.type) {
+      case 'rating_grid': return Object.keys(a).length > 0;
+      case 'single': return !!a.choice && (a.choice !== OTHER || !!String(a.other || '').trim());
+      case 'multi': return a.choices && a.choices.length > 0 && (a.choices.indexOf(OTHER) < 0 || !!String(a.other || '').trim());
+      case 'text': return !!String(a).trim();
+      case 'contact': return ['name','company','phone','email'].some(function(f){ return String(a[f] || '').trim(); });
+    }
+    return true;
+  }
+  function contactError(q){
+    var a = answers[q.id]; if (!a) return '';
+    if (a.email && !EMAIL_RE.test(String(a.email).trim())) return t('invalidEmail');
+    if (a.phone && !PHONE_RE.test(String(a.phone).trim())) return t('invalidPhone');
+    return '';
+  }
+
+  function scaleButtons(q, lo, hi, cls){
+    var cur = answers[q.id], out = '';
+    for (var v = lo; v <= hi; v++) {
+      var style = q.type === 'nps' && cur === v ? ' style="--sel:' + npsColor(v) + '"' : '';
+      out += '<button type="button" class="pt" role="radio" aria-checked="' + (cur === v) + '" data-val="' + v + '"' + style + '>' + v + '</button>';
+    }
+    return '<div class="scale ' + cls + '" role="radiogroup" aria-labelledby="focus">' + out + '</div>';
+  }
+  function starRow(value, key, size, labelPrefix){
+    var out = '';
+    for (var v = 1; v <= 5; v++) {
+      out += '<button type="button" class="star' + (value >= v ? ' on' : '') + '" role="radio" aria-checked="' + (value === v) + '" aria-label="' + esc((labelPrefix ? labelPrefix + ': ' : '') + v + ' — ' + t('stars')[v - 1]) + '" data-star="' + v + '"' + (key ? ' data-row="' + esc(key) + '"' : '') + '>' + ICON.star + '</button>';
+    }
+    return '<div class="stars' + (size === 'sm' ? ' sm' : '') + '" role="radiogroup">' + out + '</div>';
+  }
+
+  function answerUI(q){
+    var a = answers[q.id];
+    switch (q.type) {
+      case 'location':
+        return '<div class="opts" role="radiogroup" aria-labelledby="focus">' + S.locations.map(function(l){
+          return optButton(l.id, l.name, locationId === l.id, false);
+        }).join('') + '</div>';
+      case 'csat':
+        if (q.style === 'stars') return starRow(a, null, 'lg') + '<div class="pick" aria-live="polite">' + esc(a ? t('stars')[a - 1] : t('tapStar')) + '</div>';
+        return '<div class="faces" role="radiogroup" aria-labelledby="focus">' + [1,2,3,4,5].map(function(v){
+          return '<button type="button" class="face" role="radio" aria-checked="' + (a === v) + '" data-val="' + v + '" style="--c:' + FACE_COLORS[v - 1] + '" aria-label="' + v + ' — ' + esc(t('csat')[v - 1]) + '">' + faceSvg(v - 1) + '<span class="lb">' + esc(t('csat')[v - 1]) + '</span></button>';
+        }).join('') + '</div><div class="pick" aria-live="polite">' + esc(a ? t('csat')[a - 1] : t('tapFace')) + '</div>';
+      case 'rating':
+        return starRow(a, null, 'lg') + '<div class="pick" aria-live="polite">' + esc(a ? t('stars')[a - 1] : t('tapStar')) + '</div>';
+      case 'nps':
+        return scaleButtons(q, 0, 10, 'n11') + '<div class="ends"><span>0 · ' + esc(t('npsLow')) + '</span><span>10 · ' + esc(t('npsHigh')) + '</span></div>';
+      case 'ces':
+        return scaleButtons(q, 1, 7, 'n7') + '<div class="ends"><span>1 · ' + esc(t('cesLow')) + '</span><span>7 · ' + esc(t('cesHigh')) + '</span></div>';
+      case 'rating_grid':
+        return '<div>' + q.rows.map(function(r){
+          var v = a && a[r.id];
+          return '<div class="grow"><div class="gl" id="row_' + esc(r.id) + '">' + esc(L(r.label)) + '</div>' + starRow(v, r.id, 'sm', L(r.label)) + '</div>';
+        }).join('') + '</div>';
+      case 'single': case 'multi':
+        var multi = q.type === 'multi';
+        var sel = multi ? ((a && a.choices) || []) : (a && a.choice ? [a.choice] : []);
+        var opts = q.options.map(function(o){ return optButton(o.id, L(o.label), sel.indexOf(o.id) >= 0, multi); });
+        if (q.allow_other) opts.push(optButton(OTHER, t('other'), sel.indexOf(OTHER) >= 0, multi));
+        var other = sel.indexOf(OTHER) >= 0
+          ? '<input class="in other-in" id="other" maxlength="200" placeholder="' + esc(t('otherPh')) + '" value="' + esc((a && a.other) || '') + '" aria-label="' + esc(t('other')) + '">' : '';
+        return (multi ? '<p class="qhelp">' + esc(t('selectAll')) + '</p>' : '')
+          + '<div class="opts' + (multi ? ' multi' : '') + '" role="' + (multi ? 'group' : 'radiogroup') + '" aria-labelledby="focus">' + opts.join('') + other + '</div>';
+      case 'yesno':
+        return '<div class="yn" role="radiogroup" aria-labelledby="focus">'
+          + '<button type="button" class="y" role="radio" aria-checked="' + (a === true) + '" data-val="yes">' + ICON.up + esc(t('yes')) + '</button>'
+          + '<button type="button" class="n" role="radio" aria-checked="' + (a === false) + '" data-val="no">' + ICON.down + esc(t('no')) + '</button></div>';
+      case 'text':
+        var s = a || '';
+        return '<textarea id="text" maxlength="2000" placeholder="' + esc(t('typeHere')) + '" aria-labelledby="focus">' + esc(s) + '</textarea><div class="count" id="count">' + s.length + ' / 2000</div>';
+      case 'contact':
+        var c = a || {};
+        var types = { name:['text','name'], company:['text','organization'], phone:['tel','tel'], email:['email','email'] };
+        return q.fields.map(function(f){
+          return '<label class="field"><span>' + esc(t(f)) + '</span><input class="in" data-field="' + f + '" type="' + types[f][0] + '" autocomplete="' + types[f][1] + '" maxlength="' + (f === 'email' ? 200 : 120) + '" value="' + esc(c[f] || '') + '"' + (f === 'phone' ? ' inputmode="tel"' : '') + '></label>';
+        }).join('') + '<label class="check"><input type="checkbox" id="consent"' + (c.consent ? ' checked' : '') + '><span>' + esc(t('consent', { business:business() })) + '</span></label>';
+    }
+    return '';
+  }
+  function optButton(id, label, on, multi){
+    return '<button type="button" class="opt" role="' + (multi ? 'checkbox' : 'radio') + '" aria-checked="' + on + '" data-opt="' + esc(id) + '"><span class="ind">' + ICON.check + '</span><span>' + esc(label) + '</span></button>';
+  }
+
+  function renderQuestion(){
+    var f = flow(), list = f.list, q = list[pos];
+    if (!q) { pos = Math.max(0, list.length - 1); q = list[pos]; }
+    var last = pos === list.length - 1;
+    var isAnswered = answered(q);
+    var title = q.type === 'location' ? t('location') : L(q.title);
+    var help = q.help ? L(q.help) : '';
+    var nextLabel = last ? t('submit') : (!q.required && !isAnswered ? t('skip') : t('next'));
+    var canNext = sending ? false : (!q.required || isAnswered) && !(q.type === 'contact' && contactError(q));
+    var progress = Math.round(((pos) / list.length) * 100);
+    app.innerHTML = frame(
+      '<div class="qnum">' + esc(t('of', { n:pos + 1, t:list.length })) + (!q.required ? '<span class="opt-tag">' + esc(t('optional')) + '</span>' : '') + '</div>'
+      + '<h1 class="qtitle" id="focus" tabindex="-1">' + esc(title) + '</h1>'
+      + (help ? '<p class="qhelp">' + esc(help) + '</p>' : '')
+      + '<div class="answer">' + answerUI(q) + '</div>'
+      + '<div class="err" id="err" role="alert"></div>'
+      + '<div class="nav">'
+      + (pos > 0 || !S.content.skip_intro ? '<button type="button" class="btn ghost" data-act="back">' + ICON.back + esc(t('back')) + '</button>' : '<span></span>')
+      + '<button type="button" class="btn ' + (!q.required && !isAnswered && !last ? 'soft' : 'primary') + '" data-act="next"' + (canNext ? '' : ' disabled') + '>'
+      + (sending ? '<span class="spin" aria-hidden="true"></span>' + esc(t('sending')) : esc(nextLabel) + (last ? '' : ICON.arrow)) + '</button>'
+      + '</div>'
+      + (q.type === 'text' || q.type === 'contact' || q.type === 'multi' || q.type === 'rating_grid' ? '<div class="hint keys">' + esc(t('keys')) + '</div>' : ''),
+      { progress:progress });
+    bindQuestion(q);
+    var bar = document.getElementById('bar');
+    if (bar) {
+      var to = Number(bar.getAttribute('data-to'));
+      requestAnimationFrame(function(){ requestAnimationFrame(function(){ bar.style.width = to + '%'; }); });
+      lastProgress = to;
+    }
+  }
+
+  function renderDone(){
+    var r = result || {};
+    var thanks = S.content.thanks ? L(S.content.thanks) : t('thanksDefault');
+    var contactGiven = false;
+    S.questions.forEach(function(q){ if (q.type === 'contact' && answered(q)) contactGiven = true; });
+    var panel = '';
+    if (r.review_url || (PREVIEW && S.review_url && isPromoterLocal())) {
+      panel = '<div class="panel good">' + esc(t('reviewAsk')) + '<br><a class="btn primary" href="' + esc(r.review_url || S.review_url) + '" target="_blank" rel="noopener">★ ' + esc(t('reviewBtn')) + '</a></div>';
+    } else if (r.followup || (PREVIEW && isUnhappyLocal())) {
+      panel = '<div class="panel sorry">' + esc(t('sorry')) + (contactGiven ? ' ' + esc(t('willContact')) : '') + '</div>';
+    }
+    app.innerHTML = frame(
+      '<div class="center">'
+      + '<svg class="tick" viewBox="0 0 92 92" aria-hidden="true"><circle cx="46" cy="46" r="44"/><path d="M28 47l12 12 24-26"/></svg>'
+      + '<h1 id="focus" tabindex="-1">' + esc(t('thanks')) + '</h1>'
+      + '<p class="lead">' + esc(thanks) + '</p>'
+      + panel
+      + (KIOSK ? '<svg class="ring" viewBox="0 0 54 54" aria-hidden="true"><circle class="t" cx="27" cy="27" r="22"/><circle class="p" id="ringp" cx="27" cy="27" r="22" stroke-dasharray="138.2" stroke-dashoffset="0"/></svg>'
+        + '<p class="fine" id="restart">' + esc(t('restartIn', { s:10 })) + '</p><button class="btn soft" type="button" data-act="again" style="margin-top:8px;">' + esc(t('again')) + '</button>' : '')
+      + '</div>', {});
+    if (KIOSK) kioskCountdown();
+  }
+  function isPromoterLocal(){ var m = metrics(); return m.nps != null ? m.nps >= 9 : m.score === 5; }
+  function isUnhappyLocal(){ var m = metrics(); return (m.score != null && m.score <= 2) || (m.nps != null && m.nps <= 6) || m.resolved === false; }
+  function metrics(){
+    var f = flow(), m = { score:null, nps:null, resolved:null };
+    S.questions.forEach(function(q){
+      var a = f.answers[q.id]; if (a === undefined) return;
+      if (q.type === 'csat' && m.score == null) m.score = a;
+      if (q.type === 'nps' && m.nps == null) m.nps = a;
+      if (q.type === 'yesno' && q.metric === 'resolved' && m.resolved == null) m.resolved = a;
+    });
+    return m;
+  }
+
+  function render(focusDelay){
+    if (STATE !== 'ok' || !S) return renderState(STATE);
+    if (INVITE && INVITE.answered && pos !== 'done') return renderState('answered');
+    if (pos === 'done') renderDone();
+    else if (pos < 0) renderIntro();
+    else renderQuestion();
+    dirBack = false;
+    var el = document.getElementById('focus');
+    if (el && focusDelay !== 0) setTimeout(function(){ try { el.focus({ preventScroll:true }); } catch (e) { el.focus(); } }, 60);
+    window.scrollTo(0, 0);
+  }
+
+  /* ================================================================ */
+  /* Interaction                                                       */
+  /* ================================================================ */
+  var advanceTimer = null;
+  function autoAdvance(){
+    var f = flow();
+    clearTimeout(advanceTimer);
+    // Never submit by itself: the last question waits for "Submit".
+    if (pos >= f.list.length - 1) return;
+    advanceTimer = setTimeout(function(){ go(1); }, 380);
+  }
+  function focusKey(el){
+    var q = function(v){ return String(v).replace(/["\\]/g, '\\$&'); };
+    if (el.hasAttribute('data-star')) return '[data-star="' + q(el.getAttribute('data-star')) + '"]' + (el.hasAttribute('data-row') ? '[data-row="' + q(el.getAttribute('data-row')) + '"]' : ':not([data-row])');
+    if (el.hasAttribute('data-val')) return '[data-val="' + q(el.getAttribute('data-val')) + '"]';
+    if (el.hasAttribute('data-opt')) return '[data-opt="' + q(el.getAttribute('data-opt')) + '"]';
+    return null;
+  }
+  function setAnswer(q, v, advance){
+    if (q.type === 'location') locationId = v;
+    else if (v === undefined) delete answers[q.id];
+    else answers[q.id] = v;
+    save();
+    var ae = document.activeElement, key = ae && app.contains(ae) ? focusKey(ae) : null;
+    still = true; renderQuestion(); still = false;
+    if (key) { var el = app.querySelector(key); if (el) try { el.focus({ preventScroll:true }); } catch (e) { el.focus(); } }
+    if (advance) autoAdvance();
+  }
+  function refreshNext(q){
+    var btn = app.querySelector('[data-act="next"]'); if (!btn) return;
+    var f = flow(), last = pos === f.list.length - 1, ok = answered(q), cerr = q.type === 'contact' ? contactError(q) : '';
+    btn.disabled = sending || (q.required && !ok) || !!cerr;
+    if (!last) {
+      btn.className = 'btn ' + (!q.required && !ok ? 'soft' : 'primary');
+      btn.innerHTML = esc(!q.required && !ok ? t('skip') : t('next')) + ICON.arrow;
+    }
+    var err = document.getElementById('err'); if (err) err.textContent = cerr;
+  }
+
+  function bindQuestion(q){
+    var root = app;
+    root.querySelectorAll('.face,.pt').forEach(function(b){
+      b.addEventListener('click', function(){ setAnswer(q, Number(b.getAttribute('data-val')), true); });
+    });
+    root.querySelectorAll('.star').forEach(function(b){
+      b.addEventListener('click', function(){
+        var v = Number(b.getAttribute('data-star')), row = b.getAttribute('data-row');
+        if (row) { var cur = Object.assign({}, answers[q.id] || {}); cur[row] = v; setAnswer(q, cur, false); }
+        else setAnswer(q, v, true);
+      });
+    });
+    root.querySelectorAll('.yn button').forEach(function(b){
+      b.addEventListener('click', function(){ setAnswer(q, b.getAttribute('data-val') === 'yes', true); });
+    });
+    root.querySelectorAll('.opt').forEach(function(b){
+      b.addEventListener('click', function(){
+        var id = b.getAttribute('data-opt');
+        if (q.type === 'location') return setAnswer(q, id, true);
+        if (q.type === 'single') {
+          var cur = answers[q.id] || {};
+          setAnswer(q, id === OTHER ? { choice:OTHER, other:cur.other || '' } : { choice:id }, id !== OTHER);
+          if (id === OTHER) { var o = document.getElementById('other'); if (o) o.focus(); }
+          return;
+        }
+        var a = answers[q.id] || { choices:[] }, list = a.choices.slice(), i = list.indexOf(id);
+        if (i >= 0) list.splice(i, 1); else list.push(id);
+        var next = { choices:list }; if (list.indexOf(OTHER) >= 0) next.other = a.other || '';
+        setAnswer(q, list.length ? next : undefined, false);
+        if (id === OTHER && list.indexOf(OTHER) >= 0) { var o2 = document.getElementById('other'); if (o2) o2.focus(); }
+      });
+    });
+    var other = document.getElementById('other');
+    if (other) other.addEventListener('input', function(){
+      var a = Object.assign({}, answers[q.id] || {}); a.other = other.value; answers[q.id] = a; save(); refreshNext(q);
+    });
+    var text = document.getElementById('text');
+    if (text) {
+      text.addEventListener('input', function(){
+        if (text.value.trim()) answers[q.id] = text.value; else delete answers[q.id];
+        var c = document.getElementById('count'); if (c) c.textContent = text.value.length + ' / 2000';
+        save(); refreshNext(q);
+      });
+      setTimeout(function(){ if (window.matchMedia('(hover:hover)').matches) text.focus(); }, 120);
+    }
+    root.querySelectorAll('[data-field]').forEach(function(inp){
+      inp.addEventListener('input', function(){
+        var a = Object.assign({}, answers[q.id] || {}); a[inp.getAttribute('data-field')] = inp.value;
+        answers[q.id] = a; save(); refreshNext(q);
+      });
+      inp.addEventListener('blur', function(){ refreshNext(q); });
+    });
+    var consent = document.getElementById('consent');
+    if (consent) consent.addEventListener('change', function(){
+      var a = Object.assign({}, answers[q.id] || {}); a.consent = consent.checked; answers[q.id] = a; save();
+    });
+  }
+
+  function go(delta){
+    clearTimeout(advanceTimer);
+    var f = flow();
+    if (delta > 0) {
+      var q = f.list[pos];
+      if (q && q.required && !answered(q)) { var e = document.getElementById('err'); if (e) e.textContent = t('required'); return; }
+      if (q && q.type === 'contact' && contactError(q)) return;
+      if (pos >= f.list.length - 1) return submit();
+      pos += 1;
+    } else {
+      dirBack = true;
+      if (pos <= 0) { if (S.content.skip_intro) return; pos = -1; }
+      else pos -= 1;
+    }
+    save();
+    render();
+  }
+
+  app.addEventListener('click', function(e){
+    var lb = e.target.closest('[data-lang]');
+    if (lb) { setLang(lb.getAttribute('data-lang')); return; }
+    var b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
+    var act = b.getAttribute('data-act');
+    if (act === 'start') { pos = 0; startedAt = startedAt || Date.now(); save(); render(); }
+    else if (act === 'next') go(1);
+    else if (act === 'back') go(-1);
+    else if (act === 'again') resetKiosk();
+    else if (act === 'retry') submit();
+  });
+
+  document.addEventListener('keydown', function(e){
+    lastTouch = Date.now();
+    if (STATE !== 'ok' || !S || pos === 'done') return;
+    var tag = (e.target.tagName || '').toLowerCase();
+    if (pos < 0) { if (e.key === 'Enter' && tag !== 'button') { pos = 0; save(); render(); } return; }
+    var q = flow().list[pos]; if (!q) return;
+    if (e.key === 'Enter') {
+      if (tag === 'textarea' && !(e.ctrlKey || e.metaKey)) return;
+      if (tag === 'button') return;
+      e.preventDefault(); go(1); return;
+    }
+    if (tag === 'input' || tag === 'textarea') return;
+    var n = Number(e.key);
+    if (!Number.isInteger(n) || e.key === ' ') return;
+    if ((q.type === 'csat' || q.type === 'rating') && n >= 1 && n <= 5) setAnswer(q, n, true);
+    else if (q.type === 'ces' && n >= 1 && n <= 7) setAnswer(q, n, true);
+    else if (q.type === 'nps' && n >= 0 && n <= 9) setAnswer(q, n, true);
+  });
+
+  /* ================================================================ */
+  /* Sending                                                           */
+  /* ================================================================ */
+  var retryTimer = null, attempts = 0;
+  function payload(){
+    var f = flow(), clean = {};
+    Object.keys(f.answers).forEach(function(k){
+      var a = f.answers[k];
+      if (a && typeof a === 'object' && !Array.isArray(a) && a.choice === undefined && a.choices === undefined) {
+        // contact: trim every field before it leaves
+        var c = {}; Object.keys(a).forEach(function(x){ c[x] = typeof a[x] === 'string' ? a[x].trim() : a[x]; }); a = c;
+      }
+      if (typeof a === 'string') a = a.trim();
+      clean[k] = a;
+    });
+    return {
+      answers:clean, submission_id:submissionId, language:lang, location:locationId || '', channel:CHANNEL,
+      invite:INVITE ? INVITE.token : undefined, duration_ms:Date.now() - startedAt,
+      website:(document.getElementById('hp_website') || {}).value || ''
+    };
+  }
+
+  function submit(){
+    clearTimeout(retryTimer);
+    if (sending || pos === 'done') return;
+    if (PREVIEW) { result = {}; finish(); return; }
+    sending = true; pendingSubmit = true; save(); refreshButton();
+    fetch('/api/public/surveys/' + encodeURIComponent(BOOT.slug) + '/responses', {
+      method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify(payload()), keepalive:true
+    }).then(function(res){
+      return res.json().catch(function(){ return {}; }).then(function(body){ return { status:res.status, body:body }; });
+    }).then(function(r){
+      sending = false;
+      if (r.status === 200 || r.status === 201) { result = r.body || {}; attempts = 0; finish(); return; }
+      if (r.status === 400 && r.body && r.body.details && r.body.details.length) {
+        // Take them to the first question the server did not accept.
+        var bad = r.body.details[0].question, list = flow().list;
+        for (var i = 0; i < list.length; i++) if (list[i].id === bad) { pos = i; break; }
+        save(); render();
+        var e = document.getElementById('err'); if (e) e.textContent = r.body.details[0].error || t('required');
+        return;
+      }
+      if (r.status === 409 && r.body && r.body.already_answered) { clearSaved(); return renderState('answered'); }
+      if (r.status === 409 || r.status === 410) { clearSaved(); STATE = r.status === 410 ? 'closed' : 'paused'; return renderState(STATE); }
+      if (r.status === 429) { save(); return renderState('limited'); }
+      if (r.status === 404) { clearSaved(); STATE = 'not_found'; return renderState(STATE); }
+      failed();
+    }).catch(function(){ sending = false; failed(); });
+  }
+  function failed(){
+    save();
+    refreshButton();
+    attempts += 1;
+    var e = document.getElementById('err');
+    if (e) e.innerHTML = esc(navigator.onLine === false ? t('offline') : t('failed')) + ' <button type="button" class="btn soft" data-act="retry" style="min-height:38px;padding:8px 14px;margin-inline-start:6px;">' + esc(t('retry')) + '</button>';
+    clearTimeout(retryTimer);
+    // Keep trying on its own — a respondent on a weak signal should not have
+    // to notice. The server recognises the same submission, so a retry that
+    // races a slow success cannot count twice.
+    retryTimer = setTimeout(submit, Math.min(30000, 1500 * Math.pow(2, attempts)));
+  }
+  function refreshButton(){
+    var btn = app.querySelector('[data-act="next"]');
+    if (!btn) return;
+    btn.disabled = sending;
+    btn.innerHTML = sending ? '<span class="spin" aria-hidden="true"></span>' + esc(t('sending')) : esc(t('submit'));
+  }
+  window.addEventListener('online', function(){ if (!sending && pos !== 'done' && pendingSubmit) submit(); });
+
+  function clearSaved(){ pendingSubmit = false; if (SAVE_KEY) store(SAVE_KEY, undefined); }
+  function finish(){
+    clearTimeout(retryTimer);
+    clearSaved();
+    pos = 'done';
+    render();
+  }
+
+  /* ---------- kiosk: a tablet at the counter starts over for the next person ---------- */
+  var lastTouch = Date.now(), kioskTimer = null;
+  function resetKiosk(){
+    clearInterval(kioskTimer);
+    answers = {}; result = null; submissionId = uid(); startedAt = Date.now(); attempts = 0;
+    locationId = locParam && S.locations.some(function(l){ return l.id === locParam; }) ? locParam : (S.locations.length === 1 ? S.locations[0].id : '');
+    needLocationQ = needLocation();
+    pos = S.content.skip_intro ? 0 : -1;
+    setLang(S.default_language, true);
+    render();
+  }
+  function kioskCountdown(){
+    var left = 10, total = 10;
+    clearInterval(kioskTimer);
+    kioskTimer = setInterval(function(){
+      left -= 1;
+      var p = document.getElementById('ringp'), r = document.getElementById('restart');
+      if (p) p.setAttribute('stroke-dashoffset', String(138.2 * (1 - left / total)));
+      if (r) r.textContent = t('restartIn', { s:Math.max(0, left) });
+      if (left <= 0) resetKiosk();
+    }, 1000);
+  }
+  if (KIOSK) {
+    ['pointerdown','touchstart'].forEach(function(ev){ document.addEventListener(ev, function(){ lastTouch = Date.now(); }, { passive:true }); });
+    // Walked away half-way through: start over for the next person after a minute.
+    setInterval(function(){
+      if (typeof pos === 'number' && pos >= 0 && Date.now() - lastTouch > 60000) resetKiosk();
+    }, 5000);
+  }
+
+  /* ================================================================ */
+  /* Live preview: the builder posts its unsaved draft into this page   */
+  /* ================================================================ */
+  // Preview only, and only from this same origin — the studio in the portal
+  // or the CRM. Nothing posted here is ever sent anywhere: preview never submits.
+  if (PREVIEW) window.addEventListener('message', function(e){
+    if (e.origin !== location.origin || !e.data || typeof e.data !== 'object') return;
+    if (e.data.type === 'vqs:survey' && e.data.survey && S) {
+      var d = e.data.survey;
+      ['display_name','brand_color','logo_url','languages','default_language','content','questions','locations','review_url'].forEach(function(k){
+        if (d[k] !== undefined) S[k] = d[k];
+      });
+      if (!S.languages || !S.languages.length) S.languages = ['en'];
+      applyBrand(S.brand_color);
+      if (S.languages.indexOf(lang) < 0) setLang(S.languages.indexOf(S.default_language) >= 0 ? S.default_language : S.languages[0], true);
+      locationId = S.locations.length === 1 ? S.locations[0].id : (S.locations.some(function(l){ return l.id === locationId; }) ? locationId : '');
+      needLocationQ = S.locations.length > 1 && !(locParam && locationId === locParam);
+      still = true; render(0); still = false;
+    }
+    if (e.data.type === 'vqs:goto' && S) {
+      if (e.data.id === '__intro') pos = -1;
+      else if (e.data.id === '__done') pos = 'done';
+      else {
+        var list = flow().list;
+        for (var i = 0; i < list.length; i++) if (list[i].id === e.data.id) { pos = i; break; }
+      }
+      still = true; render(0); still = false;
+    }
+  });
+
+  /* ================================================================ */
+  /* Start                                                             */
+  /* ================================================================ */
+  if (STATE !== 'ok' || !S) { render(); return; }
+  applyBrand(S.brand_color);
+
+  // Language: an explicit ?lang=, then what this device chose before, then
+  // the phone's own language, then the survey's default.
+  var wanted = params.get('lang'), remembered = load('vqs:lang');
+  var device = ((navigator.languages && navigator.languages[0]) || navigator.language || '').slice(0, 2);
+  var first = [wanted, remembered, device, S.default_language].filter(function(l){ return l && S.languages.indexOf(l) >= 0; })[0] || S.languages[0];
+
+  if (locParam && S.locations.some(function(l){ return l.id === locParam; })) locationId = locParam;
+  else if (S.locations.length === 1) locationId = S.locations[0].id;
+  needLocationQ = needLocation();
+
+  var saved = !KIOSK && !PREVIEW ? load(SAVE_KEY) : null;
+  if (saved && Date.now() - (saved.t || 0) < 12 * 3600 * 1000 && saved.answers) {
+    answers = saved.answers; submissionId = saved.submissionId || submissionId; startedAt = saved.startedAt || startedAt;
+    locationId = saved.locationId || locationId; needLocationQ = S.locations.length > 1 && !(locParam && locationId === locParam);
+    pos = typeof saved.pos === 'number' ? saved.pos : -1;
+    first = S.languages.indexOf(saved.lang) >= 0 ? saved.lang : first;
+  } else {
+    pos = S.content.skip_intro ? 0 : -1;
+  }
+  setLang(first, true);
+  if (saved && saved.pending) { pendingSubmit = true; render(0); submit(); }
+  else {
+    render(0);
+    if (saved && typeof pos === 'number' && pos >= 0) toast(t('resume'));
+  }
+})();
+</script>
+</body>
+</html>

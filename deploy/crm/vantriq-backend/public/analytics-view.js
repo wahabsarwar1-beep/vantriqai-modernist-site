@@ -32,7 +32,8 @@
   // Ordinal ramp for the funnel — lightest step still clears 2:1 on white.
   const FUNNEL = ['#7f9bf2', '#5f7fe6', '#3f63dc', '#2a4cc4', '#1f3a95'];
 
-  const CHANNELS = { whatsapp:'WhatsApp', web:'Web chat', website:'Website', instagram:'Instagram', voice:'Voice', facebook:'Facebook', email:'Email' };
+  const CHANNELS = { whatsapp:'WhatsApp', web:'Web chat', website:'Website', instagram:'Instagram', voice:'Voice', facebook:'Facebook', email:'Email',
+    qr:'QR code', link:'Survey link', kiosk:'Kiosk', sms:'SMS', embed:'Website survey' };
   const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const GRAINS = [['day','Day'],['week','Week'],['month','Month'],['quarter','Quarter'],['year','Year']];
@@ -405,8 +406,8 @@
       <div class="vqa-card"><div class="vqa-empty">
         No survey answers yet in the ${esc(d.period.window_label.toLowerCase())}.
         ${audience === 'portal'
-          ? 'Ask VantriqAI to switch on the one-tap satisfaction question at the end of each conversation — answers show up here the moment they arrive: the satisfaction score, NPS, how often problems were resolved, and what people wrote.'
-          : 'Anything that asks the question — a WhatsApp button reply after the chat, a web form, or the survey app — posts the answer to <code>POST /api/webhooks/csat</code> and it appears here straight away.'}
+          ? 'Create a survey under the <b>Surveys</b> tab — share it by QR code, link or WhatsApp, and the answers show up here the moment they arrive: the satisfaction score, NPS, how often problems were resolved, and what people wrote.'
+          : 'Create a survey for this client under <b>Surveys</b>, or post answers from anything else that asks the question to <code>POST /api/webhooks/csat</code>. Either way they appear here straight away.'}
       </div></div>`;
     }
     const k = s.kpis, w = s.window;

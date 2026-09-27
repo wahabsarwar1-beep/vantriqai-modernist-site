@@ -23,6 +23,7 @@
      ourselves removes the dependency outright. -->
 <script src="/vendor/chart/chart.umd.js"></script>
 <script src="/analytics-view.js"></script>
+<script src="/survey-studio.js"></script>
 <script src="/invoice-print.js"></script>
 <style>
 /* The console is set in VantriqAI's own palette — the cream ground, ink
@@ -946,6 +947,7 @@ const NAV = [
   {group:'Overview', items:[
     {id:'dashboard', label:'Dashboard', icon:iconGrid},
     {id:'analytics', label:'Analytics', icon:iconTrend},
+    {id:'surveys', label:'Surveys', icon:iconSurvey},
   ]},
   {group:'Revenue', items:[
     {id:'pipeline', label:'Pipeline', icon:iconFunnel},
@@ -979,7 +981,11 @@ function visibleNav(){
     .filter(g=>g.items.length);
 }
 
-function navigate(view){ currentView=view; sidebarOpen=false; openPanel=null; render(); window.scrollTo(0,0); }
+function navigate(view){
+  if(currentView==='surveys' && view!=='surveys' && window.VQS && VQS.hasUnsaved()
+     && !confirm('You have unsaved survey changes. Leave without saving?')) return;
+  currentView=view; sidebarOpen=false; openPanel=null; render(); window.scrollTo(0,0);
+}
 
 /* ---------------------------- Icons (inline SVG, stroke style) ---------------------------- */
 function icon(paths, size=17){ return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`; }
@@ -1006,6 +1012,7 @@ function iconMail(size){ return icon('<rect x="2.5" y="5" width="19" height="14"
 function iconQuote(){ return icon('<path d="M6 3h9l5 5v13a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M15 3v5h5"/><path d="M9 13h6M9 17h4"/>'); }
 function iconContract(){ return icon('<path d="M7 3h7l4 4v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h4"/><circle cx="16.5" cy="17.5" r="2.6"/>'); }
 function iconBolt(){ return icon('<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'); }
+function iconSurvey(){ return icon('<rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 8h5M8 12.5h8M8 17h4"/><path d="M15.5 6.5l1.2 1.2 2.3-2.4"/>'); }
 function iconInbox(size){ return icon('<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/>', size); }
 
 /* ---------------------------- Derived data helpers ---------------------------- */
@@ -1148,6 +1155,7 @@ function sidebarPulseSVG(){
 const VIEW_TITLES = {
   dashboard:['Dashboard','Where the business stands right now'],
   analytics:['Analytics','Leads, conversations and customer satisfaction — by day, week, month, quarter or year'],
+  surveys:['Surveys','Customer-satisfaction surveys for every client — results, follow-ups and sharing'],
   pipeline:['Pipeline','Move deals from lead to active client'],
   clients:['Clients','Every active and past account'],
   billing:['Billing & Invoices','Setup fees, retainers, and overage'],
@@ -1200,6 +1208,7 @@ function renderView(){
   switch(currentView){
     case 'dashboard': return renderDashboard();
     case 'analytics': return renderAnalytics();
+    case 'surveys': return window.VQS ? '<div id="vqs-root"></div>' : '<div class="card"><div class="empty">The surveys page could not load in this browser.</div></div>';
     case 'pipeline': return renderPipeline();
     case 'clients': return renderClients();
     case 'billing': return renderBilling();
@@ -6917,6 +6926,8 @@ function attachPostRenderHooks(){
   }
   if(currentView==='analytics') requestAnimationFrame(drawAnalytics);
   else if(window.VQA) VQA.destroyCharts();
+  if(currentView==='surveys') mountSurveys();
+  else if(window.VQS) VQS.destroyCharts();
   // Views whose data is too heavy to pull on every page load fetch on first
   // sight and then keep what they have until something changes it.
   if(currentView==='agents' && agentsData===null) loadAgents();
@@ -7074,7 +7085,37 @@ async function submitOtp(){
   }
 }
 
+/**
+ * The survey studio (/survey-studio.js) — the same screens a customer has in
+ * their portal, over every client's surveys, through the staff API.
+ */
+function mountSurveys(){
+  const el = document.getElementById('vqs-root');
+  if(!el || !window.VQS) return;
+  VQS.mount(el, {
+    audience: 'crm',
+    clients: () => state.clients
+      .map(c => ({ id: c.id, company: c.company, email: c.email }))
+      .sort((a, b) => String(a.company).localeCompare(String(b.company))),
+    api: (method, path, body) => API.req(method, '/api/surveys' + path, body),
+    download: async (path, filename) => {
+      showToast('Building the spreadsheet…');
+      const headers = {};
+      if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
+      else if(API.key) headers['x-api-key'] = API.key;
+      const res = await fetch(API.base + '/api/surveys' + path, { headers });
+      if(!res.ok){ const err = await res.json().catch(()=>null); throw new Error((err&&err.error) || `Export failed (${res.status})`); }
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    },
+    toast: (msg, warn) => showToast(msg, warn ? 'warn' : undefined),
+  });
+}
+
 async function signOut(){
+  if(window.VQS) VQS.reset();
   try{ if(API.session) await fetch(API.base+'/api/auth/logout',{method:'POST',headers:{'Authorization':'Bearer '+API.session}}); }catch(e){}
   API.clearConfig(); authUser=null; apiConnected=false;
   API.base = window.location.origin;

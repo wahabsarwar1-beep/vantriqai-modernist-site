@@ -1599,3 +1599,133 @@ create unique index if not exists idx_csat_external on csat_responses(client_id,
   where external_id is not null;
 
 alter table usage_events add column if not exists handoff boolean;
+
+-- =====================================================================
+-- v9.14 — Surveys (VantriqAI Pulse)
+--
+-- v9.13 could RECEIVE a satisfaction answer but had nothing that asked the
+-- question. This is the thing that asks it: a customer builds a survey from
+-- an industry template (restaurant, FMCG, telecom, healthcare, …), shares it
+-- as a link, a QR code on the table, a kiosk tablet or a WhatsApp message
+-- after a conversation, and every answer lands in three places at once —
+-- the survey's own results, the customer's portal, and the CRM.
+--
+--   surveys           one per questionnaire. Questions are JSON because a
+--                     restaurant's questions and a telco's have nothing in
+--                     common but their shape, and the shape is validated in
+--                     src/utils/surveys.js on every write.
+--   survey_responses  one per completed submission. The headline figures
+--                     (CSAT, NPS, effort, resolved) are lifted out of the
+--                     answers into columns so they can be counted cheaply.
+--   survey_invites    one per personal link sent after a conversation, so a
+--                     response joins back to the conversation it rates and
+--                     "how many we asked" is a real number, not a guess.
+--   survey_views      opens per survey per day, for the completion rate.
+--
+-- Every response that carries a headline figure ALSO writes one
+-- csat_responses row, linked by survey_response_id. That is what puts survey
+-- results into the Analytics dashboards that already exist, in the portal
+-- and in the CRM, without a second set of satisfaction maths to keep in step.
+-- =====================================================================
+create table if not exists surveys (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  -- The public address: /s/<slug>. Lower-case words and a random tail, so a
+  -- survey cannot be found by guessing a competitor's name.
+  slug text not null unique check (slug ~ '^[a-z0-9][a-z0-9-]{2,62}$'),
+  title text not null,
+  industry text not null default 'general',
+  status text not null default 'live' check (status in ('draft','live','paused','closed')),
+  languages text[] not null default '{en}',
+  default_language text not null default 'en',
+  -- The business name a respondent sees. Defaults to the client's company.
+  display_name text not null default '',
+  brand_color text not null default '#2f56d9',
+  logo_url text not null default '',
+  -- Welcome and thank-you text, per language.
+  content jsonb not null default '{}'::jsonb,
+  questions jsonb not null default '[]'::jsonb,
+  -- Branches, outlets or sites: [{id, name}]. A QR code per location tags
+  -- every answer with where it was given.
+  locations jsonb not null default '[]'::jsonb,
+  -- Shown to a delighted respondent after they submit (a Google review link).
+  review_url text not null default '',
+  -- Who hears about an unhappy answer the moment it arrives.
+  alert_emails text not null default '',
+  closes_at timestamptz,
+  response_limit int check (response_limit is null or response_limit > 0),
+  created_by text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_surveys_client on surveys(client_id, created_at desc);
+drop trigger if exists trg_surveys_updated on surveys;
+create trigger trg_surveys_updated before update on surveys
+  for each row execute function touch_updated_at();
+
+create table if not exists survey_responses (
+  id uuid primary key default gen_random_uuid(),
+  survey_id uuid not null references surveys(id) on delete cascade,
+  client_id uuid not null references clients(id) on delete cascade,
+  -- The browser's own id for this submission. A retry after a dropped
+  -- connection sends the same one, and is recognised rather than counted twice.
+  submission_id text,
+  answers jsonb not null default '{}'::jsonb,
+  score smallint check (score between 1 and 5),
+  nps smallint check (nps between 0 and 10),
+  ces smallint check (ces between 1 and 7),
+  resolved boolean,
+  comment text not null default '',
+  location_id text not null default '',
+  location_name text not null default '',
+  channel text not null default 'link',
+  language text not null default 'en',
+  -- Only ever what the respondent typed into a contact question themselves.
+  contact_name text not null default '',
+  contact_phone text not null default '',
+  contact_email text not null default '',
+  contact_consent boolean not null default false,
+  duration_sec int,
+  -- Closing the loop: an unhappy answer opens a follow-up that somebody
+  -- works to 'resolved'. Everything else starts at 'none'.
+  followup_status text not null default 'none'
+    check (followup_status in ('none','open','contacted','resolved')),
+  followup_note text not null default '',
+  followup_by text not null default '',
+  followup_at timestamptz,
+  submitted_at timestamptz not null default now()
+);
+create index if not exists idx_survey_responses_survey on survey_responses(survey_id, submitted_at desc);
+create index if not exists idx_survey_responses_client on survey_responses(client_id, submitted_at desc);
+create unique index if not exists idx_survey_responses_submission
+  on survey_responses(survey_id, submission_id) where submission_id is not null;
+create index if not exists idx_survey_responses_followup
+  on survey_responses(client_id, followup_status) where followup_status in ('open','contacted');
+
+create table if not exists survey_invites (
+  id uuid primary key default gen_random_uuid(),
+  survey_id uuid not null references surveys(id) on delete cascade,
+  client_id uuid not null references clients(id) on delete cascade,
+  token text not null unique,
+  -- The conversation this invite follows. Built from the end customer's
+  -- phone number like every session id, so it never leaves the CRM.
+  session_id text not null default '',
+  channel text not null default 'whatsapp',
+  created_at timestamptz not null default now(),
+  opened_at timestamptz,
+  responded_at timestamptz,
+  response_id uuid references survey_responses(id) on delete set null
+);
+create index if not exists idx_survey_invites_survey on survey_invites(survey_id, created_at desc);
+
+create table if not exists survey_views (
+  survey_id uuid not null references surveys(id) on delete cascade,
+  day date not null,
+  views int not null default 0,
+  primary key (survey_id, day)
+);
+
+alter table csat_responses add column if not exists survey_response_id uuid
+  references survey_responses(id) on delete cascade;
+create unique index if not exists idx_csat_survey_response
+  on csat_responses(survey_response_id) where survey_response_id is not null;
