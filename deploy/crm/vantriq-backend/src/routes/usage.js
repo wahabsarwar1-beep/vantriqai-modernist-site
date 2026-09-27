@@ -3,6 +3,7 @@ const db = require('../db');
 const { recordQuotaCrossing } = require('../utils/quota');
 const { serviceStatusFor } = require('../utils/serviceStatus');
 const { sendMail, mailConfigured } = require('../utils/mailer');
+const S = require('../utils/surveys');
 const router = express.Router();
 
 /**
@@ -473,5 +474,75 @@ async function recordCsat(req, res) {
   if (!rows[0]) return res.json({ ok: true, duplicate: true, client_id: resolvedClientId });
   res.status(201).json({ ok: true, id: rows[0].id, client_id: resolvedClientId, agent_id: resolvedAgentId });
 }
+
+/**
+ * POST /api/webhooks/survey-invite
+ *
+ * A personal survey link for the customer an agent just finished talking to —
+ * n8n calls this when a conversation closes, and sends back `message` (or
+ * its own wording around `url`) on the same channel. The answer is then tied
+ * to that conversation: it lands with its session id, and the survey's
+ * response rate counts it.
+ *
+ * Body:
+ * {
+ *   "external_ref": "923001234567",   // or client_id / agent_ref / agent_id, exactly as /usage
+ *   "session_id": "923009998888-2026-08-16", // the conversation it follows
+ *   "channel": "whatsapp",            // how the link will be sent
+ *   "survey_slug": "khans-kitchen-3f2a1" // optional — otherwise the client's live
+ *                                        // after-chat survey, or its newest live one
+ * }
+ *
+ * 201 { url, token, survey: { slug, title }, message: { en, ur } }
+ * 404 when the client has no live survey — create one in the CRM or the portal.
+ */
+router.post('/survey-invite', async (req, res) => {
+  const body = req.body || {};
+  const { external_ref, client_id, agent_ref, agent_id } = body;
+  if (!external_ref && !client_id && !agent_ref && !agent_id) {
+    return res.status(400).json({ error: 'external_ref, client_id, agent_ref or agent_id is required' });
+  }
+
+  // Same resolution order as /usage and /csat: a named agent first, then the
+  // client's own ref, then any agent's ref.
+  let clientId = client_id || null;
+  if (agent_id || agent_ref) {
+    const { rows } = agent_id
+      ? await db.query(`select client_id from client_agents where id = $1`, [agent_id])
+      : await db.query(`select client_id from client_agents where external_ref = $1`, [String(agent_ref).trim()]);
+    if (!rows[0]) return res.status(404).json({ error: `No agent found for "${agent_id || agent_ref}".` });
+    clientId = clientId || rows[0].client_id;
+  }
+  if (!clientId) {
+    const { rows } = await db.query(`select id from clients where external_ref = $1`, [external_ref]);
+    if (rows[0]) clientId = rows[0].id;
+    else {
+      const { rows: byAgent } = await db.query(`select client_id from client_agents where external_ref = $1`, [external_ref]);
+      if (!byAgent[0]) return res.status(404).json({ error: `No client or agent found with external_ref "${external_ref}".` });
+      clientId = byAgent[0].client_id;
+    }
+  }
+
+  let survey;
+  if (body.survey_slug) {
+    survey = await S.getSurveyBySlug(body.survey_slug);
+    if (!survey || survey.client_id !== clientId) return res.status(404).json({ error: `No survey "${body.survey_slug}" for this client.` });
+    if (survey.status !== 'live' || S.isClosed(survey)) return res.status(409).json({ error: `Survey "${survey.slug}" is not live.` });
+  } else {
+    survey = await S.defaultSurveyFor(clientId);
+    if (!survey) return res.status(404).json({ error: 'This client has no live survey. Create one in the CRM or the portal first.' });
+  }
+
+  const [invite] = await S.createInvites(survey, {
+    sessionId: body.session_id || '', channel: body.channel || 'whatsapp',
+  });
+  const url = `${S.publicBase(req)}/s/${survey.slug}?i=${invite.token}`;
+  res.status(201).json({
+    url,
+    token: invite.token,
+    survey: { slug: survey.slug, title: survey.title },
+    message: S.inviteMessage(survey, url),
+  });
+});
 
 module.exports = router;

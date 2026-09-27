@@ -556,3 +556,17 @@ they did nothing wrong. Reply with something plain:
 > team has your message and will come back to you.
 
 Then notify your client, not their customer, that their agent is paused.
+
+# Asking for a rating after every conversation (v9.14)
+
+When a WhatsApp conversation closes, add one HTTP Request node after the reply:
+
+- **Method** `POST` · **URL** `http://crm_app:8080/api/webhooks/survey-invite`
+- **Header** `x-api-key` — the same webhook key the `/usage` node uses
+- **Body (JSON)** `{ "external_ref": "<as for /usage>", "session_id": "<the conversation>", "channel": "whatsapp" }`
+
+It answers `201` with `url` — a personal, one-time survey link on
+`https://portal.vantriqai.com` — and `message.en` / `message.ur`, ready to send
+back on WhatsApp. `404` means the client has no live survey yet; the flow
+should simply skip the message, not fail. Full details, and everything else
+about surveys, in `deploy/crm/SURVEYS.md`.

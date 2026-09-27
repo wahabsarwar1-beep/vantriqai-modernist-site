@@ -5,6 +5,7 @@ const { buildTaxInvoice, getSettings } = require('../utils/billing');
 const { renderInvoicePdf, invoiceFilename } = require('../utils/invoicePdf');
 const { formatInvoice } = require('./portal');
 const { clientAnalytics } = require('../utils/analytics');
+const S = require('../utils/surveys');
 
 const router = express.Router();
 
@@ -178,6 +179,40 @@ router.get('/analytics', async (req, res, next) => {
     }
     res.json(await clientAnalytics(client.id, { grain: String(req.query.grain || 'month'), quota }));
   } catch (err) { next(err); }
+});
+
+/* ---------------------------- Surveys ---------------------------- */
+// Read-only, like everything here. Responses carry what each respondent chose
+// to type into a contact question for this customer — never the session id of
+// a conversation an invite followed, which is built from a phone number.
+
+async function ownSurvey(req) {
+  const s = await S.getSurvey(req.params.id);
+  if (!s || s.client_id !== req.apiClient.id) throw new S.SurveyError(404, 'Survey not found');
+  return s;
+}
+
+/** GET /api/external/surveys — this account's surveys, each with its last 30 days of results. */
+router.get('/surveys', async (req, res) => {
+  const base = S.publicBase(req);
+  res.json(await S.listSurveys({ clientId: req.apiClient.id, base }));
+});
+
+/**
+ * GET /api/external/surveys/:id/responses?since=&limit=&offset= — responses,
+ * newest first. Poll with since= (the newest submitted_at you already hold)
+ * to pull only what is new.
+ */
+router.get('/surveys/:id/responses', async (req, res) => {
+  const survey = await ownSurvey(req);
+  res.json(await S.responsesPage(survey, {
+    limit: req.query.limit || 100, offset: req.query.offset, since: req.query.since || null,
+  }));
+});
+
+/** GET /api/external/surveys/:id/analytics?grain=day|week|month|quarter|year — the survey's results page, as data. */
+router.get('/surveys/:id/analytics', async (req, res) => {
+  res.json(await S.surveyAnalytics(await ownSurvey(req), { grain: String(req.query.grain || 'month') }));
 });
 
 module.exports = router;

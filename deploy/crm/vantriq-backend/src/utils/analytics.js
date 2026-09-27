@@ -391,7 +391,8 @@ async function satisfactionAnalytics(clientId, grain, b, { withCompany = false }
 /* ------------------------------------------------------------------ */
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const CHANNEL_NAMES = { whatsapp: 'WhatsApp', web: 'Web chat', website: 'Website', instagram: 'Instagram', voice: 'Voice', facebook: 'Facebook', email: 'Email' };
+const CHANNEL_NAMES = { whatsapp: 'WhatsApp', web: 'Web chat', website: 'Website', instagram: 'Instagram', voice: 'Voice', facebook: 'Facebook', email: 'Email',
+  qr: 'QR code', link: 'Survey link', kiosk: 'Kiosk', sms: 'SMS', embed: 'Website survey' };
 const fmtInt = (v) => Math.round(v).toLocaleString('en-US');
 const hourLabel = (h) => `${((h + 11) % 12) + 1}${h < 12 ? 'am' : 'pm'}`;
 
@@ -758,4 +759,4 @@ async function platformAnalytics({ grain } = {}) {
   };
 }
 
-module.exports = { clientAnalytics, salesAnalytics, platformAnalytics, GRAINS, TZ, normaliseGrain };
+module.exports = { clientAnalytics, salesAnalytics, platformAnalytics, GRAINS, TZ, normaliseGrain, periodBounds };

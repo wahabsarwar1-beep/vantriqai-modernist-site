@@ -12,6 +12,7 @@
      blocking cdnjs should not take the charts with it. -->
 <script src="/vendor/chart/chart.umd.js"></script>
 <script src="/analytics-view.js"></script>
+<script src="/survey-studio.js"></script>
 <script src="/invoice-print.js"></script>
 <style>
 /* The portal is the only part of the CRM a customer ever sees, so it is set
@@ -383,6 +384,7 @@ async function boot(){
     // than an error page.
     const contracts = await api('/contracts').catch(()=>[]);
     data = { account, usage, invoices, ledger, packages, agents, bundles, quotes, contracts, activity: null, analytics: null };
+    if(/^#surveys\b/.test(location.hash || '')) currentTab = 'surveys';
     render();
   }catch(e){
     if(e.expired){ renderLogin('Your session has ended. Please sign in again.'); return; }
@@ -435,6 +437,7 @@ async function doLogin(){
     if(!res.ok){ show(json.error || 'Could not sign you in.'); loginBusy=false; return; }
     setSession(json.session);
     loginBusy = false;
+    if(window.VQS) VQS.reset();
     boot();
   }catch(e){
     show('Could not reach the server. Check your connection and try again.');
@@ -469,6 +472,9 @@ async function doForgotPassword(){
 async function doLogout(){
   try{ await fetch('/api/portal/logout', { method:'POST', headers:{'Authorization':'Bearer '+SESSION} }); }catch(e){}
   setSession('');
+  // The survey studio keeps its own state between renders; the next person to
+  // sign in on this browser must not see this account's surveys.
+  if(window.VQS) VQS.reset();
   data = { account:null, usage:null, invoices:[], ledger:null, packages:null,
     agents:null, bundles:null, quotes:null, activity:null, apiTokens:null };
   currentTab = 'overview';
@@ -509,6 +515,7 @@ function render(){
       <div class="tabs">
         <div class="tab ${currentTab==='overview'?'active':''}" onclick="setTab('overview')">Overview</div>
         <div class="tab ${currentTab==='analytics'?'active':''}" onclick="setTab('analytics')">Analytics</div>
+        <div class="tab ${currentTab==='surveys'?'active':''}" onclick="setTab('surveys')">Surveys</div>
         <div class="tab ${currentTab==='agents'?'active':''}" onclick="setTab('agents')">My agents${data.agents&&data.agents.length?` <span class="tab-n">${data.agents.length}</span>`:''}</div>
         <div class="tab ${currentTab==='usage'?'active':''}" onclick="setTab('usage')">Usage</div>
         <div class="tab ${currentTab==='activity'?'active':''}" onclick="setTab('activity')">Activity</div>
@@ -528,7 +535,8 @@ function render(){
     </div>
   `;
   if(currentTab==='usage') requestAnimationFrame(drawUsageChart);
-  document.body.classList.toggle('wide', currentTab==='analytics');
+  document.body.classList.toggle('wide', currentTab==='analytics' || currentTab==='surveys');
+  if(currentTab==='surveys') mountSurveys();
   if(currentTab==='analytics'){
     if(!data.analytics) loadAnalytics();
     else if(!data.analytics.error) requestAnimationFrame(()=>VQA.drawConversations(data.analytics));
@@ -536,7 +544,13 @@ function render(){
   renderInvoiceModal();
 }
 
-function setTab(t){ currentTab=t; render(); }
+function setTab(t){
+  if(currentTab==='surveys' && t!=='surveys' && window.VQS && VQS.hasUnsaved()
+     && !confirm('You have unsaved survey changes. Leave without saving?')) return;
+  currentTab=t;
+  try{ history.replaceState(null, '', t==='surveys' ? '#surveys' : location.pathname + location.search); }catch(e){}
+  render();
+}
 
 function renderTab(){
   // The pause notice sits above every tab — it is the first thing that matters.
@@ -546,6 +560,7 @@ function renderTab(){
 function tabBody(){
   if(currentTab==='overview') return renderOverview();
   if(currentTab==='analytics') return renderAnalytics();
+  if(currentTab==='surveys') return renderSurveys();
   if(currentTab==='usage') return renderUsage();
   if(currentTab==='invoices') return renderInvoices();
   if(currentTab==='ledger') return renderLedger();
@@ -641,6 +656,28 @@ function renderAnalytics(){
   if(a.error) return `<div class="card"><div class="empty">${esc(a.error)}</div>
     <button class="btn btn-ghost" style="margin-top:10px;" onclick="data.analytics=null;render()">Try again</button></div>`;
   return VQA.conversationsHTML(a, { audience:'portal', onGrain:'setAnalyticsGrain', fileTag:'analytics' });
+}
+
+/* ---- Surveys: build, share and read customer-satisfaction surveys (/survey-studio.js) ---- */
+function renderSurveys(){
+  if(!window.VQS) return `<div class="card"><div class="empty">The surveys page could not load in this browser.</div></div>`;
+  return `<div id="vqs-root"></div>`;
+}
+function mountSurveys(){
+  const el = document.getElementById('vqs-root');
+  if(!el || !window.VQS) return;
+  VQS.mount(el, {
+    audience: 'portal',
+    company: () => (data.account && data.account.company) || '',
+    email: () => (data.account && data.account.email) || '',
+    api: (method, path, body) => api('/surveys' + path, { method, body: body !== undefined ? JSON.stringify(body) : undefined })
+      .catch(e => { if(e.expired){ renderLogin('Your session has ended. Please sign in again.'); } throw e; }),
+    download: (path, filename) => portalDownload('/surveys' + path, filename, 'Preparing your spreadsheet…'),
+    toast: (msg, warn) => toast(msg, warn),
+  });
+  // A link such as the unhappy-customer email's lands here: #surveys/<id> opens that survey.
+  const m = /^#surveys\/([0-9a-f-]{36})(?:\/(\w+))?$/i.exec(location.hash || '');
+  if(m){ try{ history.replaceState(null, '', '#surveys'); }catch(e){} VQS.open(m[1], m[2] || 'responses'); }
 }
 
 /* ---- Activity: the individual conversations behind the monthly number ---- */

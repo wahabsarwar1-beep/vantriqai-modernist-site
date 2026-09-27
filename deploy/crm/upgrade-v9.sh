@@ -17,6 +17,10 @@
 # what a customer is billed is untouched: customers are in rupees, and only
 # our own internal account is ever in dollars.
 #
+# v9.14 adds customer-satisfaction surveys: four new tables and one new
+# column on csat_responses, nothing changed or removed. It also stops a single
+# failed query from crashing the API (the cause of intermittent 502s).
+#
 # It stops at the first failure and never drops anything. The one thing that
 # touches existing rows is widening the invoice-status constraint and
 # backfilling net_payable, both additive — and there is a verified backup on
@@ -65,6 +69,23 @@ command -v docker >/dev/null || die "docker is not on PATH."
   || die "Container '$DB_CONTAINER' is not running."
 [ "$(docker inspect -f '{{.State.Running}}' "$APP_CONTAINER" 2>/dev/null)" = "true" ] \
   || warn "Container '$APP_CONTAINER' is not running yet — it will be built."
+
+# How the running API has been holding up. A container that keeps restarting
+# is exactly what a visitor sees as an intermittent 502: Nginx Proxy Manager
+# has nothing to forward to while it comes back. Counts only, never log
+# lines — those can carry customer data, and this output lands in a public
+# GitHub Actions log. Covers the current container, i.e. since the last deploy.
+if [ "$(docker inspect -f '{{.State.Running}}' "$APP_CONTAINER" 2>/dev/null)" = "true" ]; then
+  RESTARTS=$(docker inspect -f '{{.RestartCount}}' "$APP_CONTAINER" 2>/dev/null || echo '?')
+  CREATED=$(docker inspect -f '{{.Created}}' "$APP_CONTAINER" 2>/dev/null | cut -c1-16 || echo '?')
+  BOOTS=$(docker logs "$APP_CONTAINER" 2>&1 | grep -c 'Vantriq CRM API listening' || true)
+  CRASHES=$(docker logs "$APP_CONTAINER" 2>&1 | grep -cE '^Node\.js v[0-9]+' || true)
+  REJECTS=$(docker logs "$APP_CONTAINER" 2>&1 | grep -c 'Unhandled promise rejection (server kept running)' || true)
+  ok "$APP_CONTAINER since ${CREATED}Z: $BOOTS start(s), $CRASHES crash(es), Docker restarts $RESTARTS; $REJECTS stray rejection(s) caught"
+  if [ "${CRASHES:-0}" != "0" ]; then
+    warn "each crash above was a few seconds of 502 Bad Gateway for everyone signed in"
+  fi
+fi
 
 # Which compose project owns crm_app?
 #
@@ -360,6 +381,51 @@ else
   chk "v9.13 satisfaction table and handoff flag" 2 \
     "select (select count(*) from information_schema.tables where table_name='csat_responses')
           + (select count(*) from information_schema.columns where table_name='usage_events' and column_name='handoff')"
+  chk "v9.14 survey tables (surveys, responses, invites, views)" 4 \
+    "select count(*) from information_schema.tables where table_name in ('surveys','survey_responses','survey_invites','survey_views')"
+  chk "survey answers feed the satisfaction dashboards (csat link column)" 1 \
+    "select count(*) from information_schema.columns where table_name='csat_responses' and column_name='survey_response_id'"
+  chk "our own survey is made only once (settings flag)" 1 \
+    "select count(*) from information_schema.columns where table_name='settings' and column_name='own_survey_at'"
+  # The survey app itself, from inside the container: a made-up address must
+  # come back as the survey page's own "not found" (404 with the page), and
+  # the staff survey API must be mounted behind sign-in (401), not missing.
+  if docker exec "$APP_CONTAINER" node -e "fetch('http://127.0.0.1:8080/s/vqs-deploy-check-000').then(r=>r.text().then(t=>process.exit(r.status===404&&t.includes('\"state\":\"not_found\"')?0:1))).catch(()=>process.exit(1))" 2>/dev/null; then
+    ok "the survey app answers at /s/<address>"
+  else
+    warn "the survey app did not answer at /s/<address>"; FAILED=1
+  fi
+  if docker exec "$APP_CONTAINER" node -e "fetch('http://127.0.0.1:8080/api/surveys/templates').then(r=>process.exit(r.status===401?0:1)).catch(()=>process.exit(1))" 2>/dev/null; then
+    ok "the survey API is mounted behind sign-in"
+  else
+    warn "the survey API is not answering as expected"; FAILED=1
+  fi
+  # End to end on this install: a temporary survey on our own account is
+  # answered through the public endpoint, seen in its results and in the
+  # Analytics dashboards, then deleted — nothing is left behind or emailed.
+  echo "    survey end-to-end check:"
+  if docker exec "$APP_CONTAINER" npm run -s survey-smoke; then
+    ok "surveys work end to end (the check survey was created, answered and deleted)"
+  else
+    warn "the survey end-to-end check failed — lines above"; FAILED=1
+  fi
+  # Whether an unhappy answer is actually emailed to anyone. Reported, never
+  # failed on — and this log is public, so it says yes or no, nothing more.
+  MAIL_SET=$(docker exec "$APP_CONTAINER" node -e "require('dotenv').config();process.stdout.write(require('/app/src/utils/mailer').mailDiagnosis().configured?'yes':'no')" 2>/dev/null || echo '?')
+  if [ "$MAIL_SET" = "yes" ]; then
+    ok "email is set up — unhappy survey answers are emailed the moment they arrive"
+  else
+    warn "email is not set up — unhappy answers still open a follow-up in Surveys, but nobody is emailed (set HOSTINGER_MAIL_TOKEN and HOSTINGER_MAILBOX_ID on $APP_CONTAINER)"
+  fi
+  # Our own survey (made once by seed-internal above), so there is a live
+  # address to open straight after a deploy. Nothing to report once it has
+  # been paused or deleted — that is a choice, not a fault.
+  OWN_SURVEY=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
+    -c "select s.slug from surveys s join clients c on c.id = s.client_id where c.is_internal and s.status = 'live' order by s.created_at limit 1" 2>/dev/null || true)
+  if [ -n "$OWN_SURVEY" ]; then
+    SURVEY_BASE=$(docker exec "$APP_CONTAINER" node -e "require('dotenv').config();process.stdout.write((process.env.SURVEY_BASE_URL||process.env.PORTAL_URL||'https://portal.vantriqai.com').replace(/\/+$/,''))" 2>/dev/null || echo 'https://portal.vantriqai.com')
+    ok "our own survey is live: $SURVEY_BASE/s/$OWN_SURVEY"
+  fi
   # Not a chk(): creating the owner account is a deliberate, one-time manual
   # step (see 6b above) precisely so its password never touches this log.
   # A fresh install legitimately has none yet — that must never fail a deploy.
@@ -427,5 +493,13 @@ cat <<'NEXT'
   5. Billing Automation → Monthly run → "Show me what it would do".
      Our own account should appear priced in USD, per token, at what the
      month actually used. Read every line before you press the real one.
+
+  6. Surveys (v9.14). Open "our own survey" (its address is above) on a
+     phone, answer it, and watch the answer arrive in CRM → Surveys.
+     For a customer: CRM → Surveys → New survey, or they do it from their
+     own portal. Pick an industry template; it is live at once at
+     https://portal.vantriqai.com/s/<address>, with a QR poster to print.
+     To send it after every WhatsApp chat, have n8n call
+     POST /api/webhooks/survey-invite — see deploy/crm/SURVEYS.md.
 NEXT
 printf '\n'
