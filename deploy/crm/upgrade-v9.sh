@@ -385,6 +385,8 @@ else
     "select count(*) from information_schema.tables where table_name in ('surveys','survey_responses','survey_invites','survey_views')"
   chk "survey answers feed the satisfaction dashboards (csat link column)" 1 \
     "select count(*) from information_schema.columns where table_name='csat_responses' and column_name='survey_response_id'"
+  chk "our own survey is made only once (settings flag)" 1 \
+    "select count(*) from information_schema.columns where table_name='settings' and column_name='own_survey_at'"
   # The survey app itself, from inside the container: a made-up address must
   # come back as the survey page's own "not found" (404 with the page), and
   # the staff survey API must be mounted behind sign-in (401), not missing.
@@ -406,6 +408,23 @@ else
     ok "surveys work end to end (the check survey was created, answered and deleted)"
   else
     warn "the survey end-to-end check failed — lines above"; FAILED=1
+  fi
+  # Whether an unhappy answer is actually emailed to anyone. Reported, never
+  # failed on — and this log is public, so it says yes or no, nothing more.
+  MAIL_SET=$(docker exec "$APP_CONTAINER" node -e "require('dotenv').config();process.stdout.write(require('/app/src/utils/mailer').mailDiagnosis().configured?'yes':'no')" 2>/dev/null || echo '?')
+  if [ "$MAIL_SET" = "yes" ]; then
+    ok "email is set up — unhappy survey answers are emailed the moment they arrive"
+  else
+    warn "email is not set up — unhappy answers still open a follow-up in Surveys, but nobody is emailed (set HOSTINGER_MAIL_TOKEN and HOSTINGER_MAILBOX_ID on $APP_CONTAINER)"
+  fi
+  # Our own survey (made once by seed-internal above), so there is a live
+  # address to open straight after a deploy. Nothing to report once it has
+  # been paused or deleted — that is a choice, not a fault.
+  OWN_SURVEY=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
+    -c "select s.slug from surveys s join clients c on c.id = s.client_id where c.is_internal and s.status = 'live' order by s.created_at limit 1" 2>/dev/null || true)
+  if [ -n "$OWN_SURVEY" ]; then
+    SURVEY_BASE=$(docker exec "$APP_CONTAINER" node -e "require('dotenv').config();process.stdout.write((process.env.SURVEY_BASE_URL||process.env.PORTAL_URL||'https://portal.vantriqai.com').replace(/\/+$/,''))" 2>/dev/null || echo 'https://portal.vantriqai.com')
+    ok "our own survey is live: $SURVEY_BASE/s/$OWN_SURVEY"
   fi
   # Not a chk(): creating the owner account is a deliberate, one-time manual
   # step (see 6b above) precisely so its password never touches this log.
@@ -475,9 +494,11 @@ cat <<'NEXT'
      Our own account should appear priced in USD, per token, at what the
      month actually used. Read every line before you press the real one.
 
-  6. Surveys (v9.14). CRM → Surveys → New survey, or a customer does it
-     from their own portal. Pick an industry template; it is live at once
-     at https://portal.vantriqai.com/s/<address>, with a QR poster to print.
+  6. Surveys (v9.14). Open "our own survey" (its address is above) on a
+     phone, answer it, and watch the answer arrive in CRM → Surveys.
+     For a customer: CRM → Surveys → New survey, or they do it from their
+     own portal. Pick an industry template; it is live at once at
+     https://portal.vantriqai.com/s/<address>, with a QR poster to print.
      To send it after every WhatsApp chat, have n8n call
      POST /api/webhooks/survey-invite — see deploy/crm/SURVEYS.md.
 NEXT

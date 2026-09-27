@@ -13,6 +13,30 @@ at once:
 | Portal and CRM → **Analytics** | both | CSAT, NPS and resolution rate now include survey answers |
 | `GET /api/external/surveys…` | the business's own systems | surveys, responses and results as JSON |
 
+## Is it on, and working?
+
+Nothing needs switching on. It ships inside the CRM container: deploying
+v9.14 or later (**Actions → Deploy CRM → apply**) puts it online at the
+addresses above, and the deploy log proves it before it finishes:
+
+- `the survey app answers at /s/<address>` and `the survey API is mounted behind sign-in`
+- `surveys work end to end` — a temporary survey is made, answered through
+  the public endpoint, found in its results and in Analytics, then deleted
+- `email is set up` or `email is not set up` — whether unhappy answers are emailed
+- `our own survey is live: https://portal.vantriqai.com/s/vantriqai-feedback`
+
+**Our own survey.** The first deploy makes one live survey on VantriqAI's
+internal account ("Customer feedback", professional-services template,
+English and Urdu). Open it on a phone, answer it, and the answer appears in
+CRM → Surveys within seconds. It is made **once**: pause, edit or delete it
+and no later deploy brings it back. Unhappy answers to it are emailed to the
+address that was in Settings → Tax & invoicing → "Our own invoice goes to"
+when it was made (support@vantriqai.com unless changed); change it in the
+survey's own **Settings** tab.
+
+From outside the server, **Actions → Site check** requests the survey
+addresses over the public internet and prints what a visitor gets.
+
 ---
 
 ## Making a survey
@@ -149,5 +173,6 @@ since the last deploy.
 
 ```bash
 node test/surveys.test.js       # 133 checks through the API
+node test/own-survey.test.js    # 16 checks: our own survey is made once, and only once
 node test/surveys-ui.test.js    # 42 checks in a real browser
 ```

@@ -1729,3 +1729,9 @@ alter table csat_responses add column if not exists survey_response_id uuid
   references survey_responses(id) on delete cascade;
 create unique index if not exists idx_csat_survey_response
   on csat_responses(survey_response_id) where survey_response_id is not null;
+
+-- VantriqAI's own survey, made once by npm run seed-internal so a new install
+-- has a live one to open and share. The moment it was made is kept here, so
+-- pausing, renaming or deleting it is final: a later deploy never brings it
+-- back. See ensureOwnSurvey in src/utils/surveys.js.
+alter table settings add column if not exists own_survey_at timestamptz;

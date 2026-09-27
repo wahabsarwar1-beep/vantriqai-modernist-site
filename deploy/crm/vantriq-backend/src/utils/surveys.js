@@ -446,7 +446,52 @@ async function deleteSurvey(survey) {
   await db.query(`delete from surveys where id = $1`, [survey.id]);
 }
 
-const isClosed = (s) => s.status === 'closed' || (s.closes_at && new Date(s.closes_at) < new Date());
+/**
+ * VantriqAI's own survey, made by npm run seed-internal on the internal
+ * account like any customer's — so the moment an install is up there is a
+ * live survey to open on a phone, answer, and watch arrive in the CRM.
+ *
+ * Made ONCE. settings.own_survey_at records that it was, and is claimed
+ * before the survey is made, so pausing, renaming or deleting it afterwards
+ * is final: no later deploy brings it back. An internal account that already
+ * has surveys of its own gets none. If making it fails, the claim is undone
+ * and the next run tries again.
+ */
+const OWN_SURVEY_SLUG = 'vantriqai-feedback';
+
+async function ensureOwnSurvey(client) {
+  const { rows: claim } = await db.query(
+    `update settings set own_survey_at = now() where id = 1 and own_survey_at is null
+     returning internal_invoice_email`
+  );
+  if (!claim[0]) return { created: false, reason: 'made once already' };
+  try {
+    const { rows: has } = await db.query(`select count(*)::int as n from surveys where client_id = $1`, [client.id]);
+    if (has[0].n) return { created: false, reason: 'the account already has surveys' };
+    const base = publicBase(null);
+    const survey = await createSurvey({
+      client,
+      template: 'professional',
+      input: {
+        // The memorable address if it is free, a made-up one if not.
+        slug: (await getSurveyBySlug(OWN_SURVEY_SLUG)) ? undefined : OWN_SURVEY_SLUG,
+        title: 'Customer feedback',
+        status: 'live',
+        // Unhappy answers go to the mailbox our own invoices go to — the one
+        // the company is sure to read — not the account's placeholder address.
+        alert_emails: claim[0].internal_invoice_email || client.email || '',
+        logo_url: base.startsWith('https://') ? `${base}/brand/mark.svg` : '',
+      },
+      createdBy: 'seed-internal',
+    });
+    return { created: true, survey, url: `${base}/s/${survey.slug}` };
+  } catch (err) {
+    await db.query(`update settings set own_survey_at = null where id = 1`).catch(() => {});
+    throw err;
+  }
+}
+
+const isClosed =(s) => s.status === 'closed' || (s.closes_at && new Date(s.closes_at) < new Date());
 
 /** Roughly how long a survey takes, for "takes about a minute". */
 function estimateMinutes(questions) {
@@ -1475,6 +1520,7 @@ module.exports = {
   templateSummaries,
   normalizeSurvey, normalizeAnswers, conditionMet, metricsOf, needsFollowUp, isPromoter, themesOf, answerText,
   getSurvey, getSurveyBySlug, getClient, createSurvey, updateSurvey, duplicateSurvey, deleteSurvey,
+  OWN_SURVEY_SLUG, ensureOwnSurvey,
   isClosed, publicSurvey, publicBase, linksFor, withLinks, inviteMessage, qrSvg, escapeHtml, estimateMinutes,
   recordResponse, notifyUnhappy, createInvites, findInvite, markInviteOpened, defaultSurveyFor, countView,
   listSurveys, overview, responsesPage, setFollowUp, surveyAnalytics, exportWorkbook, readableAnswers,

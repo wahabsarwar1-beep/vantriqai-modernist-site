@@ -16,7 +16,7 @@
     "survey-smoke": "node src/utils/surveySmokeTest.js",
     "docs:api": "node tools/gen-api-docs.js",
     "test:proposal": "node test/proposal.test.js",
-    "test:surveys": "node test/surveys.test.js && node test/surveys-ui.test.js"
+    "test:surveys": "node test/surveys.test.js && node test/own-survey.test.js && node test/surveys-ui.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

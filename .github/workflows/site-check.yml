@@ -25,7 +25,8 @@ jobs:
                    https://crm.vantriqai.com https://crm.vantriqai.com/api/health \
                    https://portal.vantriqai.com https://n8n.vantriqai.com/healthz \
                    https://portal.vantriqai.com/s/vqs-site-check-000 \
-                   https://portal.vantriqai.com/api/public/surveys/vqs-site-check-000; do
+                   https://portal.vantriqai.com/api/public/surveys/vqs-site-check-000 \
+                   https://portal.vantriqai.com/s/vantriqai-feedback; do
             echo "================ $u"
             curl -sS -L --max-time 30 -o body.html \
               -w 'final=%{url_effective}\nstatus=%{http_code} redirects=%{num_redirects} time=%{time_total}s ip=%{remote_ip} ssl_verify=%{ssl_verify_result}\n' \
