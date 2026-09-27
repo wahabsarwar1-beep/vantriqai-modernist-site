@@ -10,6 +10,8 @@
  * results AND the Analytics dashboards, and deletes everything it made
  * (the survey, the response and the dashboard row go together). Nothing is
  * emailed: the survey has no alert list, and the answer is a happy one.
+ * Then the after-chat rules the WhatsApp flow depends on are run against a
+ * made-up conversation inside a transaction that is rolled back.
  *
  * Prints PASS/FAIL lines and exits non-zero on any failure.
  */
@@ -69,6 +71,32 @@ async function run() {
 
     const after = (await clientAnalytics(client.id, { grain: 'month' })).satisfaction.kpis.csat.responses;
     check(after === before + 1, 'and in the Analytics dashboards (CRM and portal)', `${before} -> ${after}`);
+
+    // The after-chat rules the WhatsApp flow in n8n relies on, against this
+    // database: a made-up conversation, inside a transaction that is rolled
+    // back, so no usage (which is billed) is ever left behind.
+    const conn = await db.pool.connect();
+    try {
+      await conn.query('begin');
+      const sid = `000${Date.now()}-${new Date().toISOString().slice(0, 10)}`;
+      await conn.query(
+        `insert into usage_events (client_id, session_id, channel, messages_count, occurred_at)
+         values ($1, $2, 'whatsapp', 1, now() - interval '70 minutes'), ($1, $2, 'whatsapp', 1, now() - interval '65 minutes')`,
+        [client.id, sid]
+      );
+      const verdict = (body) => S.chatVerdict(conn, { clientId: client.id, sessionId: sid, rules: S.chatRules(body), now: new Date() });
+      const due = await verdict({ quiet_minutes: 55, min_messages: 2 });
+      check(due.due === true && due.messages === 2, 'after-chat: a conversation quiet for an hour is due its survey', JSON.stringify(due));
+      const talking = await verdict({ quiet_minutes: 90 });
+      check(talking.code === 'still_talking', 'after-chat: one still going is not', JSON.stringify(talking));
+      const short = await verdict({ quiet_minutes: 55, min_messages: 3 });
+      check(short.code === 'too_short', 'after-chat: nor one too short to ask about', JSON.stringify(short));
+      const none = await S.chatVerdict(conn, { clientId: client.id, sessionId: `111${Date.now()}`, rules: S.chatRules({ quiet_minutes: 55 }), now: new Date() });
+      check(none.code === 'no_conversation', 'after-chat: nor a customer with no conversation', JSON.stringify(none));
+    } finally {
+      await conn.query('rollback').catch(() => {});
+      conn.release();
+    }
   } finally {
     if (survey) {
       await S.deleteSurvey(survey);

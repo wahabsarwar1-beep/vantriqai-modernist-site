@@ -478,22 +478,33 @@ async function recordCsat(req, res) {
 /**
  * POST /api/webhooks/survey-invite
  *
- * A personal survey link for the customer an agent just finished talking to —
- * n8n calls this when a conversation closes, and sends back `message` (or
- * its own wording around `url`) on the same channel. The answer is then tied
- * to that conversation: it lands with its session id, and the survey's
- * response rate counts it.
+ * A personal survey link for the customer an agent has been talking to — n8n
+ * sends it back on the same channel, and the answer is tied to that
+ * conversation: it lands with its session id, and the survey's response rate
+ * counts it.
  *
  * Body:
  * {
  *   "external_ref": "923001234567",   // or client_id / agent_ref / agent_id, exactly as /usage
  *   "session_id": "923009998888-2026-08-16", // the conversation it follows
  *   "channel": "whatsapp",            // how the link will be sent
- *   "survey_slug": "khans-kitchen-3f2a1" // optional — otherwise the client's live
+ *   "language": "ur",                 // optional — what the customer wrote in (en | ur)
+ *   "survey_slug": "khans-kitchen-3f2a1", // optional — otherwise the client's live
  *                                        // after-chat survey, or its newest live one
+ *
+ *   // Optional: "only if the conversation is over". Without quiet_minutes the
+ *   // link is made at once. With it, n8n can ask after every reply and hear
+ *   // yes exactly once per conversation — see chatRules in utils/surveys.js.
+ *   "quiet_minutes": 55, "min_messages": 2, "within_hours": 23, "once_per_days": 14,
+ *   "send_from": 9, "send_until": 21, "timezone": "Asia/Karachi",
+ *   "dry_run": false                  // true: say what would happen, make nothing
  * }
  *
- * 201 { url, token, survey: { slug, title }, message: { en, ur } }
+ * 201 { due: true, code: 'due', url, token, language, text, message: { en, ur }, survey: { slug, title } }
+ *     — send `text` (the message in the customer's language).
+ * 200 { due: false, code, reason, retry_at? } — not now: still_talking, too_short,
+ *     already_asked, asked_recently, window_closed, no_conversation, or night
+ *     (ask again at retry_at). Only with quiet_minutes.
  * 404 when the client has no live survey — create one in the CRM or the portal.
  */
 router.post('/survey-invite', async (req, res) => {
@@ -501,6 +512,11 @@ router.post('/survey-invite', async (req, res) => {
   const { external_ref, client_id, agent_ref, agent_id } = body;
   if (!external_ref && !client_id && !agent_ref && !agent_id) {
     return res.status(400).json({ error: 'external_ref, client_id, agent_ref or agent_id is required' });
+  }
+  const rules = S.chatRules(body);
+  const sessionId = String(body.session_id || '').trim();
+  if (rules && !sessionId) {
+    return res.status(400).json({ error: 'session_id is required with quiet_minutes: it is the conversation that has to be over.' });
   }
 
   // Same resolution order as /usage and /csat: a named agent first, then the
@@ -532,16 +548,33 @@ router.post('/survey-invite', async (req, res) => {
     survey = await S.defaultSurveyFor(clientId);
     if (!survey) return res.status(404).json({ error: 'This client has no live survey. Create one in the CRM or the portal first.' });
   }
+  const about = { slug: survey.slug, title: survey.title };
+  const channel = body.channel || 'whatsapp';
 
-  const [invite] = await S.createInvites(survey, {
-    sessionId: body.session_id || '', channel: body.channel || 'whatsapp',
-  });
-  const url = `${S.publicBase(req)}/s/${survey.slug}?i=${invite.token}`;
+  let invite;
+  if (rules) {
+    const verdict = await S.chatInvite({ survey, clientId, sessionId, channel, rules, dryRun: !!body.dry_run });
+    const { invite: made, ...said } = verdict;
+    if (!verdict.due || body.dry_run) return res.json({ ...said, ...(body.dry_run ? { dry_run: true } : {}), survey: about });
+    invite = made;
+  } else {
+    [invite] = await S.createInvites(survey, { sessionId, channel });
+  }
+
+  // The survey opens in the language the customer wrote in, when it has it.
+  const asked = String(body.language || '').toLowerCase();
+  const language = (survey.languages || []).includes(asked) ? asked : survey.default_language;
+  const url = `${S.publicBase(req)}/s/${survey.slug}?i=${invite.token}${asked === language ? `&lang=${language}` : ''}`;
+  const message = S.inviteMessage(survey, url, { chat: !!sessionId });
   res.status(201).json({
+    due: true,
+    code: 'due',
     url,
     token: invite.token,
-    survey: { slug: survey.slug, title: survey.title },
-    message: S.inviteMessage(survey, url),
+    language,
+    text: message[language] || message.en,
+    message,
+    survey: about,
   });
 });
 

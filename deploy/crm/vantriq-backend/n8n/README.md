@@ -557,16 +557,44 @@ they did nothing wrong. Reply with something plain:
 
 Then notify your client, not their customer, that their agent is paused.
 
-# Asking for a rating after every conversation (v9.14)
+# Asking for a rating after every conversation (v9.14.1)
 
-When a WhatsApp conversation closes, add one HTTP Request node after the reply:
+WhatsApp never says a conversation is over, so the agent asks after every
+reply and the CRM says yes once, when it really is. Two pieces, both live for
+VantriqAI's own WhatsApp agent:
 
-- **Method** `POST` · **URL** `http://crm_app:8080/api/webhooks/survey-invite`
-- **Header** `x-api-key` — the same webhook key the `/usage` node uses
-- **Body (JSON)** `{ "external_ref": "<as for /usage>", "session_id": "<the conversation>", "channel": "whatsapp" }`
+1. In the agent workflow, one node after **Send WhatsApp Reply** — **After-chat
+   survey (in the background)**, an *Execute Sub-workflow* node with **Wait for
+   sub-workflow completion off** and **On Error: continue**. It hands over
+   `external_ref`, `session_id` (exactly the usage node's), `phone` and
+   `language` (`ur` when the customer wrote in Urdu script) and returns at
+   once, so it can never delay or break a reply.
+2. The workflow **VantriqAI - After-chat survey (WhatsApp)** — `n8n/vantriq-after-chat-survey.json`
+   in this folder:
 
-It answers `201` with `url` — a personal, one-time survey link on
-`https://portal.vantriqai.com` — and `message.en` / `message.ur`, ready to send
-back on WhatsApp. `404` means the client has no live survey yet; the flow
-should simply skip the message, not fail. Full details, and everything else
-about surveys, in `deploy/crm/SURVEYS.md`.
+```
+After the agent replies (inputs) → Wait an hour → Is the chat over? (CRM)
+   → due    → Send the survey on WhatsApp
+   → night  → Wait until morning → Is the chat over now? (CRM) → due → Send the survey on WhatsApp
+   → other  → stop (still talking, too short, already asked, asked recently, window closed)
+```
+
+"Is the chat over?" is `POST http://crm_app:8080/api/webhooks/survey-invite`
+with the webhook key and these rules — the CRM checks them against the usage
+events the agent already posts:
+
+```json
+{ "external_ref": "…", "session_id": "…", "channel": "whatsapp", "language": "en",
+  "quiet_minutes": 55, "min_messages": 2, "within_hours": 23, "once_per_days": 14,
+  "send_from": 9, "send_until": 21, "timezone": "Asia/Karachi" }
+```
+
+`201` → send `text` to the customer (it is in their language and carries a
+personal, one-time link). `200` with `due: false` → nothing to send; `code`
+says why, and `night` comes with `retry_at`. `404` → the client has no live
+survey: pausing the survey is how to switch the messages off. Every answer and
+setting is described in `deploy/crm/SURVEYS.md`.
+
+For a client's own WhatsApp agent: add the same node after its send-reply
+node, and use a copy of the after-chat workflow whose send node carries that
+client's phone number id and WhatsApp credential.

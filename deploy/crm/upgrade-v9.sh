@@ -385,8 +385,8 @@ else
     "select count(*) from information_schema.tables where table_name in ('surveys','survey_responses','survey_invites','survey_views')"
   chk "survey answers feed the satisfaction dashboards (csat link column)" 1 \
     "select count(*) from information_schema.columns where table_name='csat_responses' and column_name='survey_response_id'"
-  chk "our own survey is made only once (settings flag)" 1 \
-    "select count(*) from information_schema.columns where table_name='settings' and column_name='own_survey_at'"
+  chk "our own surveys are made only once (settings flags)" 2 \
+    "select count(*) from information_schema.columns where table_name='settings' and column_name in ('own_survey_at','own_chat_survey_at')"
   # The survey app itself, from inside the container: a made-up address must
   # come back as the survey page's own "not found" (404 with the page), and
   # the staff survey API must be mounted behind sign-in (401), not missing.
@@ -417,14 +417,17 @@ else
   else
     warn "email is not set up — unhappy answers still open a follow-up in Surveys, but nobody is emailed (set HOSTINGER_MAIL_TOKEN and HOSTINGER_MAILBOX_ID on $APP_CONTAINER)"
   fi
-  # Our own survey (made once by seed-internal above), so there is a live
-  # address to open straight after a deploy. Nothing to report once it has
-  # been paused or deleted — that is a choice, not a fault.
-  OWN_SURVEY=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
-    -c "select s.slug from surveys s join clients c on c.id = s.client_id where c.is_internal and s.status = 'live' order by s.created_at limit 1" 2>/dev/null || true)
-  if [ -n "$OWN_SURVEY" ]; then
+  # Our own live surveys (made once by seed-internal above), so there is an
+  # address to open straight after a deploy, and the after-chat one the
+  # WhatsApp flow in n8n sends. Nothing to report once one has been paused or
+  # deleted — that is a choice, not a fault.
+  OWN_SURVEYS=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At -F ' ' \
+    -c "select s.slug, s.title from surveys s join clients c on c.id = s.client_id where c.is_internal and s.status = 'live' order by s.created_at limit 5" 2>/dev/null || true)
+  if [ -n "$OWN_SURVEYS" ]; then
     SURVEY_BASE=$(docker exec "$APP_CONTAINER" node -e "require('dotenv').config();process.stdout.write((process.env.SURVEY_BASE_URL||process.env.PORTAL_URL||'https://portal.vantriqai.com').replace(/\/+$/,''))" 2>/dev/null || echo 'https://portal.vantriqai.com')
-    ok "our own survey is live: $SURVEY_BASE/s/$OWN_SURVEY"
+    while read -r OWN_SLUG OWN_TITLE; do
+      if [ -n "$OWN_SLUG" ]; then ok "our own survey is live: $SURVEY_BASE/s/$OWN_SLUG ($OWN_TITLE)"; fi
+    done <<< "$OWN_SURVEYS"
   fi
   # Not a chk(): creating the owner account is a deliberate, one-time manual
   # step (see 6b above) precisely so its password never touches this log.
@@ -499,7 +502,9 @@ cat <<'NEXT'
      For a customer: CRM → Surveys → New survey, or they do it from their
      own portal. Pick an industry template; it is live at once at
      https://portal.vantriqai.com/s/<address>, with a QR poster to print.
-     To send it after every WhatsApp chat, have n8n call
-     POST /api/webhooks/survey-invite — see deploy/crm/SURVEYS.md.
+     After every WhatsApp chat: the "VantriqAI - After-chat survey
+     (WhatsApp)" workflow in n8n sends the after-chat survey an hour after a
+     conversation goes quiet — see "After every WhatsApp conversation" in
+     deploy/crm/SURVEYS.md.
 NEXT
 printf '\n'
