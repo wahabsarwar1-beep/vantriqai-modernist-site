@@ -7,6 +7,7 @@ import InteractiveDemo from "@/components/InteractiveDemo";
 import PinnedRail from "@/components/PinnedRail";
 import ProductMark, { type MarkId } from "@/components/ProductMark";
 import AgentTrace from "@/components/AgentTrace";
+import ModuleVisual from "@/components/ModuleVisual";
 import Magnetic from "@/components/Magnetic";
 import { AGENTS, INTEGRATIONS, JSTEPS, WHY } from "@/lib/content";
 import { industries } from "@/lib/industries";
@@ -131,18 +132,22 @@ export default function HomePage({ region }: { region: Region }) {
 
       {/* ---------- 02 Watch it think ---------- */}
       <section style={{ ...wrap, paddingTop: "clamp(72px,9vw,120px)" }}>
-        <div className="split-head">
-          <div>
-            <Eyebrow n="02" label="Watch it think" />
-            <h2 data-anim="" style={{ ...h2, maxWidth: "17ch" }}>
-              Not a chatbot. <span className="grad-text">An agent that reasons, then acts.</span>
-            </h2>
-          </div>
-          <p data-anim="" style={{ fontSize: 17, lineHeight: "29px", margin: 0, maxWidth: "44ch", ...muted }}>
-            A chatbot matches keywords to a script. A VantriqAI agent works out what was meant, checks your real systems, stays inside your rules — and knows when a person should take over.
-          </p>
-        </div>
-        <AgentTrace region={region} />
+        {/* The intro sits beside the console rather than above it, so the
+            whole section reads in one screen on a desktop. */}
+        <AgentTrace
+          region={region}
+          intro={
+            <div className="trace-intro">
+              <Eyebrow n="02" label="Watch it think" />
+              <h2 data-anim="" style={{ ...h2, fontSize: "clamp(28px,3.1vw,44px)", maxWidth: "18ch" }}>
+                Not a chatbot. <span className="grad-text">An agent that reasons, then acts.</span>
+              </h2>
+              <p data-anim="" style={{ fontSize: 16.5, lineHeight: "28px", margin: 0, maxWidth: "40ch", ...muted }}>
+                It works out what was meant, checks your real systems, stays inside your rules — and knows when a person should take over. Pick a case:
+              </p>
+            </div>
+          }
+        />
       </section>
 
       {/* ---------- 03 Try it ---------- */}
@@ -220,7 +225,61 @@ export default function HomePage({ region }: { region: Region }) {
         <p aria-hidden="true" className="swipe-hint">Swipe to see all ten →</p>
       </section>
 
-      <PinnedRail steps={JSTEPS} label="05 — Step by step" />
+      {/* ---------- 05 Insight: Pulse and Echo ---------- */}
+      <section style={{ ...wrap, paddingTop: "clamp(72px,9vw,120px)" }}>
+        <div className="split-head">
+          <div>
+            <Eyebrow n="05" label="Just launched" />
+            <h2 data-anim="" style={{ ...h2, maxWidth: "16ch" }}>
+              It answers every customer. <span className="grad-text">Then it tells you what they said.</span>
+            </h2>
+          </div>
+          <p data-anim="" style={{ fontSize: 17, lineHeight: "29px", margin: 0, maxWidth: "44ch", ...muted }}>
+            A chatbot forgets the conversation the moment it ends. Every VantriqAI conversation becomes a number you can act on — leads closed, hours that matter, how satisfied people left.
+          </p>
+        </div>
+
+        <GlowGrid className="ins swipe">
+          <Link data-anim="" href={hrefIn(region, "/products/vantriq-pulse")} className="glow ins-card">
+            <div className="ins-copy">
+              <p className="ins-k">
+                <span className="mega-new">New</span> Vantriq Pulse · analytics
+              </p>
+              <h3>Every conversation, measured live.</h3>
+              <p className="ins-body">Leads made and closed, time to close, busiest hours, satisfaction and what the AI resolved on its own — compared like for like, in plain English.</p>
+              <span className="ins-more">Explore Pulse →</span>
+            </div>
+            <div className="ins-visual">
+              <ModuleVisual kind="pulse" />
+            </div>
+          </Link>
+          <Link data-anim="" href={hrefIn(region, "/products/vantriq-echo")} className="glow ins-card">
+            <div className="ins-copy">
+              <p className="ins-k">
+                <span className="mega-new">New</span> Vantriq Echo · surveys
+              </p>
+              <h3>Hear every customer, not just the loudest.</h3>
+              <p className="ins-body">Satisfaction surveys in English and Urdu — after a chat, by QR code or link — with unhappy answers reaching your team the same day.</p>
+              <span className="ins-more">Explore Echo →</span>
+            </div>
+            <div className="ins-visual">
+              <ModuleVisual kind="echo" />
+            </div>
+          </Link>
+        </GlowGrid>
+        <p aria-hidden="true" className="swipe-hint">Swipe for Echo →</p>
+
+        <Link data-anim="" href={hrefIn(region, "/products/human-support")} className="ins-strip">
+          <ProductMark id="human" size={34} />
+          <span>
+            <strong>Human Support</strong> — AI agent assist. When a person takes over, they get the summary, the customer&rsquo;s history and a drafted reply.
+          </span>
+          <span aria-hidden="true" className="ins-strip-go">→</span>
+        </Link>
+        <p className="ins-note">Dashboard and survey figures are illustrative.</p>
+      </section>
+
+      <PinnedRail steps={JSTEPS} label="06 — Step by step" />
 
       {/* ---------- 06 Stack and guardrails ---------- */}
       <section className="dark-band">
@@ -228,7 +287,7 @@ export default function HomePage({ region }: { region: Region }) {
         <div style={{ ...wrap, position: "relative", padding: "clamp(56px,7vw,100px) clamp(20px,5vw,64px)" }}>
           <div className="split-head">
             <div>
-              <Eyebrow n="06" label="Stack and guardrails" dark />
+              <Eyebrow n="07" label="Stack and guardrails" dark />
               <h2 data-anim="" style={{ ...h2, maxWidth: "16ch", color: "#fff" }}>
                 Connected to your stack. <span className="grad-text-light">Bound by your rules.</span>
               </h2>
@@ -290,7 +349,7 @@ export default function HomePage({ region }: { region: Region }) {
       <section style={{ ...wrap, paddingTop: "clamp(72px,9vw,120px)" }}>
         <div className="split-head">
           <div>
-            <Eyebrow n="07" label="Where it applies" />
+            <Eyebrow n="08" label="Where it applies" />
             <h2 data-anim="" style={{ ...h2, maxWidth: "16ch" }}>
               Tuned to how <span className="grad-text">your sector</span> sells.
             </h2>
@@ -327,7 +386,7 @@ export default function HomePage({ region }: { region: Region }) {
 
       {/* ---------- 08 Why ---------- */}
       <section style={{ ...wrap, paddingTop: "clamp(72px,9vw,120px)", paddingBottom: "clamp(56px,7vw,96px)" }}>
-        <Eyebrow n="08" label="Why VantriqAI" />
+        <Eyebrow n="09" label="Why VantriqAI" />
         <h2 data-anim="" style={{ ...h2, maxWidth: "18ch", marginBottom: "clamp(30px,4vw,52px)" }}>
           A partner, not a <span className="grad-text">faceless subscription.</span>
         </h2>

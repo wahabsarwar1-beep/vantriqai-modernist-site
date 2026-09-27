@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { Region } from "@/lib/region";
 
 /**
@@ -121,7 +121,7 @@ function useReducedMotion() {
 const STEP_MS = 700;
 const HOLD_MS = 4200;
 
-export default function AgentTrace({ region }: { region: Region }) {
+export default function AgentTrace({ region, intro }: { region: Region; intro?: ReactNode }) {
   const all = cases(region);
   const [index, setIndex] = useState(0);
   const [shown, setShown] = useState(0);
@@ -166,6 +166,8 @@ export default function AgentTrace({ region }: { region: Region }) {
 
   return (
     <div ref={ref} className="trace">
+      <div className="trace-side">
+      {intro}
       <div role="tablist" aria-label="Example conversations" className="trace-tabs">
         {all.map((c, i) => {
           const on = i === index;
@@ -189,14 +191,16 @@ export default function AgentTrace({ region }: { region: Region }) {
                 document.getElementById(`${baseId}-t${next}`)?.focus();
               }}
             >
-              <span className="trace-tab-label">{c.label}</span>
-              <span className="trace-tab-msg">&ldquo;{c.message}&rdquo;</span>
+              {/* The message itself is in the console; the tab only names the case. */}
+              <span className="trace-tab-label">{c.label.split(" · ")[0]}</span>
+              <span className="trace-tab-sub">{c.label.split(" · ").slice(1).join(" · ")}</span>
               {on && auto && !reduced ? (
                 <span aria-hidden="true" className="trace-tab-progress" style={{ animationDuration: `${total * STEP_MS + HOLD_MS}ms` }} key={`${index}-${auto}`} />
               ) : null}
             </button>
           );
         })}
+      </div>
       </div>
 
       <div role="tabpanel" id={`${baseId}-p`} aria-labelledby={`${baseId}-t${index}`} className="trace-console">
