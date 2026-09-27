@@ -82,8 +82,8 @@ export const products = (region: Region): Product[] => [
     body: "Customer-satisfaction surveys in English and Urdu — after a WhatsApp chat, by QR code, link, SMS, email, kiosk or on your site — with every answer flowing straight into Pulse.",
   },
   {
-    kicker: "Insight", name: "Human Assistant", tier: "Add-on module", tint: "dark", mark: "human", isNew: true,
-    body: "An AI co-pilot for your team. When a person takes over a chat, it hands them the summary, the customer's history and a drafted reply in the customer's language — they decide what is sent.",
+    kicker: "Insight", name: "Human Support", tier: "Add-on module", tint: "dark", mark: "human", isNew: true,
+    body: "AI agent assist for your team. When a person takes over a chat, it hands them the summary, the customer's history and a drafted reply in the customer's language — they decide what is sent.",
   },
   {
     kicker: "Deployment", name: "Private Deployment", tier: "From Enterprise", tint: "dark", mark: "deployment",

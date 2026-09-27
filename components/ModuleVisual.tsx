@@ -1,6 +1,6 @@
 /**
  * Hero pictures for the modules that are not a conversation: a Pulse
- * dashboard, an Echo survey and the Human Assistant's handover console.
+ * dashboard, an Echo survey and Human Support's handover console.
  *
  * Every figure and name in them is illustrative — the hero labels it so, like
  * the chat cards on the other module pages. Decorative: the page text says
@@ -121,7 +121,7 @@ function Human() {
       <p className="mv-msg">I was charged twice for order #4471. Please sort this out.</p>
       <div className="mv-assist">
         <p className="mv-assist-k">
-          <span className="mv-spark">✦</span> Human Assistant
+          <span className="mv-spark">✦</span> AI agent assist
         </p>
         <ul>
           <li>Paid twice on the 12th — same amount, 2 minutes apart</li>

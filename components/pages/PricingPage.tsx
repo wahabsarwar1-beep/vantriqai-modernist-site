@@ -74,7 +74,7 @@ export default function PricingPage({ region }: { region: Region }) {
 
       {/* ---------- The six packages ---------- */}
       <section style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(56px,7vw,96px) clamp(20px,5vw,64px) 0" }}>
-        <GlowGrid className="tier-grid">
+        <GlowGrid className="tier-grid swipe">
           {pkgs.map((p) => {
             const highlights = highlightsOf(p.index);
             return (
@@ -118,6 +118,7 @@ export default function PricingPage({ region }: { region: Region }) {
             );
           })}
         </GlowGrid>
+        <p aria-hidden="true" className="swipe-hint">Swipe through all {pkgs.length} packages →</p>
       </section>
 
       {/* ---------- Find your package ---------- */}

@@ -63,7 +63,7 @@ export function menuPanels(region: Region): MenuPanel[] {
       hero: {
         kicker: "Just launched",
         title: "Vantriq Pulse & Echo",
-        body: "Live analytics on every conversation, and satisfaction surveys that feed it — plus a Human Assistant for your team.",
+        body: "Live analytics on every conversation, and satisfaction surveys that feed it — plus Human Support, AI agent assist for your team.",
         href: hrefIn(region, "/products/vantriq-pulse"),
         cta: "Meet Pulse",
       },

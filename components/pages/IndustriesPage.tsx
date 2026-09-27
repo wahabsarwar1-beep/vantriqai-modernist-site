@@ -58,7 +58,7 @@ export default function IndustriesPage({ region }: { region: Region }) {
         </section>
 
         <section style={{ padding: "0 0 clamp(38px,5vw,66px)" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(260px,100%),1fr))", gap: 18 }}>
+          <div className="swipe" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(260px,100%),1fr))", gap: 18 }}>
             {CHANNEL_STATS.map((s) => (
               <div
                 key={s.body}
@@ -82,7 +82,7 @@ export default function IndustriesPage({ region }: { region: Region }) {
               key={s.name}
               id={productSlug(s.name)}
               index={i}
-              className="spot-tint anchor-target"
+              className="spot-tint anchor-target sector-card"
               style={{
                 background: "var(--color-surface)",
                 padding: "clamp(26px,3vw,40px) clamp(20px,2.5vw,36px)",

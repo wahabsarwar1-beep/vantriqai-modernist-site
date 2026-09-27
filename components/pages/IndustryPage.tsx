@@ -146,9 +146,9 @@ export default function IndustryPage({ region, industry }: { region: Region; ind
           <h2 data-anim="" style={{ fontSize: "clamp(26px,3.2vw,44px)", lineHeight: 1.02, letterSpacing: "-0.03em", margin: "0 0 clamp(24px,3vw,38px)", maxWidth: "24ch" }}>
             The modules {industry.name.toLowerCase()} teams switch on
           </h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(196px,100%),1fr))", gap: 16 }}>
+          <div className="swipe" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(196px,100%),1fr))", gap: 16 }}>
             {modules.map((m) => (
-              <Link key={m.name} href={`${hrefIn(region, "/products")}#${productSlug(m.name)}`} data-anim="" className="industry-module">
+              <Link key={m.name} href={hrefIn(region, `/products/${productSlug(m.name)}`)} data-anim="" className="industry-module">
                 {m.mark ? <ProductMark id={m.mark} size={44} /> : null}
                 <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 17, letterSpacing: "-0.015em", color: "var(--color-text)" }}>{m.name}</span>
                 <span style={{ fontSize: 13.5, lineHeight: "21px", ...bodyMuted }}>{m.body}</span>

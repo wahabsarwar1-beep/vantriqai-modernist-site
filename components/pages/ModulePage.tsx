@@ -201,7 +201,7 @@ export default function ModulePage({ region, module: m }: { region: Region; modu
               Configured around how your sector sells and supports — your catalogue, your booking rules, your tone.
             </p>
           </div>
-          <GlowGrid className="sector-grid mod-sector-grid">
+          <GlowGrid className="sector-grid mod-sector-grid swipe">
             {sectors.map((s) => (
               <Link
                 key={s.slug}
@@ -226,7 +226,7 @@ export default function ModulePage({ region, module: m }: { region: Region; modu
         <h2 data-anim="" style={{ ...h2, maxWidth: "18ch", marginBottom: "clamp(28px,3.6vw,44px)" }}>
           One brain. <span className="grad-text">Modules that share it.</span>
         </h2>
-        <GlowGrid className="mod-grid mod-cols-3">
+        <GlowGrid className="mod-grid mod-cols-3 swipe">
           {pairs.map((p) => (
             <Link key={p.name} href={hrefIn(region, `/products/${p.slug}`)} data-anim="" className="glow mod-card mod-card-link">
               <div className="mod-card-top">
@@ -241,6 +241,7 @@ export default function ModulePage({ region, module: m }: { region: Region; modu
             </Link>
           ))}
         </GlowGrid>
+        <p aria-hidden="true" className="swipe-hint">Swipe for more →</p>
       </section>
 
       {/* ---------- 05 Systems + trust ---------- */}

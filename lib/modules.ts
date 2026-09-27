@@ -583,10 +583,10 @@ const details = (region: Region): Record<string, ModuleDetail> => ({
       { q: "Is Echo available in Urdu?", a: "Yes. Every template is bilingual, and Urdu surveys read right to left as they should." },
     ],
   },
-  "Human Assistant": {
+  "Human Support": {
     visual: "human",
     headline: ["Your team,", "with an AI at their side"],
-    lede: "When a conversation needs a person, the Human Assistant makes that person faster: it summarises what has happened, shows who the customer is, drafts the reply in their language and puts the next action one tap away. Your colleague decides what is sent.",
+    lede: "AI agent assist for the moments that need a person. When a conversation is handed over, Human Support makes your colleague faster: it summarises what has happened, shows who the customer is, drafts the reply in their language and puts the next action one tap away. Your colleague decides what is sent.",
     hero: { time: "15:47", bubbles: [], speed: "", outcome: [] },
     flowTitle: ["From handover", "to handled."],
     capTitle: ["Everything a colleague needs,", "already on the screen."],
@@ -601,7 +601,7 @@ const details = (region: Region): Record<string, ModuleDetail> => ({
       { title: "Suggested replies", body: "Drafted in English, Urdu or Roman Urdu, from your catalogue, policies and past answers." },
       { title: "One-tap actions", body: "Book the slot, send the payment link or hold the item without leaving the conversation." },
       { title: "Customer context", body: "Previous orders, bookings and conversations beside the chat, so nobody asks twice." },
-      { title: "A person always decides", body: "Nothing is sent to a customer from the Human Assistant without your colleague choosing to send it." },
+      { title: "A person always decides", body: "Nothing is sent to a customer from Human Support without your colleague choosing to send it." },
       { title: "Learns from your team", body: "What your people do with handed-over cases shapes the agent's next tuning round." },
     ],
     sectors: [
@@ -613,8 +613,8 @@ const details = (region: Region): Record<string, ModuleDetail> => ({
     pairs: ["Escalation Desk", "Vantriq Pulse", "Payments Agent"],
     systems: ["Your team inbox", "CRM", "Calendar", "Payment links"],
     faqs: [
-      { q: "Does the Human Assistant reply to customers by itself?", a: "No. It prepares — the summary, the draft, the action — and your colleague decides what is sent." },
-      { q: "How is it different from the Escalation Desk?", a: "The Escalation Desk decides when and to whom a conversation is handed over. The Human Assistant helps the person who receives it." },
+      { q: "Does Human Support reply to customers by itself?", a: "No. It prepares — the summary, the draft, the action — and your colleague decides what is sent." },
+      { q: "How is it different from the Escalation Desk?", a: "The Escalation Desk decides when and to whom a conversation is handed over. Human Support is the AI agent assist that helps the person who receives it." },
       { q: "Does it work in Urdu?", a: "Yes. It summarises and drafts in English, Urdu or Roman Urdu, matching the language the customer wrote in." },
     ],
   },
