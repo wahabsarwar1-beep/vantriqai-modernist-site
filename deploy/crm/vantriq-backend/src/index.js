@@ -7,6 +7,7 @@ installProcessGuards();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const db = require('./db');
 
 const { requireScope } = require('./middleware/auth');
 const { requireRep } = require('./middleware/repAuth');
@@ -169,6 +170,25 @@ const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 // The survey app, its QR codes and posters: /s/<survey address>. Ahead of the
 // static files and the catch-all below, on every host.
 app.use('/s', surveyPagesRoutes);
+
+// The VantriqAI app in the Play Store opens the portal full screen, which
+// Android only allows once this address vouches for the app: its package
+// name and the fingerprints of the keys Google Play signs it with, set in
+// CRM → Settings → The VantriqAI app. Until they are set it is an empty list,
+// and the app still works — just with a browser bar at the top.
+app.get('/.well-known/assetlinks.json', async (req, res) => {
+  const { rows } = await db.query(`select android_package, android_sha256 from settings where id = 1`);
+  const row = rows[0] || {};
+  const prints = String(row.android_sha256 || '').split(/\s+/).filter(Boolean);
+  res.set('Cache-Control', 'public, max-age=300').json(prints.length && row.android_package ? [{
+    relation: ['delegate_permission/common.handle_all_urls'],
+    target: { namespace: 'android_app', package_name: row.android_package, sha256_cert_fingerprints: prints },
+  }] : []);
+});
+
+// What the app and the survey pages do with personal data — the address the
+// Play Store listing and the app itself point to.
+app.get('/privacy', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'privacy.html')));
 
 app.get(['/', '/index.html'], (req, res, next) => {
   if (!isPortalHost(req)) return next();

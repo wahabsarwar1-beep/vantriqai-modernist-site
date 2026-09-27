@@ -186,7 +186,14 @@ router.get('/analytics', async (req, res, next) => {
 // to type into a contact question for this customer — never the session id of
 // a conversation an invite followed, which is built from a phone number.
 
+function surveysOn(req) {
+  if (!req.apiClient.surveys_enabled) {
+    throw new S.SurveyError(403, 'Customer-satisfaction surveys are not switched on for this account.');
+  }
+}
+
 async function ownSurvey(req) {
+  surveysOn(req);
   const s = await S.getSurvey(req.params.id);
   if (!s || s.client_id !== req.apiClient.id) throw new S.SurveyError(404, 'Survey not found');
   return s;
@@ -194,6 +201,7 @@ async function ownSurvey(req) {
 
 /** GET /api/external/surveys — this account's surveys, each with its last 30 days of results. */
 router.get('/surveys', async (req, res) => {
+  surveysOn(req);
   const base = S.publicBase(req);
   res.json(await S.listSurveys({ clientId: req.apiClient.id, base }));
 });

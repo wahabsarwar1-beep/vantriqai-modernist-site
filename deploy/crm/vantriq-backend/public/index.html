@@ -710,7 +710,8 @@ function clientFromApi(c){ return { id:c.id, name:c.name, company:c.company, ema
   customOverageRate:c.custom_overage_rate, customMsgsPerSession:c.custom_msgs_per_session,
   customAutomation:c.custom_automation||'', customDataLayer:c.custom_data_layer||'',
   customAiModel:c.custom_ai_model||'', customChannels:c.custom_channels||'',
-  apiAccessEnabled:!!c.api_access_enabled }; }
+  apiAccessEnabled:!!c.api_access_enabled,
+  surveysEnabled:!!c.surveys_enabled, surveysEnabledAt:c.surveys_enabled_at||null, surveysEnabledBy:c.surveys_enabled_by||'' }; }
 function clientToApi(c){
   const out = { name:c.name, company:c.company, email:c.email, phone:c.phone, external_ref:c.externalRef||null,
     product_id:c.productId||null, stage:c.stage, est_value:c.estValue, source:c.source, notes:c.notes,
@@ -877,6 +878,7 @@ async function loadState(){
       defaultAitRate:settings.default_ait_rate!=null?+settings.default_ait_rate:0,
       usdPkrRate:settings.usd_pkr_rate!=null?+settings.usd_pkr_rate:0,
       internalInvoiceEmail:settings.internal_invoice_email||'',
+      androidPackage:settings.android_package||'com.vantriqai.app', androidSha256:settings.android_sha256||'',
       openingCash:settings.opening_cash!=null?+settings.opening_cash:0,
       openingCashDate:settings.opening_cash_date||'',
       internalCostLabel:settings.internal_cost_label||'Internal AI usage (own agents)',
@@ -1430,7 +1432,8 @@ function renderAnalytics(){
   const opts = { onGrain:'setAnalyticsGrain' };
   if(analyticsTab==='sales') return tabs + VQA.salesHTML(cur.data, opts);
   if(analyticsTab==='platform') return tabs + VQA.conversationsHTML(cur.data, { ...opts, audience:'platform', fileTag:'all-conversations' });
-  return tabs + picker + VQA.conversationsHTML(cur.data, { ...opts, audience:'crm', fileTag:'customer' });
+  const shown = state.clients.find(c=>c.id===analyticsClientId);
+  return tabs + picker + VQA.conversationsHTML(cur.data, { ...opts, audience:'crm', fileTag:'customer', surveysEnabled: shown ? !!shown.surveysEnabled : undefined });
 }
 
 function drawAnalytics(){
@@ -4722,6 +4725,7 @@ async function saveRate(){
 /* ============================== SETTINGS ============================== */
 function renderSettings(){
   return `
+  ${appSettingsCard()}
   <div class="card" style="max-width:520px;">
     <h3 style="margin-top:0;font-size:14.5px;">Company</h3>
     <div class="field"><label>Company name</label><input id="setCompanyName" value="${esc(state.company.name)}"></div>
@@ -4936,6 +4940,7 @@ function applySettings(updated){
     defaultAitRate:updated.default_ait_rate!=null?+updated.default_ait_rate:0,
     usdPkrRate:updated.usd_pkr_rate!=null?+updated.usd_pkr_rate:0,
     internalInvoiceEmail:updated.internal_invoice_email||'',
+    androidPackage:updated.android_package||'com.vantriqai.app', androidSha256:updated.android_sha256||'',
     openingCash:updated.opening_cash!=null?+updated.opening_cash:0,
     openingCashDate:updated.opening_cash_date||'',
     internalCostLabel:updated.internal_cost_label||'Internal AI usage (own agents)',
@@ -4987,6 +4992,38 @@ async function saveAccountingSettings(){
 }
 
 /** Says whether email is working, without sending anything. */
+// The VantriqAI app (v9.15): the customer portal, installable on phones and
+// packaged for the Play Store. Android only opens it full screen once
+// portal.vantriqai.com vouches for it (/.well-known/assetlinks.json), built
+// from these two values. See deploy/crm/ANDROID-APP.md.
+function appSettingsCard(){
+  const c = state.company || {};
+  const set = !!String(c.androidSha256||'').trim();
+  return `<div class="card" style="max-width:520px;margin-bottom:16px;">
+    <h3 style="margin-top:0;font-size:14.5px;">The VantriqAI app</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:0;">
+      Customers install the portal as an app from <strong>portal.vantriqai.com</strong> (the Overview tab offers it).
+      For the <strong>Play Store</strong> version, paste the app's signing fingerprints from Play Console
+      (Test and release → App integrity → App signing key certificate, SHA-256) so it opens full screen.
+      ${set ? '<span class="pill pill-active"><span class="pill-dot"></span>Play Store app verified</span>' : ''}
+    </p>
+    <div class="field"><label>Package name</label><input id="setAndroidPackage" value="${esc(c.androidPackage||'com.vantriqai.app')}"></div>
+    <div class="field"><label>SHA-256 fingerprints (one per line)</label>
+      <textarea id="setAndroidSha" rows="3" style="font-family:var(--f-mono);font-size:11.5px;" placeholder="AB:CD:EF:…">${esc(c.androidSha256||'')}</textarea></div>
+    <button class="btn btn-primary" onclick="saveAppSettings()">Save app settings</button>
+    <a class="btn btn-ghost" href="/.well-known/assetlinks.json" target="_blank" rel="noopener">View what Android sees</a>
+  </div>`;
+}
+async function saveAppSettings(){
+  try{
+    const updated = await API.put('/api/settings', {
+      android_package: document.getElementById('setAndroidPackage').value.trim(),
+      android_sha256: document.getElementById('setAndroidSha').value,
+    });
+    applySettings(updated); render(); showToast('App settings saved');
+  }catch(e){ showToast(e.message||'Could not save','warn'); }
+}
+
 async function refreshEmailCard(){
   const host = document.getElementById('email-state');
   if(!host) return;
@@ -5527,6 +5564,42 @@ async function revokePortalCredentials(clientId){
     if(client){ client.portalEnabled = false; client.portalUsername = ''; }
     render(); showToast('Portal access revoked');
   }catch(e){ showToast(e.message||'Could not revoke access','warn'); }
+}
+
+// Customer-satisfaction surveys are an add-on: off for every client until an
+// admin switches them on here (PATCH /api/clients/:id/surveys). Staff see
+// the state; only an admin can change it.
+function clientSurveysCard(c){
+  const on = !!c.surveysEnabled;
+  const since = on && c.surveysEnabledAt ? ` since ${fmtDate(c.surveysEnabledAt)}${c.surveysEnabledBy?` (${esc(c.surveysEnabledBy)})`:''}` : '';
+  const text = on
+    ? `<div style="margin-bottom:6px;"><span class="pill pill-active"><span class="pill-dot"></span>On${since}</span></div>
+       <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">
+         They have a <strong>Surveys</strong> tab in their portal, you can build surveys for them in
+         <a href="#" style="color:var(--teal);font-weight:600;" onclick="event.preventDefault();openPanel=null;navigate('surveys')">Surveys</a>, and their agents can send after-chat surveys.</div>`
+    : `<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">Off. Surveys are an add-on: switch them on when this customer has signed up for them.
+         Until then their portal has no Surveys tab and no survey can be made or sent for them.</div>`;
+  if(!isAdmin()) return text + (on ? '' : `<div style="font-size:11.5px;color:var(--muted);">Only an admin can switch surveys on.</div>`);
+  return text + `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+      <input type="checkbox" ${on?'checked':''} onchange="setClientSurveys('${c.id}',this.checked)">
+      Surveys switched on for this customer
+    </label>`;
+}
+
+async function setClientSurveys(clientId, enabled){
+  const client = state.clients.find(c=>c.id===clientId);
+  if(!enabled && !confirm(`Switch surveys off for ${client?client.company:'this customer'}?\n\nEvery survey they have is paused for their customers straight away, the Surveys tab leaves their portal and no after-chat survey is sent. Their surveys and answers are kept, and come back when you switch it on again.`)){
+    render(); return;
+  }
+  try{
+    const r = await API.patch(`/api/clients/${clientId}/surveys`, { enabled });
+    if(client){ client.surveysEnabled = !!r.surveys_enabled; client.surveysEnabledAt = r.surveys_enabled_at; client.surveysEnabledBy = r.surveys_enabled_by||''; }
+    if(window.VQS) VQS.reset();
+    render();
+    showToast(enabled
+      ? 'Surveys switched on — they now have a Surveys tab in their portal'
+      : `Surveys switched off${r.live_surveys?` — ${r.live_surveys} live survey${r.live_surveys===1?' is':'s are'} paused for respondents`:''}`);
+  }catch(e){ showToast(e.message||'Could not change that','warn'); render(); }
 }
 
 async function setClientApiAccess(clientId, enabled){
@@ -6184,6 +6257,10 @@ function clientPanelHTML(id){
       ${c.portalEnabled?`<button class="btn btn-danger-ghost btn-sm" onclick="revokePortalCredentials('${c.id}')">Revoke access</button>`:''}
       <div style="margin-top:8px;font-size:11.5px;">The customer can also reset it themselves from the portal's "Forgot password" link — whatever they choose becomes their password here too.</div>
     </div>
+
+    <div class="divider"></div>
+    <h4 style="font-size:13px;margin-bottom:8px;">Customer-satisfaction surveys</h4>
+    ${clientSurveysCard(c)}
 
     ${authUser&&authUser.role==='admin'?`
     <div class="divider"></div>
@@ -7095,8 +7172,12 @@ function mountSurveys(){
   VQS.mount(el, {
     audience: 'crm',
     clients: () => state.clients
-      .map(c => ({ id: c.id, company: c.company, email: c.email }))
+      .map(c => ({ id: c.id, company: c.company, email: c.email, surveys_enabled: !!c.surveysEnabled }))
       .sort((a, b) => String(a.company).localeCompare(String(b.company))),
+    // What to tell someone who wants a survey for a client that does not have them.
+    enableHint: () => isAdmin()
+      ? 'Switch surveys on for a client from their page: Clients → the client → Customer-satisfaction surveys.'
+      : 'Surveys are an add-on an admin switches on per client. Ask an admin to switch them on for this client.',
     api: (method, path, body) => API.req(method, '/api/surveys' + path, body),
     download: async (path, filename) => {
       showToast('Building the spreadsheet…');

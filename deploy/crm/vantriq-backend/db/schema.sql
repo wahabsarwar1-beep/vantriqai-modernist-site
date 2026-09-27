@@ -1739,3 +1739,40 @@ alter table settings add column if not exists own_survey_at timestamptz;
 -- v9.14.1 — the same, for the after-chat survey the WhatsApp agent's flow in
 -- n8n sends ("After a WhatsApp chat", /s/vantriqai-chat). Made once.
 alter table settings add column if not exists own_chat_survey_at timestamptz;
+
+-- =====================================================================
+-- v9.15 — Surveys are an add-on, switched on per client by an admin
+--
+-- Customer-satisfaction surveys are a service VantriqAI sells, not something
+-- every account has. Off by default, like API access: an admin turns them on
+-- for one client at a time (PATCH /api/clients/:id/surveys, admin only). Until
+-- then the client's portal has no Surveys tab, nobody can make a survey for
+-- them, and their agents' after-chat invites are refused. Turning it back off
+-- pauses every survey they have at once — answers already given are kept.
+--
+-- The column is added with the one account switched on that already relies
+-- on it: VantriqAI's own, whose WhatsApp agent sends the after-chat survey.
+-- That happens once, when the column is created; after that the switch is
+-- only ever moved by an admin.
+-- =====================================================================
+alter table clients add column if not exists surveys_enabled_at timestamptz;
+alter table clients add column if not exists surveys_enabled_by text not null default '';
+do $$
+begin
+  if not exists (select 1 from information_schema.columns
+                  where table_name = 'clients' and column_name = 'surveys_enabled') then
+    alter table clients add column surveys_enabled boolean not null default false;
+    update clients set surveys_enabled = true, surveys_enabled_at = now(), surveys_enabled_by = 'VantriqAI (own account)'
+     where is_internal;
+  end if;
+end $$;
+
+-- v9.15 — The VantriqAI app in the Play Store. The Android app opens the
+-- customer portal full screen (a Trusted Web Activity), which Android only
+-- allows once portal.vantriqai.com vouches for the app at
+-- /.well-known/assetlinks.json. That file is built from these two settings:
+-- the app's package name, and the SHA-256 fingerprint(s) of the key(s) Google
+-- Play signs it with (Play Console → Test and release → App integrity). Set
+-- them in CRM → Settings → The VantriqAI app. See deploy/crm/ANDROID-APP.md.
+alter table settings add column if not exists android_package text not null default 'com.vantriqai.app';
+alter table settings add column if not exists android_sha256 text not null default '';

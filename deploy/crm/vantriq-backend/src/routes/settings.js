@@ -22,7 +22,16 @@ const FIELDS = [
   // v9.2: the rate our own dollar-denominated invoices convert into the books
   // at, and where those invoices are sent.
   'usd_pkr_rate', 'internal_invoice_email',
+  // v9.15: the Play Store app — its package name and signing-key fingerprints,
+  // which /.well-known/assetlinks.json publishes (see index.js).
+  'android_package', 'android_sha256',
 ];
+
+// A SHA-256 certificate fingerprint as Play Console shows it: 32 bytes in hex, colon-separated.
+const FINGERPRINT = /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/;
+function fingerprints(v) {
+  return String(v || '').toUpperCase().split(/[\s,;]+/).map((f) => f.trim()).filter(Boolean);
+}
 
 const OVERAGE_POLICIES = ['serve', 'grace', 'block'];
 
@@ -61,6 +70,16 @@ router.put('/', async (req, res) => {
     if (to && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
       return res.status(400).json({ error: 'That does not look like an email address.' });
     }
+  }
+  if (cols.includes('android_package') && !/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(String(body.android_package))) {
+    return res.status(400).json({ error: 'The app\'s package name looks like com.vantriqai.app — lower-case words joined by dots.' });
+  }
+  if (cols.includes('android_sha256')) {
+    const bad = fingerprints(body.android_sha256).filter((f) => !FINGERPRINT.test(f));
+    if (bad.length) {
+      return res.status(400).json({ error: `Not a SHA-256 fingerprint: ${bad[0].slice(0, 40)}. Copy it from Play Console → App integrity (32 pairs like AB:CD:…).` });
+    }
+    body.android_sha256 = fingerprints(body.android_sha256).join('\n');
   }
   if (cols.includes('invoice_prefix') && !/^[A-Za-z0-9-]{1,10}$/.test(String(body.invoice_prefix))) {
     return res.status(400).json({ error: 'Invoice prefix must be 1–10 letters, digits or hyphens.' });

@@ -3,7 +3,10 @@
 A survey app for any customer who wants to know how their own customers feel
 — a restaurant, an FMCG brand, a telco, a clinic, a shop. Built into the CRM,
 the customer portal and the public site, so every answer lands in three places
-at once:
+at once.
+
+**It is an add-on, off for every client until an admin switches it on**
+(v9.15) — see [Switching surveys on for a client](#switching-surveys-on-for-a-client-admin).
 
 | Where | Who sees it | What they see |
 |---|---|---|
@@ -44,10 +47,39 @@ addresses over the public internet and prints what a visitor gets.
 
 ---
 
+## Switching surveys on for a client (admin)
+
+Surveys are a service a client signs up for, not something every account has.
+For a client who has:
+
+1. CRM → **Clients** → open the client.
+2. **Customer-satisfaction surveys** → tick **Surveys switched on for this
+   customer**. Only an admin sees the tick box; staff see whether it is on.
+
+From that moment:
+
+| | Off (the default) | On |
+|---|---|---|
+| Their portal | no **Surveys** tab | a **Surveys** tab: build, share, results, follow-ups |
+| CRM → Surveys → New survey | the client is not in the list | the client can be chosen |
+| Their survey pages `/s/<address>` | show "This survey is paused", take no answers | live |
+| After-chat surveys from their agent (n8n) | refused (`403 surveys_disabled`), nothing is sent | sent once per conversation |
+| Their own API `GET /api/external/surveys…` | refused (`403`) | answers |
+
+Switching it **off** again pauses every survey they have straight away — the
+surveys and every answer already given are kept, and it all comes back as it
+was when it is switched on again. The client's page shows when it was
+switched on and by whom. VantriqAI's own account was switched on with v9.15,
+because its WhatsApp agent already sends the after-chat survey.
+
+Behind the tick box: `PATCH /api/clients/:id/surveys  { "enabled": true | false }`,
+admin only (an admin's session or the admin key; staff and automation keys get 403).
+
 ## Making a survey
 
-CRM → **Surveys** → **New survey** (choose the client), or the customer does
-it themselves in their portal. Pick the template closest to the business:
+CRM → **Surveys** → **New survey** (choose the client — only clients with
+surveys switched on are listed), or the customer does it themselves in their
+portal. Pick the template closest to the business:
 
 | Template | Measures |
 |---|---|
@@ -225,6 +257,7 @@ since the last deploy.
 ```bash
 node test/surveys.test.js       # 133 checks through the API
 node test/after-chat.test.js    # 30 checks: the after-chat rules, one yes per conversation
-node test/own-survey.test.js    # 22 checks: our own surveys are made once, and only once
+node test/own-survey.test.js    # 24 checks: our own surveys are made once, and only once
+node test/survey-access.test.js # 28 checks: off by default, only an admin switches it, what off and on mean
 node test/surveys-ui.test.js    # 42 checks in a real browser
 ```

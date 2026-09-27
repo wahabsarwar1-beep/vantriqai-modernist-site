@@ -345,7 +345,8 @@ async function uniqueSlug(name) {
 async function getSurvey(id) {
   if (!/^[0-9a-f-]{36}$/i.test(String(id || ''))) return null;
   const { rows } = await db.query(
-    `select s.*, c.company, c.email as client_email from surveys s join clients c on c.id = s.client_id where s.id = $1`, [id]);
+    `select s.*, c.company, c.email as client_email, c.surveys_enabled as client_surveys_enabled
+       from surveys s join clients c on c.id = s.client_id where s.id = $1`, [id]);
   return rows[0] || null;
 }
 
@@ -353,13 +354,37 @@ async function getSurveyBySlug(slug) {
   const s = String(slug || '').toLowerCase();
   if (!SLUG_RE.test(s)) return null;
   const { rows } = await db.query(
-    `select s.*, c.company, c.email as client_email from surveys s join clients c on c.id = s.client_id where s.slug = $1`, [s]);
+    `select s.*, c.company, c.email as client_email, c.surveys_enabled as client_surveys_enabled
+       from surveys s join clients c on c.id = s.client_id where s.slug = $1`, [s]);
+  return rows[0] || null;
+}
+
+/**
+ * Surveys on or off for one client — the admin's switch (PATCH
+ * /api/clients/:id/surveys). Off pauses every survey the client has for
+ * respondents and refuses their portal, API and after-chat invites; the
+ * surveys and every answer already given are kept, so switching back on
+ * picks up where it left off. Returns the client's new state, or null.
+ */
+async function setSurveysEnabled(clientId, enabled, by = '') {
+  if (!/^[0-9a-f-]{36}$/i.test(String(clientId || ''))) return null;
+  const { rows } = await db.query(
+    `update clients
+        set surveys_enabled = $2,
+            surveys_enabled_at = case when $2 and not surveys_enabled then now() else surveys_enabled_at end,
+            surveys_enabled_by = case when $2 and not surveys_enabled then $3 else surveys_enabled_by end
+      where id = $1
+      returning id, company, surveys_enabled, surveys_enabled_at, surveys_enabled_by,
+                (select count(*)::int from surveys where client_id = $1) as surveys,
+                (select count(*)::int from surveys where client_id = $1 and status = 'live') as live_surveys`,
+    [clientId, !!enabled, cleanStr(by, 200)]
+  );
   return rows[0] || null;
 }
 
 async function getClient(id) {
   if (!/^[0-9a-f-]{36}$/i.test(String(id || ''))) return null;
-  const { rows } = await db.query(`select id, company, name, email from clients where id = $1`, [id]);
+  const { rows } = await db.query(`select id, company, name, email, surveys_enabled from clients where id = $1`, [id]);
   return rows[0] || null;
 }
 
@@ -481,6 +506,9 @@ const OWN_SURVEYS = [
 ];
 
 async function ensureOwnSurvey(client, spec = OWN_SURVEYS[0]) {
+  // Surveys are an add-on even for our own account: none are made, and the
+  // one-time claim is not spent, until it has them switched on.
+  if (client.surveys_enabled === false) return { created: false, reason: 'surveys are not switched on for this account' };
   // spec.flag is one of the fixed column names above, never input.
   const { rows: claim } = await db.query(
     `update settings set ${spec.flag} = now() where id = 1 and ${spec.flag} is null
@@ -540,7 +568,8 @@ function estimateMinutes(questions) {
 function publicSurvey(s) {
   return {
     slug: s.slug,
-    status: s.status,
+    // Surveys switched off for the client pause every survey they have.
+    status: s.client_surveys_enabled === false && s.status === 'live' ? 'paused' : s.status,
     closed: !!isClosed(s),
     industry: s.industry,
     display_name: s.display_name || s.company || '',
@@ -1034,7 +1063,9 @@ function readableAnswers(survey, answers, lang = 'en') {
  */
 async function recordResponse(survey, body = {}, { invite = null } = {}) {
   if (survey.status === 'draft') throw new SurveyError(409, 'This survey is not open yet.');
-  if (survey.status === 'paused') throw new SurveyError(409, 'This survey is paused just now. Please try again later.');
+  if (survey.status === 'paused' || survey.client_surveys_enabled === false) {
+    throw new SurveyError(409, 'This survey is paused just now. Please try again later.');
+  }
   if (isClosed(survey)) throw new SurveyError(410, 'This survey has closed. Thank you for your interest.');
 
   const { answers, errors } = normalizeAnswers(survey.questions || [], body.answers);
@@ -1182,8 +1213,9 @@ async function markInviteOpened(invite) {
 /** The survey a client's automation should send after a conversation. */
 async function defaultSurveyFor(clientId) {
   const { rows } = await db.query(
-    `select s.*, c.company, c.email as client_email from surveys s join clients c on c.id = s.client_id
-      where s.client_id = $1 and s.status = 'live' and (s.closes_at is null or s.closes_at > now())
+    `select s.*, c.company, c.email as client_email, c.surveys_enabled as client_surveys_enabled
+       from surveys s join clients c on c.id = s.client_id
+      where s.client_id = $1 and c.surveys_enabled and s.status = 'live' and (s.closes_at is null or s.closes_at > now())
       order by (s.industry = 'support_chat') desc, s.updated_at desc limit 1`,
     [clientId]
   );
@@ -1212,7 +1244,7 @@ async function countView(survey, ip) {
 
 const SUMMARY_SQL = `
   select s.id, s.client_id, s.slug, s.title, s.industry, s.status, s.languages, s.display_name, s.brand_color,
-         s.locations, s.closes_at, s.created_at, s.updated_at, c.company,
+         s.locations, s.closes_at, s.created_at, s.updated_at, c.company, c.surveys_enabled as client_surveys_enabled,
          jsonb_array_length(s.questions)::int as question_count,
          coalesce(st.responses, 0)::int as responses,
          coalesce(st.responses_30d, 0)::int as responses_30d,
@@ -1239,7 +1271,8 @@ const SUMMARY_SQL = `
 function summaryOf(r, base) {
   return {
     id: r.id, client_id: r.client_id, company: r.company, slug: r.slug, title: r.title, industry: r.industry,
-    status: r.status, closed: !!isClosed(r), languages: r.languages, display_name: r.display_name,
+    status: r.status, closed: !!isClosed(r), client_surveys_enabled: r.client_surveys_enabled !== false,
+    languages: r.languages, display_name: r.display_name,
     brand_color: r.brand_color, location_count: (r.locations || []).length, question_count: r.question_count,
     created_at: r.created_at, updated_at: r.updated_at,
     responses: r.responses, responses_30d: r.responses_30d, last_response_at: r.last_response_at,
@@ -1760,7 +1793,7 @@ module.exports = {
   SurveyError, LANGUAGES, TYPES, CHANNELS, CHANNEL_NAMES, SLUG_RE,
   templateSummaries,
   normalizeSurvey, normalizeAnswers, conditionMet, metricsOf, needsFollowUp, isPromoter, themesOf, answerText,
-  getSurvey, getSurveyBySlug, getClient, createSurvey, updateSurvey, duplicateSurvey, deleteSurvey,
+  getSurvey, getSurveyBySlug, getClient, setSurveysEnabled, createSurvey, updateSurvey, duplicateSurvey, deleteSurvey,
   OWN_SURVEY_SLUG, OWN_CHAT_SURVEY_SLUG, ensureOwnSurvey, ensureOwnSurveys,
   isClosed, publicSurvey, publicBase, linksFor, withLinks, inviteMessage, qrSvg, escapeHtml, estimateMinutes,
   customerKey, chatRules, chatVerdict, chatInvite, nextLocalHour, inSendingHours,

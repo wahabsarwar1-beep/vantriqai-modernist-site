@@ -48,6 +48,7 @@ const pktHour = () => Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/
     ntn: '1234567-8', billing_address: 'Lahore',
   })).body;
   ok(client && client.id, 'a throwaway client');
+  await call('PATCH', `/api/clients/${client.id}/surveys`, { enabled: true });
   try {
     const survey = (await post('/api/surveys', { client_id: client.id, template: 'support_chat', title: 'After a WhatsApp chat' })).body;
     ok(survey && survey.status === 'live', 'with a live after-chat survey');

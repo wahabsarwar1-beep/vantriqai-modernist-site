@@ -49,6 +49,9 @@ const ip = () => `10.77.${Math.floor(++ipN / 250)}.${ipN % 250}`; // a fresh "de
   const A = await mkClient('a');
   const Bc = await mkClient('b');
   ok(A && A.id && Bc && Bc.id, 'two throwaway clients');
+  // Surveys are an add-on an admin switches on per client (v9.15); what
+  // happens without it is test/survey-access.test.js.
+  for (const c of [A, Bc]) await patch(`/api/clients/${c.id}/surveys`, { enabled: true });
 
   console.log('\n== the template gallery ==');
   const tpls = (await get('/api/surveys/templates')).body;

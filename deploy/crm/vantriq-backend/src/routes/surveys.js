@@ -21,6 +21,29 @@ const router = express.Router();
 
 const isPortal = (req) => !!req.portalClient;
 
+// Surveys are an add-on an admin switches on per client (PATCH
+// /api/clients/:id/surveys). A customer without it is refused on every
+// survey route, and the portal does not show the tab at all.
+router.use((req, res, next) => {
+  if (isPortal(req) && !req.portalClient.surveys_enabled) {
+    return res.status(403).json({
+      error: 'Customer-satisfaction surveys are not switched on for your account. Ask Vantriq AI to turn them on.',
+      code: 'surveys_disabled',
+    });
+  }
+  next();
+});
+
+// Staff can read a switched-off client's surveys and answers, but not start
+// anything new for them: no new survey, copy or personal links.
+function mustBeOn(client) {
+  if (client && client.surveys_enabled === false) {
+    throw new S.SurveyError(403, `Customer-satisfaction surveys are not switched on for ${client.company}. `
+      + 'An admin turns them on from the client\'s page in the CRM (Clients → the client → Customer-satisfaction surveys).');
+  }
+}
+const clientOf = (survey) => ({ company: survey.company, surveys_enabled: survey.client_surveys_enabled });
+
 // Who a change is recorded against, in words a person reading the record understands.
 function actor(req) {
   if (isPortal(req)) return `${req.portalClient.company} (portal)`;
@@ -64,6 +87,7 @@ router.post('/', async (req, res) => {
   if (!clientId) throw new S.SurveyError(400, 'Choose which client this survey is for.');
   const client = await S.getClient(clientId);
   if (!client) throw new S.SurveyError(404, 'Client not found');
+  mustBeOn(client);
   const survey = await S.createSurvey({ client, template: body.template, input: body, createdBy: actor(req) });
   res.status(201).json(S.withLinks(survey, S.publicBase(req)));
 });
@@ -81,7 +105,9 @@ router.patch('/:id', async (req, res) => {
 
 /** A draft copy of a survey, with a new address. */
 router.post('/:id/duplicate', async (req, res) => {
-  const copy = await S.duplicateSurvey(await load(req), actor(req));
+  const survey = await load(req);
+  mustBeOn(clientOf(survey));
+  const copy = await S.duplicateSurvey(survey, actor(req));
   res.status(201).json(S.withLinks(copy, S.publicBase(req)));
 });
 
@@ -126,6 +152,7 @@ router.patch('/:id/responses/:responseId', async (req, res) => {
 /** Personal one-time links (count 1–500): each is answered once and counts towards the response rate. */
 router.post('/:id/invites', async (req, res) => {
   const survey = await load(req);
+  mustBeOn(clientOf(survey));
   const body = req.body || {};
   const count = Number(body.count || 1);
   if (!Number.isInteger(count) || count < 1 || count > 500) throw new S.SurveyError(400, 'Ask for between 1 and 500 links.');

@@ -402,7 +402,10 @@
   /* Home: every survey, the 30-day picture, the follow-up queue         */
   /* ------------------------------------------------------------------ */
   function viewHome(){
-    var clients = !isPortal() && host.clients ? host.clients() : [];
+    var listed = st.list && st.list.surveys ? st.list.surveys : [];
+    var clients = (!isPortal() && host.clients ? host.clients() : []).filter(function(c){
+      return c.surveys_enabled !== false || listed.some(function(s){ return s.client_id === c.id; });
+    });
     var head = '<div class="vqs-top"><div><h2>Customer satisfaction surveys</h2>'
       + '<p>Ask customers how you did — by QR code on the table, a link on WhatsApp, a tablet at the counter or your website — and see every answer here the moment it arrives. Unhappy answers raise a follow-up so nobody slips through.</p></div>'
       + '<div class="vqs-row">'
@@ -429,6 +432,7 @@
   function surveyCard(s){
     return '<div class="vqs-card vqs-scard" data-a="open" data-id="' + esc(s.id) + '" role="button" tabindex="0">'
       + '<div class="vqs-spread">' + status(s) + '<span class="vqs-row"><span class="vqs-swatch" style="background:' + esc(s.brand_color) + '"></span>'
+      + (s.client_surveys_enabled === false && !isPortal() ? '<span class="vqs-tag" title="Surveys are switched off for this client, so it is paused for respondents">Surveys off</span>' : '')
       + (s.open_followups ? '<span class="vqs-tag" style="background:#fbe8e4;color:#8f3527;">' + s.open_followups + ' to follow up</span>' : '') + '</span></div>'
       + '<div><div class="t">' + esc(s.title) + '</div>'
       + '<div class="co">' + (isPortal() ? esc(s.display_name) : esc(s.company)) + ' · ' + s.question_count + ' questions' + (s.location_count ? ' · ' + s.location_count + ' locations' : '') + '</div></div>'
@@ -482,8 +486,12 @@
     if (!t) { loadTemplates().then(render).catch(function(e){ toast(e.message, true); }); return back() + loading('Loading templates…'); }
     var f = st.newForm;
     var tpl = st.newTpl ? t.find(function(x){ return x.key === st.newTpl; }) : null;
-    var clients = !isPortal() && host.clients ? host.clients() : [];
+    var all = !isPortal() && host.clients ? host.clients() : [];
+    var clients = all.filter(function(c){ return c.surveys_enabled !== false; });
+    var hint = host.enableHint ? host.enableHint() : '';
+    var noneOn = !isPortal() && all.length && !clients.length;
     return back()
+      + (noneOn ? '<div class="vqs-banner warn"><b>No client has surveys switched on yet.</b> ' + esc(hint) + '</div>' : '')
       + '<div class="vqs-top"><div><h2>New survey</h2><p>Choose the template closest to your business. Every question can be reworded, reordered or removed afterwards.</p></div></div>'
       + '<div class="vqs-grid vqs-g3">' + t.map(function(x){
         return '<div class="vqs-card vqs-tpl' + (x.key === st.newTpl ? ' on' : '') + '" data-a="pick-tpl" data-tpl="' + esc(x.key) + '" role="button" tabindex="0">'
@@ -495,8 +503,9 @@
         + '<h3>' + esc(tpl.icon + ' ' + tpl.name) + '</h3>'
         + '<div class="sub">The questions: ' + tpl.preview.map(esc).join(' · ') + '</div>'
         + (tpl.setup_hint ? '<div class="vqs-banner warn">' + esc(tpl.setup_hint) + '</div>' : '')
-        + (clients.length ? '<label class="vqs-f"><span>Client</span><select data-nf="client_id"><option value="">Choose a client…</option>'
-          + clients.map(function(c){ return '<option value="' + esc(c.id) + '"' + (f.client_id === c.id ? ' selected' : '') + '>' + esc(c.company) + '</option>'; }).join('') + '</select></label>' : '')
+        + (clients.length ? '<label class="vqs-f"><span>Client <em>— clients with surveys switched on</em></span><select data-nf="client_id"><option value="">Choose a client…</option>'
+          + clients.map(function(c){ return '<option value="' + esc(c.id) + '"' + (f.client_id === c.id ? ' selected' : '') + '>' + esc(c.company) + '</option>'; }).join('') + '</select></label>'
+          + (all.length > clients.length && hint ? '<div class="sub" style="margin:-4px 0 10px;">Not listed? ' + esc(hint) + '</div>' : '') : '')
         + '<div class="vqs-two">'
         + '<label class="vqs-f"><span>Survey name <em>— only you see this</em></span><input type="text" data-nf="title" maxlength="160" value="' + esc(f.title || tpl.name + ' survey') + '"></label>'
         + '<label class="vqs-f"><span>Business name customers see</span><input type="text" data-nf="display_name" maxlength="120" placeholder="' + esc(defaultBusinessName()) + '" value="' + esc(f.display_name || '') + '"></label>'
@@ -510,8 +519,8 @@
         + '<label class="vqs-f"><span>Google review link <em>— optional; shown to delighted customers</em></span><input type="url" data-nf="review_url" placeholder="https://g.page/r/…/review" value="' + esc(f.review_url || '') + '"></label>'
         + '<label class="vqs-f"><span>Email unhappy answers to <em>— optional</em></span><input type="text" data-nf="alert_emails" placeholder="' + esc(defaultAlertEmail() || 'manager@yourbusiness.com') + '" value="' + esc(f.alert_emails != null ? f.alert_emails : '') + '"></label>'
         + '</div>'
-        + '<div class="vqs-row" style="margin-top:6px;"><button class="vqs-btn primary" data-a="create" data-status="live"' + (st.creating ? ' disabled' : '') + '>' + (st.creating ? 'Creating…' : 'Create and go live') + '</button>'
-        + '<button class="vqs-btn" data-a="create" data-status="draft"' + (st.creating ? ' disabled' : '') + '>Save as a draft</button></div>'
+        + '<div class="vqs-row" style="margin-top:6px;"><button class="vqs-btn primary" data-a="create" data-status="live"' + (st.creating || noneOn ? ' disabled' : '') + '>' + (st.creating ? 'Creating…' : 'Create and go live') + '</button>'
+        + '<button class="vqs-btn" data-a="create" data-status="draft"' + (st.creating || noneOn ? ' disabled' : '') + '>Save as a draft</button></div>'
         + '</div>' : '');
   }
   function defaultBusinessName(){
@@ -575,6 +584,9 @@
       + '<button class="vqs-btn" data-a="copy" data-text="' + esc(s.links.url) + '">Copy link</button>'
       + '<a class="vqs-btn" href="' + esc(s.status === 'live' ? s.links.url : s.links.preview) + '" target="_blank" rel="noopener">Open survey ↗</a>'
       + '</div></div>'
+      + (s.client_surveys_enabled === false && !isPortal()
+        ? '<div class="vqs-banner warn"><b>Surveys are switched off for ' + esc(s.company) + ',</b> so this survey is paused for respondents and no new links can be made. '
+          + 'Its answers are kept. ' + esc(host.enableHint ? host.enableHint() : '') + '</div>' : '')
       + '<div class="vqs-tabs" role="tablist">' + tabs.map(function(t){
         return '<button role="tab" aria-selected="' + (st.tab === t[0]) + '" class="' + (st.tab === t[0] ? 'on' : '') + '" data-a="tab" data-tab="' + t[0] + '">' + t[1]
           + (t[0] === 'responses' && fu ? '<span class="ct" style="background:#fbe8e4;color:#8f3527;">' + fu + '</span>' : '') + '</button>';

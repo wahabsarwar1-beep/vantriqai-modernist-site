@@ -399,15 +399,22 @@
   /* ------------------------------------------------------------------ */
   /* Satisfaction block (shared by the customer and platform views)     */
   /* ------------------------------------------------------------------ */
-  function satisfactionHTML(d, { audience }){
+  function satisfactionHTML(d, { audience, surveysEnabled }){
     const s = d.satisfaction;
     if(!s || !s.responses_window){
+      // Surveys are an add-on switched on per account; an account without
+      // them is not sent to a Surveys tab it does not have.
+      const off = surveysEnabled === false;
       return `<div class="vqa-section">Customer satisfaction</div>
       <div class="vqa-card"><div class="vqa-empty">
         No survey answers yet in the ${esc(d.period.window_label.toLowerCase())}.
         ${audience === 'portal'
-          ? 'Create a survey under the <b>Surveys</b> tab — share it by QR code, link or WhatsApp, and the answers show up here the moment they arrive: the satisfaction score, NPS, how often problems were resolved, and what people wrote.'
-          : 'Create a survey for this client under <b>Surveys</b>, or post answers from anything else that asks the question to <code>POST /api/webhooks/csat</code>. Either way they appear here straight away.'}
+          ? (off
+            ? 'Customer-satisfaction surveys are not part of your account yet. Ask Vantriq AI to switch them on: you get a Surveys tab to ask your customers how you did — by QR code, link or WhatsApp — and the satisfaction score, NPS and what people wrote show up here.'
+            : 'Create a survey under the <b>Surveys</b> tab — share it by QR code, link or WhatsApp, and the answers show up here the moment they arrive: the satisfaction score, NPS, how often problems were resolved, and what people wrote.')
+          : (off
+            ? 'Surveys are switched off for this client. An admin switches them on from the client\'s page (Customer-satisfaction surveys); answers posted to <code>POST /api/webhooks/csat</code> by anything else still appear here.'
+            : 'Create a survey for this client under <b>Surveys</b>, or post answers from anything else that asks the question to <code>POST /api/webhooks/csat</code>. Either way they appear here straight away.')}
       </div></div>`;
     }
     const k = s.kpis, w = s.window;
@@ -559,7 +566,7 @@
         ${heatmap(d.heatmap, d.period.window_label)}
       </div>`}
 
-      ${satisfactionHTML(d, { audience })}
+      ${satisfactionHTML(d, { audience, surveysEnabled: opts.surveysEnabled })}
 
       <div class="vqa-card" style="margin-top:14px;">
         <details>
