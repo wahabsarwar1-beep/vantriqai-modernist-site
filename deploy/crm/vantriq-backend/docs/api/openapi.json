@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "VantriqAI CRM API",
-    "version": "9.14.1",
+    "version": "9.15.0",
     "description": "The CRM behind VantriqAI: clients, invoices, payments, quotes and proposals,\ncontracts, statements, and the webhook surface the AI agents write through.\n\n## Authentication\n\nTwo ways in, and one of them is for people:\n\n- **Staff session** — `Authorization: Bearer <token>`, issued by `POST /api/auth/verify`\n  after a password and an emailed one-time code. A staff member's role decides reach.\n- **API key** — `x-api-key: <key>`, for machines. Keys are scoped.\n\n## Scopes\n\nLeast to most: `webhook` < `automation` < `staff` < `admin`. A scope opens everything\nbelow it. The admin key opens everything and is intended as break-glass only — set\n`ALLOW_API_KEY_LOGIN=false` once staff accounts exist.\n\n## Automation writes through this API, never to the database\n\nn8n and any other integration must use these endpoints rather than connecting to\nPostgres. Tenancy, quota and tax rules live here; a direct write bypasses all three."
   },
   "servers": [
@@ -3304,6 +3304,66 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/clients/{id}/surveys": {
+      "patch": {
+        "tags": [
+          "clients"
+        ],
+        "summary": "PATCH /api/clients/:id/surveys { enabled: true|false } Customer-satisfaction surveys are an add-on, off for every client until an admin turns them on here — the same pattern as API access above. On: the client gets a Surveys tab in their portal, staff can build surveys for them, and their agents' after-chat invites are answered. Off: every survey they have is paused for respondents at once, the tab disappears and invites are refused; the surveys and their answers are kept for when it comes back on.",
+        "description": "Requires the **automation** scope or higher. Automation key or any staff session. Clients, invoices, packages, agents.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success",
@@ -11262,7 +11322,7 @@
         "tags": [
           "usage"
         ],
-        "summary": "POST /api/webhooks/survey-invite A personal survey link for the customer an agent has been talking to — n8n sends it back on the same channel, and the answer is tied to that conversation: it lands with its session id, and the survey's response rate counts it. Body: { \"external_ref\": \"923001234567\", // or client_id / agent_ref / agent_id, exactly as /usage \"session_id\": \"923009998888-2026-08-16\", // the conversation it follows \"channel\": \"whatsapp\", // how the link will be sent \"language\": \"ur\", // optional — what the customer wrote in (en | ur) \"survey_slug\": \"khans-kitchen-3f2a1\", // optional — otherwise the client's live // after-chat survey, or its newest live one // Optional: \"only if the conversation is over\". Without quiet_minutes the // link is made at once. With it, n8n can ask after every reply and hear // yes exactly once per conversation — see chatRules in utils/surveys.js. \"quiet_minutes\": 55, \"min_messages\": 2, \"within_hours\": 23, \"once_per_days\": 14, \"send_from\": 9, \"send_until\": 21, \"timezone\": \"Asia/Karachi\", \"dry_run\": false // true: say what would happen, make nothing } 201 { due: true, code: 'due', url, token, language, text, message: { en, ur }, survey: { slug, title } } — send `text` (the message in the customer's language). 200 { due: false, code, reason, retry_at? } — not now: still_talking, too_short, already_asked, asked_recently, window_closed, no_conversation, or night (ask again at retry_at). Only with quiet_minutes. 404 when the client has no live survey — create one in the CRM or the portal.",
+        "summary": "POST /api/webhooks/survey-invite A personal survey link for the customer an agent has been talking to — n8n sends it back on the same channel, and the answer is tied to that conversation: it lands with its session id, and the survey's response rate counts it. Body: { \"external_ref\": \"923001234567\", // or client_id / agent_ref / agent_id, exactly as /usage \"session_id\": \"923009998888-2026-08-16\", // the conversation it follows \"channel\": \"whatsapp\", // how the link will be sent \"language\": \"ur\", // optional — what the customer wrote in (en | ur) \"survey_slug\": \"khans-kitchen-3f2a1\", // optional — otherwise the client's live // after-chat survey, or its newest live one // Optional: \"only if the conversation is over\". Without quiet_minutes the // link is made at once. With it, n8n can ask after every reply and hear // yes exactly once per conversation — see chatRules in utils/surveys.js. \"quiet_minutes\": 55, \"min_messages\": 2, \"within_hours\": 23, \"once_per_days\": 14, \"send_from\": 9, \"send_until\": 21, \"timezone\": \"Asia/Karachi\", \"dry_run\": false // true: say what would happen, make nothing } 201 { due: true, code: 'due', url, token, language, text, message: { en, ur }, survey: { slug, title } } — send `text` (the message in the customer's language). 200 { due: false, code, reason, retry_at? } — not now: still_talking, too_short, already_asked, asked_recently, window_closed, no_conversation, or night (ask again at retry_at). Only with quiet_minutes. 403 (code surveys_disabled) when surveys are not switched on for the client. 404 when the client has no live survey — create one in the CRM or the portal.",
         "description": "Requires the **webhook** scope or higher. Webhook key. The narrowest scope — usage, lead and conversation ingestion only.",
         "parameters": [],
         "requestBody": {

@@ -25,6 +25,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     product_id: products.find((p) => p.name === 'Growth').id, stage: 'active', est_value: 0, source: 'Referral',
     external_ref: `ui-surveys-${stamp}`, ntn: '1234567-8', billing_address: 'Islamabad',
   });
+  // Surveys are an add-on an admin switches on per client (v9.15).
+  await api('PATCH', `/api/clients/${client.id}/surveys`, { enabled: true });
   const survey = await api('POST', '/api/surveys', {
     client_id: client.id, template: 'restaurant', title: 'UI dine-in', display_name: 'Café <b>Test</b>',
     locations: ['Blue Area', 'F-7'], review_url: 'https://g.page/r/ui-test/review',

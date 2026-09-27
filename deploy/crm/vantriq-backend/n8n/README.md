@@ -599,8 +599,11 @@ events the agent already posts:
 
 `201` → send `text` to the customer (it is in their language and carries a
 personal, one-time link). `200` with `due: false` → nothing to send; `code`
-says why, and `night` comes with `retry_at`. `404` → the client has no live
-survey: pausing the survey is how to switch the messages off. Every answer and
+says why, and `night` comes with `retry_at`. `403` with `code:
+surveys_disabled` → surveys are not switched on for this client (an admin does
+that in CRM → Clients); `404` → the client has no live survey. Either way
+nothing is sent: pausing the survey, or switching surveys off for the client,
+is how to stop the messages. Every answer and
 setting is described in `deploy/crm/SURVEYS.md`.
 
 For a client's own WhatsApp agent: add the same node after its send-reply

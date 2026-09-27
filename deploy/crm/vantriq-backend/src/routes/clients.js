@@ -5,6 +5,7 @@ const { hashPassword, generatePassword } = require('../utils/password');
 const { billOnActivation } = require('../utils/billing');
 const { quotaStatus } = require('../utils/quota');
 const { blockAutomation, isAdminRequest } = require('../middleware/auth');
+const { setSurveysEnabled } = require('../utils/surveys');
 const router = express.Router();
 
 const FIELDS = [
@@ -472,6 +473,24 @@ router.patch('/:id/api-access', async (req, res) => {
   );
   if (!rows[0]) return res.status(404).json({ error: 'Client not found' });
   res.json(rows[0]);
+});
+
+/**
+ * PATCH /api/clients/:id/surveys  { enabled: true|false }
+ *
+ * Customer-satisfaction surveys are an add-on, off for every client until an
+ * admin turns them on here — the same pattern as API access above. On: the
+ * client gets a Surveys tab in their portal, staff can build surveys for them,
+ * and their agents' after-chat invites are answered. Off: every survey they
+ * have is paused for respondents at once, the tab disappears and invites are
+ * refused; the surveys and their answers are kept for when it comes back on.
+ */
+router.patch('/:id/surveys', async (req, res) => {
+  if (!isAdminRequest(req)) return res.status(403).json({ error: 'Only an admin can switch surveys on or off for a client.' });
+  const by = req.user ? (req.user.name || req.user.email) : 'admin key';
+  const row = await setSurveysEnabled(req.params.id, !!(req.body || {}).enabled, by);
+  if (!row) return res.status(404).json({ error: 'Client not found' });
+  res.json(row);
 });
 
 /**

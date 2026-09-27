@@ -505,6 +505,7 @@ async function recordCsat(req, res) {
  * 200 { due: false, code, reason, retry_at? } — not now: still_talking, too_short,
  *     already_asked, asked_recently, window_closed, no_conversation, or night
  *     (ask again at retry_at). Only with quiet_minutes.
+ * 403 (code surveys_disabled) when surveys are not switched on for the client.
  * 404 when the client has no live survey — create one in the CRM or the portal.
  */
 router.post('/survey-invite', async (req, res) => {
@@ -537,6 +538,16 @@ router.post('/survey-invite', async (req, res) => {
       if (!byAgent[0]) return res.status(404).json({ error: `No client or agent found with external_ref "${external_ref}".` });
       clientId = byAgent[0].client_id;
     }
+  }
+
+  // An add-on an admin switches on per client: without it, no survey is
+  // sent, whatever the agent's flow asks for.
+  const { rows: [on] } = await db.query(`select surveys_enabled from clients where id = $1`, [clientId]);
+  if (!on || !on.surveys_enabled) {
+    return res.status(403).json({
+      error: 'Customer-satisfaction surveys are not switched on for this client. An admin turns them on in the CRM.',
+      code: 'surveys_disabled',
+    });
   }
 
   let survey;

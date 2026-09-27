@@ -62,7 +62,7 @@ router.get('/:slug', async (req, res) => {
   let state = 'ok';
   if (!survey) state = 'not_found';
   else if (survey.status === 'draft' && !preview) state = 'draft';
-  else if (survey.status === 'paused' && !preview) state = 'paused';
+  else if ((survey.status === 'paused' || survey.client_surveys_enabled === false) && !preview) state = 'paused';
   else if (S.isClosed(survey) && !preview) state = 'closed';
 
   let invite = null;

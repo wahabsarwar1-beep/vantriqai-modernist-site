@@ -24,8 +24,8 @@ const surveysOf = async (clientId) => (await db.query(
   const saved = await flags();
   const stamp = Date.now();
   const { rows } = await db.query(
-    `insert into clients (name, company, email, external_ref, stage, source)
-     values ('Own survey test', $1, 'placeholder@example.com', $2, 'active', 'Internal') returning *`,
+    `insert into clients (name, company, email, external_ref, stage, source, surveys_enabled)
+     values ('Own survey test', $1, 'placeholder@example.com', $2, 'active', 'Internal', true) returning *`,
     [`Own Survey Co ${stamp}`, `own-survey-${stamp}`]
   );
   const client = rows[0];
@@ -35,6 +35,13 @@ const surveysOf = async (clientId) => (await db.query(
       feedback: !!(await S.getSurveyBySlug(S.OWN_SURVEY_SLUG)),
       chat: !!(await S.getSurveyBySlug(S.OWN_CHAT_SURVEY_SLUG)),
     };
+
+    console.log('\n== not until the account has surveys switched on ==');
+    await setFlags(null, null);
+    const off = await S.ensureOwnSurveys({ ...client, surveys_enabled: false });
+    ok(off.every((x) => !x.created) && (await surveysOf(client.id)).length === 0, 'an account with surveys off gets none', JSON.stringify(off));
+    const fl0 = await flags();
+    ok(fl0.own_survey_at === null && fl0.own_chat_survey_at === null, 'and the one-time claims are not spent on it');
 
     console.log('\n== the first run makes both ==');
     await setFlags(null, null);

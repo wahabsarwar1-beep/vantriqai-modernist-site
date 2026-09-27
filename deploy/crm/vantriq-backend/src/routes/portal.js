@@ -149,6 +149,10 @@ router.get('/account', async (req, res) => {
     // API-access section stays entirely hidden until then, rather than
     // showing every customer a feature almost none of them asked for.
     api_access_enabled: !!client.api_access_enabled,
+    // Customer-satisfaction surveys: the same — off until an admin turns them
+    // on for this account (clients.js PATCH /:id/surveys); the portal shows no
+    // Surveys tab until then.
+    surveys_enabled: !!client.surveys_enabled,
     // ai_model is intentionally omitted — internal delivery detail.
     package: eff ? {
       name: eff.name, retainer: eff.retainer, setup_fee: eff.setup_fee,

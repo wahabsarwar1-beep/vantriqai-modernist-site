@@ -385,6 +385,16 @@ else
     "select count(*) from information_schema.tables where table_name in ('surveys','survey_responses','survey_invites','survey_views')"
   chk "survey answers feed the satisfaction dashboards (csat link column)" 1 \
     "select count(*) from information_schema.columns where table_name='csat_responses' and column_name='survey_response_id'"
+  chk "v9.15 surveys are switched on per client (clients columns)" 3 \
+    "select count(*) from information_schema.columns where table_name='clients' and column_name in ('surveys_enabled','surveys_enabled_at','surveys_enabled_by')"
+  # Who has the add-on. A count only: this log is public, client names are not.
+  SURVEY_CLIENTS=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At -F ' ' \
+    -c "select count(*) filter (where surveys_enabled), count(*) filter (where not surveys_enabled and exists (select 1 from surveys s where s.client_id = clients.id)) from clients" 2>/dev/null || echo '? ?')
+  read -r SURVEYS_ON SURVEYS_PAUSED <<< "$SURVEY_CLIENTS"
+  ok "surveys are switched on for $SURVEYS_ON client(s) — an admin switches them on in CRM → Clients → the client"
+  if [ "$SURVEYS_PAUSED" != "0" ]; then
+    warn "$SURVEYS_PAUSED client(s) have surveys but are switched off, so their surveys are paused — switch them on in CRM → Clients if they should run"
+  fi
   chk "our own surveys are made only once (settings flags)" 2 \
     "select count(*) from information_schema.columns where table_name='settings' and column_name in ('own_survey_at','own_chat_survey_at')"
   # The survey app itself, from inside the container: a made-up address must
@@ -499,8 +509,10 @@ cat <<'NEXT'
 
   6. Surveys (v9.14). Open "our own survey" (its address is above) on a
      phone, answer it, and watch the answer arrive in CRM → Surveys.
-     For a customer: CRM → Surveys → New survey, or they do it from their
-     own portal. Pick an industry template; it is live at once at
+     Surveys are an add-on (v9.15): for a customer who has signed up, an
+     admin switches them on in CRM → Clients → the client → Customer-
+     satisfaction surveys. Then CRM → Surveys → New survey, or they do it
+     from their own portal. Pick an industry template; it is live at once at
      https://portal.vantriqai.com/s/<address>, with a QR poster to print.
      After every WhatsApp chat: the "VantriqAI - After-chat survey
      (WhatsApp)" workflow in n8n sends the after-chat survey an hour after a

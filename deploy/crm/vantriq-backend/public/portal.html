@@ -384,7 +384,7 @@ async function boot(){
     // than an error page.
     const contracts = await api('/contracts').catch(()=>[]);
     data = { account, usage, invoices, ledger, packages, agents, bundles, quotes, contracts, activity: null, analytics: null };
-    if(/^#surveys\b/.test(location.hash || '')) currentTab = 'surveys';
+    if(/^#surveys\b/.test(location.hash || '') && surveysOn()) currentTab = 'surveys';
     render();
   }catch(e){
     if(e.expired){ renderLogin('Your session has ended. Please sign in again.'); return; }
@@ -515,7 +515,7 @@ function render(){
       <div class="tabs">
         <div class="tab ${currentTab==='overview'?'active':''}" onclick="setTab('overview')">Overview</div>
         <div class="tab ${currentTab==='analytics'?'active':''}" onclick="setTab('analytics')">Analytics</div>
-        <div class="tab ${currentTab==='surveys'?'active':''}" onclick="setTab('surveys')">Surveys</div>
+        ${surveysOn()?`<div class="tab ${currentTab==='surveys'?'active':''}" onclick="setTab('surveys')">Surveys</div>`:''}
         <div class="tab ${currentTab==='agents'?'active':''}" onclick="setTab('agents')">My agents${data.agents&&data.agents.length?` <span class="tab-n">${data.agents.length}</span>`:''}</div>
         <div class="tab ${currentTab==='usage'?'active':''}" onclick="setTab('usage')">Usage</div>
         <div class="tab ${currentTab==='activity'?'active':''}" onclick="setTab('activity')">Activity</div>
@@ -544,7 +544,12 @@ function render(){
   renderInvoiceModal();
 }
 
+// Surveys are an add-on Vantriq AI switches on per account; until then there
+// is no Surveys tab at all (and the API refuses it anyway).
+function surveysOn(){ return !!(data && data.account && data.account.surveys_enabled); }
+
 function setTab(t){
+  if(t==='surveys' && !surveysOn()) t = 'overview';
   if(currentTab==='surveys' && t!=='surveys' && window.VQS && VQS.hasUnsaved()
      && !confirm('You have unsaved survey changes. Leave without saving?')) return;
   currentTab=t;
@@ -560,7 +565,7 @@ function renderTab(){
 function tabBody(){
   if(currentTab==='overview') return renderOverview();
   if(currentTab==='analytics') return renderAnalytics();
-  if(currentTab==='surveys') return renderSurveys();
+  if(currentTab==='surveys') return surveysOn() ? renderSurveys() : renderOverview();
   if(currentTab==='usage') return renderUsage();
   if(currentTab==='invoices') return renderInvoices();
   if(currentTab==='ledger') return renderLedger();
@@ -655,7 +660,7 @@ function renderAnalytics(){
   if(!a) return `<div class="card" style="text-align:center;color:var(--muted);"><span class="loading-dot"></span>&nbsp; Working out your numbers…</div>`;
   if(a.error) return `<div class="card"><div class="empty">${esc(a.error)}</div>
     <button class="btn btn-ghost" style="margin-top:10px;" onclick="data.analytics=null;render()">Try again</button></div>`;
-  return VQA.conversationsHTML(a, { audience:'portal', onGrain:'setAnalyticsGrain', fileTag:'analytics' });
+  return VQA.conversationsHTML(a, { audience:'portal', onGrain:'setAnalyticsGrain', fileTag:'analytics', surveysEnabled: surveysOn() });
 }
 
 /* ---- Surveys: build, share and read customer-satisfaction surveys (/survey-studio.js) ---- */
