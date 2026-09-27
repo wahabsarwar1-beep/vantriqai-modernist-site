@@ -1,0 +1,357 @@
+{
+  "name": "VantriqAI - After-chat survey (WhatsApp)",
+  "nodes": [
+    {
+      "name": "How this works",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -60
+      ],
+      "parameters": {
+        "content": "## After-chat survey (WhatsApp)\nCalled by the WhatsApp agent after every reply it sends (fire-and-forget).\n\nWaits an hour, then asks the CRM whether the conversation is over. The CRM says yes once per conversation: quiet 55+ min, 2+ messages, inside the 24h window, not asked in 14 days, 9am-9pm Karachi. At night it answers \"night\" with retry_at, and this waits until then and asks again.\n\nTo stop sending: pause the \"After a WhatsApp chat\" survey in CRM -> Surveys (the CRM then answers 404 and nothing is sent).",
+        "color": 5,
+        "width": 760,
+        "height": 300
+      }
+    },
+    {
+      "name": "After the agent replies",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "external_ref",
+              "type": "string"
+            },
+            {
+              "name": "session_id",
+              "type": "string"
+            },
+            {
+              "name": "phone",
+              "type": "string"
+            },
+            {
+              "name": "language",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Wait an hour",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 60,
+        "unit": "minutes"
+      }
+    },
+    {
+      "name": "Is the chat over? (CRM)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://crm_app:8080/api/webhooks/survey-invite",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ external_ref: $(\"After the agent replies\").first().json.external_ref, session_id: $(\"After the agent replies\").first().json.session_id, channel: \"whatsapp\", language: $(\"After the agent replies\").first().json.language || \"en\", quiet_minutes: 55, min_messages: 2, within_hours: 23, once_per_days: 14, send_from: 9, send_until: 21, timezone: \"Asia/Karachi\" }) }}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput",
+      "notes": "Credential: the same webhook key the usage node sends as x-api-key (Simplified Custom Auth account)."
+    },
+    {
+      "name": "Ask them now?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.due === true && !!$json.text }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "name": "Night? Ask in the morning",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        460
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.code === \"night\" && !!$json.retry_at }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "name": "Wait until morning",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        460
+      ],
+      "parameters": {
+        "resume": "specificTime",
+        "dateTime": "={{ $json.retry_at }}"
+      }
+    },
+    {
+      "name": "Is the chat over now? (CRM)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        460
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://crm_app:8080/api/webhooks/survey-invite",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ external_ref: $(\"After the agent replies\").first().json.external_ref, session_id: $(\"After the agent replies\").first().json.session_id, channel: \"whatsapp\", language: $(\"After the agent replies\").first().json.language || \"en\", quiet_minutes: 55, min_messages: 2, within_hours: 23, once_per_days: 14, send_from: 9, send_until: 21, timezone: \"Asia/Karachi\" }) }}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput",
+      "notes": "Credential: the same webhook key the usage node sends as x-api-key (Simplified Custom Auth account)."
+    },
+    {
+      "name": "Ask them now? (morning)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1680,
+        460
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.due === true && !!$json.text }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "name": "Send the survey on WhatsApp",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        1920,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "1364107426780963",
+        "recipientPhoneNumber": "={{ $(\"After the agent replies\").first().json.phone }}",
+        "messageType": "text",
+        "textBody": "={{ $json.text }}",
+        "additionalFields": {
+          "previewUrl": true
+        }
+      },
+      "notes": "Credential: the WhatsApp account the agent replies with. phoneNumberId is the business number's id (923411120049)."
+    }
+  ],
+  "connections": {
+    "After the agent replies": {
+      "main": [
+        [
+          {
+            "node": "Wait an hour",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait an hour": {
+      "main": [
+        [
+          {
+            "node": "Is the chat over? (CRM)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is the chat over? (CRM)": {
+      "main": [
+        [
+          {
+            "node": "Ask them now?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask them now?": {
+      "main": [
+        [
+          {
+            "node": "Send the survey on WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Night? Ask in the morning",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Night? Ask in the morning": {
+      "main": [
+        [
+          {
+            "node": "Wait until morning",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait until morning": {
+      "main": [
+        [
+          {
+            "node": "Is the chat over now? (CRM)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is the chat over now? (CRM)": {
+      "main": [
+        [
+          {
+            "node": "Ask them now? (morning)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask them now? (morning)": {
+      "main": [
+        [
+          {
+            "node": "Send the survey on WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "note": "Live in n8n as UYHAgDVpL8nXZLjb. Credentials are left out of this copy: pick them on import (see the notes on the two CRM nodes and the send node)."
+  },
+  "tags": []
+}

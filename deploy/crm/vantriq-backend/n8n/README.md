@@ -568,7 +568,15 @@ VantriqAI's own WhatsApp agent:
    sub-workflow completion off** and **On Error: continue**. It hands over
    `external_ref`, `session_id` (exactly the usage node's), `phone` and
    `language` (`ur` when the customer wrote in Urdu script) and returns at
-   once, so it can never delay or break a reply.
+   once, so it can never delay or break a reply. Its inputs, in the
+   WhatsApp agent:
+
+   ```
+   external_ref  {{ $('WhatsApp Trigger').item.json.metadata.display_phone_number }}   (falls back to 923411120049)
+   session_id    {{ $('Prepare Sales Context').item.json.phone + '-' + $now.toFormat('yyyy-MM-dd') }}   ← exactly the usage node's
+   phone         {{ $('Prepare Sales Context').item.json.phone }}
+   language      {{ /[\u0600-\u06FF]/.test(String($('Prepare Sales Context').item.json.message_text || '')) ? 'ur' : 'en' }}
+   ```
 2. The workflow **VantriqAI - After-chat survey (WhatsApp)** — `n8n/vantriq-after-chat-survey.json`
    in this folder:
 
