@@ -398,6 +398,15 @@ else
   else
     warn "the survey API is not answering as expected"; FAILED=1
   fi
+  # End to end on this install: a temporary survey on our own account is
+  # answered through the public endpoint, seen in its results and in the
+  # Analytics dashboards, then deleted — nothing is left behind or emailed.
+  echo "    survey end-to-end check:"
+  if docker exec "$APP_CONTAINER" npm run -s survey-smoke; then
+    ok "surveys work end to end (the check survey was created, answered and deleted)"
+  else
+    warn "the survey end-to-end check failed — lines above"; FAILED=1
+  fi
   # Not a chk(): creating the owner account is a deliberate, one-time manual
   # step (see 6b above) precisely so its password never touches this log.
   # A fresh install legitimately has none yet — that must never fail a deploy.

@@ -23,7 +23,9 @@ jobs:
           for u in https://vantriqai.com https://www.vantriqai.com http://vantriqai.com \
                    https://vantriqai.com/pricing https://vantriqai.com/global \
                    https://crm.vantriqai.com https://crm.vantriqai.com/api/health \
-                   https://portal.vantriqai.com https://n8n.vantriqai.com/healthz; do
+                   https://portal.vantriqai.com https://n8n.vantriqai.com/healthz \
+                   https://portal.vantriqai.com/s/vqs-site-check-000 \
+                   https://portal.vantriqai.com/api/public/surveys/vqs-site-check-000; do
             echo "================ $u"
             curl -sS -L --max-time 30 -o body.html \
               -w 'final=%{url_effective}\nstatus=%{http_code} redirects=%{num_redirects} time=%{time_total}s ip=%{remote_ip} ssl_verify=%{ssl_verify_result}\n' \
@@ -32,6 +34,14 @@ jobs:
             echo "title: $(grep -o '<title>[^<]*' body.html | head -1 | sed 's/<title>//')"
             echo "bytes: $(wc -c < body.html 2>/dev/null || echo 0)"
             head -c 300 body.html | tr '\n' ' '; echo
+          done
+      - name: Ports
+        # Whether the VPS answers at all, and on which doors. A deploy that
+        # stops at "Set up the SSH key" is ssh-keyscan getting nothing on 22.
+        run: |
+          for port in 22 80 443; do
+            if timeout 6 bash -c "</dev/tcp/crm.vantriqai.com/$port" 2>/dev/null; then echo "crm.vantriqai.com:$port open"
+            else echo "crm.vantriqai.com:$port NO ANSWER"; fi
           done
       - name: Certificate
         run: |

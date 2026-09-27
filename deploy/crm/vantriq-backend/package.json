@@ -13,6 +13,7 @@
     "test:webhooks": "node test/webhooks-lead.test.js",
     "seed-internal": "node src/utils/seedInternal.js",
     "seed-owner": "node src/utils/seedOwner.js",
+    "survey-smoke": "node src/utils/surveySmokeTest.js",
     "docs:api": "node tools/gen-api-docs.js",
     "test:proposal": "node test/proposal.test.js",
     "test:surveys": "node test/surveys.test.js && node test/surveys-ui.test.js"
