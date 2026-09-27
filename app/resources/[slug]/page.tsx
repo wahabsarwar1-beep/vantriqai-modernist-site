@@ -22,18 +22,10 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const resource = getResource(slug);
   if (!resource) return {};
 
-  return {
-    ...resourceMetadata(`/resources/${resource.slug}`, resource.title, resource.description),
-    // An article is not a "website"; saying so is what lets a reader see a
-    // published date rather than a generic card.
-    openGraph: {
-      type: "article",
-      title: `${resource.title} | VantriqAI`,
-      description: resource.description,
-      publishedTime: resource.published,
-      modifiedTime: resource.updated ?? resource.published,
-    },
-  };
+  return resourceMetadata(`/resources/${resource.slug}`, resource.title, resource.description, {
+    publishedTime: resource.published,
+    modifiedTime: resource.updated ?? resource.published,
+  });
 }
 
 const dateLabel = (iso: string) =>

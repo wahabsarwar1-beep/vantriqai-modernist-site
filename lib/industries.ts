@@ -663,7 +663,7 @@ export const industries = (region: Region): Industry[] => {
         { q: "Is every conversation recorded?", a: "Yes. Every conversation is kept with its outcome, so you have a complete record of what was said and when." },
       ],
       seoTitle: "AI Agents for Banking, Finance & Insurance",
-      seoDescription: "AI agents for lenders, banks and insurers: eligibility questions, loan and policy onboarding, servicing and payment reminders on WhatsApp — with a person for judgement calls.",
+      seoDescription: "AI agents for lenders, banks and insurers: eligibility questions, onboarding, servicing and payment reminders on WhatsApp — with a person for judgement calls.",
     },
   ];
 };

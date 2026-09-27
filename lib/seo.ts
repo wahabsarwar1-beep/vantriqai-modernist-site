@@ -118,7 +118,10 @@ export function packageMetadata(region: Region, slug: string, name: string, audi
   return pageMetadata(region, `/pricing/${slug}`, {
     title: `${name} AI Agent Package · ${audience}`,
     globalTitle: `${name} AI Agent Package (${currency}) · ${audience}`,
-    description: `${lede} Quoted in ${currency} after a discovery call.`,
+    // The lede alone: a currency sentence on the end took every package past
+    // the point a result list cuts a description off, and the global title
+    // already carries the currency.
+    description: lede,
   });
 }
 
@@ -176,21 +179,23 @@ function pageMetadata(region: Region, path: string, page: PageSeo): Metadata {
  * this file works to avoid. One copy, one canonical, no hreflang pair —
  * linked from both trees.
  */
-export function resourceMetadata(path: string, title: string, description: string): Metadata {
+export function resourceMetadata(
+  path: string,
+  title: string,
+  description: string,
+  article?: { publishedTime: string; modifiedTime: string },
+): Metadata {
   const fullTitle = `${title} | ${SITE_NAME}`;
+  const card = { title: fullTitle, description, url: path, siteName: SITE_NAME, locale: "en", images: [OG_IMAGE] };
   return {
     title,
     description,
     alternates: { canonical: path },
-    openGraph: {
-      title: fullTitle,
-      description,
-      url: path,
-      siteName: SITE_NAME,
-      locale: "en",
-      type: "website",
-      images: [OG_IMAGE],
-    },
+    // A guide is an article, not a "website"; saying so is what lets a reader
+    // see a published date rather than a generic card. Built here rather than
+    // overridden in the page: a page that sets `openGraph` replaces the whole
+    // object, image and URL included.
+    openGraph: article ? { ...card, type: "article", ...article } : { ...card, type: "website" },
     twitter: { card: "summary_large_image", title: fullTitle, description, images: [OG_IMAGE] },
   };
 }
