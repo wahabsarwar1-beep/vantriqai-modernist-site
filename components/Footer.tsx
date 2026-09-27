@@ -1,12 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import Wordmark from "@/components/Wordmark";
 import RegionSwitch from "@/components/RegionSwitch";
 import SocialIcon, { socialKey } from "@/components/SocialIcon";
+import VantriqMark from "@/components/VantriqMark";
+import { TIERS } from "@/lib/content";
+import { menuPanels } from "@/lib/menu";
+import { productSlug } from "@/lib/products";
+import { hrefIn, navHref, regionFromPathname, type Region } from "@/lib/region";
 import { RESOURCES } from "@/lib/resources";
-import { navHref, regionFromPathname, type Region } from "@/lib/region";
 import { SOCIAL_PROFILES } from "@/lib/social";
 import { waLink, WHATSAPP_DISPLAY } from "@/lib/whatsapp";
 
@@ -25,172 +29,152 @@ const socialLabel = (url: string) => {
   return SOCIAL_LABELS[host] ?? host;
 };
 
+type FooterLink = { href: string; label: string; external?: boolean; isNew?: boolean };
+
 /**
- * Columns, built only from pages that exist.
- *
- * The temptation with a footer this shape is to list all fourteen modules and
- * all ten industries. They live on one page each, so that would be fourteen
- * links to /products — a padded column, not a deeper site. When per-module and
- * per-industry pages exist they slot in here, and the depth is earned.
+ * The columns, built from the same data as the menus, so every module,
+ * sector, package and guide the site has is one tap from the bottom of any
+ * page — and a new one appears here without anyone editing the footer.
  */
-const columns = (region: Region) => [
-  {
-    title: "Platform",
-    links: [
-      { href: navHref(region, { href: "/products" }), label: "Products" },
-      { href: navHref(region, { href: "/how-it-works" }), label: "How it works" },
-      { href: navHref(region, { href: "/industries" }), label: "Industries" },
-      { href: navHref(region, { href: "/pricing" }), label: "Packages" },
-    ],
-  },
-  {
-    title: "Resources",
-    links: [
-      { href: "/resources", label: "All guides" },
-      ...RESOURCES.map((r) => ({ href: `/resources/${r.slug}`, label: r.title })),
-    ],
-  },
-];
+function columns(region: Region): { title: string; links: FooterLink[] }[] {
+  const panels = menuPanels(region);
+  const panel = (label: string) => panels.find((p) => p.label === label)!;
+  const platform = panel("Platform");
+  const industries = panel("Industries");
 
-const colTitle = {
-  fontFamily: "var(--font-heading)",
-  fontWeight: 800,
-  fontSize: 12,
-  letterSpacing: "0.12em",
-  textTransform: "uppercase" as const,
-  color: "var(--color-accent)",
-  margin: "0 0 18px",
-};
-
-const linkStyle = {
-  fontSize: 14.5,
-  lineHeight: "22px",
-  color: "color-mix(in srgb, var(--color-text) 72%, transparent)",
-};
+  return [
+    {
+      title: "Platform",
+      links: [
+        ...platform.columns
+          .filter((c) => c.title === "Channels" || c.title === "Insight & people")
+          .flatMap((c) => c.links.map((l) => ({ href: l.href, label: l.label, isNew: l.isNew }))),
+        { href: navHref(region, { href: "/how-it-works" }), label: "How it works" },
+        { href: platform.footer.href, label: platform.footer.label },
+      ],
+    },
+    {
+      title: "Industries",
+      links: [...industries.columns.flatMap((c) => c.links.map((l) => ({ href: l.href, label: l.label }))), { href: industries.footer.href, label: "Every sector" }],
+    },
+    {
+      title: "Packages",
+      links: [
+        ...TIERS.map((t) => ({ href: hrefIn(region, `/pricing/${productSlug(t.name)}`), label: t.name })),
+        { href: `${hrefIn(region, "/pricing")}#find`, label: "Find your package" },
+        { href: `${hrefIn(region, "/pricing")}#compare`, label: "Compare every package" },
+      ],
+    },
+    {
+      title: "Resources",
+      links: [...RESOURCES.map((r) => ({ href: `/resources/${r.slug}`, label: r.title })), { href: "/resources", label: "All guides" }],
+    },
+    {
+      title: "Company",
+      links: [
+        { href: navHref(region, { href: "/contact" }), label: "Send a brief" },
+        { href: waLink(), label: "WhatsApp us", external: true },
+        ...SOCIAL_PROFILES.map((url) => ({ href: url, label: socialLabel(url), external: true })),
+        { href: `${hrefIn(region, "/pricing")}#terms`, label: "Terms & conditions" },
+      ],
+    },
+  ];
+}
 
 export default function Footer() {
   const region = regionFromPathname(usePathname());
   const year = new Date().getFullYear();
+  /** On a phone the columns are an accordion; on wider screens all are open. */
+  const [open, setOpen] = useState<string | null>(null);
 
   return (
-    <footer style={{ borderTop: "1px solid var(--color-divider)", background: "var(--color-surface)" }}>
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "clamp(40px,5vw,66px) clamp(20px,5vw,64px) 0" }}>
-        <div className="footer-grid">
-          {/* Brand block: who this is, how to reach them, where else they are. */}
+    <footer className="ft">
+      <div aria-hidden="true" className="ft-aurora" />
+      <div aria-hidden="true" className="ft-grid-bg" />
+
+      <div className="ft-inner">
+        {/* The last word: what we do, that we are here now, and two ways in. */}
+        <div className="ft-top">
           <div>
-            <div style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 22, letterSpacing: "-0.02em" }}>
-              <Wordmark />
-            </div>
-            <p style={{ fontSize: 14.5, lineHeight: "24px", margin: "16px 0 22px", maxWidth: "34ch", color: "color-mix(in srgb, var(--color-text) 68%, transparent)" }}>
-              AI agents that reply, qualify and book on WhatsApp, Instagram and your website — every hour, at any volume.
+            <p className="ft-status">
+              <span aria-hidden="true" className="ft-status-dot" />
+              Agents online · replying in seconds
             </p>
-
-            <a
-              href={waLink()}
-              target="_blank"
-              rel="noopener"
-              style={{ display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 15, letterSpacing: "-0.01em" }}
-            >
-              <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: "50%", background: "#25c16a", flex: "none" }} />
-              {WHATSAPP_DISPLAY}
-            </a>
-
-            {SOCIAL_PROFILES.length ? (
-              <div style={{ display: "flex", gap: 10, marginTop: 22, flexWrap: "wrap" }}>
-                {SOCIAL_PROFILES.map((url) => {
-                  const key = socialKey(url);
-                  const label = socialLabel(url);
-                  return (
-                    <a
-                      key={url}
-                      href={url}
-                      target="_blank"
-                      rel="noopener me"
-                      aria-label={label}
-                      title={label}
-                      className="footer-social"
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        width: 44,
-                        height: 44,
-                        borderRadius: 14,
-                        border: "1px solid var(--color-divider)",
-                        background: "var(--color-bg)",
-                        color: "color-mix(in srgb, var(--color-text) 62%, transparent)",
-                        flex: "none",
-                      }}
-                    >
-                      {key ? <SocialIcon name={key} /> : <span style={{ fontSize: 12 }}>{label}</span>}
-                    </a>
-                  );
-                })}
-              </div>
-            ) : null}
+            <p className="ft-statement">
+              Every customer, <span className="ft-statement-grad">answered.</span>
+            </p>
           </div>
-
-          {columns(region).map((col) => (
-            <nav key={col.title} aria-label={col.title}>
-              <p style={colTitle}>{col.title}</p>
-              <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 13 }}>
-                {col.links.map((l) => (
-                  <li key={l.href}>
-                    <Link href={l.href} className="footer-link" style={linkStyle}>
-                      {l.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          ))}
-
-          <nav aria-label="Talk to us">
-            <p style={colTitle}>Talk to us</p>
-            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 13 }}>
-              <li>
-                <Link href={navHref(region, { href: "/contact" })} className="footer-link" style={linkStyle}>
-                  Send a brief
-                </Link>
-              </li>
-              <li>
-                <a href={waLink()} target="_blank" rel="noopener" className="footer-link" style={linkStyle}>
-                  Message us on WhatsApp
-                </a>
-              </li>
-              {SOCIAL_PROFILES.map((url) => (
-                <li key={url}>
-                  <a href={url} target="_blank" rel="noopener me" className="footer-link" style={linkStyle}>
-                    {socialLabel(url)}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
+          <div className="ft-actions">
+            <a className="ft-btn ft-btn-primary" href={waLink()} target="_blank" rel="noopener">
+              <span aria-hidden="true" className="ft-btn-dot" />
+              {WHATSAPP_DISPLAY}
+              <span aria-hidden="true">→</span>
+            </a>
+            <Link className="ft-btn ft-btn-ghost" href={navHref(region, { href: "/contact" })}>
+              Send a brief
+            </Link>
+          </div>
         </div>
 
-        {/* Bottom bar: the legal line, and the currency everything above is in. */}
-        <div
-          className="footer-bottom"
-          style={{
-            marginTop: "clamp(32px,4vw,54px)",
-            paddingTop: 22,
-            borderTop: "1px solid var(--color-divider)",
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            /* Both to the left, not spread. The chat launcher is fixed to the
-               bottom right of every page and sat directly on top of the
-               region control when this row justified to space-between. */
-            justifyContent: "flex-start",
-            gap: "14px 24px",
-            paddingRight: "clamp(0px, 14vw, 190px)",
-          }}
-        >
-          <p style={{ margin: 0, fontSize: 12.5, letterSpacing: "0.03em", color: "color-mix(in srgb, var(--color-text) 52%, transparent)" }}>
-            &copy; {year} Vantriq<span style={{ color: "var(--color-accent)" }}>AI</span> &middot; Intelligent automation for business
+        <div className="ft-cols">
+          {columns(region).map((col, i) => {
+            const isOpen = open === col.title;
+            const id = `ft-col-${i}`;
+            return (
+              <nav key={col.title} aria-label={col.title} className="ft-col" data-open={isOpen ? "" : undefined}>
+                <button type="button" className="ft-col-head" aria-expanded={isOpen} aria-controls={id} onClick={() => setOpen(isOpen ? null : col.title)}>
+                  {col.title}
+                  <span aria-hidden="true" className="ft-chev" />
+                </button>
+                <div id={id} className="ft-col-body">
+                  <ul>
+                    {col.links.map((l) => (
+                      <li key={l.href + l.label}>
+                        {l.external ? (
+                          <a href={l.href} target="_blank" rel="noopener me" className="ft-link">
+                            {l.label}
+                          </a>
+                        ) : (
+                          <Link href={l.href} className="ft-link">
+                            {l.label}
+                            {l.isNew ? <span className="mega-new">New</span> : null}
+                          </Link>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </nav>
+            );
+          })}
+        </div>
+
+        {/* The name, as large as the page allows, lit by a slow sweep. */}
+        <div aria-hidden="true" className="ft-word">
+          <VantriqMark size={0} className="ft-word-mark" frame="currentColor" notch="#7f9bf2" />
+          <span>
+            Vantriq<em>AI</em>
+          </span>
+        </div>
+
+        <div className="ft-bottom">
+          <p className="ft-legal">
+            &copy; {year} VantriqAI · Intelligent automation for business
           </p>
-          <RegionSwitch />
+          <div className="ft-bottom-right">
+            {SOCIAL_PROFILES.map((url) => {
+              const key = socialKey(url);
+              const label = socialLabel(url);
+              return (
+                <a key={url} href={url} target="_blank" rel="noopener me" aria-label={label} title={label} className="ft-social">
+                  {key ? <SocialIcon name={key} /> : <span style={{ fontSize: 11 }}>{label}</span>}
+                </a>
+              );
+            })}
+            <span className="ft-region">
+              <RegionSwitch />
+            </span>
+          </div>
         </div>
       </div>
     </footer>

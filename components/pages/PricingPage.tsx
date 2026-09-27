@@ -200,7 +200,7 @@ export default function PricingPage({ region }: { region: Region }) {
             </div>
           </div>
         </section>
-        <div style={{ padding: "0 0 clamp(40px,5.2vw,68px)" }}>
+        <div id="terms" className="anchor-target" style={{ padding: "0 0 clamp(40px,5.2vw,68px)" }}>
           <div data-anim="" style={{ display: "grid", gap: 9, borderBottom: "1px solid var(--color-divider)", paddingBottom: "clamp(18px,2.2vw,26px)" }}>
             <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 9.5, letterSpacing: "0.16em", textTransform: "uppercase", margin: "0 0 2px", color: "color-mix(in srgb, var(--color-text) 45%, transparent)" }}>Terms &amp; conditions</p>
             <p style={{ fontSize: 11, lineHeight: "19px", margin: 0, maxWidth: "104ch", ...mutedLabel }}>

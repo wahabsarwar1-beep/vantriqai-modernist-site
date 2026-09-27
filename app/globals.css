@@ -2305,3 +2305,101 @@ span[data-chev] { display: inline-block; transition: transform .2s ease; }
   .hood-grid p:last-child { font-size: 13px !important; line-height: 20px !important; }
   .hood-grid p:first-child { margin-bottom: 10px !important; }
 }
+
+/* ---------- Footer ----------
+   A dark stage like the heroes and the curtain: the last thing on every page
+   reads as the same product as the first. Five columns on a desktop; on a
+   phone each column is a large accordion row. */
+.ft {
+  position: relative; overflow: hidden; isolation: isolate; color: #fff; background: #07070d;
+  border-radius: clamp(28px,3.4vw,48px) clamp(28px,3.4vw,48px) 0 0; margin-top: clamp(24px,3vw,40px);
+}
+.ft-aurora {
+  position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(50% 60% at 0% 0%, rgba(47,86,217,.42), transparent 70%),
+    radial-gradient(40% 50% at 100% 20%, rgba(122,91,214,.3), transparent 70%),
+    radial-gradient(60% 50% at 70% 100%, rgba(224,133,79,.22), transparent 70%);
+}
+.ft-grid-bg {
+  position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+  background-image: linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px);
+  background-size: 56px 56px; -webkit-mask-image: linear-gradient(#000, transparent 70%); mask-image: linear-gradient(#000, transparent 70%);
+}
+.ft-inner { max-width: 1280px; margin: 0 auto; padding: clamp(48px,6vw,88px) clamp(20px,5vw,64px) 0; }
+
+.ft-top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 28px; padding-bottom: clamp(36px,4.4vw,56px); border-bottom: 1px solid rgba(255,255,255,.1); }
+.ft-status { display: inline-flex; align-items: center; gap: 10px; margin: 0 0 18px; padding: 7px 14px; border-radius: 999px; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.75); background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); }
+.ft-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #3ddc97; box-shadow: 0 0 0 0 rgba(61,220,151,.6); animation: mv-ping 2s ease-out infinite; }
+.ft-statement { margin: 0; font-family: var(--font-heading); font-weight: 700; font-size: clamp(38px,6vw,84px); line-height: .96; letter-spacing: -.05em; max-width: 12ch; }
+.ft-statement-grad { background: linear-gradient(100deg, #c5d2ff, #b89cf0 50%, #f3b38b); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.ft-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.ft-btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 54px; padding: 0 24px; border-radius: 999px; font-family: var(--font-heading); font-weight: 700; font-size: 15.5px; white-space: nowrap; transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s ease, background-color .2s ease; }
+.ft-btn:hover { transform: translateY(-2px); }
+.ft-btn-primary { color: #0b0b12; background: #fff; box-shadow: 0 0 0 1px rgba(255,255,255,.6), 0 18px 44px -12px rgba(127,155,242,.8); }
+.ft-btn-primary:hover { color: #0b0b12; }
+.ft-btn-dot { width: 8px; height: 8px; border-radius: 50%; background: #25c16a; }
+.ft-btn-ghost { color: #fff; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.18); }
+.ft-btn-ghost:hover { color: #fff; background: rgba(255,255,255,.12); }
+
+.ft-cols { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 32px; padding: clamp(36px,4.4vw,60px) 0; }
+.ft-col-head {
+  display: flex; align-items: center; justify-content: space-between; width: 100%; margin: 0 0 16px; padding: 0; background: none; border: 0; cursor: default; text-align: left;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: #a9bbf7;
+}
+.ft-chev { display: none; }
+.ft-col-body ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 11px; }
+.ft-link { display: inline-flex; align-items: center; font-size: 14px; line-height: 20px; color: rgba(255,255,255,.66); background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat; transition: color .2s ease, background-size .3s ease; }
+.ft-link:hover { color: #fff; background-size: 100% 1px; }
+.ft-link .mega-new { margin-left: 7px; }
+
+.ft-word {
+  position: relative; display: flex; align-items: center; gap: clamp(10px,2vw,28px); margin: 0 0 clamp(10px,1.4vw,18px); user-select: none;
+  font-family: var(--font-heading); font-weight: 800; font-size: clamp(52px,13.2vw,184px); line-height: .82; letter-spacing: -.06em; white-space: nowrap;
+}
+.ft-word > span {
+  background: linear-gradient(100deg, rgba(255,255,255,.07) 0%, rgba(255,255,255,.07) 38%, rgba(197,210,255,.55) 48%, rgba(243,179,139,.45) 54%, rgba(255,255,255,.07) 64%, rgba(255,255,255,.07) 100%);
+  background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: ft-sweep 9s ease-in-out infinite;
+}
+.ft-word em { font-style: normal; }
+.ft-word-mark { width: .72em !important; height: .72em !important; flex: none; color: rgba(255,255,255,.1); }
+@keyframes ft-sweep { 0% { background-position: 100% 0; } 100% { background-position: -50% 0; } }
+
+.ft-bottom {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 24px;
+  padding: 22px 0 28px; border-top: 1px solid rgba(255,255,255,.1);
+  /* The chat launcher is fixed to the bottom right; keep this row clear of it. */
+  padding-right: clamp(0px, 14vw, 210px);
+}
+.ft-legal { margin: 0; font-size: 12.5px; letter-spacing: .02em; color: rgba(255,255,255,.5); }
+.ft-bottom-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ft-social { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; color: rgba(255,255,255,.75); background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); transition: color .2s ease, background-color .2s ease, transform .2s ease; }
+.ft-social:hover { color: #fff; background: rgba(255,255,255,.12); transform: translateY(-2px); }
+/* The region control, re-tokened for the dark stage. */
+.ft-region { --color-text: #ffffff; --color-divider: rgba(255,255,255,.16); --color-surface: rgba(255,255,255,.06); --color-bg: #ffffff; }
+.ft-region a[aria-current="true"] { color: #0b0b12 !important; }
+
+@media (max-width: 1000px) { .ft-cols { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+@media (max-width: 760px) {
+  .ft-top { flex-direction: column; align-items: flex-start; }
+  .ft-actions { width: 100%; }
+  .ft-actions .ft-btn { flex: 1; }
+  /* Phones: the columns become big accordion rows, like the menu. */
+  .ft-cols { grid-template-columns: 1fr; gap: 0; padding: 12px 0 32px; }
+  .ft-col { border-bottom: 1px solid rgba(255,255,255,.1); }
+  .ft-col-head {
+    margin: 0; min-height: 68px; cursor: pointer; -webkit-tap-highlight-color: transparent;
+    font-family: var(--font-heading); font-weight: 700; font-size: 26px; letter-spacing: -.03em; text-transform: none; color: #fff;
+  }
+  .ft-col[data-open] .ft-col-head { color: #c5d2ff; }
+  .ft-chev { display: block; position: relative; width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(255,255,255,.18); transition: transform .4s cubic-bezier(.16,1,.3,1), background-color .25s ease; }
+  .ft-chev::before { content: ""; position: absolute; left: 50%; top: 45%; width: 9px; height: 9px; border-right: 1.8px solid currentColor; border-bottom: 1.8px solid currentColor; transform: translate(-50%, -50%) rotate(45deg); }
+  .ft-col[data-open] .ft-chev { transform: rotate(180deg); background: rgba(255,255,255,.1); }
+  .ft-col-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .45s cubic-bezier(.16,1,.3,1); }
+  .ft-col[data-open] .ft-col-body { grid-template-rows: 1fr; }
+  .ft-col-body > ul { min-height: 0; overflow: hidden; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+  .ft-col-body li:last-child { margin-bottom: 20px; }
+  .ft-link { min-height: 40px; font-size: 15px; }
+  .ft-bottom { flex-direction: column; align-items: flex-start; padding-right: 0; padding-bottom: 110px; }
+}
+@media (prefers-reduced-motion: reduce) { .ft-word > span, .ft-status-dot { animation: none; } .ft-col-body { transition: none; } }
