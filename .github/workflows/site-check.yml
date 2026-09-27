@@ -1,0 +1,39 @@
+name: Site check
+
+# On-demand: request every public address from outside our own network and
+# report what a visitor gets — status, redirects, timing, TLS, and the page
+# title — so "the site is not opening" can be checked from somewhere neutral.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: DNS
+        run: |
+          for h in vantriqai.com www.vantriqai.com crm.vantriqai.com portal.vantriqai.com n8n.vantriqai.com; do
+            echo "== $h"; dig +short "$h" A; dig +short "$h" CNAME
+          done
+      - name: HTTP
+        run: |
+          for u in https://vantriqai.com https://www.vantriqai.com http://vantriqai.com \
+                   https://vantriqai.com/pricing https://vantriqai.com/global \
+                   https://crm.vantriqai.com https://crm.vantriqai.com/api/health \
+                   https://portal.vantriqai.com https://n8n.vantriqai.com/healthz; do
+            echo "================ $u"
+            curl -sS -L --max-time 30 -o body.html \
+              -w 'final=%{url_effective}\nstatus=%{http_code} redirects=%{num_redirects} time=%{time_total}s ip=%{remote_ip} ssl_verify=%{ssl_verify_result}\n' \
+              -D headers.txt "$u" || echo "curl failed (exit $?)"
+            grep -iE '^(HTTP/|server:|location:|x-powered-by:|cache-control:|platform:|x-hcdn)' headers.txt || true
+            echo "title: $(grep -o '<title>[^<]*' body.html | head -1 | sed 's/<title>//')"
+            echo "bytes: $(wc -c < body.html 2>/dev/null || echo 0)"
+            head -c 300 body.html | tr '\n' ' '; echo
+          done
+      - name: Certificate
+        run: |
+          echo | openssl s_client -servername vantriqai.com -connect vantriqai.com:443 2>/dev/null \
+            | openssl x509 -noout -subject -issuer -dates || echo "TLS handshake failed"
