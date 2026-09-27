@@ -237,6 +237,7 @@ export default function MegaMenu({
                 border: "1px solid var(--color-accent-200)",
               }}
             >
+              {panel.hero.kicker ? <span className="mega-hero-kicker">{panel.hero.kicker}</span> : null}
               <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 17, letterSpacing: "-0.02em", lineHeight: "23px" }}>
                 {panel.hero.title}
               </span>
@@ -278,6 +279,7 @@ export default function MegaMenu({
                         <span style={{ display: "block" }}>
                           <span style={{ display: "block", fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 13.5, letterSpacing: "-0.01em", lineHeight: "19px" }}>
                             {l.label}
+                            {l.isNew ? <span className="mega-new">New</span> : null}
                           </span>
                           {l.note ? (
                             <span style={{ display: "block", fontSize: 11.5, lineHeight: "16px", marginTop: 2, color: "color-mix(in srgb, var(--color-text) 55%, transparent)" }}>

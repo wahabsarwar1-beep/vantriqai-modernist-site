@@ -12,7 +12,10 @@ export type MarkId =
   | "payments"
   | "insights"
   | "deployment"
-  | "custom";
+  | "custom"
+  | "pulse"
+  | "echo"
+  | "human";
 
 /** Channels sit on an accent field; capabilities and deployment sit on ink. */
 const FIELD_BG: Record<MarkId, string> = {
@@ -30,6 +33,9 @@ const FIELD_BG: Record<MarkId, string> = {
   insights: "var(--color-text)",
   deployment: "var(--color-text)",
   custom: "var(--color-text)",
+  pulse: "var(--color-text)",
+  echo: "var(--color-text)",
+  human: "var(--color-text)",
 };
 
 function MarkGlyph({ id }: { id: MarkId }) {
@@ -141,6 +147,31 @@ function MarkGlyph({ id }: { id: MarkId }) {
           <rect x="19" y="19" width="10" height="10" fill="var(--color-accent)" />
         </>
       );
+    case "pulse":
+      // A heartbeat line across a dashboard frame, peaking in accent.
+      return (
+        <>
+          <path d="M5 27h8l5-11 7 20 6-27 4 18h8" fill="none" stroke="var(--color-bg)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="42" cy="27" r="4" fill="var(--color-accent)" />
+        </>
+      );
+    case "echo":
+      // A speech bubble with the answer rippling back out of it.
+      return (
+        <>
+          <path d="M4 6h26v20H14l-8 7v-7H4z" fill="var(--color-bg)" />
+          <path d="M34 14h4v24h-4zM42 8h4v36h-4z" fill="var(--color-accent)" />
+        </>
+      );
+    case "human":
+      // A person, with the AI tile at their shoulder.
+      return (
+        <>
+          <circle cx="18" cy="14" r="9" fill="var(--color-bg)" />
+          <path d="M2 44c0-10 7-16 16-16s16 6 16 16z" fill="var(--color-bg)" />
+          <rect x="34" y="4" width="11" height="11" fill="var(--color-accent)" />
+        </>
+      );
     case "custom":
       // The blank module: a frame with the corner still to be filled in.
       return (
@@ -153,7 +184,7 @@ function MarkGlyph({ id }: { id: MarkId }) {
 }
 
 /**
- * One of the thirteen product marks: a rounded field with a filled-SVG glyph.
+ * One of the product marks: a rounded field with a filled-SVG glyph.
  *
  * `size` exists for the navigation menu, which wants the same mark at a third
  * of the size and without the card's bottom margin.

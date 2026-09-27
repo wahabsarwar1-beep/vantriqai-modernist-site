@@ -1,4 +1,4 @@
-export type ColumnIconId = "channels" | "capabilities" | "deployment" | "sectors" | "tiers" | "guides";
+export type ColumnIconId = "channels" | "capabilities" | "deployment" | "insight" | "sectors" | "tiers" | "guides";
 
 /**
  * A glyph for a menu column heading.
@@ -28,6 +28,12 @@ const GLYPHS: Record<ColumnIconId, React.ReactNode> = {
     <>
       <path d="M12 3.5l7 2.6v5.2c0 4.2-2.9 7.6-7 9.2-4.1-1.6-7-5-7-9.2V6.1z" />
       <path d="M9 12l2.2 2.2L15.5 10" />
+    </>
+  ),
+  insight: (
+    <>
+      <path d="M3.5 12.5h4l2.5-5 4 10 2.5-5h4" />
+      <circle cx="12" cy="12" r="8.5" />
     </>
   ),
   sectors: (

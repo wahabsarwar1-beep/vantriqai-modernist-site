@@ -19,12 +19,14 @@ const bodyMuted = { color: "color-mix(in srgb, var(--color-text) 78%, transparen
 const GROUP_LABELS: Record<Product["kicker"], { title: string; note: string }> = {
   Channel: { title: "Channels", note: "where customers reach you" },
   Capability: { title: "Capabilities", note: "what the agent does once they have" },
+  Insight: { title: "Insight & people", note: "what your conversations tell you, and help for your team" },
   Deployment: { title: "Deployment", note: "where it runs and what only you need" },
 };
 
 
 export default function ProductsPage({ region }: { region: Region }) {
   const catalogue = products(region);
+  const count = (k: Product["kicker"]) => ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"][catalogue.filter((p) => p.kicker === k).length];
   return (
     <>
       <JsonLd schema={breadcrumbSchema(region, "/products", "Products")} />
@@ -34,14 +36,14 @@ export default function ProductsPage({ region }: { region: Region }) {
         heading={
           <>
             <LineReveal>
-              <Counter target={14} /> agents. Assemble
+              <Counter target={catalogue.length} /> modules. Assemble
             </LineReveal>
             <LineReveal>
               the <span style={{ color: "var(--color-accent)" }}>one you need.</span>
             </LineReveal>
           </>
         }
-        body="Each product is a module on the same platform: three channels, eight capabilities, two ways to deploy. Start with one, add as volume grows — nothing is rebuilt when you do."
+        body={`Each product is a module on the same platform: ${count("Channel")} channels, ${count("Capability")} capabilities, ${count("Insight")} for insight and your team, ${count("Deployment")} ways to deploy. Start with one, add as volume grows — nothing is rebuilt when you do.`}
         orbit={
           <HeroChatCard
             time="20:52"
@@ -79,7 +81,10 @@ export default function ProductsPage({ region }: { region: Region }) {
                 <div key={p.name} id={productSlug(p.name)} data-anim="" className={`glow mod-card anchor-target${p.featured ? " mod-card-featured" : ""}`}>
                   <div className="mod-card-top">
                     {p.mark ? <ProductMark id={p.mark} size={p.featured ? 64 : 52} /> : null}
-                    <span className="mod-tier">{p.tier}</span>
+                    <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      {p.isNew ? <span className="mega-new" style={{ margin: 0 }}>New</span> : null}
+                      <span className="mod-tier">{p.tier}</span>
+                    </span>
                   </div>
                   <h2 className="mod-title">
                     <Link href={hrefIn(region, `/products/${productSlug(p.name)}`)} className="card-link" style={{ color: "inherit" }}>

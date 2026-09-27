@@ -80,9 +80,9 @@ export default function HomeHero({ region }: { region: Region }) {
 
       <div className="hh-inner">
         <div className="hh-copy">
-          <Link href={`${hrefIn(region, "/products")}#voice-agent`} className="hh-announce">
+          <Link href={hrefIn(region, "/products/vantriq-pulse")} className="hh-announce">
             <span className="hh-announce-tag">New</span>
-            Voice Agent — it answers the phone too
+            Vantriq Pulse &amp; Echo — every conversation, measured
             <span aria-hidden="true" className="hh-announce-arrow">→</span>
           </Link>
 

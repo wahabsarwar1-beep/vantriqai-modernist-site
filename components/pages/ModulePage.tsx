@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import JsonLd from "@/components/JsonLd";
 import HeroChatCard from "@/components/HeroChatCard";
+import ModuleVisual from "@/components/ModuleVisual";
 import LineReveal from "@/components/LineReveal";
 import GlowGrid from "@/components/GlowGrid";
 import Magnetic from "@/components/Magnetic";
@@ -23,6 +24,7 @@ const h2: CSSProperties = { fontSize: "clamp(28px,3.6vw,48px)", lineHeight: 1, l
 const GROUP_THEME: Record<Module["kicker"], { a: string; b: string; label: string }> = {
   Channel: { a: "#2f56d9", b: "#7a5bd6", label: "Channels" },
   Capability: { a: "#6a4fd1", b: "#e0854f", label: "Capabilities" },
+  Insight: { a: "#0f8fb3", b: "#7a5bd6", label: "Insight & people" },
   Deployment: { a: "#15907f", b: "#2f56d9", label: "Deployment" },
 };
 
@@ -118,13 +120,23 @@ export default function ModulePage({ region, module: m }: { region: Region; modu
             </div>
           </div>
           <div className="ph-orbit mod-stage">
-            <HeroChatCard channel={m.hero.channel} time={m.hero.time} bubbles={m.hero.bubbles} speed={m.hero.speed} outcome={m.hero.outcome} />
-            <span aria-hidden="true" className="industry-float industry-float-a">
-              <span className="industry-float-ico">⟳</span>Synced to your systems
-            </span>
-            <span aria-hidden="true" className="industry-float industry-float-b">
-              <span className="industry-float-ico">✓</span>Illustrative example
-            </span>
+            {m.visual ? (
+              <ModuleVisual kind={m.visual} />
+            ) : (
+              <HeroChatCard channel={m.hero.channel} time={m.hero.time} bubbles={m.hero.bubbles} speed={m.hero.speed} outcome={m.hero.outcome} />
+            )}
+            {m.visual ? (
+              <p className="mv-caption">Illustrative example — not client data</p>
+            ) : (
+              <>
+                <span aria-hidden="true" className="industry-float industry-float-a">
+                  <span className="industry-float-ico">⟳</span>Synced to your systems
+                </span>
+                <span aria-hidden="true" className="industry-float industry-float-b">
+                  <span className="industry-float-ico">✓</span>Illustrative example
+                </span>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -135,7 +147,7 @@ export default function ModulePage({ region, module: m }: { region: Region; modu
           <div>
             <Eyebrow n="01" label="How it works" />
             <h2 data-anim="" style={{ ...h2, maxWidth: "16ch" }}>
-              From first message <span className="grad-text">to done.</span>
+              {m.flowTitle?.[0] ?? "From first message"} <span className="grad-text">{m.flowTitle?.[1] ?? "to done."}</span>
             </h2>
           </div>
           <p data-anim="" style={{ fontSize: 17, lineHeight: "29px", margin: 0, maxWidth: "44ch", ...muted }}>
@@ -157,7 +169,7 @@ export default function ModulePage({ region, module: m }: { region: Region; modu
       <section style={{ ...wrap, paddingTop: "clamp(64px,8vw,112px)" }}>
         <Eyebrow n="02" label="What it does" />
         <h2 data-anim="" style={{ ...h2, maxWidth: "18ch", marginBottom: "clamp(28px,3.6vw,44px)" }}>
-          Built to finish the job, <span className="grad-text">not just reply.</span>
+          {m.capTitle?.[0] ?? "Built to finish the job,"} <span className="grad-text">{m.capTitle?.[1] ?? "not just reply."}</span>
         </h2>
         <GlowGrid className="cap-grid">
           {m.capabilities.map((c) => (

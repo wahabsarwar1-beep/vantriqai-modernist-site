@@ -59,6 +59,7 @@ export default function PackageCompare({ region }: { region: Region }) {
         cells: pkgs.map((k) => (k.index >= f.from ? "included" : "none")),
       })),
     },
+    { title: "Insight & people", rows: moduleRows("Insight") },
     { title: "Deployment", rows: moduleRows("Deployment") },
     {
       title: "Capacity",

@@ -10,7 +10,9 @@ import type { Region } from "@/lib/region";
  * out you forgot when a menu link scrolled to nothing.
  */
 export type Product = {
-  kicker: "Channel" | "Capability" | "Deployment";
+  kicker: "Channel" | "Capability" | "Insight" | "Deployment";
+  /** Shown as a "New" flag in the menu and on the Products page. */
+  isNew?: boolean;
   name: string;
   body: string;
   tier: string;
@@ -72,6 +74,18 @@ export const products = (region: Region): Product[] => [
     body: "What customers asked, what they abandoned and which hours cost you money — one Monday digest in plain language, not a wall of charts.",
   },
   {
+    kicker: "Insight", name: "Vantriq Pulse", tier: "In every plan", tint: "dark", mark: "pulse", isNew: true,
+    body: "Live analytics on every conversation: leads made and closed, time to close, busiest hours, satisfaction and what the AI resolved on its own — compared like for like, in plain English.",
+  },
+  {
+    kicker: "Insight", name: "Vantriq Echo", tier: "Add-on module", tint: "dark", mark: "echo", isNew: true,
+    body: "Customer-satisfaction surveys in English and Urdu — after a WhatsApp chat, by QR code, link, SMS, email, kiosk or on your site — with every answer flowing straight into Pulse.",
+  },
+  {
+    kicker: "Insight", name: "Human Assistant", tier: "Add-on module", tint: "dark", mark: "human", isNew: true,
+    body: "An AI co-pilot for your team. When a person takes over a chat, it hands them the summary, the customer's history and a drafted reply in the customer's language — they decide what is sent.",
+  },
+  {
     kicker: "Deployment", name: "Private Deployment", tier: "From Enterprise", tint: "dark", mark: "deployment",
     body: "The whole stack self-hosted on your infrastructure, for strict data-residency requirements. Same agents, nothing leaving your network.",
   },
@@ -91,4 +105,4 @@ export const productSlug = (name: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
-export const PRODUCT_GROUPS: Product["kicker"][] = ["Channel", "Capability", "Deployment"];
+export const PRODUCT_GROUPS: Product["kicker"][] = ["Channel", "Capability", "Insight", "Deployment"];

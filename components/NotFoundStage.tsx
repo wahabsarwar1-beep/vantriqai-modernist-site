@@ -16,7 +16,7 @@ export default function NotFoundStage() {
   const routes = [
     { href: hrefIn(region, "/"), label: "Home", note: "Start from the top" },
     { href: hrefIn(region, "/industries"), label: "Industries", note: "Find your sector" },
-    { href: hrefIn(region, "/products"), label: "Platform", note: "All fourteen modules" },
+    { href: hrefIn(region, "/products"), label: "Platform", note: "Every module" },
   ];
 
   return (

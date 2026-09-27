@@ -11,19 +11,19 @@ import { sectorSlug } from "@/lib/industries";
  *
  * Every item goes somewhere distinct. The modules and the sectors live as
  * sections on one page each, so they are anchors — which is a real
- * destination, not fourteen links to the same URL dressed up as depth. The
+ * destination, not a dozen links to the same URL dressed up as depth. The
  * anchors come from productSlug, the same function that stamps the ids onto
  * the cards, so a renamed module cannot leave a menu entry pointing at
  * nothing.
  */
 
-export type MenuLink = { href: string; label: string; note?: string; mark?: MarkId };
+export type MenuLink = { href: string; label: string; note?: string; mark?: MarkId; isNew?: boolean };
 export type MenuColumn = { title: string; icon?: ColumnIconId; links: MenuLink[] };
 /** The promoted card at the end of a panel — one next step, not a link list. */
 export type MenuFeature = { title: string; body: string; href: string; cta: string; kicker?: string; bullets?: string[] };
 
 /** The panel's opening statement: a tinted card, not another list item. */
-export type MenuHero = { title: string; body: string; href: string; cta: string };
+export type MenuHero = { title: string; body: string; href: string; cta: string; kicker?: string };
 
 export type MenuPanel = {
   /** The nav item that opens it. */
@@ -40,12 +40,14 @@ export type MenuPanel = {
 const GROUP_ICONS: Record<string, ColumnIconId> = {
   Channel: "channels",
   Capability: "capabilities",
+  Insight: "insight",
   Deployment: "deployment",
 };
 
 const GROUP_TITLES: Record<string, string> = {
   Channel: "Channels",
   Capability: "Capabilities",
+  Insight: "Insight & people",
   Deployment: "Deployment",
 };
 
@@ -56,11 +58,14 @@ export function menuPanels(region: Region): MenuPanel[] {
     {
       label: "Platform",
       href: navHref(region, { href: "/products" }),
+      /* Four module groups leave no room for a closing card, so the panel
+         opens with the launch instead — the one thing new in the catalogue. */
       hero: {
-        title: "One platform, fourteen modules",
-        body: "Switch on what your day needs. The rest stay quiet until you want them, and nothing is rebuilt when you add one.",
-        href: navHref(region, { href: "/how-it-works" }),
-        cta: "See how it works",
+        kicker: "Just launched",
+        title: "Vantriq Pulse & Echo",
+        body: "Live analytics on every conversation, and satisfaction surveys that feed it — plus a Human Assistant for your team.",
+        href: hrefIn(region, "/products/vantriq-pulse"),
+        cta: "Meet Pulse",
       },
       columns: PRODUCT_GROUPS.map((group) => ({
         title: GROUP_TITLES[group] ?? group,
@@ -72,17 +77,10 @@ export function menuPanels(region: Region): MenuPanel[] {
             label: p.name,
             note: p.tier,
             mark: p.mark,
+            isNew: p.isNew,
           })),
       })),
       footer: { href: navHref(region, { href: "/products" }), label: `All ${all.length} modules` },
-      feature: {
-        kicker: "Start here",
-        title: "Not sure which you need?",
-        body: "Describe how customers reach you today and we will say which modules that actually takes.",
-        bullets: ["Fifteen-minute discovery call", "Scoped against your real message history", "Fixed setup fee, in writing"],
-        href: navHref(region, { href: "/contact" }),
-        cta: "Send a brief",
-      },
     },
     {
       label: "Industries",

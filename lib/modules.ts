@@ -26,6 +26,11 @@ export type ModuleDetail = {
   pairs: string[];
   systems: string[];
   faqs: { q: string; a: string }[];
+  /** A bespoke hero picture in place of the chat card, for modules that are not a conversation. */
+  visual?: "pulse" | "echo" | "human";
+  /** Section headings for modules the chat-flavoured defaults do not fit. */
+  flowTitle?: [string, string];
+  capTitle?: [string, string];
 };
 
 export type Module = Product & ModuleDetail & { slug: string };
@@ -506,6 +511,111 @@ const details = (region: Region): Record<string, ModuleDetail> => ({
       { q: "Is there a dashboard?", a: "The digest comes to you, so you do not need to log in anywhere — the underlying data can be exported if you want it." },
       { q: "Who writes it?", a: "It is generated from your conversations each week and reviewed in the monthly tuning session with our team." },
       { q: "Is it included in every plan?", a: "Yes, from Starter up." },
+    ],
+  },
+  "Vantriq Pulse": {
+    visual: "pulse",
+    headline: ["Every conversation,", "measured live"],
+    lede: "Pulse turns the conversations your agents and your team have into a live picture of the business: leads made and closed, how long closing takes, when customers write, how satisfied they leave — and what the AI resolved without a person.",
+    hero: { time: "09:00", bubbles: [], speed: "", outcome: [] },
+    flowTitle: ["From conversation", "to clear numbers."],
+    capTitle: ["The numbers that run the business,", "not vanity charts."],
+    steps: [
+      { title: "Every conversation counted", body: "Chats, calls and DMs from every channel are logged as they happen — no exports, no spreadsheets." },
+      { title: "People, not sessions", body: "A customer who comes back next week is one returning contact, not two new ones, so your counts mean what they say." },
+      { title: "Compared like for like", body: "This month so far against last month up to the same day — never a half month against a whole one." },
+      { title: "Said in plain English", body: "The findings worth acting on are written out: your busiest slot, a spike, a slump, a slipping score." },
+    ],
+    capabilities: [
+      { title: "Leads and closes", body: "New leads, won and lost, win rate and the time it takes to close — with the funnel and the sources that convert." },
+      { title: "Timings", body: "A day-by-hour heatmap of when customers write, so staffing and follow-ups land at the right hour." },
+      { title: "Satisfaction", body: "CSAT, NPS, resolution rate, score spread and the comments behind them — fed by Vantriq Echo." },
+      { title: "AI containment", body: "How many conversations the agent resolved on its own, and how many it handed to a person." },
+      { title: "Channels and agents", body: "Volume by channel and by agent, new versus returning contacts, and your package's pace for the month." },
+      { title: "Any period, any system", body: "Day, week, month, quarter or year in your portal — and the same figures over an API for your own BI tools." },
+    ],
+    sectors: [
+      { slug: "ecommerce-retail", line: "See which hours sell, and which leave carts unanswered." },
+      { slug: "real-estate", line: "Enquiries, viewings and closes per agent, side by side." },
+      { slug: "healthcare", line: "Booking volume and patient satisfaction by branch." },
+      { slug: "marketing-agencies", line: "Lead sources and conversion to show every client." },
+    ],
+    pairs: ["Vantriq Echo", "Lead Qualifier", "Insights Digest"],
+    systems: ["Your customer portal", "Analytics API", "CRM", "Your BI tools"],
+    faqs: [
+      { q: "Where do we see Pulse?", a: "In the Analytics tab of your customer portal. If your plan includes API access, the same figures are available to your own systems." },
+      { q: "Can Pulse identify our customers?", a: "No. Customers are counted, never exposed: phone numbers and session ids stay on the server, and only the counts reach the dashboard." },
+      { q: "How is Pulse different from the Insights Digest?", a: "The Digest is a short plain-language note each Monday. Pulse is the live dashboard behind it, for whenever you want to look." },
+    ],
+  },
+  "Vantriq Echo": {
+    visual: "echo",
+    headline: ["Hear every customer,", "not just the loudest"],
+    lede: `Echo asks customers how it went — once, at the right moment, in ${region.key === "pk" ? "English or Urdu" : "their language"} — and turns the answers into scores you can act on. Unhappy answers reach your team the same day, and every score flows straight into Pulse.`,
+    hero: { time: "18:32", bubbles: [], speed: "", outcome: [] },
+    flowTitle: ["From the last message", "to the next improvement."],
+    capTitle: ["Surveys people actually finish,", "results you can use."],
+    steps: [
+      { title: "Pick or build a survey", body: "Start from a ready template for your industry, or build your own with a live preview as you go." },
+      { title: "Ask at the right moment", body: "After a WhatsApp chat has ended, by QR code at the counter, or by link, SMS, email, kiosk or on your site." },
+      { title: "Listen properly", body: "Follow-up questions appear only when they are relevant — ask what to improve only if the answer was unhappy." },
+      { title: "Act on it", body: "Unhappy answers alert your team, and scores land in Pulse next to the conversations they came from." },
+    ],
+    capabilities: [
+      { title: "Industry templates", body: "Nineteen bilingual templates, from clinics and restaurants to real estate and retail, ready to use or adapt." },
+      { title: "Every standard measure", body: "CSAT, NPS, customer effort, ratings, grids, choices, yes/no, free text and contact details." },
+      { title: "After-chat invites", body: "One polite invite once a WhatsApp conversation has ended — never mid-chat, never twice, never at night." },
+      { title: "QR posters and kiosk mode", body: "Print a poster for the counter or run a tablet at reception, with results per location." },
+      { title: "Alerts on unhappy answers", body: "A low score or a complaint reaches the right person the same day, so a bad visit gets a call back." },
+      { title: "Straight into Pulse", body: "Scores, trends and comments sit in your analytics, with exports whenever you need the raw answers." },
+    ],
+    sectors: [
+      { slug: "healthcare", line: "Patient feedback after every visit, by branch and by doctor." },
+      { slug: "hospitality", line: "A QR code on the table, answers before the bill arrives." },
+      { slug: "ecommerce-retail", line: "Delivery and product feedback after every order chat." },
+      { slug: "education", line: "Parent and student satisfaction, term by term." },
+    ],
+    pairs: ["Vantriq Pulse", "WhatsApp Agent", "Escalation Desk"],
+    systems: ["WhatsApp", "QR codes and posters", "SMS and email", "Your website"],
+    faqs: [
+      { q: "Will customers be asked after every message?", a: "No. The after-chat invite goes once per conversation, after it has gone quiet, within your sending hours — and not again for as long as you set." },
+      { q: "Can we survey customers who never chatted?", a: "Yes. Share a link, print a QR code, run a kiosk, or embed the survey on your site. Every channel feeds the same results." },
+      { q: "Is Echo available in Urdu?", a: "Yes. Every template is bilingual, and Urdu surveys read right to left as they should." },
+    ],
+  },
+  "Human Assistant": {
+    visual: "human",
+    headline: ["Your team,", "with an AI at their side"],
+    lede: "When a conversation needs a person, the Human Assistant makes that person faster: it summarises what has happened, shows who the customer is, drafts the reply in their language and puts the next action one tap away. Your colleague decides what is sent.",
+    hero: { time: "15:47", bubbles: [], speed: "", outcome: [] },
+    flowTitle: ["From handover", "to handled."],
+    capTitle: ["Everything a colleague needs,", "already on the screen."],
+    steps: [
+      { title: "The agent hands over", body: "Anything needing judgement — a complaint, a big order, a special request — goes to the right person." },
+      { title: "The briefing is ready", body: "A short summary of the conversation, the customer's history and what they are asking for, before your colleague types a word." },
+      { title: "A reply is drafted", body: "In the customer's language and your tone, from your approved content. Your colleague edits, sends or ignores it." },
+      { title: "The loop closes", body: "The outcome is logged to your CRM, and the case feeds the next tuning round so the agent handles it next time." },
+    ],
+    capabilities: [
+      { title: "Instant summaries", body: "No scrolling back through forty messages to work out what the customer wants." },
+      { title: "Suggested replies", body: "Drafted in English, Urdu or Roman Urdu, from your catalogue, policies and past answers." },
+      { title: "One-tap actions", body: "Book the slot, send the payment link or hold the item without leaving the conversation." },
+      { title: "Customer context", body: "Previous orders, bookings and conversations beside the chat, so nobody asks twice." },
+      { title: "A person always decides", body: "Nothing is sent to a customer from the Human Assistant without your colleague choosing to send it." },
+      { title: "Learns from your team", body: "What your people do with handed-over cases shapes the agent's next tuning round." },
+    ],
+    sectors: [
+      { slug: "finance-insurance", line: "Complex cases handled quickly, with a person accountable." },
+      { slug: "healthcare", line: "Front-desk staff briefed before they answer a patient." },
+      { slug: "ecommerce-retail", line: "Returns and complaints resolved in one reply, not five." },
+      { slug: "legal-consulting", line: "Intake summarised before a consultant picks it up." },
+    ],
+    pairs: ["Escalation Desk", "Vantriq Pulse", "Payments Agent"],
+    systems: ["Your team inbox", "CRM", "Calendar", "Payment links"],
+    faqs: [
+      { q: "Does the Human Assistant reply to customers by itself?", a: "No. It prepares — the summary, the draft, the action — and your colleague decides what is sent." },
+      { q: "How is it different from the Escalation Desk?", a: "The Escalation Desk decides when and to whom a conversation is handed over. The Human Assistant helps the person who receives it." },
+      { q: "Does it work in Urdu?", a: "Yes. It summarises and drafts in English, Urdu or Roman Urdu, matching the language the customer wrote in." },
     ],
   },
   "Private Deployment": {
