@@ -47,9 +47,18 @@ const STATE_TITLE = {
   not_found: 'Survey not found', draft: 'This survey is not open yet', paused: 'This survey is paused', closed: 'This survey has closed',
 };
 
+// Link previews. A survey link sent on WhatsApp with previews on is fetched
+// by Meta (facebookexternalhit) to draw the card, and apps fetch links pasted
+// into chats the same way. That is not the customer opening it: it must not
+// mark their invite opened, nor count as a view. Only the fetchers themselves
+// are matched — WhatsApp's previewer sends "WhatsApp/2.x", while a page opened
+// inside WhatsApp's browser is an ordinary browser user agent.
+const LINK_PREVIEW = /^WhatsApp\/|facebookexternalhit|facebookcatalog|meta-externalagent|Twitterbot|Slackbot|TelegramBot|Discordbot|LinkedInBot|SkypeUriPreview|Googlebot|bingbot|Applebot|redditbot|Pinterestbot|Embedly|vkShare/i;
+
 router.get('/:slug', async (req, res) => {
   const survey = await S.getSurveyBySlug(req.params.slug);
   const preview = req.query.preview === '1';
+  const fetcher = LINK_PREVIEW.test(String(req.get('user-agent') || ''));
   let state = 'ok';
   if (!survey) state = 'not_found';
   else if (survey.status === 'draft' && !preview) state = 'draft';
@@ -61,10 +70,10 @@ router.get('/:slug', async (req, res) => {
     const inv = await S.findInvite(survey, String(req.query.i));
     if (inv) {
       invite = { token: inv.token, answered: !!inv.response_id };
-      S.markInviteOpened(inv).catch(() => {});
+      if (!fetcher) S.markInviteOpened(inv).catch(() => {});
     }
   }
-  if (survey && state === 'ok' && !preview) S.countView(survey, clientIp(req)).catch(() => {});
+  if (survey && state === 'ok' && !preview && !fetcher) S.countView(survey, clientIp(req)).catch(() => {});
 
   const pub = survey && state === 'ok' ? S.publicSurvey(survey) : null;
   const name = survey ? (survey.display_name || survey.company || '') : '';

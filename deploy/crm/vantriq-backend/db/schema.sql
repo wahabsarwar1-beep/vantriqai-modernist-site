@@ -1735,3 +1735,7 @@ create unique index if not exists idx_csat_survey_response
 -- pausing, renaming or deleting it is final: a later deploy never brings it
 -- back. See ensureOwnSurvey in src/utils/surveys.js.
 alter table settings add column if not exists own_survey_at timestamptz;
+
+-- v9.14.1 — the same, for the after-chat survey the WhatsApp agent's flow in
+-- n8n sends ("After a WhatsApp chat", /s/vantriqai-chat). Made once.
+alter table settings add column if not exists own_chat_survey_at timestamptz;

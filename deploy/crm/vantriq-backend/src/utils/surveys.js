@@ -447,35 +447,57 @@ async function deleteSurvey(survey) {
 }
 
 /**
- * VantriqAI's own survey, made by npm run seed-internal on the internal
- * account like any customer's — so the moment an install is up there is a
- * live survey to open on a phone, answer, and watch arrive in the CRM.
+ * VantriqAI's own surveys, made by npm run seed-internal on the internal
+ * account like any customer's:
  *
- * Made ONCE. settings.own_survey_at records that it was, and is claimed
+ *   vantriqai-feedback  "Customer feedback" — a live survey to open on a
+ *                       phone the moment an install is up, answer, and watch
+ *                       arrive in the CRM.
+ *   vantriqai-chat      "After a WhatsApp chat" — three taps, the one the
+ *                       WhatsApp agent's after-chat flow in n8n sends
+ *                       (defaultSurveyFor prefers an after-chat survey).
+ *
+ * Each is made ONCE. Its settings column records that it was, and is claimed
  * before the survey is made, so pausing, renaming or deleting it afterwards
- * is final: no later deploy brings it back. An internal account that already
- * has surveys of its own gets none. If making it fails, the claim is undone
+ * is final: no later deploy brings it back. An account that already has a
+ * survey of that kind gets none. If making one fails, its claim is undone
  * and the next run tries again.
  */
 const OWN_SURVEY_SLUG = 'vantriqai-feedback';
+const OWN_CHAT_SURVEY_SLUG = 'vantriqai-chat';
 
-async function ensureOwnSurvey(client) {
+const OWN_SURVEYS = [
+  {
+    flag: 'own_survey_at', slug: OWN_SURVEY_SLUG, template: 'professional', title: 'Customer feedback',
+    // An account already using surveys has chosen its own.
+    has: `select count(*)::int as n from surveys where client_id = $1`,
+    hasReason: 'the account already has surveys',
+  },
+  {
+    flag: 'own_chat_survey_at', slug: OWN_CHAT_SURVEY_SLUG, template: 'support_chat', title: 'After a WhatsApp chat',
+    has: `select count(*)::int as n from surveys where client_id = $1 and industry = 'support_chat'`,
+    hasReason: 'the account already has an after-chat survey',
+  },
+];
+
+async function ensureOwnSurvey(client, spec = OWN_SURVEYS[0]) {
+  // spec.flag is one of the fixed column names above, never input.
   const { rows: claim } = await db.query(
-    `update settings set own_survey_at = now() where id = 1 and own_survey_at is null
+    `update settings set ${spec.flag} = now() where id = 1 and ${spec.flag} is null
      returning internal_invoice_email`
   );
   if (!claim[0]) return { created: false, reason: 'made once already' };
   try {
-    const { rows: has } = await db.query(`select count(*)::int as n from surveys where client_id = $1`, [client.id]);
-    if (has[0].n) return { created: false, reason: 'the account already has surveys' };
+    const { rows: has } = await db.query(spec.has, [client.id]);
+    if (has[0].n) return { created: false, reason: spec.hasReason };
     const base = publicBase(null);
     const survey = await createSurvey({
       client,
-      template: 'professional',
+      template: spec.template,
       input: {
         // The memorable address if it is free, a made-up one if not.
-        slug: (await getSurveyBySlug(OWN_SURVEY_SLUG)) ? undefined : OWN_SURVEY_SLUG,
-        title: 'Customer feedback',
+        slug: (await getSurveyBySlug(spec.slug)) ? undefined : spec.slug,
+        title: spec.title,
         status: 'live',
         // Unhappy answers go to the mailbox our own invoices go to — the one
         // the company is sure to read — not the account's placeholder address.
@@ -486,12 +508,25 @@ async function ensureOwnSurvey(client) {
     });
     return { created: true, survey, url: `${base}/s/${survey.slug}` };
   } catch (err) {
-    await db.query(`update settings set own_survey_at = null where id = 1`).catch(() => {});
+    await db.query(`update settings set ${spec.flag} = null where id = 1`).catch(() => {});
     throw err;
   }
 }
 
-const isClosed =(s) => s.status === 'closed' || (s.closes_at && new Date(s.closes_at) < new Date());
+/** Both of VantriqAI's own surveys, in order; one failing never stops the other. */
+async function ensureOwnSurveys(client) {
+  const out = [];
+  for (const spec of OWN_SURVEYS) {
+    try {
+      out.push({ slug: spec.slug, ...(await ensureOwnSurvey(client, spec)) });
+    } catch (err) {
+      out.push({ slug: spec.slug, created: false, error: err.message });
+    }
+  }
+  return out;
+}
+
+const isClosed = (s) => s.status === 'closed' || (s.closes_at && new Date(s.closes_at) < new Date());
 
 /** Roughly how long a survey takes, for "takes about a minute". */
 function estimateMinutes(questions) {
@@ -584,12 +619,218 @@ function withLinks(survey, base) {
 }
 
 /** The text to send with a personal link, ready for WhatsApp, in both languages. */
-function inviteMessage(survey, url) {
+function inviteMessage(survey, url, { chat = false } = {}) {
   const name = survey.display_name || survey.company || 'us';
+  // After a conversation the customer may not have bought anything yet, so
+  // it thanks them for the chat rather than for "choosing" the business.
+  if (chat) {
+    return {
+      en: `Thanks for chatting with ${name}! How did we do? It takes less than a minute: ${url}`,
+      ur: `${name} سے بات کرنے کا شکریہ! ہماری کارکردگی کیسی رہی؟ اس میں ایک منٹ سے بھی کم وقت لگتا ہے: ${url}`,
+    };
+  }
   return {
     en: `Thank you for choosing ${name}! Could you tell us how we did? It takes under a minute: ${url}`,
     ur: `${name} کا انتخاب کرنے کا شکریہ! کیا آپ ہمیں بتائیں گے کہ ہماری کارکردگی کیسی رہی؟ اس میں ایک منٹ سے بھی کم وقت لگتا ہے: ${url}`,
   };
+}
+
+// ---------------------------------------------------------------------
+// After a chat: is it time to ask?
+// ---------------------------------------------------------------------
+
+/**
+ * The customer a conversation belongs to. n8n names a WhatsApp session
+ * `<customer number>-<yyyy-MM-dd>` (one per day — n8n/README.md), so a
+ * conversation that runs past midnight is two sessions of one customer.
+ * Everything that asks "has this customer…" goes by this, not by the session.
+ */
+const SESSION_DATE = /-\d{4}-\d{2}-\d{2}$/;
+function customerKey(sessionId) {
+  return String(sessionId || '').trim().replace(SESSION_DATE, '');
+}
+// A session of that customer: the key itself, or the key and a date.
+const OF_CUSTOMER = (col, keyParam) => `(${col} = ${keyParam} or (length(${col}) = length(${keyParam}) + 11
+  and left(${col}, length(${keyParam}) + 1) = ${keyParam} || '-' and ${col} ~ '-[0-9]{4}-[0-9]{2}-[0-9]{2}$'))`;
+
+const DEFAULT_TZ = process.env.SURVEY_TIMEZONE || 'Asia/Karachi';
+
+/**
+ * The rules n8n sends with an after-chat invite. All optional — and without
+ * quiet_minutes there are none: the webhook asks at once, as it always has.
+ *
+ *   quiet_minutes   the customer has not written for this long        (required)
+ *   min_messages    at least this many answered messages in the last
+ *                   day — a lone "hi" is not a conversation           (default 1)
+ *   within_hours    their last message is no older than this: WhatsApp
+ *                   lets a business write freely for 24 hours after it (default 23)
+ *   once_per_days   not if this customer was asked in the last N days (default 0)
+ *   send_from,      sending hours, local time, so nobody is woken at
+ *   send_until      3 a.m. — outside them the answer is "night", with
+ *                   the time to ask again                              (default: any hour)
+ *   timezone        for the sending hours                         (default Asia/Karachi)
+ */
+function chatRules(body = {}) {
+  const given = (v) => v !== undefined && v !== null && v !== '';
+  if (!given(body.quiet_minutes)) return null;
+  const int = (v, name, min, max, dflt) => {
+    if (!given(v)) return dflt;
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < min || n > max) throw bad(`${name} must be a whole number from ${min} to ${max}.`);
+    return n;
+  };
+  const rules = {
+    quiet_minutes: int(body.quiet_minutes, 'quiet_minutes', 1, 1380),
+    min_messages: int(body.min_messages, 'min_messages', 1, 1000, 1),
+    within_hours: int(body.within_hours, 'within_hours', 1, 720, 23),
+    once_per_days: int(body.once_per_days, 'once_per_days', 0, 365, 0),
+    send_from: int(body.send_from, 'send_from', 0, 23, null),
+    send_until: int(body.send_until, 'send_until', 0, 23, null),
+    timezone: given(body.timezone) ? String(body.timezone).trim() : DEFAULT_TZ,
+  };
+  if ((rules.send_from === null) !== (rules.send_until === null)) throw bad('send_from and send_until go together.');
+  if (rules.send_from !== null && rules.send_from === rules.send_until) throw bad('send_from and send_until cannot be the same hour.');
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: rules.timezone });
+  } catch {
+    throw bad(`"${cleanStr(rules.timezone, 60)}" is not a time zone (for example Asia/Karachi).`);
+  }
+  return rules;
+}
+
+/** The wall clock in a time zone, as numbers. */
+function zonedParts(date, tz) {
+  const p = {};
+  for (const x of new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(date)) p[x.type] = Number(x.value);
+  return p;
+}
+
+/** The next moment after `now` that the clock in `tz` reads hour:00. */
+function nextLocalHour(now, hour, tz) {
+  // A wall-clock time in tz, as an instant: take off the zone's offset.
+  const instant = (wall) => {
+    const p = zonedParts(new Date(wall), tz);
+    return wall - (Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - wall);
+  };
+  const p = zonedParts(now, tz);
+  const wall = Date.UTC(p.year, p.month - 1, p.day, hour, 0, 0);
+  let t = instant(wall);
+  if (t <= now.getTime()) t = instant(wall + 86400000);
+  return new Date(t);
+}
+
+function inSendingHours(now, rules) {
+  if (rules.send_from === null) return true;
+  const h = zonedParts(now, rules.timezone).hour;
+  const { send_from: from, send_until: until } = rules;
+  return from < until ? h >= from && h < until : h >= from || h < until;
+}
+
+const agoText = (ms) => {
+  const m = Math.max(0, Math.round(ms / 60000));
+  if (m < 90) return `${m} minute${m === 1 ? '' : 's'}`;
+  const h = Math.round(m / 60);
+  if (h < 48) return `${h} hours`;
+  return `${Math.round(h / 24)} days`;
+};
+
+/** Every rule, against what is on record. Read-only; runs inside chatInvite's lock. */
+async function chatVerdict(q, { clientId, sessionId, rules, now }) {
+  const key = customerKey(sessionId);
+  // Every reply the agent sent is a usage event: that is the conversation.
+  const { rows: [act] } = await q.query(
+    `select max(occurred_at) as last_at,
+            coalesce(sum(messages_count) filter (where occurred_at > $3::timestamptz - make_interval(hours => $4)), 0)::int as messages
+       from usage_events
+      where client_id = $1 and ${OF_CUSTOMER('session_id', '$2')}
+        and occurred_at > $3::timestamptz - make_interval(hours => $5)`,
+    [clientId, key, now.toISOString(), rules.within_hours, rules.within_hours + 24]
+  );
+  const lastAt = act.last_at ? new Date(act.last_at) : null;
+  const base = { due: false, last_message_at: lastAt ? lastAt.toISOString() : null, messages: act.messages };
+  const say = (code, reason, extra = {}) => ({ ...base, code, reason, ...extra });
+
+  if (!lastAt) return say('no_conversation', 'There is no recent conversation with this customer on record.');
+  const quiet = now.getTime() - lastAt.getTime();
+  if (quiet > rules.within_hours * 3600000) {
+    return say('window_closed', `The customer last wrote ${agoText(quiet)} ago — too long ago to message them.`);
+  }
+
+  // Asked already — about this conversation (whenever), or this customer
+  // lately: never twice within the window, nor within once_per_days.
+  const { rows: [prev] } = await q.query(
+    `select session_id, created_at from survey_invites
+      where client_id = $1 and ${OF_CUSTOMER('session_id', '$2')}
+        and (session_id = $3 or created_at > $4::timestamptz - make_interval(hours => $5))
+      order by (session_id = $3) desc, created_at desc limit 1`,
+    [clientId, key, sessionId, now.toISOString(), Math.max(rules.within_hours, rules.once_per_days * 24)]
+  );
+  if (prev) {
+    if (prev.session_id === sessionId) return say('already_asked', 'This conversation has already been asked about.');
+    return say('asked_recently', `This customer was asked ${agoText(now.getTime() - new Date(prev.created_at).getTime())} ago.`);
+  }
+
+  if (quiet < rules.quiet_minutes * 60000) {
+    return say('still_talking', `The customer wrote ${agoText(quiet)} ago — the conversation may still be going.`);
+  }
+  if (act.messages < rules.min_messages) {
+    return say('too_short', `${act.messages} message${act.messages === 1 ? '' : 's'} — fewer than the ${rules.min_messages} that make a conversation worth asking about.`);
+  }
+  if (!inSendingHours(now, rules)) {
+    const retry = nextLocalHour(now, rules.send_from, rules.timezone);
+    if (retry.getTime() >= lastAt.getTime() + rules.within_hours * 3600000) {
+      return say('window_closed', 'Outside sending hours, and the WhatsApp window closes before they begin again.');
+    }
+    const hh = (h) => String(h).padStart(2, '0');
+    return say('night', `Outside sending hours (${hh(rules.send_from)}:00–${hh(rules.send_until)}:00 ${rules.timezone}).`,
+      { retry_at: retry.toISOString() });
+  }
+  return { ...base, due: true, code: 'due', reason: 'The conversation has ended.' };
+}
+
+/**
+ * Asked by n8n about an hour after each reply its WhatsApp agent sends: has
+ * this conversation ended, and should the customer be asked about it now?
+ *
+ * WhatsApp has no "conversation closed" event — the customer just stops
+ * writing — but every reply the agent sends is already on record here. So
+ * n8n waits, then asks, and the answer is yes exactly once per conversation:
+ * the customer has gone quiet, said enough for it to be a conversation, is
+ * still inside WhatsApp's 24-hour window, is inside sending hours, and has not
+ * been asked already. The customer's number stays with n8n, which has it
+ * anyway; nothing here sends it anywhere.
+ *
+ * Returns the verdict ({ due, code, reason, … }) and, when due and not a dry
+ * run, the invite it made.
+ */
+async function chatInvite({ survey, clientId, sessionId, channel = 'whatsapp', rules, dryRun = false, now = new Date() }) {
+  const conn = await db.pool.connect();
+  try {
+    await conn.query('begin');
+    // Two waits for one customer ending in the same minute — two quick
+    // messages — must not both hear yes: one decision per customer at a time.
+    await conn.query('select pg_advisory_xact_lock(hashtext($1))', [`survey-chat|${clientId}|${customerKey(sessionId)}`]);
+    const verdict = await chatVerdict(conn, { clientId, sessionId, rules, now });
+    if (!verdict.due || dryRun) {
+      await conn.query('rollback');
+      return verdict;
+    }
+    const { rows } = await conn.query(
+      `insert into survey_invites (survey_id, client_id, token, session_id, channel) values ($1,$2,$3,$4,$5) returning *`,
+      [survey.id, survey.client_id, crypto.randomBytes(12).toString('base64url'), cleanStr(sessionId, 200),
+        CHANNELS.includes(channel) ? channel : 'whatsapp']
+    );
+    await conn.query('commit');
+    return { ...verdict, invite: rows[0] };
+  } catch (err) {
+    await conn.query('rollback').catch(() => {});
+    throw err;
+  } finally {
+    conn.release();
+  }
 }
 
 /** A QR code as SVG. One path, dark modules merged into runs, so it stays small and prints sharp. */
@@ -1520,8 +1761,9 @@ module.exports = {
   templateSummaries,
   normalizeSurvey, normalizeAnswers, conditionMet, metricsOf, needsFollowUp, isPromoter, themesOf, answerText,
   getSurvey, getSurveyBySlug, getClient, createSurvey, updateSurvey, duplicateSurvey, deleteSurvey,
-  OWN_SURVEY_SLUG, ensureOwnSurvey,
+  OWN_SURVEY_SLUG, OWN_CHAT_SURVEY_SLUG, ensureOwnSurvey, ensureOwnSurveys,
   isClosed, publicSurvey, publicBase, linksFor, withLinks, inviteMessage, qrSvg, escapeHtml, estimateMinutes,
+  customerKey, chatRules, chatVerdict, chatInvite, nextLocalHour, inSendingHours,
   recordResponse, notifyUnhappy, createInvites, findInvite, markInviteOpened, defaultSurveyFor, countView,
   listSurveys, overview, responsesPage, setFollowUp, surveyAnalytics, exportWorkbook, readableAnswers,
 };
