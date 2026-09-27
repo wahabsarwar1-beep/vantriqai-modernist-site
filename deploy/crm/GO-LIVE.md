@@ -191,7 +191,7 @@ Right now that address serves an empty placeholder. In **Nginx Proxy Manager**
 | Forward Port | `8080` |
 | Websockets Support | on |
 
-Save. Customers can then sign in at **https://portal.vantriqai.com/portal.html**
+Save. Customers can then sign in at **https://portal.vantriqai.com** — the app serves the customer portal at the root of that address (since v9.13.1; `/portal.html` keeps working too).
 
 ## 11. Give each client a portal login
 

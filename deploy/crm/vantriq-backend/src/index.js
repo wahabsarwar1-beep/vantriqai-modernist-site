@@ -135,10 +135,25 @@ app.use('/api', requireScope('admin'), procurementRoutes); // /api/vendors, /api
 
 // Serve the frontend (public/index.html) as a static site from the same server,
 // so the whole thing — API + UI — is one deployment.
-app.use(express.static(path.join(__dirname, '..', 'public')));
+//
+// portal.vantriqai.com is the customers' address and reaches this same app, so
+// its front door is the customer portal, not the staff console. Invoice emails
+// and password resets send customers to that bare address; without this they
+// landed on the staff sign-in. Nginx Proxy Manager passes the visitor's Host
+// through, which is what req.hostname reads. Set PORTAL_HOSTS to override.
+const PORTAL_HOSTS = (process.env.PORTAL_HOSTS || 'portal.vantriqai.com')
+  .split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
+const isPortalHost = (req) => PORTAL_HOSTS.includes(String(req.hostname || '').toLowerCase());
+const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+
+app.get(['/', '/index.html'], (req, res, next) => {
+  if (!isPortalHost(req)) return next();
+  res.sendFile(path.join(PUBLIC_DIR, 'portal.html'));
+});
+app.use(express.static(PUBLIC_DIR));
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api')) return next();
-  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+  res.sendFile(path.join(PUBLIC_DIR, isPortalHost(req) ? 'portal.html' : 'index.html'));
 });
 
 app.use((err, req, res, next) => {
