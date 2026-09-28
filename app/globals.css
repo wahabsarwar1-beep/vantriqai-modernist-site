@@ -2478,15 +2478,100 @@ span[data-chev] { display: inline-block; transition: transform .2s ease; }
 @media (max-width: 760px) { .ins.swipe { grid-auto-columns: 88%; } .ins-card:hover { transform: none; } }
 @media (max-width: 560px) { .ins .mv-heat { display: none; } .ins .mv-muted { display: none; } }
 
-/* ---------- Try it yourself, on a phone ----------
-   A phone drawn inside a phone looked like a toy and left a tall empty
-   screen before the first tap. On a phone it becomes a plain chat card:
-   no bezel, the height of the conversation, the businesses in one row. */
+/* ---------- Try it yourself: business picker on a phone ---------- */
 @media (max-width: 560px) {
   .demo-tabs { flex-wrap: nowrap !important; justify-content: flex-start !important; overflow-x: auto; max-width: 100%; scrollbar-width: none; padding: 2px 2px 4px; }
   .demo-tabs::-webkit-scrollbar { display: none; }
   .demo-tabs > button { flex: none; min-height: 36px !important; font-size: 10.5px !important; padding-inline: 14px !important; }
-  .demo-frame { max-width: none !important; padding: 0 !important; border: 0 !important; border-radius: 22px !important; background: none !important; box-shadow: 0 24px 50px -30px rgba(22,21,26,.45) !important; }
-  .demo-screen { min-height: 0 !important; border-radius: 22px !important; border: 1px solid var(--color-divider); }
-  .demo-thread { min-height: 150px !important; max-height: 320px !important; }
 }
+
+/* ---------- Try it yourself: the phone ----------
+   A realistic handset at true proportions (19.5:9): titanium edge, black
+   bezel, Dynamic Island, status bar, side buttons and a home indicator.
+   The chat inside takes the look of the channel it is on. */
+.phone {
+  --w: clamp(258px, 70vw, 296px);
+  position: relative; width: var(--w); aspect-ratio: 9 / 19.5; padding: 10px; border-radius: calc(var(--w) * .17);
+  background: linear-gradient(145deg, #4a4d57, #1b1c21 30%, #2b2d33 70%, #5a5d66);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.6), inset 0 0 0 1.5px rgba(255,255,255,.18), inset 0 0 0 7px #0b0b0e, 0 50px 90px -40px rgba(22,21,46,.65), 0 20px 40px -24px rgba(47,86,217,.45);
+}
+.phone-btn { position: absolute; width: 3px; border-radius: 2px; background: linear-gradient(90deg, #2b2d33, #62656e); }
+.phone-btn-action { left: -2px; top: 17%; height: 4.5%; }
+.phone-btn-vol { left: -2px; top: 25%; height: 13%; box-shadow: 0 calc(var(--w) * .1) 0 #45484f; }
+.phone-btn-power { right: -2px; left: auto; top: 26%; height: 15%; background: linear-gradient(270deg, #2b2d33, #62656e); }
+.phone-screen {
+  position: relative; height: 100%; display: flex; flex-direction: column; overflow: hidden; border-radius: calc(var(--w) * .145);
+  background: #fff; font-family: -apple-system, "SF Pro Text", "Segoe UI", Roboto, var(--font-body), sans-serif; color: #111b21;
+}
+.phone-status { position: relative; flex: none; display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 4px 22px 0 26px; font-size: 13px; font-weight: 600; background: var(--chat-head, #f7f7f7); }
+.phone-island { position: absolute; left: 50%; top: 9px; width: 31%; height: 23px; transform: translateX(-50%); border-radius: 20px; background: #000; }
+.phone-icons { display: inline-flex; align-items: center; gap: 5px; }
+.phone-icons svg { fill: currentColor; }
+.phone-battery { position: relative; width: 23px; height: 11px; padding: 1.5px; border-radius: 3.5px; border: 1px solid rgba(17,27,33,.4); }
+.phone-battery::after { content: ""; position: absolute; right: -3px; top: 3px; width: 1.5px; height: 4px; border-radius: 0 1px 1px 0; background: rgba(17,27,33,.4); }
+.phone-battery i { display: block; width: 78%; height: 100%; border-radius: 2px; background: currentColor; }
+
+.chat-head { flex: none; display: flex; align-items: center; gap: 8px; padding: 6px 12px 8px 8px; background: var(--chat-head, #f7f7f7); border-bottom: 1px solid rgba(0,0,0,.08); }
+.chat-back { font-size: 26px; line-height: 1; color: var(--chat-accent, #007aff); margin-top: -3px; }
+.chat-avatar { display: grid; place-items: center; width: 30px; height: 30px; flex: none; border-radius: 50%; background: #111827; }
+.chat-avatar img { width: 16px; height: 16px; }
+.chat-who { display: grid; min-width: 0; flex: 1; line-height: 1.2; }
+.chat-who strong { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chat-who > span { font-size: 11px; color: #667781; }
+.chat-tools { display: inline-flex; gap: 14px; color: var(--chat-accent, #007aff); }
+
+.chat-thread {
+  flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 10px 10px 12px; scrollbar-width: none;
+  background: var(--chat-bg, #efeae2);
+}
+.chat-thread::-webkit-scrollbar { display: none; }
+.chat-day { align-self: center; margin: 2px 0 4px; padding: 3px 9px; border-radius: 7px; font-size: 11px; color: #54656f; background: rgba(255,255,255,.9); box-shadow: 0 1px .5px rgba(11,20,26,.13); }
+.chat-turn { display: flex; flex-direction: column; gap: 6px; }
+.chat-msg { position: relative; max-width: 80%; padding: 6px 9px 17px; border-radius: 10px; font-size: 13.5px; line-height: 18px; box-shadow: 0 1px .5px rgba(11,20,26,.13); animation: chat-in .28s ease both; overflow-wrap: anywhere; }
+.chat-in { align-self: flex-start; background: var(--chat-in, #fff); color: var(--chat-in-text, #111b21); border-top-left-radius: 3px; }
+.chat-out { align-self: flex-end; background: var(--chat-out, #d9fdd3); color: var(--chat-out-text, #111b21); border-top-right-radius: 3px; }
+.chat-meta { position: absolute; right: 8px; bottom: 3px; display: inline-flex; gap: 3px; font-size: 10px; line-height: 1; opacity: .6; white-space: nowrap; }
+.chat-ticks { color: #53bdeb; letter-spacing: -3px; opacity: 1; font-weight: 700; }
+.chat-typing { display: inline-flex; gap: 4px; padding: 11px 12px; }
+.chat-typing i { width: 6px; height: 6px; border-radius: 50%; background: #8696a0; animation: blip 1.1s infinite; }
+.chat-typing i:nth-child(2) { animation-delay: .18s; } .chat-typing i:nth-child(3) { animation-delay: .36s; }
+/* What the agent did, as a system note under its reply. */
+.chat-did { align-self: flex-start; display: flex; flex-wrap: wrap; gap: 4px; max-width: 90%; animation: chat-in .35s ease both; }
+.chat-did > span { padding: 3px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 600; color: #1f3a95; background: rgba(232,236,253,.95); border: 1px solid #cfd9fb; }
+@keyframes chat-in { from { opacity: 0; transform: translateY(6px) scale(.98); } to { opacity: 1; transform: none; } }
+
+.chat-compose { flex: none; display: grid; gap: 7px; padding: 8px 10px 6px; background: var(--chat-head, #f7f7f7); border-top: 1px solid rgba(0,0,0,.06); }
+.chat-suggest {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0 8px; width: 100%; padding: 7px 7px 7px 12px; border-radius: 16px; cursor: pointer; text-align: left;
+  border: 1px solid #cfd9fb; background: #eef2ff; color: #182c70; font: inherit; transition: opacity .2s ease, transform .15s ease;
+}
+.chat-suggest:active { transform: scale(.98); }
+.chat-suggest:disabled { opacity: .5; cursor: default; }
+.chat-suggest-k { grid-column: 1; font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #2f56d9; }
+.chat-suggest-q { grid-column: 1; font-size: 13px; line-height: 17px; font-weight: 500; }
+.chat-send { grid-column: 2; grid-row: 1 / span 2; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: #fff; background: var(--chat-send, #25d366); font-size: 15px; }
+.chat-restart .chat-suggest-q { font-size: 12px; }
+.chat-bar { display: flex; align-items: center; gap: 8px; }
+.chat-plus { font-size: 22px; line-height: 1; color: var(--chat-accent, #007aff); }
+.chat-input { flex: 1; padding: 6px 12px; border-radius: 18px; font-size: 13px; color: #8696a0; background: #fff; border: 1px solid rgba(0,0,0,.08); }
+.chat-mic { color: var(--chat-accent, #007aff); display: inline-flex; }
+.phone-home { justify-self: center; width: 36%; height: 4px; margin-top: 3px; border-radius: 4px; background: #111; }
+
+/* WhatsApp: beige wallpaper with a faint pattern, green bubbles, blue ticks. */
+.phone[data-channel="whatsapp"] { --chat-bg: #efeae2; --chat-out: #d9fdd3; --chat-send: #25d366; --chat-accent: #007aff; }
+.phone[data-channel="whatsapp"] .chat-thread {
+  background-color: #efeae2;
+  background-image: radial-gradient(rgba(0,0,0,.035) 1.2px, transparent 1.3px), radial-gradient(rgba(0,0,0,.025) 1px, transparent 1.1px);
+  background-size: 22px 22px, 13px 13px; background-position: 0 0, 7px 9px;
+}
+/* Instagram DMs: white, gradient outgoing bubbles, rounder shapes. */
+.phone[data-channel="instagram"] { --chat-head: #fff; --chat-bg: #fff; --chat-in: #efefef; --chat-out: linear-gradient(135deg, #3b6cf6, #8a3ab9); --chat-out-text: #fff; --chat-send: linear-gradient(135deg, #3b6cf6, #8a3ab9); --chat-accent: #111; }
+.phone[data-channel="instagram"] .chat-msg { border-radius: 18px; box-shadow: none; }
+.phone[data-channel="instagram"] .chat-out { background: var(--chat-out); }
+.phone[data-channel="instagram"] .chat-send { background: var(--chat-send); }
+.phone[data-channel="instagram"] .chat-avatar { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px #d6249f; }
+/* Website: the clinic's site chat widget, in its brand blue. */
+.phone[data-channel="website"] { --chat-head: #fff; --chat-bg: #f4f6fb; --chat-out: #2f56d9; --chat-out-text: #fff; --chat-send: #2f56d9; --chat-accent: #2f56d9; }
+.phone[data-channel="website"] .chat-msg { border-radius: 14px; }
+
+@media (prefers-reduced-motion: reduce) { .chat-msg, .chat-did { animation: none; } }

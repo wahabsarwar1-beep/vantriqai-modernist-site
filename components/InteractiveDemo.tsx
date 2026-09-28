@@ -30,6 +30,8 @@ type Turn = {
 
 type Scenario = {
   key: string;
+  /** A made-up business, so the screen reads like a real chat. */
+  business: string;
   label: string;
   channel: string;
   time: string;
@@ -39,6 +41,7 @@ type Scenario = {
 const SCENARIOS: Scenario[] = [
   {
     key: "retail",
+    business: "Aurora Furniture",
     label: "Furniture shop",
     channel: "WhatsApp",
     time: "21:40",
@@ -65,6 +68,7 @@ const SCENARIOS: Scenario[] = [
   },
   {
     key: "clinic",
+    business: "Smile Dental Clinic",
     label: "Dental clinic",
     channel: "Website",
     time: "19:05",
@@ -91,6 +95,7 @@ const SCENARIOS: Scenario[] = [
   },
   {
     key: "property",
+    business: "Keystone Estates",
     label: "Estate agency",
     channel: "Instagram",
     time: "22:15",
@@ -119,8 +124,6 @@ const SCENARIOS: Scenario[] = [
 
 const wait = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
-const bubbleIn = { animation: "pop .3s ease both" as const };
-
 const mono = {
   fontFamily: "var(--font-heading)",
   fontWeight: 800,
@@ -143,7 +146,6 @@ export default function InteractiveDemo() {
 
   const scenario = SCENARIOS[scenarioIndex];
   const busy = pending !== null;
-  const done = played >= scenario.turns.length;
 
   useEffect(() => {
     reduced.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -247,64 +249,86 @@ export default function InteractiveDemo() {
         })}
       </div>
 
-      <div className="demo-frame" style={{ width: "100%", maxWidth: 320, background: "var(--color-neutral-900)", border: "1px solid var(--color-neutral-800)", padding: 8, borderRadius: 46, boxShadow: "var(--shadow-lg)" }}>
-        <div className="demo-screen" style={{ position: "relative", background: "var(--color-surface)", borderRadius: 38, overflow: "hidden", minHeight: 470, display: "flex", flexDirection: "column" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--color-text)", color: "var(--color-bg)", padding: "12px 16px" }}>
-            <Image src="/ventriqai-mark-reversed-cobalt.svg" alt="" width={22} height={22} style={{ width: 22, height: 22, flex: "none", display: "block" }} />
-            <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 13, letterSpacing: "-0.01em", whiteSpace: "nowrap", flex: "none" }}>
-              Vantriq<span style={{ color: "var(--color-accent-400)" }}>AI</span> agent
-            </span>
-            <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 999, background: "var(--color-accent-300)", flex: "none", animation: "blip 1.6s ease-in-out infinite" }} />
-            <span style={{ marginLeft: "auto", flex: "none", ...mono, fontSize: 9.5, whiteSpace: "nowrap", color: "color-mix(in srgb, var(--color-bg) 60%, transparent)" }}>
-              {scenario.channel}
+      {/* A realistic handset: metal edge, bezel, Dynamic Island, status bar,
+          and the chat styled like the real app for the scenario's channel. */}
+      <div className="phone" data-channel={scenario.channel.toLowerCase()}>
+        <span aria-hidden="true" className="phone-btn phone-btn-action" />
+        <span aria-hidden="true" className="phone-btn phone-btn-vol" />
+        <span aria-hidden="true" className="phone-btn phone-btn-power" />
+        <div className="phone-screen">
+          <div aria-hidden="true" className="phone-status">
+            <span className="phone-time">{scenario.time}</span>
+            <span className="phone-island" />
+            <span className="phone-icons">
+              <svg width="17" height="11" viewBox="0 0 17 11"><rect x="0" y="7" width="3" height="4" rx="1" /><rect x="4.5" y="5" width="3" height="6" rx="1" /><rect x="9" y="2.5" width="3" height="8.5" rx="1" /><rect x="13.5" y="0" width="3" height="11" rx="1" /></svg>
+              <svg width="15" height="11" viewBox="0 0 15 11"><path d="M7.5 2.2c2.2 0 4.2.8 5.7 2.2l1.1-1.2A9.6 9.6 0 0 0 7.5.5 9.6 9.6 0 0 0 .7 3.2l1.1 1.2a8 8 0 0 1 5.7-2.2Zm0 3.3c1.3 0 2.5.5 3.4 1.3l1.1-1.2a6.6 6.6 0 0 0-9 0l1.1 1.2c.9-.8 2.1-1.3 3.4-1.3Zm0 3.2c.5 0 .9.2 1.2.5L7.5 10.5 6.3 9.2c.3-.3.7-.5 1.2-.5Z" /></svg>
+              <span className="phone-battery"><i /></span>
             </span>
           </div>
 
-          <div
-            ref={threadRef}
-            aria-live="polite"
-            className="demo-thread"
-            style={{ flex: 1, minHeight: 0, maxHeight: 360, display: "grid", gap: 12, padding: "16px 14px", overflowY: "auto", alignContent: "start", background: "var(--color-surface)" }}
-          >
-            <p style={{ justifySelf: "center", ...mono, fontWeight: 700, color: "color-mix(in srgb, var(--color-text) 42%, transparent)", margin: "0 0 2px" }}>
-              Today · {scenario.time}
-            </p>
+          <div className="chat-head">
+            <span aria-hidden="true" className="chat-back">‹</span>
+            <span aria-hidden="true" className="chat-avatar">
+              <Image src="/ventriqai-mark-reversed-cobalt.svg" alt="" width={18} height={18} />
+            </span>
+            <span className="chat-who">
+              <strong>{scenario.business}</strong>
+              <span>{typing ? "typing…" : scenario.channel === "Website" ? "AI assistant · online" : "online"}</span>
+            </span>
+            <span aria-hidden="true" className="chat-tools">
+              {scenario.channel === "Website" ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+              ) : (
+                <>
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><rect x="2.5" y="6" width="13" height="12" rx="3" /><path d="M15.5 10.5l6-3.5v10l-6-3.5z" /></svg>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><path d="M5 3h3.5l2 5-2.5 1.5a11 11 0 0 0 6.5 6.5L16 13.5l5 2V19a2 2 0 0 1-2 2A17 17 0 0 1 3 5a2 2 0 0 1 2-2z" /></svg>
+                </>
+              )}
+            </span>
+          </div>
+
+          <div ref={threadRef} aria-live="polite" className="chat-thread">
+            <p className="chat-day">Today</p>
+            <div className="chat-msg chat-in">
+              Hi! You&rsquo;ve reached {scenario.business}. How can I help?
+              <span className="chat-meta">{scenario.time}</span>
+            </div>
 
             {scenario.turns.slice(0, pending === null ? played : pending + 1).map((turn, i) => {
               const answered = i < played;
               const answerText = answered ? turn.a : typed;
               return (
-                <div key={turn.q} style={{ display: "grid", gap: 12 }}>
-                  <div style={{ justifySelf: "start", maxWidth: "84%", border: "1px solid var(--color-divider)", borderRadius: "22px 22px 22px 6px", background: "var(--color-surface)", padding: "11px 15px", boxShadow: "var(--shadow-sm)", fontSize: 14.5, lineHeight: "23px", ...bubbleIn }}>
+                <div key={turn.q} className="chat-turn">
+                  <div className="chat-msg chat-out">
                     {turn.q}
+                    <span className="chat-meta">
+                      {scenario.time}
+                      {scenario.channel === "WhatsApp" ? <span className="chat-ticks">✓✓</span> : null}
+                    </span>
                   </div>
 
                   {!answered && typing ? (
-                    <div aria-label="Agent is typing" style={{ justifySelf: "end", display: "flex", gap: 5, alignItems: "center", background: "var(--color-text)", borderRadius: 999, padding: "13px 15px" }}>
-                      <span style={{ width: 7, height: 7, borderRadius: 999, background: "var(--color-bg)", animation: "blip 1.1s infinite" }} />
-                      <span style={{ width: 7, height: 7, borderRadius: 999, background: "var(--color-bg)", animation: "blip 1.1s .18s infinite" }} />
-                      <span style={{ width: 7, height: 7, borderRadius: 999, background: "var(--color-bg)", animation: "blip 1.1s .36s infinite" }} />
+                    <div aria-label="Agent is typing" className="chat-msg chat-in chat-typing">
+                      <i />
+                      <i />
+                      <i />
                     </div>
                   ) : null}
 
                   {answerText ? (
-                    <div style={{ justifySelf: "end", maxWidth: "88%" }}>
-                      <div style={{ background: "var(--color-text)", color: "var(--color-bg)", borderRadius: "22px 22px 6px 22px", padding: "11px 15px", fontSize: 14.5, lineHeight: "23px" }}>
-                        {answerText}
-                      </div>
-                      {answered ? (
-                        <>
-                          <p style={{ margin: "7px 0 0", ...mono, color: "var(--color-accent)", textAlign: "right" }}>{turn.speed}</p>
-                          <div style={{ marginTop: 8, background: "var(--color-accent-100)", border: "1px dashed var(--color-accent-300)", borderRadius: 14, padding: "9px 12px", display: "grid", gap: 3, ...bubbleIn }}>
-                            {turn.actions.map((a, j) => (
-                              <p key={a} style={{ margin: 0, fontSize: 12, lineHeight: "18px", color: "var(--color-accent-800)" }}>
-                                {j === 0 ? <span aria-hidden="true" style={{ marginRight: 6 }}>✓</span> : null}
-                                {a}
-                              </p>
-                            ))}
-                          </div>
-                        </>
-                      ) : null}
+                    <div className="chat-msg chat-in">
+                      {answerText}
+                      {answered ? <span className="chat-meta">{turn.speed}</span> : null}
+                    </div>
+                  ) : null}
+
+                  {answered ? (
+                    <div className="chat-did">
+                      {turn.actions.map((a) => (
+                        <span key={a}>
+                          <span aria-hidden="true">✓</span> {a}
+                        </span>
+                      ))}
                     </div>
                   ) : null}
                 </div>
@@ -312,47 +336,31 @@ export default function InteractiveDemo() {
             })}
           </div>
 
-          {/* The quick-reply rail, which is what makes this a demo you drive. */}
-          <div style={{ flex: "none", borderTop: "1px solid var(--color-divider)", background: "var(--color-bg)", padding: "12px 14px", display: "grid", gap: 8 }}>
+          {/* The suggested reply sits above the message bar, like a quick
+              reply; tapping it is what drives the demo. */}
+          <div className="chat-compose">
             {next ? (
-              <button
-                type="button"
-                onClick={() => play(played)}
-                disabled={busy}
-                style={{
-                  textAlign: "left",
-                  border: "1px solid var(--color-accent-300)",
-                  background: busy ? "var(--color-neutral-100)" : "var(--color-accent-100)",
-                  color: "var(--color-accent-800)",
-                  borderRadius: 14,
-                  padding: "11px 14px",
-                  minHeight: 44,
-                  fontSize: 14,
-                  lineHeight: "20px",
-                  cursor: busy ? "default" : "pointer",
-                  opacity: busy ? 0.55 : 1,
-                  transition: "opacity .2s ease, background-color .2s ease",
-                }}
-              >
-                <span style={{ ...mono, fontSize: 9, display: "block", marginBottom: 4, color: "var(--color-accent)" }}>
-                  Tap to send
+              <button type="button" className="chat-suggest" onClick={() => play(played)} disabled={busy}>
+                <span className="chat-suggest-k">Tap to send</span>
+                <span className="chat-suggest-q">{next.q}</span>
+                <span aria-hidden="true" className="chat-send">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M3 20.5V14l9-2-9-2V3.5L22 12z" /></svg>
                 </span>
-                {next.q}
               </button>
             ) : (
-              <div style={{ display: "grid", gap: 8 }}>
-                <p style={{ margin: 0, fontSize: 13, lineHeight: "20px", color: "color-mix(in srgb, var(--color-text) 66%, transparent)" }}>
-                  That is the whole thread — answered, booked and logged, with nobody watching the inbox.
-                </p>
-                <button
-                  type="button"
-                  onClick={reset}
-                  style={{ ...mono, fontSize: 10.5, border: "1px solid var(--color-divider)", background: "var(--color-surface)", borderRadius: 999, minHeight: 40, cursor: "pointer", color: "var(--color-text)" }}
-                >
-                  Start over
-                </button>
-              </div>
+              <button type="button" className="chat-suggest chat-restart" onClick={reset}>
+                <span className="chat-suggest-q">Answered, booked and logged — start over</span>
+                <span aria-hidden="true" className="chat-send">↺</span>
+              </button>
             )}
+            <div aria-hidden="true" className="chat-bar">
+              <span className="chat-plus">+</span>
+              <span className="chat-input">Message</span>
+              <span className="chat-mic">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
+              </span>
+            </div>
+            <span aria-hidden="true" className="phone-home" />
           </div>
         </div>
       </div>
