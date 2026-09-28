@@ -419,6 +419,14 @@ else
   else
     warn "the survey end-to-end check failed — lines above"; FAILED=1
   fi
+  # v9.16: "Download report" on Vantriq Pulse — the Excel workbook is built
+  # from this install's real data (read-only). Only whether it built is
+  # printed: the workbook holds customers' numbers and this log is public.
+  if docker exec "$APP_CONTAINER" node -e "require('dotenv').config();require('/app/src/utils/analyticsReport').clientReport(null,{grain:'week'}).then(r=>process.exit(r.buffer.slice(0,2).toString()==='PK'&&r.buffer.length>5000?0:1)).catch(e=>{console.error('    '+e.message);process.exit(1)})"; then
+    ok "the Pulse & Echo Excel report builds from this install's data"
+  else
+    warn "the Pulse & Echo Excel report did not build — lines above"; FAILED=1
+  fi
   # Whether an unhappy answer is actually emailed to anyone. Reported, never
   # failed on — and this log is public, so it says yes or no, nothing more.
   MAIL_SET=$(docker exec "$APP_CONTAINER" node -e "require('dotenv').config();process.stdout.write(require('/app/src/utils/mailer').mailDiagnosis().configured?'yes':'no')" 2>/dev/null || echo '?')
@@ -518,5 +526,11 @@ cat <<'NEXT'
      (WhatsApp)" workflow in n8n sends the after-chat survey an hour after a
      conversation goes quiet — see "After every WhatsApp conversation" in
      deploy/crm/SURVEYS.md.
+
+  7. Reports (v9.16). CRM → Vantriq Pulse → any view → "Download report
+     (Excel)": a tab per subject — every dashboard figure, each contact (new
+     and returning, by the number they wrote from), each conversation, and
+     every Echo answer and follow-up. Customers have the same button on
+     their portal's Pulse tab, for their own customers only.
 NEXT
 printf '\n'

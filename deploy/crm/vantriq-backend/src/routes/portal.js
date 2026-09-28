@@ -10,6 +10,7 @@ const { requirePortalSession } = require('../middleware/portalAuth');
 const { hashToken } = require('../middleware/clientApiAuth');
 const { effectivePackage } = require('../utils/pkg');
 const { clientAnalytics } = require('../utils/analytics');
+const { clientReport, sendReport } = require('../utils/analyticsReport');
 const { acceptQuote, buildQuoteDocument } = require('./quotes');
 const surveysRoutes = require('./surveys');
 const { renderInvoicePdf, invoiceFilename } = require('../utils/invoicePdf');
@@ -216,24 +217,44 @@ router.get('/usage', async (req, res) => {
   });
 });
 
+/** The package allowance Pulse measures this month against, or null. */
+async function portalQuota(client) {
+  if (!client.product_id) return null;
+  const { rows } = await db.query(`select * from products where id = $1`, [client.product_id]);
+  const eff = effectivePackage(client, rows[0]);
+  return eff ? eff.quota : null;
+}
+
 /**
  * GET /api/portal/analytics?grain=day|week|month|quarter|year
  *
  * The dashboard: conversations, contacts (new and returning), channels,
  * agents, busiest hours, satisfaction, and a few plain-English findings.
- * Only counts leave the server — never a session id or anything else that
- * would identify one of this customer's own customers.
+ * Counts only — the people behind them are in the report below.
  */
 router.get('/analytics', async (req, res, next) => {
   try {
     const client = req.portalClient;
-    let quota = null;
-    if (client.product_id) {
-      const { rows } = await db.query(`select * from products where id = $1`, [client.product_id]);
-      const eff = effectivePackage(client, rows[0]);
-      if (eff) quota = eff.quota;
-    }
-    res.json(await clientAnalytics(client.id, { grain: String(req.query.grain || 'month'), quota }));
+    res.json(await clientAnalytics(client.id, { grain: String(req.query.grain || 'month'), quota: await portalQuota(client) }));
+  } catch (err) { next(err); }
+});
+
+/**
+ * GET /api/portal/analytics/report.xlsx?grain=…
+ *
+ * The dashboard as a workbook, with the detail behind it: this customer's
+ * own contacts (by the number they wrote from — new, and who came back),
+ * each conversation, and, with Vantriq Echo, every survey answer and
+ * follow-up. Only ever this customer's own; see utils/analyticsReport.js.
+ */
+router.get('/analytics/report.xlsx', async (req, res, next) => {
+  try {
+    const client = req.portalClient;
+    sendReport(res, await clientReport(client, {
+      grain: String(req.query.grain || 'month'),
+      quota: await portalQuota(client),
+      echo: !!client.surveys_enabled,
+    }));
   } catch (err) { next(err); }
 });
 

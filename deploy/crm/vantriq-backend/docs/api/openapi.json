@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "VantriqAI CRM API",
-    "version": "9.15.2",
+    "version": "9.16.0",
     "description": "The CRM behind VantriqAI: clients, invoices, payments, quotes and proposals,\ncontracts, statements, and the webhook surface the AI agents write through.\n\n## Authentication\n\nTwo ways in, and one of them is for people:\n\n- **Staff session** — `Authorization: Bearer <token>`, issued by `POST /api/auth/verify`\n  after a password and an emailed one-time code. A staff member's role decides reach.\n- **API key** — `x-api-key: <key>`, for machines. Keys are scoped.\n\n## Scopes\n\nLeast to most: `webhook` < `automation` < `staff` < `admin`. A scope opens everything\nbelow it. The admin key opens everything and is intended as break-glass only — set\n`ALLOW_API_KEY_LOGIN=false` once staff accounts exist.\n\n## Automation writes through this API, never to the database\n\nn8n and any other integration must use these endpoints rather than connecting to\nPostgres. Tenancy, quota and tax rules live here; a direct write bypasses all three."
   },
   "servers": [
@@ -756,6 +756,55 @@
         ]
       }
     },
+    "/api/analytics/clients/{id}/report.xlsx": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "One customer's workbook — Pulse and Echo, with their contacts (new and returning), conversations and survey answers. Staff see the Echo tabs even when Echo is switched off for the customer, as they see its surveys.",
+        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
     "/api/analytics/platform": {
       "get": {
         "tags": [
@@ -796,6 +845,46 @@
         ]
       }
     },
+    "/api/analytics/platform/report.xlsx": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Every customer's workbook in one: each customer side by side, then every contact and conversation.",
+        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
     "/api/analytics/sales": {
       "get": {
         "tags": [
@@ -812,6 +901,46 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/analytics/sales/report.xlsx": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "The sales workbook: every lead, the funnel, sources, and each prospect conversation.",
+        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
                 }
               }
             }
@@ -5678,7 +5807,7 @@
         "tags": [
           "portal"
         ],
-        "summary": "GET /api/portal/analytics?grain=day|week|month|quarter|year The dashboard: conversations, contacts (new and returning), channels, agents, busiest hours, satisfaction, and a few plain-English findings. Only counts leave the server — never a session id or anything else that would identify one of this customer's own customers.",
+        "summary": "GET /api/portal/analytics?grain=day|week|month|quarter|year The dashboard: conversations, contacts (new and returning), channels, agents, busiest hours, satisfaction, and a few plain-English findings. Counts only — the people behind them are in the report below.",
         "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
         "parameters": [],
         "responses": {
@@ -5689,6 +5818,39 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/portal/analytics/report.xlsx": {
+      "get": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "GET /api/portal/analytics/report.xlsx?grain=… The dashboard as a workbook, with the detail behind it: this customer's own contacts (by the number they wrote from — new, and who came back), each conversation, and, with Vantriq Echo, every survey answer and follow-up. Only ever this customer's own; see utils/analyticsReport.js.",
+        "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
                 }
               }
             }

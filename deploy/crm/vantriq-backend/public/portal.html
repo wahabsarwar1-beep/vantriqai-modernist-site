@@ -725,7 +725,16 @@ function renderAnalytics(){
   if(a.error) return `<div class="card"><div class="empty">${esc(a.error)}</div>
     <button class="btn btn-ghost" style="margin-top:10px;" onclick="data.analytics=null;render()">Try again</button></div>`;
   return productHead('Vantriq Pulse', 'Live analytics on every conversation — leads, busiest hours, satisfaction and what the AI resolved on its own.')
-    + VQA.conversationsHTML(a, { audience:'portal', onGrain:'setAnalyticsGrain', fileTag:'analytics', surveysEnabled: surveysOn() });
+    + VQA.conversationsHTML(a, { audience:'portal', onGrain:'setAnalyticsGrain', onReport:'downloadAnalyticsReport', surveysEnabled: surveysOn(),
+      reportHint: surveysOn()
+        ? 'Every figure here, plus your contacts (new and returning), each conversation and every survey answer — a tab for each'
+        : 'Every figure here, plus your contacts (new and returning) and each conversation — a tab for each' });
+}
+
+/** Pulse as an Excel workbook, at the period on screen. */
+function downloadAnalyticsReport(){
+  portalDownload(`/analytics/report.xlsx?grain=${encodeURIComponent(analyticsGrain)}`,
+    `vantriq-pulse-${analyticsGrain}-${new Date().toISOString().slice(0,10)}.xlsx`, 'Building your report…');
 }
 
 /** The product name at the top of Pulse and Echo, matching vantriqai.com. */

@@ -15,9 +15,11 @@ const db = require('../db');
  * the same point, never a part-month against a whole one, which would make
  * every month look like a collapse until the last week.
  *
- * What never leaves this module for a customer: session_id and anything
- * derived from it that could identify one of THEIR customers. Contacts are
- * counted from it, server-side, and only the counts come out.
+ * What never leaves this module: session_id, or anything derived from it
+ * that identifies a person. Contacts are counted from it, server-side, and
+ * only the counts come out. The one place people are named is the Excel
+ * report (utils/analyticsReport.js): a customer's own contacts, for that
+ * customer, and everyone's for staff.
  */
 
 const TZ = process.env.ANALYTICS_TZ || 'Asia/Karachi';
