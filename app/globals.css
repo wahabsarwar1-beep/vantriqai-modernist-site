@@ -2645,3 +2645,22 @@ span[data-chev] { display: inline-block; transition: transform .2s ease; }
 .av-step[data-last] { color: #fff; background: var(--color-accent); border-color: transparent; }
 @keyframes av-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .av-toast, .av-paid { animation: none; } }
+
+/* ---------- Reception card on desktop: the whole front desk ---------- */
+.rx-extra { display: none; }
+@media (min-width: 1081px) {
+  .bento-xl .bento-chat { flex: 1; align-content: space-between; gap: 12px; margin: 32px 0 24px; }
+  .bento-xl .bento-bubble { font-size: 15px; line-height: 22px; padding: 12px 15px; }
+  .rx-channels, .rx-langs { margin-bottom: 0; }
+  .rx-extra { display: contents; }
+  .rx-channels { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+  .rx-channels span { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 999px; font-size: 12.5px; color: rgba(255,255,255,.7); background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); }
+  .rx-channels span[data-on] { color: #fff; background: rgba(127,155,242,.2); border-color: rgba(169,187,247,.4); }
+  .rx-channels b { font-size: 11px; padding: 1px 6px; border-radius: 999px; color: #0b0b12; background: #c5d2ff; }
+  .rx-dot { width: 7px; height: 7px; border-radius: 50%; background: #3ddc97; box-shadow: 0 0 8px #3ddc97; }
+  .rx-langs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.45); font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .rx-langs i { font-style: normal; text-transform: none; letter-spacing: 0; font-family: var(--font-body); font-size: 12.5px; padding: 4px 10px; border-radius: 8px; color: #f3c7a8; background: rgba(224,133,79,.12); border: 1px solid rgba(224,133,79,.25); }
+  .rx-stats { display: grid !important; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+  .rx-stats span { display: grid; gap: 2px; padding: 12px; border-radius: 14px; font-size: 12px; line-height: 16px; color: rgba(255,255,255,.6); background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); }
+  .rx-stats b { font-family: var(--font-heading); font-size: 24px; line-height: 1.1; letter-spacing: -.03em; color: #fff; }
+}

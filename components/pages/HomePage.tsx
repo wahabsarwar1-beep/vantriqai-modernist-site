@@ -210,6 +210,33 @@ export default function HomePage({ region }: { region: Region }) {
               <p className="bento-body">{a.body}</p>
               {a.name === "Reception" ? (
                 <div className="bento-chat" aria-hidden="true">
+                  {/* Desktop only: the card spans two rows there, so it shows
+                      the whole front desk rather than one exchange. */}
+                  <div className="rx-extra">
+                    <div className="rx-channels">
+                      <span data-on="">
+                        <i className="rx-dot" />
+                        WhatsApp <b>12</b>
+                      </span>
+                      <span>
+                        Instagram <b>5</b>
+                      </span>
+                      <span>
+                        Website <b>3</b>
+                      </span>
+                      <span>
+                        Calls <b>2</b>
+                      </span>
+                    </div>
+                    <div className="rx-langs">
+                      <span>Answers in</span>
+                      {(region.key === "pk" ? ["English", "Roman Urdu", "اردو"] : ["English", "Español", "العربية"]).map((l) => (
+                        <i key={l}>{l}</i>
+                      ))}
+                    </div>
+                    <span className="bento-bubble bento-them">Hi, do you do home delivery?</span>
+                    <span className="bento-bubble bento-us">Yes — free within the city, usually the next day. Anything in mind?</span>
+                  </div>
                   <span className="bento-bubble bento-them">Are you open on Sunday?</span>
                   <span className="bento-bubble bento-us">We are, 11 to 6. Want me to book you in?</span>
                   <span className="bento-typing">
@@ -217,6 +244,17 @@ export default function HomePage({ region }: { region: Region }) {
                     <i />
                     <i />
                   </span>
+                  <div className="rx-extra rx-stats">
+                    <span>
+                      <b>22</b> chats today
+                    </span>
+                    <span>
+                      <b>19</b> answered by the agent
+                    </span>
+                    <span>
+                      <b>3</b> handed to your team
+                    </span>
+                  </div>
                 </div>
               ) : (
                 <div aria-hidden="true" className="bento-viz">
