@@ -2665,13 +2665,8 @@ span[data-chev] { display: inline-block; transition: transform .2s ease; }
   .rx-stats b { font-family: var(--font-heading); font-size: 24px; line-height: 1.1; letter-spacing: -.03em; color: #fff; }
 }
 
-/* ---------- Menu icons for industries, packages and guides ---------- */
-.mglyph {
-  position: relative; display: grid; place-items: center; flex: none; overflow: hidden; border-radius: 30%; color: #fff;
-  background: linear-gradient(135deg, var(--ga), var(--gb));
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 6px 14px -8px var(--ga);
-}
-.mglyph::before { content: ""; position: absolute; inset: 0; background: radial-gradient(80% 60% at 25% 15%, rgba(255,255,255,.35), transparent 60%); pointer-events: none; }
-.mglyph svg { position: relative; display: block; }
-.mega-link:hover .mglyph { transform: scale(1.06); }
-.mglyph { transition: transform .25s cubic-bezier(.16,1,.3,1); }
+/* ---------- Menu marks for industries, packages and guides ----------
+   The product-mark tile: ink field, cream shapes, one accent detail. */
+.mglyph { display: grid; place-items: center; flex: none; background: var(--color-text); transition: transform .25s cubic-bezier(.16,1,.3,1), background-color .25s ease; }
+.mglyph svg { display: block; }
+.mega-link:hover .mglyph, .mm-link:hover .mglyph { transform: scale(1.06); }

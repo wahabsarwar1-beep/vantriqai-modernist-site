@@ -5,7 +5,7 @@ import { SECTORS, TIERS } from "@/lib/content";
 import { PRODUCT_GROUPS, productSlug, products } from "@/lib/products";
 import { hrefIn, navHref, type Region } from "@/lib/region";
 import { RESOURCES } from "@/lib/resources";
-import { industries, sectorSlug } from "@/lib/industries";
+import { sectorSlug } from "@/lib/industries";
 
 /**
  * The navigation menus, built from the same arrays the pages render.
@@ -18,7 +18,7 @@ import { industries, sectorSlug } from "@/lib/industries";
  * nothing.
  */
 
-export type MenuLink = { href: string; label: string; note?: string; mark?: MarkId; isNew?: boolean; glyph?: GlyphId; tint?: [string, string] };
+export type MenuLink = { href: string; label: string; note?: string; mark?: MarkId; isNew?: boolean; glyph?: GlyphId };
 export type MenuColumn = { title: string; icon?: ColumnIconId; links: MenuLink[] };
 /** The promoted card at the end of a panel — one next step, not a link list. */
 export type MenuFeature = { title: string; body: string; href: string; cta: string; kicker?: string; bullets?: string[] };
@@ -52,32 +52,17 @@ const GROUP_TITLES: Record<string, string> = {
   Deployment: "Deployment",
 };
 
-/* Packages climb from cobalt to violet to amber, so the ladder reads as one. */
-const TIER_TINTS: [string, string][] = [
-  ["#4d6cf0", "#7fcaa8"],
-  ["#2f56d9", "#4fb3a0"],
-  ["#2f56d9", "#7a5bd6"],
-  ["#6a4fd1", "#c43b8b"],
-  ["#34497a", "#6a4fd1"],
-  ["#c9433d", "#f2b544"],
-];
 const GUIDE_GLYPHS: Record<string, GlyphId> = {
   "lead-response-time-benchmarks": "guide-speed",
   "whatsapp-business-app-vs-platform": "guide-compare",
   "choosing-an-ai-agent-checklist": "guide-checklist",
 };
-const GUIDE_TINTS: [string, string][] = [
-  ["#d9573b", "#f2b544"],
-  ["#23895a", "#4fb3a0"],
-  ["#6a4fd1", "#2f56d9"],
-];
 
 export function menuPanels(region: Region): MenuPanel[] {
   const all = products(region);
-  const themes = new Map(industries(region).map((i) => [i.slug, [i.theme.a, i.theme.b] as [string, string]]));
   const sectorLink = (s: (typeof SECTORS)[number]): MenuLink => {
     const slug = sectorSlug(s.name);
-    return { href: hrefIn(region, `/industries/${slug}`), label: s.name, note: s.kicker, glyph: slug as GlyphId, tint: themes.get(slug) };
+    return { href: hrefIn(region, `/industries/${slug}`), label: s.name, note: s.kicker, glyph: slug as GlyphId };
   };
 
   return [
@@ -150,21 +135,20 @@ export function menuPanels(region: Region): MenuPanel[] {
         {
           title: "Tiers",
           icon: "tiers",
-          links: TIERS.map((t, i) => ({
+          links: TIERS.map((t) => ({
             href: hrefIn(region, `/pricing/${productSlug(t.name)}`),
             label: t.name,
             note: t.audience,
             glyph: productSlug(t.name) as GlyphId,
-            tint: TIER_TINTS[i],
           })),
         },
         {
           title: "Before you buy",
           icon: "guides",
           links: [
-            { href: `${hrefIn(region, "/pricing")}#find`, label: "Find your package", note: "Volume, channels, needs", glyph: "find", tint: ["#e0854f", "#f2b544"] },
-            { href: `${hrefIn(region, "/pricing")}#compare`, label: "Compare every package", note: "Modules, features, capacity", glyph: "compare", tint: ["#15907f", "#5fb6e0"] },
-            { href: `${hrefIn(region, "/pricing")}#questions`, label: "Common questions", note: "Seven, answered plainly", glyph: "questions", tint: ["#6a4fd1", "#c43b8b"] },
+            { href: `${hrefIn(region, "/pricing")}#find`, label: "Find your package", note: "Volume, channels, needs", glyph: "find" },
+            { href: `${hrefIn(region, "/pricing")}#compare`, label: "Compare every package", note: "Modules, features, capacity", glyph: "compare" },
+            { href: `${hrefIn(region, "/pricing")}#questions`, label: "Common questions", note: "Seven, answered plainly", glyph: "questions" },
           ],
         },
       ],
@@ -191,12 +175,11 @@ export function menuPanels(region: Region): MenuPanel[] {
         {
           title: "Guides",
           icon: "guides",
-          links: RESOURCES.map((r, i) => ({
+          links: RESOURCES.map((r) => ({
             href: `/resources/${r.slug}`,
             label: r.title,
             note: r.kind,
             glyph: GUIDE_GLYPHS[r.slug] ?? "guides",
-            tint: GUIDE_TINTS[i % GUIDE_TINTS.length],
           })),
         },
       ],

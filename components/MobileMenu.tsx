@@ -152,7 +152,7 @@ export default function MobileMenu({
                               {l.mark ? (
                                 <ProductMark id={l.mark} size={34} />
                               ) : l.glyph ? (
-                                <MenuGlyph id={l.glyph} tint={l.tint} size={34} />
+                                <MenuGlyph id={l.glyph} size={34} />
                               ) : (
                                 <span aria-hidden="true" className="mm-link-tile">
                                   {l.label.replace(/[^A-Za-z]/g, "").slice(0, 1)}
