@@ -214,7 +214,7 @@ export default function InteractiveDemo() {
     <div style={{ position: "relative", zIndex: 1, width: "100%", display: "grid", justifyItems: "center", gap: 18 }}>
       {/* Which business. Real buttons, because this is the first choice the
           visitor makes and it should survive a keyboard. */}
-      <div role="tablist" aria-label="Choose a business" style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 8 }}>
+      <div role="tablist" aria-label="Choose a business" className="demo-tabs" style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 8 }}>
         {SCENARIOS.map((s, i) => {
           const active = i === scenarioIndex;
           return (
@@ -247,8 +247,8 @@ export default function InteractiveDemo() {
         })}
       </div>
 
-      <div style={{ width: "100%", maxWidth: 320, background: "var(--color-neutral-900)", border: "1px solid var(--color-neutral-800)", padding: 8, borderRadius: 46, boxShadow: "var(--shadow-lg)" }}>
-        <div style={{ position: "relative", background: "var(--color-surface)", borderRadius: 38, overflow: "hidden", minHeight: 470, display: "flex", flexDirection: "column" }}>
+      <div className="demo-frame" style={{ width: "100%", maxWidth: 320, background: "var(--color-neutral-900)", border: "1px solid var(--color-neutral-800)", padding: 8, borderRadius: 46, boxShadow: "var(--shadow-lg)" }}>
+        <div className="demo-screen" style={{ position: "relative", background: "var(--color-surface)", borderRadius: 38, overflow: "hidden", minHeight: 470, display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--color-text)", color: "var(--color-bg)", padding: "12px 16px" }}>
             <Image src="/ventriqai-mark-reversed-cobalt.svg" alt="" width={22} height={22} style={{ width: 22, height: 22, flex: "none", display: "block" }} />
             <span style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 13, letterSpacing: "-0.01em", whiteSpace: "nowrap", flex: "none" }}>
@@ -263,6 +263,7 @@ export default function InteractiveDemo() {
           <div
             ref={threadRef}
             aria-live="polite"
+            className="demo-thread"
             style={{ flex: 1, minHeight: 0, maxHeight: 360, display: "grid", gap: 12, padding: "16px 14px", overflowY: "auto", alignContent: "start", background: "var(--color-surface)" }}
           >
             <p style={{ justifySelf: "center", ...mono, fontWeight: 700, color: "color-mix(in srgb, var(--color-text) 42%, transparent)", margin: "0 0 2px" }}>

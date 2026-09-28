@@ -2477,3 +2477,16 @@ span[data-chev] { display: inline-block; transition: transform .2s ease; }
 }
 @media (max-width: 760px) { .ins.swipe { grid-auto-columns: 88%; } .ins-card:hover { transform: none; } }
 @media (max-width: 560px) { .ins .mv-heat { display: none; } .ins .mv-muted { display: none; } }
+
+/* ---------- Try it yourself, on a phone ----------
+   A phone drawn inside a phone looked like a toy and left a tall empty
+   screen before the first tap. On a phone it becomes a plain chat card:
+   no bezel, the height of the conversation, the businesses in one row. */
+@media (max-width: 560px) {
+  .demo-tabs { flex-wrap: nowrap !important; justify-content: flex-start !important; overflow-x: auto; max-width: 100%; scrollbar-width: none; padding: 2px 2px 4px; }
+  .demo-tabs::-webkit-scrollbar { display: none; }
+  .demo-tabs > button { flex: none; min-height: 36px !important; font-size: 10.5px !important; padding-inline: 14px !important; }
+  .demo-frame { max-width: none !important; padding: 0 !important; border: 0 !important; border-radius: 22px !important; background: none !important; box-shadow: 0 24px 50px -30px rgba(22,21,26,.45) !important; }
+  .demo-screen { min-height: 0 !important; border-radius: 22px !important; border: 1px solid var(--color-divider); }
+  .demo-thread { min-height: 150px !important; max-height: 320px !important; }
+}
