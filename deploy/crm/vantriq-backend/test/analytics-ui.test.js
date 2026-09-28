@@ -57,9 +57,12 @@ const post = (p, b) => fetch(B + p, { method: 'POST', headers: AH, body: JSON.st
     await page.click('.vqa-seg button:has-text("Year")');
     await page.waitForFunction(() => document.querySelector('.vqa-note') && /This year/.test(document.querySelector('.vqa-note').textContent), null, { timeout: 10000 }).catch(() => {});
     ok(/This year/.test(await page.innerText('.vqa-note')), 'switching to Year reloads the page for years');
-    ok(await page.evaluate(() => document.body.classList.contains('wide')), 'the portal widens for analytics');
+    const appWidth = () => page.evaluate(() => document.getElementById('app').getBoundingClientRect().width);
+    const pulseWidth = await appWidth();
     await page.click('.tab:has-text("Overview")');
-    ok(!(await page.evaluate(() => document.body.classList.contains('wide'))), 'and goes back to its usual width elsewhere');
+    ok(Math.abs((await appWidth()) - pulseWidth) < 1, 'every tab is the same width — Overview is not squeezed after Pulse', `${pulseWidth} vs ${await appWidth()}`);
+    if (width >= 1200) ok(pulseWidth > 1000, 'and on a desktop that width is the wide one', String(pulseWidth));
+    else ok(pulseWidth <= width, 'and on a phone it still fits the screen', String(pulseWidth));
     await page.close();
   }
 

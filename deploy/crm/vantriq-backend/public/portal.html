@@ -163,10 +163,14 @@ tr.row-click:active{background:#FAF8F3;}
  *  whether the important number is the one your eye lands on first.
  * ==================================================================== */
 
-#app{max-width:760px;}
-/* Analytics needs the room: charts side by side on a desktop, stacked on a phone. */
-body.wide #app{max-width:1100px;}
-body.wide .topbar-inner{max-width:1060px;}
+/* One width for every tab. It used to be a 760px column that only Pulse and
+   Echo widened, so switching tabs made the page jump and everything else
+   looked cramped on a desktop. On a phone this cap never comes into play. */
+#app{max-width:1100px;}
+.topbar-inner{max-width:1060px;}
+/* Cards that sit side by side on a desktop and stack on a phone. */
+.two-up{display:grid;gap:0 18px;}
+@media (min-width:880px){ .two-up{grid-template-columns:1fr 1fr;} }
 
 /* ---------- Header ---------- */
 .topbar{
@@ -593,7 +597,6 @@ function render(){
     </div>
   `;
   if(currentTab==='usage') requestAnimationFrame(drawUsageChart);
-  document.body.classList.toggle('wide', currentTab==='analytics' || currentTab==='surveys');
   if(currentTab==='surveys') mountSurveys();
   if(currentTab==='analytics'){
     if(!data.analytics) loadAnalytics();
@@ -674,6 +677,7 @@ function renderOverview(){
     <div style="font-size:13px;color:var(--teal-dark);font-weight:600;">✓ Your account is fully paid up. Nothing due right now.</div>
   </div>`}
 
+  <div class="two-up">
   <div class="card">
     <h3>Your package</h3>
     ${p ? `
@@ -691,6 +695,7 @@ function renderOverview(){
     <div class="kv"><span class="k">Email</span><span class="v">${esc(account.email||'—')}</span></div>
     <div class="kv"><span class="k">Phone</span><span class="v">${esc(account.phone||'—')}</span></div>
     <div class="kv"><span class="k">Client since</span><span class="v">${fmtDate(account.join_date)}</span></div>
+  </div>
   </div>
   `;
 }
