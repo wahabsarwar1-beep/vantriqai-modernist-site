@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import ColumnIcon from "@/components/ColumnIcon";
 import ProductMark from "@/components/ProductMark";
+import MenuGlyph from "@/components/MenuGlyph";
 import { NAV_LINKS } from "@/lib/nav-links";
 import type { MenuPanel } from "@/lib/menu";
 import { navHref, type Region } from "@/lib/region";
@@ -150,6 +151,8 @@ export default function MobileMenu({
                             <Link key={l.href} href={l.href} className="mm-link" aria-current={isHere(l.href) ? "page" : undefined}>
                               {l.mark ? (
                                 <ProductMark id={l.mark} size={34} />
+                              ) : l.glyph ? (
+                                <MenuGlyph id={l.glyph} tint={l.tint} size={34} />
                               ) : (
                                 <span aria-hidden="true" className="mm-link-tile">
                                   {l.label.replace(/[^A-Za-z]/g, "").slice(0, 1)}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import ColumnIcon from "@/components/ColumnIcon";
 import ProductMark from "@/components/ProductMark";
+import MenuGlyph from "@/components/MenuGlyph";
 import type { MenuPanel } from "@/lib/menu";
 
 /**
@@ -275,7 +276,7 @@ export default function MegaMenu({
                       }}
                     >
                       <span style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                        {l.mark ? <ProductMark id={l.mark} size={28} /> : null}
+                        {l.mark ? <ProductMark id={l.mark} size={28} /> : l.glyph ? <MenuGlyph id={l.glyph} tint={l.tint} size={28} /> : null}
                         <span style={{ display: "block" }}>
                           <span style={{ display: "block", fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 13.5, letterSpacing: "-0.01em", lineHeight: "19px" }}>
                             {l.label}
