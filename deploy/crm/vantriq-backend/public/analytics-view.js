@@ -39,7 +39,7 @@
   const GRAINS = [['day','Day'],['week','Week'],['month','Month'],['quarter','Quarter'],['year','Year']];
 
   let charts = [];
-  let lastSeries = null; // what the CSV button downloads
+  let lastSeries = null; // what "See every figure as a table" shows
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -153,6 +153,11 @@
   /* ------------------------------------------------------------------ */
   /* Building blocks                                                    */
   /* ------------------------------------------------------------------ */
+  /**
+   * The period switch, the comparison note, and — when the page says how to
+   * get it (opts.onReport, a global function's name) — the Excel report:
+   * every figure here plus the people, conversations and answers behind them.
+   */
   function filters(grain, onGrain, note, opts){
     opts = opts || {};
     return `<div class="vqa-filters">
@@ -160,7 +165,7 @@
         ${GRAINS.map(([g, l]) => `<button type="button" class="${g === grain ? 'on' : ''}" aria-pressed="${g === grain}" onclick="${onGrain}('${g}')">${l}</button>`).join('')}
       </div>
       <div class="vqa-note">${note}</div>
-      ${opts.csv === false ? '' : `<button type="button" class="vqa-btn" onclick="VQA.downloadCsv()">Download CSV</button>`}
+      ${opts.onReport ? `<button type="button" class="vqa-btn" onclick="${opts.onReport}()" title="${esc(opts.reportHint || 'Every figure on this page, and the people and conversations behind them — a tab for each')}">Download report (Excel)</button>` : ''}
     </div>`;
   }
 
@@ -381,22 +386,6 @@
   }
 
   /* ------------------------------------------------------------------ */
-  /* CSV                                                                */
-  /* ------------------------------------------------------------------ */
-  function downloadCsv(){
-    if(!lastSeries) return;
-    const { headers, rows, name } = lastSeries;
-    const q = (v) => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-    const csv = [headers, ...rows].map(r => r.map(q).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = name;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  }
-
-  /* ------------------------------------------------------------------ */
   /* Satisfaction block (shared by the customer and platform views)     */
   /* ------------------------------------------------------------------ */
   function satisfactionHTML(d, { audience, surveysEnabled }){
@@ -483,7 +472,6 @@
     const q = d.quota;
 
     lastSeries = {
-      name: `vantriq-${opts.fileTag || 'analytics'}-${g}-${new Date().toISOString().slice(0, 10)}.csv`,
       headers: ['Period', 'Conversations', 'Messages', 'Contacts', 'New contacts', 'Returning contacts', 'Satisfied %', 'Survey answers', 'NPS'],
       rows: series.map((s, i) => {
         const sat = (d.satisfaction && d.satisfaction.series[i]) || {};
@@ -496,7 +484,7 @@
     const agentRows = d.agents.map(a => ({ name: a.name, value: a.conversations, share: a.share_pct }));
 
     return `<div class="vqa">
-      ${filters(g, opts.onGrain, compareNote(d))}
+      ${filters(g, opts.onGrain, compareNote(d), opts)}
       ${insightsCard(d.insights)}
       <div class="vqa-grid vqa-kpis">
         ${kpi({ label: 'Conversations', value: n(k.conversations.current), delta: k.conversations.delta_pct, prevLabel: prev,
@@ -597,14 +585,13 @@
     opts = opts || {};
     const k = d.kpis, g = d.grain, prev = d.period.previous_label;
     lastSeries = {
-      name: `vantriq-sales-${g}-${new Date().toISOString().slice(0, 10)}.csv`,
       headers: ['Period', 'New leads', 'Won', 'Lost', 'Prospect conversations'],
       rows: d.series.map((s, i) => [bucketLabel(s.bucket, g, true), s.new_leads, s.won, s.lost, (d.prospect_series[i] || {}).conversations || 0]),
     };
     const top = d.funnel[0] ? d.funnel[0].n : 0;
     const topics = d.topics.filter(t => t.conversations > 0);
     return `<div class="vqa">
-      ${filters(g, opts.onGrain, compareNote(d))}
+      ${filters(g, opts.onGrain, compareNote(d), opts)}
       ${insightsCard(d.insights)}
       <div class="vqa-grid vqa-kpis">
         ${kpi({ label: 'New leads', value: n(k.new_leads.current), delta: k.new_leads.delta_pct, prevLabel: prev, projected: k.new_leads.projected, sparkValues: d.series.map(s => s.new_leads) })}
@@ -673,7 +660,7 @@
     injectStyles,
     conversationsHTML, drawConversations,
     salesHTML, drawSales,
-    destroyCharts, downloadCsv,
+    destroyCharts,
     grains: GRAINS,
   };
 })();

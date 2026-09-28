@@ -14,6 +14,7 @@ at once.
 | Portal → **Surveys** | the business | their surveys, results, every response, follow-ups, sharing |
 | CRM → **Surveys** | VantriqAI staff | the same, for every client |
 | Portal and CRM → **Analytics** | both | CSAT, NPS and resolution rate now include survey answers |
+| Portal and CRM → **Vantriq Pulse → Download report (Excel)** | both | every figure, and the contacts, conversations and survey answers behind them (v9.16) |
 | `GET /api/external/surveys…` | the business's own systems | surveys, responses and results as JSON |
 
 ## Is it on, and working?
@@ -222,6 +223,40 @@ addresses, the email goes out the moment the answer arrives — which needs
 A delighted customer (NPS 9–10, or CSAT 5) is offered the Google review link
 on the thank-you screen.
 
+## The Pulse & Echo report (v9.16)
+
+**Download report (Excel)** — on every Vantriq Pulse view, in the CRM (one
+customer, all customers, Sales) and on the customer's portal — replaces the
+old one-table CSV. It builds a workbook for the period on screen (day, week,
+month, quarter or year), with a tab per subject:
+
+| Tab | What it holds |
+|---|---|
+| Summary | every dashboard figure against the previous period at the same point, the window's totals, how often people come back, who comes back most, the package pace, satisfaction and NPS, and the plain-English findings |
+| Trend | each period of the window: conversations, messages, people, new and returning contacts, satisfaction, NPS |
+| Customers | all-customers report only: each customer side by side |
+| Contacts | everyone who wrote in the window — number, name when known, New / New, came back / Returning, first and last contact, conversations, messages, days active, days since, channel, agent, their last satisfaction score and NPS |
+| New contacts | people whose first ever conversation was in the window, with the period they first wrote |
+| Returning contacts | everyone who came back: how many times, days from first to last, average days between visits |
+| Conversations | every conversation: start, last reply, minutes, contact, first contact or visit N, channel, agent, messages, hand-off |
+| Channels, Agents, Busiest times | the split by channel and agent, and a day × hour grid |
+| Echo summary, Echo responses | score distribution, NPS groups, every survey's results and response rate, and every answer question by question |
+| All answers, Comments | every satisfaction answer from any source, and everything customers wrote |
+| Follow-ups | unhappy answers: who, what they said, how long they have waited, where each stands |
+| Definitions | how each figure is worked out — the dashboard's own rules |
+
+The numbers come from the same engine as the dashboards, so the workbook and
+the screen agree. **Unlike the dashboards, the report names people**: a
+WhatsApp contact is shown by the number they wrote from, a web visitor by a
+short tag. A customer's report holds only their own customers. A customer
+without Vantriq Echo gets the satisfaction answers other tools post, but no
+survey, survey-answer or follow-up tabs; staff always see them.
+
+Routes: `GET /api/analytics/clients/:id/report.xlsx`,
+`/api/analytics/platform/report.xlsx`, `/api/analytics/sales/report.xlsx`
+(staff), and `GET /api/portal/analytics/report.xlsx` (the customer), each
+with `?grain=day|week|month|quarter|year`.
+
 ## Settings on the server
 
 All optional:
@@ -260,4 +295,5 @@ node test/after-chat.test.js    # 30 checks: the after-chat rules, one yes per c
 node test/own-survey.test.js    # 24 checks: our own surveys are made once, and only once
 node test/survey-access.test.js # 28 checks: off by default, only an admin switches it, what off and on mean
 node test/surveys-ui.test.js    # 42 checks in a real browser
+node test/report.test.js        # the Pulse & Echo workbook, tab by tab, against known contacts
 ```

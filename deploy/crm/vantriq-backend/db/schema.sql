@@ -1579,7 +1579,8 @@ create table if not exists csat_responses (
   agent_id uuid references client_agents(id) on delete set null,
   -- Kept for joining a response back to its conversation. Like
   -- usage_events.session_id it is built from the end customer's phone
-  -- number, so it never leaves the CRM (not the portal, not the API).
+  -- number: never sent as it is, and the number in it only in the Excel
+  -- report, to the customer whose customer it is (utils/analyticsReport.js).
   session_id text not null default '',
   channel text not null default 'whatsapp',
   score smallint check (score between 1 and 5),
@@ -1708,7 +1709,8 @@ create table if not exists survey_invites (
   client_id uuid not null references clients(id) on delete cascade,
   token text not null unique,
   -- The conversation this invite follows. Built from the end customer's
-  -- phone number like every session id, so it never leaves the CRM.
+  -- phone number like every session id: never sent as it is, and the number
+  -- only in the Excel report, to that customer (utils/analyticsReport.js).
   session_id text not null default '',
   channel text not null default 'whatsapp',
   created_at timestamptz not null default now(),

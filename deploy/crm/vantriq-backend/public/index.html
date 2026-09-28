@@ -1429,11 +1429,47 @@ function renderAnalytics(){
   if(!cur) return tabs + picker + `<div class="card" style="text-align:center;color:var(--muted);padding:32px;">Working out the numbers…</div>`;
   if(cur.error) return tabs + picker + `<div class="card" style="color:var(--red);">${esc(cur.error)}
     <button class="btn btn-ghost btn-sm" style="margin-left:8px;" onclick="analyticsData=null;render()">Try again</button></div>`;
-  const opts = { onGrain:'setAnalyticsGrain' };
-  if(analyticsTab==='sales') return tabs + VQA.salesHTML(cur.data, opts);
-  if(analyticsTab==='platform') return tabs + VQA.conversationsHTML(cur.data, { ...opts, audience:'platform', fileTag:'all-conversations' });
+  const opts = { onGrain:'setAnalyticsGrain', onReport:'downloadAnalyticsReport' };
+  if(analyticsTab==='sales') return tabs + VQA.salesHTML(cur.data, { ...opts,
+    reportHint:'Every lead, the funnel, sources and each prospect conversation — a tab for each' });
+  if(analyticsTab==='platform') return tabs + VQA.conversationsHTML(cur.data, { ...opts, audience:'platform',
+    reportHint:'Every customer side by side, then every contact (new and returning), conversation and survey answer — a tab for each' });
   const shown = state.clients.find(c=>c.id===analyticsClientId);
-  return tabs + picker + VQA.conversationsHTML(cur.data, { ...opts, audience:'crm', fileTag:'customer', surveysEnabled: shown ? !!shown.surveysEnabled : undefined });
+  return tabs + picker + VQA.conversationsHTML(cur.data, { ...opts, audience:'crm', surveysEnabled: shown ? !!shown.surveysEnabled : undefined,
+    reportHint:'Pulse and Echo for this customer: every figure, their contacts (new and returning), conversations and survey answers — a tab for each' });
+}
+
+/**
+ * The Excel report for whichever Pulse view is open, at its period: the
+ * dashboard's figures plus the contacts, conversations and answers behind
+ * them. Fetched rather than linked, because the session travels in a header.
+ */
+async function downloadAnalyticsReport(){
+  const g = encodeURIComponent(analyticsGrain);
+  const path = analyticsTab==='sales' ? `/api/analytics/sales/report.xlsx?grain=${g}`
+    : analyticsTab==='platform' ? `/api/analytics/platform/report.xlsx?grain=${g}`
+    : `/api/analytics/clients/${encodeURIComponent(analyticsClientId)}/report.xlsx?grain=${g}`;
+  const shown = state.clients.find(c=>c.id===analyticsClientId);
+  const who = analyticsTab==='sales' ? 'sales' : analyticsTab==='platform' ? 'echo-all-customers'
+    : 'echo-' + (String((shown && shown.company) || 'customer').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40) || 'customer');
+  showToast('Building the report…');
+  try{
+    const headers = {};
+    if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
+    else if(API.key) headers['x-api-key'] = API.key;
+    const res = await fetch(API.base + path, { headers });
+    if(!res.ok){
+      const err = await res.json().catch(()=>null);
+      throw new Error((err&&err.error) || `Report failed (${res.status})`);
+    }
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `vantriq-pulse-${who}-${analyticsGrain}-${todayISO()}.xlsx`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    showToast('Report downloaded');
+  }catch(e){ showToast(e.message||'Could not build the report','warn'); }
 }
 
 function drawAnalytics(){
