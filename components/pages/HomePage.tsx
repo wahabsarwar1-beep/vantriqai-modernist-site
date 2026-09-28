@@ -8,6 +8,7 @@ import PinnedRail from "@/components/PinnedRail";
 import ProductMark, { type MarkId } from "@/components/ProductMark";
 import AgentTrace from "@/components/AgentTrace";
 import ModuleVisual from "@/components/ModuleVisual";
+import AgentViz from "@/components/AgentViz";
 import Magnetic from "@/components/Magnetic";
 import { AGENTS, INTEGRATIONS, JSTEPS, WHY } from "@/lib/content";
 import { industries } from "@/lib/industries";
@@ -217,7 +218,11 @@ export default function HomePage({ region }: { region: Region }) {
                     <i />
                   </span>
                 </div>
-              ) : null}
+              ) : (
+                <div aria-hidden="true" className="bento-viz">
+                  <AgentViz name={a.name} region={region} />
+                </div>
+              )}
               <p className="bento-metric">{a.metric}</p>
             </div>
           ))}
