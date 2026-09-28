@@ -164,7 +164,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await page.fill('#lg_pass', 'UiSurveysPass123');
     await page.keyboard.press('Enter');
     await page.waitForSelector('.vqs-scard', { timeout: 10000 });
-    ok(await page.locator('.tab.active').innerText() === 'Surveys', 'a #surveys link opens straight onto the tab');
+    ok(await page.locator('.tab.active').innerText() === 'Echo', 'a #surveys link opens straight onto the tab');
     const home = await page.innerText('.vqs');
     ok(/UI dine-in/.test(home) && /Waiting for follow-up\s*\n?\s*1/.test(home), 'the survey, and one unhappy customer waiting', home.slice(0, 300));
 
@@ -214,7 +214,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await page.goto(B + '/');
     await page.evaluate((k) => localStorage.setItem('vantriq_api_key', k), ADMIN_KEY);
     await page.goto(B + '/');
-    await page.click('.nav-item:has-text("Surveys")');
+    await page.click('.nav-item:has-text("Vantriq Echo")');
     await page.waitForSelector('.vqs-scard', { timeout: 10000 });
     await page.selectOption('select[data-a-change="client-filter"]', client.id);
     await page.waitForFunction((co) => document.querySelectorAll('.vqs-scard').length === 2 && document.querySelector('.vqs').innerText.includes(co), client.company, { timeout: 8000 }).catch(() => {});

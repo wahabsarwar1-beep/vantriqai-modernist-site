@@ -486,7 +486,7 @@ router.patch('/:id/api-access', async (req, res) => {
  * refused; the surveys and their answers are kept for when it comes back on.
  */
 router.patch('/:id/surveys', async (req, res) => {
-  if (!isAdminRequest(req)) return res.status(403).json({ error: 'Only an admin can switch surveys on or off for a client.' });
+  if (!isAdminRequest(req)) return res.status(403).json({ error: 'Only an admin can switch Vantriq Echo on or off for a client.' });
   const by = req.user ? (req.user.name || req.user.email) : 'admin key';
   const row = await setSurveysEnabled(req.params.id, !!(req.body || {}).enabled, by);
   if (!row) return res.status(404).json({ error: 'Client not found' });

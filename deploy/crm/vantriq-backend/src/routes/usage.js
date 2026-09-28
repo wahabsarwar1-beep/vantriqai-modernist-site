@@ -545,7 +545,7 @@ router.post('/survey-invite', async (req, res) => {
   const { rows: [on] } = await db.query(`select surveys_enabled from clients where id = $1`, [clientId]);
   if (!on || !on.surveys_enabled) {
     return res.status(403).json({
-      error: 'Customer-satisfaction surveys are not switched on for this client. An admin turns them on in the CRM.',
+      error: 'Vantriq Echo (customer-satisfaction surveys) is not switched on for this client. An admin turns it on in the CRM.',
       code: 'surveys_disabled',
     });
   }

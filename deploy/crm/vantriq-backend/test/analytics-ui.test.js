@@ -43,7 +43,7 @@ const post = (p, b) => fetch(B + p, { method: 'POST', headers: AH, body: JSON.st
     await page.fill('input[type=password]', 'UiAnalyticsPass123');
     await page.keyboard.press('Enter');
     await page.waitForSelector('.tab');
-    await page.click('.tab:has-text("Analytics")');
+    await page.click('.tab:has-text("Pulse")');
     await page.waitForSelector('#vqaConv', { timeout: 10000 }).catch(() => {});
     ok(!!(await page.$('#vqaConv')), 'the conversations chart is drawn');
     ok(await page.evaluate(() => !!document.querySelector('#vqaConv') && Chart.getChart(document.querySelector('#vqaConv')) != null), 'as a live Chart.js chart');
@@ -69,7 +69,7 @@ const post = (p, b) => fetch(B + p, { method: 'POST', headers: AH, body: JSON.st
   await page.goto(B + '/');
   await page.evaluate((k) => localStorage.setItem('vantriq_api_key', k), ADMIN_KEY);
   await page.goto(B + '/');
-  await page.click('.nav-item:has-text("Analytics")');
+  await page.click('.nav-item:has-text("Vantriq Pulse")');
   await page.waitForSelector('#vqaLeads', { timeout: 10000 }).catch(() => {});
   ok(!!(await page.$('#vqaLeads')), 'Sales & leads: the new-leads chart is drawn');
   ok(!!(await page.$('text=Funnel')), 'with the funnel');

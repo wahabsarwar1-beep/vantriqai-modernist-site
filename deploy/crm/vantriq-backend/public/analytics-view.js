@@ -405,16 +405,16 @@
       // Surveys are an add-on switched on per account; an account without
       // them is not sent to a Surveys tab it does not have.
       const off = surveysEnabled === false;
-      return `<div class="vqa-section">Customer satisfaction</div>
+      return `<div class="vqa-section">Customer satisfaction <span style="font-size:12px;font-weight:500;color:var(--muted,#6b645b);">· from Vantriq Echo</span></div>
       <div class="vqa-card"><div class="vqa-empty">
         No survey answers yet in the ${esc(d.period.window_label.toLowerCase())}.
         ${audience === 'portal'
           ? (off
-            ? 'Customer-satisfaction surveys are not part of your account yet. Ask Vantriq AI to switch them on: you get a Surveys tab to ask your customers how you did — by QR code, link or WhatsApp — and the satisfaction score, NPS and what people wrote show up here.'
-            : 'Create a survey under the <b>Surveys</b> tab — share it by QR code, link or WhatsApp, and the answers show up here the moment they arrive: the satisfaction score, NPS, how often problems were resolved, and what people wrote.')
+            ? 'Customer-satisfaction surveys are not part of your account yet. Ask Vantriq AI to switch them on: you get Vantriq Echo, an Echo tab to ask your customers how you did — by QR code, link or WhatsApp — and the satisfaction score, NPS and what people wrote show up here.'
+            : 'Create a survey under the <b>Echo</b> tab — share it by QR code, link or WhatsApp, and the answers show up here the moment they arrive: the satisfaction score, NPS, how often problems were resolved, and what people wrote.')
           : (off
-            ? 'Surveys are switched off for this client. An admin switches them on from the client\'s page (Customer-satisfaction surveys); answers posted to <code>POST /api/webhooks/csat</code> by anything else still appear here.'
-            : 'Create a survey for this client under <b>Surveys</b>, or post answers from anything else that asks the question to <code>POST /api/webhooks/csat</code>. Either way they appear here straight away.')}
+            ? 'Vantriq Echo is switched off for this client. An admin switches it on from the client\'s page (Vantriq Echo); answers posted to <code>POST /api/webhooks/csat</code> by anything else still appear here.'
+            : 'Create a survey for this client under <b>Vantriq Echo</b>, or post answers from anything else that asks the question to <code>POST /api/webhooks/csat</code>. Either way they appear here straight away.')}
       </div></div>`;
     }
     const k = s.kpis, w = s.window;
@@ -422,7 +422,7 @@
     const seg = (v) => npsTotal ? (v / npsTotal) * 100 : 0;
     const distMax = Math.max(...s.distribution.map(x => x.n), 1);
     return `
-    <div class="vqa-section">Customer satisfaction</div>
+    <div class="vqa-section">Customer satisfaction <span style="font-size:12px;font-weight:500;color:var(--muted,#6b645b);">· from Vantriq Echo</span></div>
     <div class="vqa-grid vqa-kpis">
       ${kpi({ label: 'Satisfied (4–5 of 5)', value: k.csat.current == null ? '—' : k.csat.current, unit: k.csat.current == null ? '' : '%',
               delta: k.csat.current == null ? undefined : k.csat.delta_pts, deltaUnit: 'pts', prevLabel: d.period.previous_label,

@@ -948,8 +948,8 @@ let kanbanDragId = null;
 const NAV = [
   {group:'Overview', items:[
     {id:'dashboard', label:'Dashboard', icon:iconGrid},
-    {id:'analytics', label:'Analytics', icon:iconTrend},
-    {id:'surveys', label:'Surveys', icon:iconSurvey},
+    {id:'analytics', label:'Vantriq Pulse', icon:iconTrend},
+    {id:'surveys', label:'Vantriq Echo', icon:iconSurvey},
   ]},
   {group:'Revenue', items:[
     {id:'pipeline', label:'Pipeline', icon:iconFunnel},
@@ -1156,8 +1156,8 @@ function sidebarPulseSVG(){
 
 const VIEW_TITLES = {
   dashboard:['Dashboard','Where the business stands right now'],
-  analytics:['Analytics','Leads, conversations and customer satisfaction — by day, week, month, quarter or year'],
-  surveys:['Surveys','Customer-satisfaction surveys for every client — results, follow-ups and sharing'],
+  analytics:['Vantriq Pulse','Analytics — leads, conversations and customer satisfaction, by day, week, month, quarter or year'],
+  surveys:['Vantriq Echo','Customer-satisfaction surveys for every client — results, follow-ups and sharing'],
   pipeline:['Pipeline','Move deals from lead to active client'],
   clients:['Clients','Every active and past account'],
   billing:['Billing & Invoices','Setup fees, retainers, and overage'],
@@ -1210,7 +1210,7 @@ function renderView(){
   switch(currentView){
     case 'dashboard': return renderDashboard();
     case 'analytics': return renderAnalytics();
-    case 'surveys': return window.VQS ? '<div id="vqs-root"></div>' : '<div class="card"><div class="empty">The surveys page could not load in this browser.</div></div>';
+    case 'surveys': return window.VQS ? '<div id="vqs-root"></div>' : '<div class="card"><div class="empty">The Vantriq Echo page could not load in this browser.</div></div>';
     case 'pipeline': return renderPipeline();
     case 'clients': return renderClients();
     case 'billing': return renderBilling();
@@ -1420,7 +1420,7 @@ function renderAnalytics(){
       <select onchange="setAnalyticsClient(this.value)">
         ${analyticsClients().map(c=>`<option value="${c.id}" ${c.id===analyticsClientId?'selected':''}>${esc(c.company)}${c.isInternal?' (VantriqAI — our own agents)':''}</option>`).join('')}
       </select>
-      <div class="footnote" style="margin-top:6px;">This is exactly what the customer sees on the Analytics tab of their portal.</div>
+      <div class="footnote" style="margin-top:6px;">This is exactly what the customer sees on the Pulse tab of their portal.</div>
     </div>`;
   if(analyticsTab==='client' && !analyticsClientId){
     return tabs + `<div class="card" style="text-align:center;color:var(--muted);padding:32px;">No active customers yet.</div>`;
@@ -5575,20 +5575,20 @@ function clientSurveysCard(c){
   const text = on
     ? `<div style="margin-bottom:6px;"><span class="pill pill-active"><span class="pill-dot"></span>On${since}</span></div>
        <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">
-         They have a <strong>Surveys</strong> tab in their portal, you can build surveys for them in
-         <a href="#" style="color:var(--teal);font-weight:600;" onclick="event.preventDefault();openPanel=null;navigate('surveys')">Surveys</a>, and their agents can send after-chat surveys.</div>`
-    : `<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">Off. Surveys are an add-on: switch them on when this customer has signed up for them.
-         Until then their portal has no Surveys tab and no survey can be made or sent for them.</div>`;
-  if(!isAdmin()) return text + (on ? '' : `<div style="font-size:11.5px;color:var(--muted);">Only an admin can switch surveys on.</div>`);
+         They have an <strong>Echo</strong> tab in their portal, you can build surveys for them in
+         <a href="#" style="color:var(--teal);font-weight:600;" onclick="event.preventDefault();openPanel=null;navigate('surveys')">Vantriq Echo</a>, and their agents can send after-chat surveys.</div>`
+    : `<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">Off. Vantriq Echo is an add-on: switch it on when this customer has signed up for it.
+         Until then their portal has no Echo tab and no survey can be made or sent for them.</div>`;
+  if(!isAdmin()) return text + (on ? '' : `<div style="font-size:11.5px;color:var(--muted);">Only an admin can switch Vantriq Echo on.</div>`);
   return text + `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
       <input type="checkbox" ${on?'checked':''} onchange="setClientSurveys('${c.id}',this.checked)">
-      Surveys switched on for this customer
+      Vantriq Echo switched on for this customer
     </label>`;
 }
 
 async function setClientSurveys(clientId, enabled){
   const client = state.clients.find(c=>c.id===clientId);
-  if(!enabled && !confirm(`Switch surveys off for ${client?client.company:'this customer'}?\n\nEvery survey they have is paused for their customers straight away, the Surveys tab leaves their portal and no after-chat survey is sent. Their surveys and answers are kept, and come back when you switch it on again.`)){
+  if(!enabled && !confirm(`Switch Vantriq Echo off for ${client?client.company:'this customer'}?\n\nEvery survey they have is paused for their customers straight away, the Echo tab leaves their portal and no after-chat survey is sent. Their surveys and answers are kept, and come back when you switch it on again.`)){
     render(); return;
   }
   try{
@@ -5597,8 +5597,8 @@ async function setClientSurveys(clientId, enabled){
     if(window.VQS) VQS.reset();
     render();
     showToast(enabled
-      ? 'Surveys switched on — they now have a Surveys tab in their portal'
-      : `Surveys switched off${r.live_surveys?` — ${r.live_surveys} live survey${r.live_surveys===1?' is':'s are'} paused for respondents`:''}`);
+      ? 'Vantriq Echo switched on — they now have an Echo tab in their portal'
+      : `Vantriq Echo switched off${r.live_surveys?` — ${r.live_surveys} live survey${r.live_surveys===1?' is':'s are'} paused for respondents`:''}`);
   }catch(e){ showToast(e.message||'Could not change that','warn'); render(); }
 }
 
@@ -6259,7 +6259,7 @@ function clientPanelHTML(id){
     </div>
 
     <div class="divider"></div>
-    <h4 style="font-size:13px;margin-bottom:8px;">Customer-satisfaction surveys</h4>
+    <h4 style="font-size:13px;margin-bottom:8px;">Vantriq Echo · customer-satisfaction surveys</h4>
     ${clientSurveysCard(c)}
 
     ${authUser&&authUser.role==='admin'?`
@@ -7176,8 +7176,8 @@ function mountSurveys(){
       .sort((a, b) => String(a.company).localeCompare(String(b.company))),
     // What to tell someone who wants a survey for a client that does not have them.
     enableHint: () => isAdmin()
-      ? 'Switch surveys on for a client from their page: Clients → the client → Customer-satisfaction surveys.'
-      : 'Surveys are an add-on an admin switches on per client. Ask an admin to switch them on for this client.',
+      ? 'Switch Vantriq Echo on for a client from their page: Clients → the client → Vantriq Echo.'
+      : 'Vantriq Echo is an add-on an admin switches on per client. Ask an admin to switch it on for this client.',
     api: (method, path, body) => API.req(method, '/api/surveys' + path, body),
     download: async (path, filename) => {
       showToast('Building the spreadsheet…');

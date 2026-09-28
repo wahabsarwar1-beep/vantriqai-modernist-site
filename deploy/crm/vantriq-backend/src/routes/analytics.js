@@ -29,7 +29,7 @@ router.get('/platform', async (req, res, next) => {
   try { res.json(await platformAnalytics({ grain: grainOf(req) })); } catch (err) { next(err); }
 });
 
-/** One customer's analytics — identical to what they see on their portal's Analytics tab. */
+/** One customer's analytics — identical to what they see on their portal's Pulse tab (Vantriq Pulse). */
 router.get('/clients/:id', async (req, res, next) => {
   try {
     const { rows } = await db.query(`select * from clients where id = $1`, [req.params.id]);

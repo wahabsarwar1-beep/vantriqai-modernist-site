@@ -27,7 +27,7 @@ const isPortal = (req) => !!req.portalClient;
 router.use((req, res, next) => {
   if (isPortal(req) && !req.portalClient.surveys_enabled) {
     return res.status(403).json({
-      error: 'Customer-satisfaction surveys are not switched on for your account. Ask Vantriq AI to turn them on.',
+      error: 'Vantriq Echo (customer-satisfaction surveys) is not switched on for your account. Ask Vantriq AI to turn it on.',
       code: 'surveys_disabled',
     });
   }

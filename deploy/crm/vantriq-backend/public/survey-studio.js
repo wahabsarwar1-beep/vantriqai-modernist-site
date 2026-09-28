@@ -406,7 +406,7 @@
     var clients = (!isPortal() && host.clients ? host.clients() : []).filter(function(c){
       return c.surveys_enabled !== false || listed.some(function(s){ return s.client_id === c.id; });
     });
-    var head = '<div class="vqs-top"><div><h2>Customer satisfaction surveys</h2>'
+    var head = '<div class="vqs-top"><div><h2>Customer-satisfaction surveys</h2>'
       + '<p>Ask customers how you did — by QR code on the table, a link on WhatsApp, a tablet at the counter or your website — and see every answer here the moment it arrives. Unhappy answers raise a follow-up so nobody slips through.</p></div>'
       + '<div class="vqs-row">'
       + (clients.length ? '<select data-a-change="client-filter" style="width:auto;min-width:180px;"><option value="">All clients</option>' + clients.map(function(c){ return '<option value="' + esc(c.id) + '"' + (st.clientFilter === c.id ? ' selected' : '') + '>' + esc(c.company) + '</option>'; }).join('') + '</select>' : '')
@@ -432,7 +432,7 @@
   function surveyCard(s){
     return '<div class="vqs-card vqs-scard" data-a="open" data-id="' + esc(s.id) + '" role="button" tabindex="0">'
       + '<div class="vqs-spread">' + status(s) + '<span class="vqs-row"><span class="vqs-swatch" style="background:' + esc(s.brand_color) + '"></span>'
-      + (s.client_surveys_enabled === false && !isPortal() ? '<span class="vqs-tag" title="Surveys are switched off for this client, so it is paused for respondents">Surveys off</span>' : '')
+      + (s.client_surveys_enabled === false && !isPortal() ? '<span class="vqs-tag" title="Vantriq Echo is switched off for this client, so it is paused for respondents">Echo off</span>' : '')
       + (s.open_followups ? '<span class="vqs-tag" style="background:#fbe8e4;color:#8f3527;">' + s.open_followups + ' to follow up</span>' : '') + '</span></div>'
       + '<div><div class="t">' + esc(s.title) + '</div>'
       + '<div class="co">' + (isPortal() ? esc(s.display_name) : esc(s.company)) + ' · ' + s.question_count + ' questions' + (s.location_count ? ' · ' + s.location_count + ' locations' : '') + '</div></div>'
@@ -491,7 +491,7 @@
     var hint = host.enableHint ? host.enableHint() : '';
     var noneOn = !isPortal() && all.length && !clients.length;
     return back()
-      + (noneOn ? '<div class="vqs-banner warn"><b>No client has surveys switched on yet.</b> ' + esc(hint) + '</div>' : '')
+      + (noneOn ? '<div class="vqs-banner warn"><b>No client has Vantriq Echo switched on yet.</b> ' + esc(hint) + '</div>' : '')
       + '<div class="vqs-top"><div><h2>New survey</h2><p>Choose the template closest to your business. Every question can be reworded, reordered or removed afterwards.</p></div></div>'
       + '<div class="vqs-grid vqs-g3">' + t.map(function(x){
         return '<div class="vqs-card vqs-tpl' + (x.key === st.newTpl ? ' on' : '') + '" data-a="pick-tpl" data-tpl="' + esc(x.key) + '" role="button" tabindex="0">'
@@ -503,7 +503,7 @@
         + '<h3>' + esc(tpl.icon + ' ' + tpl.name) + '</h3>'
         + '<div class="sub">The questions: ' + tpl.preview.map(esc).join(' · ') + '</div>'
         + (tpl.setup_hint ? '<div class="vqs-banner warn">' + esc(tpl.setup_hint) + '</div>' : '')
-        + (clients.length ? '<label class="vqs-f"><span>Client <em>— clients with surveys switched on</em></span><select data-nf="client_id"><option value="">Choose a client…</option>'
+        + (clients.length ? '<label class="vqs-f"><span>Client <em>— clients with Vantriq Echo switched on</em></span><select data-nf="client_id"><option value="">Choose a client…</option>'
           + clients.map(function(c){ return '<option value="' + esc(c.id) + '"' + (f.client_id === c.id ? ' selected' : '') + '>' + esc(c.company) + '</option>'; }).join('') + '</select></label>'
           + (all.length > clients.length && hint ? '<div class="sub" style="margin:-4px 0 10px;">Not listed? ' + esc(hint) + '</div>' : '') : '')
         + '<div class="vqs-two">'
@@ -585,7 +585,7 @@
       + '<a class="vqs-btn" href="' + esc(s.status === 'live' ? s.links.url : s.links.preview) + '" target="_blank" rel="noopener">Open survey ↗</a>'
       + '</div></div>'
       + (s.client_surveys_enabled === false && !isPortal()
-        ? '<div class="vqs-banner warn"><b>Surveys are switched off for ' + esc(s.company) + ',</b> so this survey is paused for respondents and no new links can be made. '
+        ? '<div class="vqs-banner warn"><b>Vantriq Echo is switched off for ' + esc(s.company) + ',</b> so this survey is paused for respondents and no new links can be made. '
           + 'Its answers are kept. ' + esc(host.enableHint ? host.enableHint() : '') + '</div>' : '')
       + '<div class="vqs-tabs" role="tablist">' + tabs.map(function(t){
         return '<button role="tab" aria-selected="' + (st.tab === t[0]) + '" class="' + (st.tab === t[0] ? 'on' : '') + '" data-a="tab" data-tab="' + t[0] + '">' + t[1]
