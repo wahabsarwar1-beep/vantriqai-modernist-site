@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // The Claude Design handoff bundle (prototype source, not app code).
     "project/**",
+    // Social ad card sources and their render script (not app code).
+    "marketing/**",
   ]),
 ]);
 

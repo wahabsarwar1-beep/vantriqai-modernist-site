@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>VantriqAI Social Ads</title>
+<link rel="stylesheet" href="fonts.css">
+<style>
+  :root{
+    --ink:#111015; --ink-2:#16151a; --cream:#fbf9f6; --cobalt:#2f56d9; --cobalt-hi:#6f8cf5;
+    --cobalt-deep:#111f4f; --peach:#e0854f; --peach-soft:#f3c9a6; --mint:#b9e2cf; --lilac:#d6c8ef;
+    --divider:#e7e2da; --muted:#8d857a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#2a2a2a;font-family:'Manrope',sans-serif;-webkit-font-smoothing:antialiased;display:flex;flex-wrap:wrap;gap:40px;padding:40px}
+  body.solo{padding:0;gap:0;background:none}
+  body.solo .card:not(.on){display:none}
+
+  .card{width:1080px;height:1350px;position:relative;overflow:hidden;flex:none;display:flex;flex-direction:column;align-items:center}
+  .card > *{position:relative;z-index:2}
+  .grain{position:absolute!important;inset:0;z-index:1!important;pointer-events:none;opacity:.22;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+  .contours{position:absolute!important;inset:0;z-index:0!important;width:100%;height:100%}
+
+  /* lockup */
+  .lockup{display:flex;align-items:center;gap:18px;margin-top:70px;font-family:'Sora';font-weight:700;font-size:44px;letter-spacing:-.03em}
+  .lockup svg{width:46px;height:46px}
+  .lockup .ai{color:var(--cobalt)}
+  .dark .lockup{color:#fff} .dark .lockup .ai{color:var(--cobalt-hi)}
+
+  h1{font-family:'Sora';font-weight:500;letter-spacing:-.045em;line-height:1.02;text-align:center;text-wrap:balance}
+  .sub{font-size:36px;line-height:1.35;text-align:center;letter-spacing:-.01em;text-wrap:balance}
+  .dark h1{color:#fff} .dark .sub{color:rgba(255,255,255,.78)}
+  .light h1{color:var(--ink-2)} .light .sub{color:#4a453f}
+
+  .cta{font-family:'Sora';font-weight:500;font-size:34px;letter-spacing:-.02em;padding:30px 60px;border-radius:999px;display:inline-flex;align-items:center;gap:16px}
+  .cta.white{background:#fff;color:var(--ink-2);box-shadow:0 20px 50px -20px rgba(0,0,0,.6)}
+  .cta.ink{background:var(--ink-2);color:#fff;box-shadow:0 24px 50px -24px rgba(22,21,26,.55)}
+  .cta.cobalt{background:var(--cobalt);color:#fff;box-shadow:0 24px 50px -22px rgba(47,86,217,.7)}
+  .cta svg{width:30px;height:30px}
+
+  .foot{position:absolute!important;left:64px;right:64px;bottom:54px;display:flex;justify-content:space-between;font-size:24px;font-weight:600;letter-spacing:.02em}
+  .dark .foot{color:rgba(255,255,255,.5)} .light .foot{color:var(--muted)}
+  .foot .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#35c47a;margin-right:10px;vertical-align:middle;box-shadow:0 0 0 6px rgba(53,196,122,.18)}
+
+  /* ============ 1 · ORB ============ */
+  .c1{background:radial-gradient(900px 700px at 50% 62%, #1a2350 0%, #121020 45%, #0c0b10 100%)}
+  .c1 h1{font-size:108px;margin-top:64px}
+  .c1 .sub{margin-top:34px;max-width:820px}
+  .orb-wrap{position:relative;width:470px;height:470px;margin-top:40px}
+  .orb{position:absolute;inset:40px;border-radius:50%;
+    background:
+      radial-gradient(circle at 30% 26%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 32%),
+      radial-gradient(circle at 78% 72%, #f08a55 0%, rgba(240,138,85,0) 46%),
+      radial-gradient(circle at 70% 30%, #c79cf0 0%, rgba(199,156,240,0) 52%),
+      radial-gradient(circle at 30% 70%, #2f56d9 0%, #2a3fb0 40%, #1d2466 100%);
+    box-shadow:inset -30px -40px 80px rgba(10,10,40,.55), inset 20px 20px 60px rgba(255,255,255,.18), 0 60px 140px -30px rgba(80,100,255,.55)}
+  .orb::after{content:"";position:absolute;inset:0;border-radius:50%;opacity:.5;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+  .dial{position:absolute;inset:0}
+  .c1 .cta{margin-top:30px}
+
+  /* ============ 2 · CHAT ============ */
+  .c2{background:var(--cream)}
+  .c2 .blob{position:absolute!important;border-radius:50%;filter:blur(90px);z-index:0!important}
+  .c2 h1{font-size:78px;margin-top:52px;max-width:940px}
+  .c2 h1 em{font-style:normal;color:var(--cobalt)}
+  .chat{margin-top:42px;width:780px;background:#fff;border-radius:44px;box-shadow:0 2px 4px rgba(22,21,26,.04),0 50px 90px -40px rgba(22,21,26,.35);overflow:hidden;border:1px solid var(--divider)}
+  .chat-head{display:flex;align-items:center;gap:20px;padding:28px 34px;border-bottom:1px solid #efeae1}
+  .chat-av{width:64px;height:64px;border-radius:50%;background:var(--ink-2);display:grid;place-items:center}
+  .chat-av svg{width:34px;height:34px}
+  .chat-name{font-family:'Sora';font-weight:600;font-size:28px;color:var(--ink-2);letter-spacing:-.02em}
+  .chat-status{font-size:22px;color:#35a86a;font-weight:600;margin-top:2px}
+  .chat-body{padding:26px 28px 28px;display:flex;flex-direction:column;gap:14px;background:#f7f4ee}
+  .b{max-width:560px;padding:16px 24px 12px;border-radius:28px;font-size:25px;line-height:1.36;color:var(--ink-2);position:relative}
+  .b small{display:block;text-align:right;font-size:18px;color:var(--muted);margin-top:6px;font-weight:600}
+  .b.in{background:#fff;align-self:flex-start;border-bottom-left-radius:10px;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+  .b.out{background:var(--cobalt);color:#fff;align-self:flex-end;border-bottom-right-radius:10px}
+  .b.out small{color:rgba(255,255,255,.7)}
+  .speed{position:absolute!important;right:92px;top:470px;z-index:3!important;background:var(--ink-2);color:#fff;font-family:'Sora';font-weight:600;font-size:26px;padding:16px 26px;border-radius:999px;display:flex;align-items:center;gap:12px;transform:rotate(4deg);box-shadow:0 20px 40px -18px rgba(0,0,0,.5)}
+  .speed i{width:12px;height:12px;border-radius:50%;background:#5cf0a0;display:block}
+  .c2 .cta{margin-top:40px}
+
+  /* ============ 3 · STAT ============ */
+  .c3{background:radial-gradient(1100px 900px at 80% 10%, #4a70f0 0%, #2f56d9 38%, #1f3a95 78%, #182c70 100%)}
+  .c3 .kicker{margin-top:110px;font-size:26px;font-weight:700;letter-spacing:.24em;text-transform:uppercase;color:rgba(255,255,255,.7)}
+  .c3 .fig{font-family:'Sora';font-weight:600;font-size:400px;line-height:.9;letter-spacing:-.07em;color:#fff;margin-top:40px;
+    background:linear-gradient(180deg,#fff 30%,rgba(255,255,255,.72));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .c3 .fig span{font-size:230px;letter-spacing:-.04em}
+  .c3 h1{font-size:72px;margin-top:40px;max-width:900px;color:#fff}
+  .c3 .sub{margin-top:28px;font-size:36px;color:rgba(255,255,255,.8)}
+  .c3 .sub b{color:#fff;font-weight:700}
+  .c3 .cta{margin-top:60px}
+  .c3 .src{position:absolute!important;bottom:118px;font-size:20px;color:rgba(255,255,255,.5);letter-spacing:.03em}
+  .rings{position:absolute!important;z-index:0!important;right:-340px;top:-340px;width:1100px;height:1100px}
+
+  /* ============ 4 · TIMELINE ============ */
+  .c4{background:linear-gradient(180deg,#0e0d12 0%,#15141b 100%)}
+  .c4 h1{font-size:92px;margin-top:56px}
+  .c4 .sub{margin-top:24px;font-size:32px}
+  .tl{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:48px;width:952px}
+  .lane{border-radius:36px;padding:38px 36px 36px;position:relative}
+  .lane.no{background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08)}
+  .lane.yes{background:linear-gradient(160deg,#2f56d9 0%,#1f3a95 100%);box-shadow:0 40px 90px -40px rgba(47,86,217,.8)}
+  .lane-t{font-family:'Sora';font-weight:600;font-size:28px;letter-spacing:-.01em;display:flex;align-items:center;gap:12px}
+  .lane.no .lane-t{color:rgba(255,255,255,.55)} .lane.yes .lane-t{color:#fff}
+  .ev{display:grid;grid-template-columns:96px 1fr;gap:8px;margin-top:30px;position:relative}
+  .ev t{font-family:'Sora';font-weight:600;font-size:26px;font-variant-numeric:tabular-nums}
+  .ev p{font-size:24px;line-height:1.38}
+  .lane.no .ev t{color:rgba(255,255,255,.45)} .lane.no .ev p{color:rgba(255,255,255,.5)}
+  .lane.yes .ev t{color:#fff} .lane.yes .ev p{color:rgba(255,255,255,.9)}
+  .outcome{margin-top:34px;padding-top:26px;border-top:1px dashed rgba(255,255,255,.2);font-family:'Sora';font-weight:600;font-size:28px;letter-spacing:-.01em}
+  .lane.no .outcome{color:#f0997a} .lane.yes .outcome{color:#fff}
+  .c4 .cta{margin-top:56px}
+
+  /* ============ 5 · CHANNELS ============ */
+  .c5{background:radial-gradient(900px 800px at 50% 110%, #2f56d9 0%, #1a2a78 40%, #0d0f22 80%)}
+  .c5 h1{font-size:94px;margin-top:56px;max-width:900px}
+  .c5 .sub{margin-top:28px;max-width:800px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:48px;width:900px}
+  .tile{border-radius:36px;padding:36px;background:linear-gradient(160deg,rgba(255,255,255,.12),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(10px);min-height:196px;display:flex;flex-direction:column;justify-content:space-between}
+  .tile .ic{width:64px;height:64px;border-radius:20px;display:grid;place-items:center}
+  .tile .ic svg{width:34px;height:34px}
+  .tile h3{font-family:'Sora';font-weight:600;font-size:36px;color:#fff;letter-spacing:-.02em;margin-top:26px}
+  .tile p{font-size:23px;color:rgba(255,255,255,.65);margin-top:6px}
+  .c5 .cta{margin-top:48px}
+
+  /* ============ 6 · STEPS ============ */
+  .c6{background:var(--cream)}
+  .c6 .blob{position:absolute!important;border-radius:50%;filter:blur(100px);z-index:0!important}
+  .c6 h1{font-size:104px;margin-top:56px}
+  .c6 h1 .soft{color:#bdb4a5}
+  .steps{margin-top:50px;width:900px;background:rgba(255,255,255,.72);border:1px solid var(--divider);border-radius:44px;padding:14px 44px;box-shadow:0 50px 90px -50px rgba(22,21,26,.3)}
+  .step{display:grid;grid-template-columns:78px 1fr auto;align-items:center;gap:10px;padding:28px 0;border-bottom:1px solid #efeae1}
+  .step:last-child{border-bottom:0}
+  .step .n{font-family:'Sora';font-weight:600;font-size:26px;color:var(--cobalt)}
+  .step h3{font-family:'Sora';font-weight:600;font-size:34px;color:var(--ink-2);letter-spacing:-.02em}
+  .step p{font-size:23px;color:#6b645b;margin-top:4px}
+  .step .tag{font-family:'Sora';font-weight:600;font-size:22px;color:var(--ink-2);background:#efeae1;padding:10px 18px;border-radius:999px;white-space:nowrap}
+  .step .tag.live{background:var(--cobalt);color:#fff}
+  .c6 .cta{margin-top:48px}
+</style>
+</head>
+<body>
+
+<!-- reusable mark -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="mark-dark" viewBox="0 0 100 100"><path d="M10 10 H90 V90 H10 Z M28 28 V72 H72 V28 Z" fill="#16151a" fill-rule="evenodd"/><rect x="10" y="28" width="28" height="10" fill="#2f56d9"/><rect x="28" y="10" width="10" height="28" fill="#2f56d9"/></symbol>
+    <symbol id="mark-light" viewBox="0 0 100 100"><path d="M10 10 H90 V90 H10 Z M28 28 V72 H72 V28 Z" fill="#ffffff" fill-rule="evenodd"/><rect x="10" y="28" width="28" height="10" fill="#6f8cf5"/><rect x="28" y="10" width="10" height="28" fill="#6f8cf5"/></symbol>
+    <symbol id="arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="contour" viewBox="0 0 1080 1350" preserveAspectRatio="none">
+      <g fill="none" stroke="currentColor" stroke-width="1.4">
+        <path d="M-50 140 C 180 60, 320 240, 560 150 S 900 60, 1130 190"/>
+        <path d="M-50 230 C 200 150, 340 330, 580 240 S 920 150, 1130 280"/>
+        <path d="M-50 420 C 140 520, 380 360, 600 470 S 960 560, 1130 430"/>
+        <path d="M-50 520 C 160 620, 400 460, 620 570 S 980 660, 1130 530"/>
+        <path d="M-50 860 C 220 780, 360 960, 620 880 S 940 780, 1130 900"/>
+        <path d="M-50 960 C 240 880, 380 1060, 640 980 S 960 880, 1130 1000"/>
+        <path d="M-50 1180 C 180 1260, 420 1110, 640 1210 S 980 1300, 1130 1170"/>
+        <path d="M-50 1280 C 200 1360, 440 1210, 660 1310 S 1000 1400, 1130 1270"/>
+        <path d="M120 -50 C 60 200, 240 380, 150 620 S 60 1000, 190 1400"/>
+        <path d="M930 -50 C 1000 220, 840 420, 950 660 S 1020 1040, 900 1400"/>
+      </g>
+    </symbol>
+  </defs>
+</svg>
+
+<!-- ================= 1 · ORB ================= -->
+<section class="card c1 dark" id="c1">
+  <svg class="contours" style="color:rgba(255,255,255,.045)"><use href="#contour"/></svg>
+  <div class="grain"></div>
+  <div class="lockup"><svg><use href="#mark-light"/></svg><span>Vantriq<span class="ai">AI</span></span></div>
+  <h1>Answer every<br>customer in 1.2s</h1>
+  <p class="sub">AI agents that reply, qualify and book — on WhatsApp, Instagram and your website.</p>
+  <div class="orb-wrap">
+    <div class="orb"></div>
+    <svg class="dial" viewBox="0 0 520 520" style="width:100%;height:100%">
+      <g id="ticks" stroke="rgba(255,255,255,.55)" stroke-width="2" stroke-linecap="round"></g>
+      <g font-family="Sora" font-size="19" font-weight="500" fill="rgba(255,255,255,.75)" text-anchor="middle" dominant-baseline="middle" id="nums"></g>
+    </svg>
+  </div>
+  <a class="cta white">Book a free demo <svg><use href="#arrow"/></svg></a>
+  <div class="foot"><span>vantriqai.com</span><span><i class="dot"></i>Answering 24/7</span></div>
+</section>
+
+<!-- ================= 2 · CHAT ================= -->
+<section class="card c2 light" id="c2">
+  <div class="blob" style="width:620px;height:620px;background:var(--peach-soft);left:-220px;top:380px;opacity:.9"></div>
+  <div class="blob" style="width:560px;height:560px;background:var(--lilac);right:-200px;top:120px;opacity:.9"></div>
+  <div class="blob" style="width:520px;height:520px;background:var(--mint);right:-80px;bottom:-160px;opacity:.8"></div>
+  <div class="grain" style="opacity:.35;mix-blend-mode:multiply;filter:invert(1);opacity:.06"></div>
+  <div class="lockup"><svg><use href="#mark-dark"/></svg><span>Vantriq<span class="ai">AI</span></span></div>
+  <h1>It’s 21:40. Your team is off.<br><em>Your agent isn’t.</em></h1>
+  <div class="chat">
+    <div class="chat-head">
+      <div class="chat-av"><svg><use href="#mark-light"/></svg></div>
+      <div><div class="chat-name">Your Store · AI Agent</div><div class="chat-status">● online · WhatsApp</div></div>
+    </div>
+    <div class="chat-body">
+      <div class="b in">Is the black leather sofa in stock?<small>21:40</small></div>
+      <div class="b out">Yes — 2 left in black. Delivery by Thursday. Shall I hold one and book you a showroom visit?<small>21:40 ✓✓</small></div>
+      <div class="b in">Tomorrow 6:30pm works.<small>21:42</small></div>
+      <div class="b out">Booked ✓ Tomorrow, 18:30. Reminder sent.<small>21:43 ✓✓</small></div>
+    </div>
+  </div>
+  <div class="speed"><i></i>Replied in 1.2s</div>
+  <a class="cta ink">Get your agent <svg><use href="#arrow"/></svg></a>
+  <div class="foot"><span>vantriqai.com</span><span>WhatsApp · Instagram · Web</span></div>
+</section>
+
+<!-- ================= 3 · STAT ================= -->
+<section class="card c3 dark" id="c3">
+  <svg class="rings" viewBox="0 0 1100 1100"><g fill="none" stroke="rgba(255,255,255,.09)" stroke-width="1.5"><circle cx="550" cy="550" r="180"/><circle cx="550" cy="550" r="280"/><circle cx="550" cy="550" r="380"/><circle cx="550" cy="550" r="480"/><circle cx="550" cy="550" r="545"/></g></svg>
+  <div class="grain"></div>
+  <div class="lockup"><svg><use href="#mark-light"/></svg><span>Vantriq<span class="ai" style="color:#cfd9fb">AI</span></span></div>
+  <div class="kicker">The speed economy</div>
+  <div class="fig">78<span>%</span></div>
+  <h1>of customers buy from whoever answers first.</h1>
+  <p class="sub">Not the cheapest. Not the biggest. <b>The first.</b></p>
+  <a class="cta white">Be first — every time <svg><use href="#arrow"/></svg></a>
+  <div class="src">Source: MIT / InsideSales.com Lead Response study</div>
+  <div class="foot"><span>vantriqai.com</span><span>AI agents · 24/7</span></div>
+</section>
+
+<!-- ================= 4 · TIMELINE ================= -->
+<section class="card c4 dark" id="c4">
+  <svg class="contours" style="color:rgba(255,255,255,.04)"><use href="#contour"/></svg>
+  <div class="grain"></div>
+  <div class="lockup"><svg><use href="#mark-light"/></svg><span>Vantriq<span class="ai">AI</span></span></div>
+  <h1>Same message.<br>Two endings.</h1>
+  <p class="sub">A customer asks about a sofa at 21:40.</p>
+  <div class="tl">
+    <div class="lane no">
+      <div class="lane-t">Without an agent</div>
+      <div class="ev"><t>21:40</t><p>Message delivered. Nobody is watching.</p></div>
+      <div class="ev"><t>08:58</t><p>Team opens a night of unread threads.</p></div>
+      <div class="ev"><t>09:47</t><p>First reply finally goes out.</p></div>
+      <div class="outcome">✕ Sold elsewhere by 22:10</div>
+    </div>
+    <div class="lane yes">
+      <div class="lane-t"><svg width="30" height="30"><use href="#mark-light"/></svg>With VantriqAI</div>
+      <div class="ev"><t>21:40</t><p>Live stock checked and answered in 1.2s.</p></div>
+      <div class="ev"><t>21:42</t><p>Budget &amp; timing captured. Lead scored.</p></div>
+      <div class="ev"><t>21:43</t><p>Visit booked. Reminder scheduled.</p></div>
+      <div class="outcome">✓ Sale on the calendar</div>
+    </div>
+  </div>
+  <a class="cta white">See it on your business <svg><use href="#arrow"/></svg></a>
+  <div class="foot"><span>vantriqai.com</span><span><i class="dot"></i>Never off the clock</span></div>
+</section>
+
+<!-- ================= 5 · CHANNELS ================= -->
+<section class="card c5 dark" id="c5">
+  <svg class="contours" style="color:rgba(255,255,255,.05)"><use href="#contour"/></svg>
+  <div class="grain"></div>
+  <div class="lockup"><svg><use href="#mark-light"/></svg><span>Vantriq<span class="ai">AI</span></span></div>
+  <h1>One agent. Every channel.</h1>
+  <p class="sub">Answers, qualifies and books wherever your customers already are.</p>
+  <div class="grid">
+    <div class="tile">
+      <div class="ic" style="background:#25d366"><svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.3-.7-2.8-1.1-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.9s.7-2 1-2.3c.3-.3.6-.3.8-.3h.6c.2 0 .4 0 .6.5l.9 2.1c.1.2.1.4 0 .5l-.3.5-.4.4c-.1.1-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.4 2.4 1.5.3.1.5.1.6-.1l.9-1c.2-.3.4-.2.6-.1l2 1c.3.1.5.2.5.3.1.2.1.7-.1 1.3Z"/></svg></div>
+      <div><h3>WhatsApp</h3><p>Replies in ~1.2 seconds</p></div>
+    </div>
+    <div class="tile">
+      <div class="ic" style="background:linear-gradient(45deg,#feda75,#fa7e1e,#d62976,#962fbf,#4f5bd5)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.4" cy="6.6" r="1" fill="#fff" stroke="none"/></svg></div>
+      <div><h3>Instagram</h3><p>Comment → qualified DM</p></div>
+    </div>
+    <div class="tile">
+      <div class="ic" style="background:#fff"><svg viewBox="0 0 24 24" fill="none" stroke="#2f56d9" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18M7 6.5h.01M10 6.5h.01"/></svg></div>
+      <div><h3>Website</h3><p>Books straight to your calendar</p></div>
+    </div>
+    <div class="tile">
+      <div class="ic" style="background:var(--peach)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg></div>
+      <div><h3>Voice</h3><p>Picks up your business line</p></div>
+    </div>
+  </div>
+  <a class="cta white">Start building <svg><use href="#arrow"/></svg></a>
+  <div class="foot"><span>vantriqai.com</span><span>Plugs into your CRM, calendar &amp; stock</span></div>
+</section>
+
+<!-- ================= 6 · STEPS ================= -->
+<section class="card c6 light" id="c6">
+  <div class="blob" style="width:640px;height:640px;background:var(--lilac);left:-260px;top:-120px"></div>
+  <div class="blob" style="width:600px;height:600px;background:var(--peach-soft);right:-240px;top:520px"></div>
+  <div class="blob" style="width:560px;height:560px;background:var(--mint);left:-120px;bottom:-240px;opacity:.85"></div>
+  <div class="lockup"><svg><use href="#mark-dark"/></svg><span>Vantriq<span class="ai">AI</span></span></div>
+  <h1>Live in weeks.<br><span class="soft">Not quarters.</span></h1>
+  <div class="steps">
+    <div class="step"><span class="n">01</span><div><h3>Tell us how you work</h3><p>The questions that repeat, the hours nobody watches.</p></div><span class="tag">15 min</span></div>
+    <div class="step"><span class="n">02</span><div><h3>We build &amp; test your agent</h3><p>Trained on your real message history.</p></div><span class="tag">2–4 weeks</span></div>
+    <div class="step"><span class="n">03</span><div><h3>It plugs into your tools</h3><p>Calendar, CRM, inventory, payments.</p></div><span class="tag">8+ systems</span></div>
+    <div class="step"><span class="n">04</span><div><h3>It answers, every hour</h3><p>You keep the judgement calls.</p></div><span class="tag live">24/7</span></div>
+  </div>
+  <a class="cta cobalt">Book a 15‑min call <svg><use href="#arrow"/></svg></a>
+  <div class="foot"><span>vantriqai.com</span><span>For businesses of any size</span></div>
+</section>
+
+<script>
+  // dial ticks around the top-right of the orb, like a response-time gauge
+  const cx=260, cy=260, r=236, ticks=document.getElementById('ticks'), nums=document.getElementById('nums');
+  for(let i=0;i<=24;i++){
+    const a=(-90 + i*4.5)*Math.PI/180, major=i%6===0, len=major?16:8;
+    const x1=cx+Math.cos(a)*(r-len), y1=cy+Math.sin(a)*(r-len), x2=cx+Math.cos(a)*r, y2=cy+Math.sin(a)*r;
+    ticks.insertAdjacentHTML('beforeend',`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" ${major?'':'stroke-opacity=".5"'}/>`);
+    if(major){const lr=r-40; nums.insertAdjacentHTML('beforeend',`<text x="${cx+Math.cos(a)*lr}" y="${cy+Math.sin(a)*lr}">${(i/20).toFixed(1).replace('.0','')}${i===24?'s':''}</text>`)}
+  }
+  const q=new URLSearchParams(location.search).get('c');
+  if(q){document.body.classList.add('solo');document.getElementById('c'+q).classList.add('on')}
+</script>
+</body>
+</html>
