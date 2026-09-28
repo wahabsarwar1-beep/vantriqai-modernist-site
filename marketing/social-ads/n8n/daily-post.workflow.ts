@@ -32,7 +32,7 @@ const config = node({
       assignments: {
         assignments: [
           { id: 'cfg-base', name: 'contentBaseUrl', value: 'https://raw.githubusercontent.com/wahabsarwar1-beep/vantriqai-modernist-site/claude/zealous-thompson-g0lxu7/marketing/social-ads/', type: 'string' },
-          { id: 'cfg-page', name: 'facebookPageId', value: '', type: 'string' },
+          { id: 'cfg-page', name: 'facebookPageId', value: '61594465987920', type: 'string' },
           { id: 'cfg-ig', name: 'instagramAccountId', value: '', type: 'string' },
           { id: 'cfg-graph', name: 'graphApiVersion', value: 'v23.0', type: 'string' },
           { id: 'cfg-approval', name: 'requireApproval', value: true, type: 'boolean' },
@@ -73,8 +73,7 @@ const pickPost = node({
       language: 'javaScript',
       jsCode:
         "const cfg = $('Config').first().json;\n" +
-        "const missing = ['facebookPageId', 'instagramAccountId'].filter(k => !String(cfg[k] || '').trim());\n" +
-        "if (missing.length) throw new Error('Fill in ' + missing.join(' and ') + ' in the Config node first.');\n" +
+        "if (!String(cfg.facebookPageId || '').trim()) throw new Error('Fill in facebookPageId in the Config node first.');\n" +
         "\n" +
         "const raw = $input.first().json.data;\n" +
         "const posts = typeof raw === 'string' ? JSON.parse(raw) : raw;\n" +
@@ -98,7 +97,7 @@ const pickPost = node({
         "  instagramCaption: post.instagram,\n" +
         "  imageUrl: cfg.contentBaseUrl + post.image,\n" +
         "  facebookPageId: String(cfg.facebookPageId).trim(),\n" +
-        "  instagramAccountId: String(cfg.instagramAccountId).trim(),\n" +
+        "  instagramAccountId: String(cfg.instagramAccountId || '').trim(),\n" +
         "  graphApiVersion: cfg.graphApiVersion,\n" +
         "  requireApproval: cfg.requireApproval,\n" +
         "  approvalEmail: cfg.approvalEmail,\n" +
@@ -200,7 +199,7 @@ const createIgContainer = node({
       hostUrl: 'graph.facebook.com',
       httpRequestMethod: 'POST',
       graphApiVersion: expr("{{ $('Pick Card of the Day').item.json.graphApiVersion }}"),
-      node: expr("{{ $('Pick Card of the Day').item.json.instagramAccountId }}"),
+      node: expr("{{ $('Pick Card of the Day').item.json.instagramAccountId || $('Find Linked Instagram Account').item.json.instagram_business_account.id }}"),
       edge: 'media',
       options: {
         queryParameters: {
@@ -212,7 +211,7 @@ const createIgContainer = node({
       }
     },
     credentials: { facebookGraphApi: newCredential('VantriqAI Page Access Token') },
-    position: [1940, 520]
+    position: [2180, 520]
   },
   output: [{ id: '17900000000000000' }]
 });
@@ -223,7 +222,7 @@ const waitForIg = node({
   config: {
     name: 'Let Instagram Process Image',
     parameters: { resume: 'timeInterval', amount: 30, unit: 'seconds' },
-    position: [2180, 520]
+    position: [2420, 520]
   },
   output: [{ id: '17900000000000000' }]
 });
@@ -237,7 +236,7 @@ const publishIg = node({
       hostUrl: 'graph.facebook.com',
       httpRequestMethod: 'POST',
       graphApiVersion: expr("{{ $('Pick Card of the Day').item.json.graphApiVersion }}"),
-      node: expr("{{ $('Pick Card of the Day').item.json.instagramAccountId }}"),
+      node: expr("{{ $('Pick Card of the Day').item.json.instagramAccountId || $('Find Linked Instagram Account').item.json.instagram_business_account.id }}"),
       edge: 'media_publish',
       options: {
         queryParameters: {
@@ -248,7 +247,7 @@ const publishIg = node({
       }
     },
     credentials: { facebookGraphApi: newCredential('VantriqAI Page Access Token') },
-    position: [2420, 520]
+    position: [2660, 520]
   },
   output: [{ id: '17911111111111111' }]
 });
@@ -256,7 +255,7 @@ const publishIg = node({
 const setupNote = sticky(
   '## VantriqAI daily FB + IG post\n' +
   '**Before activating:**\n' +
-  '1. Config: fill `facebookPageId` and `instagramAccountId` (the IG Business account linked to the Page).\n' +
+  '1. Instagram @vantriq_ai must be a Business account linked to the Page (ID 61594465987920 in Config); its ID is looked up automatically.\n' +
   '2. Credential **VantriqAI Page Access Token** (Facebook Graph API): a long-lived Page token with `pages_manage_posts`, `pages_read_engagement`, `instagram_basic`, `instagram_content_publish`.\n' +
   '3. Credential **VantriqAI SMTP**: e.g. Hostinger smtp.hostinger.com:465 for server@vantriqai.com.\n' +
   '4. Workflow settings → Timezone: Asia/Karachi.\n\n' +
@@ -264,6 +263,24 @@ const setupNote = sticky(
   [],
   { color: 5, position: [-40, -60], width: 560, height: 360 }
 );
+
+const findIgAccount = node({
+  type: 'n8n-nodes-base.facebookGraphApi',
+  version: 1,
+  config: {
+    name: 'Find Linked Instagram Account',
+    parameters: {
+      hostUrl: 'graph.facebook.com',
+      httpRequestMethod: 'GET',
+      graphApiVersion: expr("{{ $('Pick Card of the Day').item.json.graphApiVersion }}"),
+      node: expr("{{ $('Pick Card of the Day').item.json.facebookPageId }}"),
+      options: { fields: { field: [{ name: 'instagram_business_account' }, { name: 'name' }] } }
+    },
+    credentials: { facebookGraphApi: newCredential('VantriqAI Page Access Token') },
+    position: [1940, 520]
+  },
+  output: [{ id: '61594465987920', name: 'VantriqAI', instagram_business_account: { id: '17841400000000000' } }]
+});
 
 const readyToPublish = node({
   type: 'n8n-nodes-base.noOp',
@@ -286,6 +303,7 @@ export default workflow('vantriqai-daily-social', 'VantriqAI · Daily Facebook +
   .add(readyToPublish)
   .to(postToFacebook)
   .add(readyToPublish)
+  .to(findIgAccount)
   .to(createIgContainer)
   .to(waitForIg)
   .to(publishIg);

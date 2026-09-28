@@ -41,8 +41,10 @@ publish the Instagram post.
 
 Before you activate it:
 
-1. **Config node**: fill in `facebookPageId` and `instagramAccountId` (the
-   Instagram Business account linked to that Page).
+1. **Accounts**: it posts to facebook.com/profile.php?id=61594465987920 (the
+   Page ID is already in Config) and instagram.com/vantriq_ai. @vantriq_ai must
+   be a Business account linked to that Page. The workflow looks up its ID from
+   the Page, so `instagramAccountId` can stay blank.
 2. **VantriqAI Page Access Token** credential (Facebook Graph API): a long-lived
    Page token with `pages_manage_posts`, `pages_read_engagement`,
    `instagram_basic` and `instagram_content_publish`.
