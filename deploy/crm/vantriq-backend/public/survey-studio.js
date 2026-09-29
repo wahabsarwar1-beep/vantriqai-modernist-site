@@ -93,6 +93,7 @@
     // The template library: its shelves, the shelf and search in view, the
     // template open in Preview, and industries changed here (client id → key).
     categories: null, tplCat: 'all', tplQ: '', tplOpen: null, industries: {}, ownId: null,
+    shareId: null,           // the survey the home page's Share panel is showing
   };
 
   /* ------------------------------------------------------------------ */
@@ -401,6 +402,18 @@
       '@media (max-width:720px){.vqs-hero{grid-template-columns:1fr;}}',
       '.vqs-hero ul{margin:10px 0 0;padding:0 0 0 18px;font-size:13px;line-height:1.8;}',
       '.vqs-danger{border-color:#f0c7bf;}',
+      /* share, on the home page */
+      '.vqs-share{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;border-color:var(--teal-300,#a9bbf7);background:linear-gradient(135deg,var(--teal-light,#e8ecfd),var(--card,#fff) 55%);margin:0 0 14px;}',
+      '.vqs-share-qr{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;text-decoration:none;}',
+      '@media (max-width:560px){.vqs-share-qr{width:100%;}}',
+      '.vqs-share-qr img{width:128px;height:128px;border-radius:14px;border:1px solid var(--border,#e7e2da);background:#fff;padding:6px;display:block;}',
+      '.vqs-share-qr span{font-size:11px;color:var(--muted,#6b645b);font-weight:600;}',
+      '.vqs-share-main{flex:1 1 340px;min-width:0;}',
+      '.vqs-share-main h3{font-size:15.5px;}',
+      '.vqs-share-main select{width:auto;max-width:100%;min-width:200px;}',
+      '.vqs-share-btns{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px;}',
+      '.vqs-scard-acts{border-top:1px solid var(--border-2,#f0ece5);padding-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;}',
+      '.vqs-scard-acts .vqs-btn{justify-content:center;padding-left:8px;padding-right:8px;}',
       /* template library */
       '.vqs-lib{margin-top:18px;}',
       '.vqs-lib-head{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap;margin:0 0 14px;}',
@@ -520,6 +533,7 @@
     if (!surveys.length) return head + emptyHome();
     var o = st.overview || {};
     return head
+      + sharePanel(surveys)
       + dashboard()
       + (o.followup_queue && o.followup_queue.length ? followupQueue(o.followup_queue) : '')
       + '<div class="vqs-spread" style="margin:18px 0 0;"><h3 style="margin:0;">Your surveys</h3><span class="sub" style="margin:0;">' + n(o.live) + ' live · ' + n(o.surveys) + ' in total</span></div>'
@@ -527,8 +541,53 @@
       + library(false);
   }
 
+  /**
+   * The first thing to do with a live survey is share it, so the home page
+   * leads with it: the QR code, the link, WhatsApp, the printable poster and
+   * table cards, the kiosk link for a counter tablet and the website code —
+   * for the survey chosen here (the newest still waiting for its first answer
+   * unless someone picks another). Staff see it for the client they picked.
+   */
+  function sharePanel(surveys){
+    if (!isPortal() && !st.clientFilter) return '';
+    var live = surveys.filter(function(x){ return x.status === 'live' && !x.closed && x.client_surveys_enabled !== false && x.links; });
+    if (!live.length) {
+      var draft = surveys.find(function(x){ return x.status === 'draft'; });
+      return draft ? '<div class="vqs-banner warn"><b>“' + esc(draft.title) + '” is a draft,</b> so it cannot be shared yet. '
+        + '<button class="vqs-link" data-a="open" data-id="' + esc(draft.id) + '" data-tab="settings">Set it live</button> and its QR code, link, WhatsApp, kiosk and website options appear here.</div>' : '';
+    }
+    var sv = live.find(function(x){ return x.id === st.shareId; }) || live.find(function(x){ return !x.responses; }) || live[0];
+    var L = sv.links, first = !sv.responses;
+    return '<div class="vqs-card vqs-share" id="vqs-share">'
+      + '<a class="vqs-share-qr" href="' + esc(L.poster) + '" target="_blank" rel="noopener" title="Open the printable QR poster">'
+      + '<img src="/s/' + encodeURIComponent(sv.slug) + '/qr.svg?size=256" alt="QR code for ' + esc(sv.title) + '" width="128" height="128"><span>Scan to answer</span></a>'
+      + '<div class="vqs-share-main">'
+      + '<div class="vqs-spread" style="align-items:flex-start;"><div style="min-width:0;flex:1 1 260px;"><h3>' + (first ? '🚀 Your survey is live — share it to get your first answers' : '📣 Share your survey') + '</h3>'
+      + '<div class="sub" style="margin:2px 0 10px;">Customers answer on their own phone: they scan the QR code, tap the link on WhatsApp, use a tablet at your counter, or find it on your website.</div></div>'
+      + (live.length > 1
+        ? '<select data-a-change="share-pick" aria-label="Which survey to share">' + live.map(function(x){
+          return '<option value="' + esc(x.id) + '"' + (x.id === sv.id ? ' selected' : '') + '>' + esc(x.title) + '</option>';
+        }).join('') + '</select>'
+        : '<span class="vqs-tag" style="font-size:11.5px;padding:3px 9px;">' + esc(sv.title) + '</span>')
+      + '</div>'
+      + '<div class="vqs-url"><code>' + esc(L.url) + '</code><button class="vqs-btn sm primary" data-a="copy" data-text="' + esc(L.url) + '" data-label="Link copied">Copy link</button></div>'
+      + '<div class="vqs-share-btns">'
+      + '<a class="vqs-btn sm" href="' + esc(L.whatsapp) + '" target="_blank" rel="noopener">🟢 Send on WhatsApp</a>'
+      + '<a class="vqs-btn sm" href="' + esc(L.poster) + '" target="_blank" rel="noopener">🖨 QR poster</a>'
+      + '<a class="vqs-btn sm" href="' + esc(L.poster) + '?layout=cards" target="_blank" rel="noopener">🃏 Table cards</a>'
+      + '<button class="vqs-btn sm" data-a="copy" data-text="' + esc(L.kiosk) + '" data-label="Kiosk link copied — open it on the tablet at your counter" title="For a tablet at the counter: it starts over for each customer">🖥 Kiosk link</button>'
+      + '<button class="vqs-btn sm" data-a="copy" data-text="' + esc(L.embed) + '" data-label="Website code copied — paste it into your site" title="Code to paste into your website">🌐 Website code</button>'
+      + '<button class="vqs-link" data-a="open" data-id="' + esc(sv.id) + '" data-tab="share">All sharing options →</button>'
+      + '</div>'
+      + '<div class="sub" style="margin:10px 0 0;">' + (first
+        ? 'No answers yet — they appear on this page the moment they arrive.'
+        : n(sv.responses) + ' answer' + (sv.responses === 1 ? '' : 's') + ' so far' + (sv.last_response_at ? ' · the last ' + ago(sv.last_response_at) : '') + '.') + '</div>'
+      + '</div></div>';
+  }
+
   function surveyCard(s){
-    return '<div class="vqs-card vqs-scard" data-a="open" data-id="' + esc(s.id) + '" role="button" tabindex="0">'
+    // No answers yet: the next step is sharing it, so that is where it opens.
+    return '<div class="vqs-card vqs-scard" data-a="open" data-id="' + esc(s.id) + '"' + (s.responses ? '' : ' data-tab="share"') + ' role="button" tabindex="0">'
       + '<div class="vqs-spread">' + status(s) + '<span class="vqs-row"><span class="vqs-swatch" style="background:' + esc(s.brand_color) + '"></span>'
       + (s.client_surveys_enabled === false && !isPortal() ? '<span class="vqs-tag" title="Vantriq Echo is switched off for this client, so it is paused for respondents">Echo off</span>' : '')
       + (s.open_followups ? '<span class="vqs-tag" style="background:#fbe8e4;color:#8f3527;">' + s.open_followups + ' to follow up</span>' : '') + '</span></div>'
@@ -536,6 +595,10 @@
       + '<div class="co">' + (isPortal() ? esc(s.display_name) : esc(s.company)) + ' · ' + s.question_count + ' questions' + (s.location_count ? ' · ' + s.location_count + ' locations' : '') + '</div></div>'
       + '<div class="vqs-stats"><div>Responses<b>' + n(s.responses_30d) + '</b></div><div>Satisfied<b>' + (s.csat_30d == null ? '—' : s.csat_30d + '%') + '</b></div><div>NPS<b>' + sign(s.nps_30d) + '</b></div></div>'
       + '<div class="vqs-spread" style="font-size:11.5px;color:var(--muted,#6b645b);"><span>Last 30 days · ' + n(s.responses) + ' all time</span><span>' + (s.last_response_at ? 'Last answer ' + ago(s.last_response_at) : 'No answers yet') + '</span></div>'
+      + (s.links && s.status === 'live' && !s.closed
+        ? '<div class="vqs-row vqs-scard-acts"><button class="vqs-btn sm" data-a="copy" data-text="' + esc(s.links.url) + '" data-label="Link copied">🔗 Copy link</button>'
+          + '<button class="vqs-btn sm" data-a="open" data-id="' + esc(s.id) + '" data-tab="share">📣 Share · QR</button></div>'
+        : '')
       + '</div>';
   }
 
@@ -568,7 +631,8 @@
     ];
     return '<div class="vqs-card"><div class="vqs-hero"><div>'
       + '<h2>Start hearing from every customer</h2>'
-      + '<p class="sub" style="font-size:13.5px;">Choose the survey made for your industry and it is live in a minute — in English and Urdu, in your colours, with a QR code to print.</p>'
+      + '<p class="sub" style="font-size:13.5px;">Choose the survey made for your industry and it is live in a minute — in English and Urdu, in your colours, with a QR code to print. '
+      + 'Its QR code, link, WhatsApp message, kiosk link and website code then appear at the top of this page, ready to share.</p>'
       + '<ul><li><b>Link, QR code, WhatsApp, kiosk or website</b> — one survey, every channel</li>'
       + '<li><b>CSAT, NPS and effort</b> scores, with trends and plain-English findings</li>'
       + '<li><b>Unhappy answers raise a follow-up</b> and can email you the moment they arrive</li>'
@@ -890,14 +954,15 @@
     var s = st.survey;
     if (!s) return back() + loading('Opening the survey…');
     var fu = st.overview && st.overview.followup_queue ? st.overview.followup_queue.filter(function(r){ return r.survey_id === s.id && r.followup_status === 'open'; }).length : 0;
-    var tabs = [['results', 'Results'], ['responses', 'Responses'], ['questions', 'Questions'], ['share', 'Share'], ['settings', 'Settings']];
+    var tabs = [['results', 'Results'], ['responses', 'Responses'], ['questions', 'Questions'], ['share', '📣 Share · QR'], ['settings', 'Settings']];
     return back()
       + '<div class="vqs-top"><div>'
       + '<div class="vqs-row">' + status(s) + '<span style="font-size:12px;color:var(--muted,#6b645b);">' + esc(s.template ? s.template.icon + ' ' + s.template.name : '') + (!isPortal() ? ' · ' + esc(s.company) : '') + '</span></div>'
       + '<h2 style="margin-top:6px;">' + esc(s.title) + '</h2>'
       + '<p>' + esc(biz(s)) + ' · ' + s.questions.length + ' questions · about ' + s.estimated_minutes + ' min · ' + s.languages.map(function(l){ return LANGS[l]; }).join(' + ') + '</p></div>'
       + '<div class="vqs-row">'
-      + '<button class="vqs-btn" data-a="copy" data-text="' + esc(s.links.url) + '">Copy link</button>'
+      + (st.tab !== 'share' ? '<button class="vqs-btn primary" data-a="tab" data-tab="share">📣 Share · QR code</button>' : '')
+      + '<button class="vqs-btn" data-a="copy" data-text="' + esc(s.links.url) + '" data-label="Link copied">Copy link</button>'
       + '<a class="vqs-btn" href="' + esc(s.status === 'live' ? s.links.url : s.links.preview) + '" target="_blank" rel="noopener">Open survey ↗</a>'
       + '</div></div>'
       + (s.client_surveys_enabled === false && !isPortal()
@@ -1464,7 +1529,7 @@
       case 'export':
         host.download('/' + st.survey.id + '/responses.xlsx', st.survey.slug + '-responses.xlsx').catch(function(err){ toast(err.message || 'Could not download.', true); });
         break;
-      case 'copy': copy(ds.text); break;
+      case 'copy': copy(ds.text, ds.label); break;
       case 'resp-filter': st.tab = 'responses'; st.rFilter = ds.f; loadResponses(true); break;
       case 'reload-resp': case 'more': loadResponses(a !== 'more'); break;
       case 'toggle-resp': st.openResp = st.openResp === ds.id ? null : ds.id; render(); break;
@@ -1595,6 +1660,7 @@
       var which = el.getAttribute('data-a-change');
       if (which === 'client-filter') { st.clientFilter = el.value; st.list = null; st.dash = null; render(); loadHome(); }
       if (which === 'industry') setIndustry(el.value);
+      if (which === 'share-pick') { st.shareId = el.value; render(); }
       if (which === 'report-grain') { st.reportGrain = el.value; }
       if (which === 'resp-loc') { st.rLoc = el.value; loadResponses(true); }
       return;

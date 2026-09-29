@@ -5656,7 +5656,7 @@ function clientSurveysCard(c){
          <a href="#" style="color:var(--teal);font-weight:600;" onclick="event.preventDefault();openEchoFor('${c.id}')">Vantriq Echo</a>, and their agents can send after-chat surveys.</div>`
     : `<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">Off. Vantriq Echo is an add-on: switch it on when this customer has signed up for it.
          Until then their portal has no Echo tab and no survey can be made or sent for them.</div>`;
-  const industry = clientIndustrySelect(c);
+  const industry = clientEchoSurveys(c) + clientIndustrySelect(c);
   if(!isAdmin()) return text + industry + (on ? '' : `<div style="font-size:11.5px;color:var(--muted);">Only an admin can switch Vantriq Echo on.</div>`);
   const starterName = echoIndustryName(c.industry) || '⭐ General satisfaction';
   return text + industry + `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
@@ -5667,6 +5667,52 @@ function clientSurveysCard(c){
       <input type="checkbox" id="echo-starter-${c.id}" checked style="margin-top:2px;">
       <span>When switching on, also create their first survey from the <strong>${esc(starterName)}</strong> template — live in English and Urdu, with its QR code and link ready to share. Only if they have no survey yet.</span>
     </label>`}`;
+}
+
+// v9.19.2 — the client's surveys on their page, each with the ways to share
+// it (link, QR poster, WhatsApp), so nobody has to hunt for them in Echo.
+const echoSurveysByClient = {};
+function loadClientEchoSurveys(clientId, force){
+  const cur = echoSurveysByClient[clientId];
+  if(cur && (cur.busy || (!force && Date.now() - cur.at < 60000))) return;
+  echoSurveysByClient[clientId] = { busy: true, at: Date.now(), list: cur ? cur.list : null };
+  API.get('/api/surveys?client_id=' + encodeURIComponent(clientId)).then(r => {
+    echoSurveysByClient[clientId] = { busy: false, at: Date.now(), list: (r && r.surveys) || [] };
+    if(openPanel && openPanel.type === 'client' && openPanel.id === clientId) render();
+  }).catch(() => { echoSurveysByClient[clientId] = { busy: false, at: Date.now(), list: cur && cur.list ? cur.list : [] }; });
+}
+function clientEchoSurveys(c){
+  if(!c.surveysEnabled) return '';
+  loadClientEchoSurveys(c.id);
+  const cur = echoSurveysByClient[c.id];
+  if(!cur || !cur.list) return `<div style="font-size:12px;color:var(--muted);margin:2px 0 12px;"><span class="loading-dot"></span> Loading their surveys…</div>`;
+  if(!cur.list.length) return `<div style="font-size:12.5px;color:var(--muted);margin:2px 0 12px;">No survey yet.
+      <a href="#" style="color:var(--teal);font-weight:600;" onclick="event.preventDefault();openEchoFor('${c.id}')">Create one in Vantriq Echo</a> — its QR code, link, WhatsApp, kiosk and website options then show here.</div>`;
+  const statusPill = s => s.status === 'live' && !s.closed
+    ? `<span class="pill pill-active"><span class="pill-dot"></span>Live</span>`
+    : `<span class="pill">${esc(s.closed && s.status === 'live' ? 'Closed' : s.status.charAt(0).toUpperCase() + s.status.slice(1))}</span>`;
+  return `<div style="margin:2px 0 12px;">
+    <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;">Their surveys — share by QR code, link, WhatsApp, kiosk or website</div>
+    ${cur.list.slice(0, 5).map(s => `<div class="echo-survey" style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><strong style="font-size:13px;">${esc(s.title)}</strong>${statusPill(s)}</div>
+      <div style="font-size:11.5px;color:var(--muted);margin:2px 0 8px;">${s.responses} answer${s.responses === 1 ? '' : 's'}${s.last_response_at ? ' · last ' + fmtDate(s.last_response_at) : ''}${s.links ? ` · <span style="font-family:var(--f-mono,monospace);">${esc(s.links.url.replace(/^https?:\/\//, ''))}</span>` : ''}</div>
+      ${s.links && s.status === 'live' && !s.closed ? `<div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-sm" data-url="${esc(s.links.url)}" onclick="copyEchoLink(this.dataset.url)">Copy link</button>
+        <a class="btn btn-ghost btn-sm" style="text-decoration:none;" href="${esc(s.links.poster)}" target="_blank" rel="noopener">QR poster</a>
+        <a class="btn btn-ghost btn-sm" style="text-decoration:none;" href="${esc(s.links.whatsapp)}" target="_blank" rel="noopener">WhatsApp</a>
+        <button class="btn btn-ghost btn-sm" onclick="openEchoSurvey('${c.id}','${s.id}')">All sharing options</button>
+      </div>` : `<button class="btn btn-ghost btn-sm" onclick="openEchoSurvey('${c.id}','${s.id}')">Open in Vantriq Echo</button>`}
+    </div>`).join('')}
+    ${cur.list.length > 5 ? `<a href="#" style="color:var(--teal);font-weight:600;font-size:12.5px;" onclick="event.preventDefault();openEchoFor('${c.id}')">All ${cur.list.length} surveys →</a>` : ''}
+  </div>`;
+}
+function copyEchoLink(url){
+  navigator.clipboard.writeText(url).then(() => showToast('Survey link copied'), () => showToast('Could not copy — select the link and copy it', 'warn'));
+}
+/** One of the client's surveys in Vantriq Echo, on its Share tab. */
+function openEchoSurvey(clientId, surveyId){
+  openEchoFor(clientId);
+  if(window.VQS) VQS.open(surveyId, 'share');
 }
 
 /** Vantriq Echo, looking at one client. */
@@ -5697,6 +5743,7 @@ async function setClientSurveys(clientId, enabled){
   try{
     const r = await API.patch(`/api/clients/${clientId}/surveys`, starter ? { enabled, starter_survey: true } : { enabled });
     if(client){ client.surveysEnabled = !!r.surveys_enabled; client.surveysEnabledAt = r.surveys_enabled_at; client.surveysEnabledBy = r.surveys_enabled_by||''; }
+    delete echoSurveysByClient[clientId];
     if(window.VQS) VQS.reset();
     render();
     showToast(!enabled

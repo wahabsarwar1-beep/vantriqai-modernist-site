@@ -1354,7 +1354,9 @@ function summaryOf(r, base) {
     responses: r.responses, responses_30d: r.responses_30d, last_response_at: r.last_response_at,
     csat_30d: pctOf(r.csat_sat, r.csat_n), csat_average_30d: r.csat_avg != null ? round2(Number(r.csat_avg)) : null,
     nps_30d: npsOf(r.nps_pro, r.nps_det, r.nps_n), open_followups: r.open_followups,
-    ...(base ? { url: `${base}/s/${r.slug}` } : {}),
+    // Every way to share it — link, QR code, poster, kiosk, WhatsApp, website —
+    // so the list can offer them without opening the survey first.
+    ...(base ? { url: `${base}/s/${r.slug}`, links: linksFor(r, base) } : {}),
   };
 }
 

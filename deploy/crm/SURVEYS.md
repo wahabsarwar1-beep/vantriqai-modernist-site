@@ -133,6 +133,18 @@ Then, in the survey:
 
 ## Sharing it
 
+**Where to find it (v9.19.2).** As soon as a survey is live, the top of the
+Echo page — in the client's portal, and in the CRM once a client is picked —
+is a **Share your survey** panel: its QR code (click it for the printable
+poster), the link with **Copy link**, **Send on WhatsApp**, **QR poster**,
+**Table cards**, **Kiosk link** (for a tablet at the counter) and **Website
+code**, for the newest survey still waiting for its first answer (or any
+live survey, chosen from the list). Every survey card has **Copy link** and
+**Share · QR**; a survey with no answers yet opens straight on its Share tab,
+and every survey has a **Share · QR code** button at the top. In the CRM the
+client's page (Clients → the client → Vantriq Echo) lists their surveys with
+Copy link, QR poster, WhatsApp and **All sharing options**.
+
 **Share** tab:
 
 - **The link** — for WhatsApp, SMS, email, receipts.
@@ -375,7 +387,7 @@ node test/after-chat.test.js    # 30 checks: the after-chat rules, one yes per c
 node test/own-survey.test.js    # 24 checks: our own surveys are made once, and only once
 node test/survey-access.test.js # 28 checks: off by default, only an admin switches it, what off and on mean
 node test/surveys-ui.test.js    # 45 checks in a real browser
-node test/templates.test.js     # 63 checks: the library, industries, the starter survey, the preview page
-node test/templates-ui.test.js  # 63 checks: the library and its phone preview in the portal, on a phone, a small laptop and the CRM
+node test/templates.test.js     # 64 checks: the library, industries, the starter survey, the preview page, share links in the list
+node test/templates-ui.test.js  # 72 checks: the library, its phone preview, sharing from the Echo page and the client's page — portal, phone, small laptop, CRM
 node test/report.test.js        # the Pulse & Echo workbook, tab by tab, against known contacts
 ```
