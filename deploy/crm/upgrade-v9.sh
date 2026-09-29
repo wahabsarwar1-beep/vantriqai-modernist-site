@@ -419,14 +419,20 @@ else
   else
     warn "the survey end-to-end check failed — lines above"; FAILED=1
   fi
-  # v9.16: "Download report" on Vantriq Pulse — the Excel workbook is built
-  # from this install's real data (read-only). Only whether it built is
-  # printed: the workbook holds customers' numbers and this log is public.
-  if docker exec "$APP_CONTAINER" node -e "require('dotenv').config();require('/app/src/utils/analyticsReport').clientReport(null,{grain:'week'}).then(r=>process.exit(r.buffer.slice(0,2).toString()==='PK'&&r.buffer.length>5000?0:1)).catch(e=>{console.error('    '+e.message);process.exit(1)})"; then
-    ok "the Pulse & Echo Excel report builds from this install's data"
+  chk "v9.17 customers: the contacts table, and gender/city/age on survey answers" 4 \
+    "select (select count(*) from information_schema.tables where table_name='contacts')
+          + (select count(*) from information_schema.columns where table_name='survey_responses' and column_name in ('gender','city','age_band'))"
+  # The Excel workbooks — Pulse, Echo and the customer directory — are built
+  # from this install's real data (read-only). Only whether each built is
+  # printed: they hold customers' numbers and this log is public.
+  if docker exec "$APP_CONTAINER" node -e "require('dotenv').config();const R=require('/app/src/utils/analyticsReport');Promise.all([R.pulseReport(null,{grain:'week'}),R.echoReport(null,{grain:'week'}),R.contactsWorkbook(null)]).then(rs=>process.exit(rs.every(r=>r.buffer.slice(0,2).toString()==='PK'&&r.buffer.length>5000)?0:1)).catch(e=>{console.error('    '+e.message);process.exit(1)})"; then
+    ok "the Pulse, Echo and customer-directory workbooks build from this install's data"
   else
-    warn "the Pulse & Echo Excel report did not build — lines above"; FAILED=1
+    warn "a report workbook did not build — lines above"; FAILED=1
   fi
+  CUSTOMERS=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
+    -c "select count(*) from contacts" 2>/dev/null || echo '?')
+  ok "customer profiles on file: $CUSTOMERS (they fill in as agents pass names and customers answer surveys)"
   # Whether an unhappy answer is actually emailed to anyone. Reported, never
   # failed on — and this log is public, so it says yes or no, nothing more.
   MAIL_SET=$(docker exec "$APP_CONTAINER" node -e "require('dotenv').config();process.stdout.write(require('/app/src/utils/mailer').mailDiagnosis().configured?'yes':'no')" 2>/dev/null || echo '?')
@@ -527,10 +533,17 @@ cat <<'NEXT'
      conversation goes quiet — see "After every WhatsApp conversation" in
      deploy/crm/SURVEYS.md.
 
-  7. Reports (v9.16). CRM → Vantriq Pulse → any view → "Download report
-     (Excel)": a tab per subject — every dashboard figure, each contact (new
-     and returning, by the number they wrote from), each conversation, and
-     every Echo answer and follow-up. Customers have the same button on
-     their portal's Pulse tab, for their own customers only.
+  7. Reports (v9.17). Pulse → "Download Pulse report (Excel)": every
+     figure, each contact (new and returning, who and where), conversation
+     and transcript. Echo → "Echo report (Excel)": satisfaction, NPS, every
+     survey and answer, who answered (gender, age, city), follow-ups.
+     Customers → "All customers (Excel)": everyone ever, every detail.
+     Clients have the same three in their portal, for their own customers.
+
+  8. Customers (v9.17). CRM → Customers, and a Customers tab in every
+     client's portal: each customer's profile, every conversation and what
+     was said, their survey answers, tags and notes. Names arrive with the
+     WhatsApp agent's usage calls (contact_name); cities and more through
+     POST /api/webhooks/contact or a survey's About-you questions.
 NEXT
 printf '\n'

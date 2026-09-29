@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "VantriqAI CRM API",
-    "version": "9.16.0",
+    "version": "9.17.0",
     "description": "The CRM behind VantriqAI: clients, invoices, payments, quotes and proposals,\ncontracts, statements, and the webhook surface the AI agents write through.\n\n## Authentication\n\nTwo ways in, and one of them is for people:\n\n- **Staff session** — `Authorization: Bearer <token>`, issued by `POST /api/auth/verify`\n  after a password and an emailed one-time code. A staff member's role decides reach.\n- **API key** — `x-api-key: <key>`, for machines. Keys are scoped.\n\n## Scopes\n\nLeast to most: `webhook` < `automation` < `staff` < `admin`. A scope opens everything\nbelow it. The admin key opens everything and is intended as break-glass only — set\n`ALLOW_API_KEY_LOGIN=false` once staff accounts exist.\n\n## Automation writes through this API, never to the database\n\nn8n and any other integration must use these endpoints rather than connecting to\nPostgres. Tenancy, quota and tax rules live here; a direct write bypasses all three."
   },
   "servers": [
@@ -52,6 +52,9 @@
     },
     {
       "name": "clients"
+    },
+    {
+      "name": "contacts"
     },
     {
       "name": "contracts"
@@ -761,7 +764,7 @@
         "tags": [
           "analytics"
         ],
-        "summary": "One customer's workbook — Pulse and Echo, with their contacts (new and returning), conversations and survey answers. Staff see the Echo tabs even when Echo is switched off for the customer, as they see its surveys.",
+        "summary": "One customer's Pulse workbook: their contacts (new and returning, who they are and where), conversations and transcripts. Echo has its own report.",
         "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
         "parameters": [
           {
@@ -3634,6 +3637,209 @@
         ]
       }
     },
+    "/api/contacts": {
+      "get": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "The directory: search, segments (new, returning, regulars, at risk, unhappy…), city filter, sort.",
+        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/contacts/{clientId}/{key}": {
+      "get": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "One customer: profile, stats, every conversation with its transcript, survey answers.",
+        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "parameters": [
+          {
+            "name": "clientId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "Edit what is known about them. A person's edit always wins over what an agent or survey filled in.",
+        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "parameters": [
+          {
+            "name": "clientId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/contacts/export.xlsx": {
+      "get": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "Every customer ever, as a workbook: directory, segments, every conversation, every transcript line.",
+        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
     "/api/contracts": {
       "get": {
         "tags": [
@@ -5840,7 +6046,7 @@
         "tags": [
           "portal"
         ],
-        "summary": "GET /api/portal/analytics/report.xlsx?grain=… The dashboard as a workbook, with the detail behind it: this customer's own contacts (by the number they wrote from — new, and who came back), each conversation, and, with Vantriq Echo, every survey answer and follow-up. Only ever this customer's own; see utils/analyticsReport.js.",
+        "summary": "GET /api/portal/analytics/report.xlsx?grain=… Pulse as a workbook, with the detail behind it: this customer's own contacts (by the number they wrote from — new, and who came back, with name, email and city when known), each conversation and its transcript. Only ever this customer's own; see utils/analyticsReport.js. Echo's report is at /api/portal/surveys/report.xlsx.",
         "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
         "parameters": [],
         "responses": {
@@ -6140,6 +6346,165 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/portal/contacts": {
+      "get": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "GET /api/portal/contacts?q=&segment=&city=&sort=&limit=&offset= — the directory, searchable.",
+        "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/portal/contacts/{key}": {
+      "get": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "GET /api/portal/contacts/:key — one customer: profile, every conversation and what was said, their survey answers.",
+        "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": []
+      },
+      "patch": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "PATCH /api/portal/contacts/:key — name, email, city, gender, age group, company, tags, notes, do-not-contact.",
+        "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/portal/contacts/export.xlsx": {
+      "get": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "GET /api/portal/contacts/export.xlsx — every customer ever, every detail, every conversation.",
+        "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
                 }
               }
             }
@@ -7399,6 +7764,39 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/portal/surveys/report.xlsx": {
+      "get": {
+        "tags": [
+          "surveys"
+        ],
+        "summary": "The Echo workbook: satisfaction, NPS, every survey and answer, who answered (gender, age group, city), follow-ups and respondents — for one client (the portal's own, or ?client_id= in the CRM) or every client.",
+        "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
                 }
               }
             }
@@ -10721,6 +11119,46 @@
         ]
       }
     },
+    "/api/surveys/report.xlsx": {
+      "get": {
+        "tags": [
+          "surveys"
+        ],
+        "summary": "The Echo workbook: satisfaction, NPS, every survey and answer, who answered (gender, age group, city), follow-ups and respondents — for one client (the portal's own, or ?client_id= in the CRM) or every client.",
+        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
     "/api/surveys/templates": {
       "get": {
         "tags": [
@@ -11286,6 +11724,57 @@
         ]
       }
     },
+    "/api/webhooks/contact": {
+      "post": {
+        "tags": [
+          "usage"
+        ],
+        "summary": "POST /api/webhooks/csat A customer-satisfaction answer, from whatever asked the question — a WhatsApp button reply at the end of a conversation, a web form, or a separate survey app. One call per answer. Body: { \"external_ref\": \"923001234567\", // or client_id / agent_ref / agent_id, exactly as /usage \"session_id\": \"923009998888-2026-08-16\", // optional — the conversation being rated \"channel\": \"whatsapp\", \"score\": 5, // optional — CSAT, 1 to 5 \"nps\": 9, // optional — 0 to 10 \"resolved\": true, // optional — \"did we sort out what you needed?\" \"comment\": \"Quick and clear, thanks\", \"source\": \"survey-app\", \"external_id\": \"resp_8f2c\", // optional — your id for this answer; a repeat is ignored, not double-counted \"responded_at\": \"2026-08-16T11:02:00Z\" // optional, defaults to now() } At least one of score, nps or resolved is required. POST /api/webhooks/contact What an agent learned about a customer during the conversation — \"I'm Ayesha, from Lahore\" — saved to their profile so it shows in the CRM, the business's portal (Customers) and every report. Body: { external_ref | agent_ref | client_id, session_id | phone, name, email, city, gender, age_band, company } Fills blanks only: anything a person has typed into the profile stays.",
+        "description": "Requires the **webhook** scope or higher. Webhook key. The narrowest scope — usage, lead and conversation ingestion only.",
+        "parameters": [],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
     "/api/webhooks/conversation": {
       "post": {
         "tags": [
@@ -11342,7 +11831,7 @@
         "tags": [
           "usage"
         ],
-        "summary": "POST /api/webhooks/csat A customer-satisfaction answer, from whatever asked the question — a WhatsApp button reply at the end of a conversation, a web form, or a separate survey app. One call per answer. Body: { \"external_ref\": \"923001234567\", // or client_id / agent_ref / agent_id, exactly as /usage \"session_id\": \"923009998888-2026-08-16\", // optional — the conversation being rated \"channel\": \"whatsapp\", \"score\": 5, // optional — CSAT, 1 to 5 \"nps\": 9, // optional — 0 to 10 \"resolved\": true, // optional — \"did we sort out what you needed?\" \"comment\": \"Quick and clear, thanks\", \"source\": \"survey-app\", \"external_id\": \"resp_8f2c\", // optional — your id for this answer; a repeat is ignored, not double-counted \"responded_at\": \"2026-08-16T11:02:00Z\" // optional, defaults to now() } At least one of score, nps or resolved is required.",
+        "summary": "POST /api/webhooks/csat",
         "description": "Requires the **webhook** scope or higher. Webhook key. The narrowest scope — usage, lead and conversation ingestion only.",
         "parameters": [],
         "requestBody": {
@@ -11535,7 +12024,7 @@
         "tags": [
           "usage"
         ],
-        "summary": "POST /api/webhooks/usage Called by n8n (or any automation step) immediately after an AI model call returns, or when a WhatsApp 24-hour session closes. This is what makes usage numbers real-time instead of manually entered. Body: { \"external_ref\": \"923001234567\", // required unless client_id given — the client's ref, or one of its agents' refs \"client_id\": \"uuid\", // alternative to external_ref, if n8n already knows Vantriq's internal client id \"agent_ref\": \"instagram:@khantraders\", // optional — which of the client's agents handled this \"agent_id\": \"uuid\", // alternative to agent_ref \"session_id\": \"923009998888-2026-08-16\", // required — one id per 24h conversation window \"channel\": \"whatsapp\", // whatsapp | web | voice | instagram \"ai_model\": \"claude-sonnet-4-6\", \"input_tokens\": 812, \"output_tokens\": 340, \"messages_count\": 1, \"handoff\": false, // optional — true if a human had to take over (drives AI containment) \"occurred_at\": \"2026-08-16T10:32:00Z\" // optional, defaults to now() } n8n gets input_tokens/output_tokens straight from the AI provider's response JSON (Claude, OpenAI, and DeepSeek all return a `usage` object on every completion) — no extra computation needed on the n8n side.",
+        "summary": "POST /api/webhooks/usage Called by n8n (or any automation step) immediately after an AI model call returns, or when a WhatsApp 24-hour session closes. This is what makes usage numbers real-time instead of manually entered. Body: { \"external_ref\": \"923001234567\", // required unless client_id given — the client's ref, or one of its agents' refs \"client_id\": \"uuid\", // alternative to external_ref, if n8n already knows Vantriq's internal client id \"agent_ref\": \"instagram:@khantraders\", // optional — which of the client's agents handled this \"agent_id\": \"uuid\", // alternative to agent_ref \"session_id\": \"923009998888-2026-08-16\", // required — one id per 24h conversation window \"channel\": \"whatsapp\", // whatsapp | web | voice | instagram \"ai_model\": \"claude-sonnet-4-6\", \"input_tokens\": 812, \"output_tokens\": 340, \"messages_count\": 1, \"handoff\": false, // optional — true if a human had to take over (drives AI containment) \"occurred_at\": \"2026-08-16T10:32:00Z\", // optional, defaults to now() \"contact_name\": \"Ayesha\" // optional — the customer's WhatsApp profile name; also contact_email, // city, gender, age_band, or all of them as \"contact\": { … }. // Fills blanks on the customer's profile; never overwrites. } n8n gets input_tokens/output_tokens straight from the AI provider's response JSON (Claude, OpenAI, and DeepSeek all return a `usage` object on every completion) — no extra computation needed on the n8n side.",
         "description": "Requires the **webhook** scope or higher. Webhook key. The narrowest scope — usage, lead and conversation ingestion only.",
         "parameters": [],
         "requestBody": {

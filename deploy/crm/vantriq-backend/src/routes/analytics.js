@@ -2,7 +2,7 @@ const express = require('express');
 const db = require('../db');
 const { effectivePackage } = require('../utils/pkg');
 const { clientAnalytics, salesAnalytics, platformAnalytics } = require('../utils/analytics');
-const { clientReport, salesReport, sendReport } = require('../utils/analyticsReport');
+const { pulseReport, salesReport, sendReport } = require('../utils/analyticsReport');
 
 const router = express.Router();
 
@@ -17,7 +17,8 @@ const router = express.Router();
  *                                        customer sees it in their portal
  *
  * Each has a …/report.xlsx beside it: the same figures as a workbook, with
- * the contacts, conversations and survey answers behind them.
+ * the contacts and conversations behind them. Echo's report is at
+ * /api/surveys/report.xlsx; the customer directory at /api/contacts.
  *
  * Staff and admins alike: none of this is cost or margin data.
  */
@@ -58,7 +59,7 @@ router.get('/platform', async (req, res, next) => {
 
 /** Every customer's workbook in one: each customer side by side, then every contact and conversation. */
 router.get('/platform/report.xlsx', async (req, res, next) => {
-  try { sendReport(res, await clientReport(null, { grain: grainOf(req) })); } catch (err) { next(err); }
+  try { sendReport(res, await pulseReport(null, { grain: grainOf(req) })); } catch (err) { next(err); }
 });
 
 /** One customer's analytics — identical to what they see on their portal's Pulse tab (Vantriq Pulse). */
@@ -72,15 +73,14 @@ router.get('/clients/:id', async (req, res, next) => {
 });
 
 /**
- * One customer's workbook — Pulse and Echo, with their contacts (new and
- * returning), conversations and survey answers. Staff see the Echo tabs even
- * when Echo is switched off for the customer, as they see its surveys.
+ * One customer's Pulse workbook: their contacts (new and returning, who they
+ * are and where), conversations and transcripts. Echo has its own report.
  */
 router.get('/clients/:id/report.xlsx', async (req, res, next) => {
   try {
     const client = await clientById(req.params.id);
     if (!client) return res.status(404).json({ error: 'Client not found' });
-    sendReport(res, await clientReport(client, { grain: grainOf(req), quota: await quotaOf(client) }));
+    sendReport(res, await pulseReport(client, { grain: grainOf(req), quota: await quotaOf(client) }));
   } catch (err) { next(err); }
 });
 

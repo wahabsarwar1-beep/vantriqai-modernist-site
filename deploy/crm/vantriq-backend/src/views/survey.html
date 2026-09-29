@@ -283,7 +283,7 @@ html[lang=ur] .toast{line-height:2;}
       stars:['Poor','Fair','Good','Very good','Excellent'],
       npsLow:'Not at all likely', npsHigh:'Extremely likely', cesLow:'Very difficult', cesHigh:'Very easy',
       yes:'Yes', no:'No', other:'Other', otherPh:'Please tell us…', selectAll:'Choose all that apply',
-      typeHere:'Type your answer…', name:'Your name', company:'Business name', phone:'Phone or WhatsApp', email:'Email',
+      typeHere:'Type your answer…', name:'Your name', company:'Business name', phone:'Phone or WhatsApp', email:'Email', city:'Your city',
       consent:'{business} may contact me about my feedback', location:'Which branch did you visit?',
       thanks:'Thank you!', thanksDefault:'Your feedback goes straight to our team.',
       reviewAsk:'So glad you had a great experience! Would you share it on Google? It really helps us.',
@@ -306,7 +306,7 @@ html[lang=ur] .toast{line-height:2;}
       stars:['خراب','مناسب','اچھا','بہت اچھا','بہترین'],
       npsLow:'بالکل امکان نہیں', npsHigh:'بہت زیادہ امکان', cesLow:'بہت مشکل', cesHigh:'بہت آسان',
       yes:'جی ہاں', no:'جی نہیں', other:'دیگر', otherPh:'براہِ کرم بتائیں…', selectAll:'جو بھی لاگو ہوں منتخب کریں',
-      typeHere:'اپنا جواب یہاں لکھیں…', name:'آپ کا نام', company:'کاروبار کا نام', phone:'فون یا واٹس ایپ', email:'ای میل',
+      typeHere:'اپنا جواب یہاں لکھیں…', name:'آپ کا نام', company:'کاروبار کا نام', phone:'فون یا واٹس ایپ', email:'ای میل', city:'آپ کا شہر',
       consent:'{business} میری رائے کے بارے میں مجھ سے رابطہ کر سکتا ہے', location:'آپ کس برانچ میں تشریف لائے؟',
       thanks:'شکریہ!', thanksDefault:'آپ کی رائے براہِ راست ہماری ٹیم تک پہنچتی ہے۔',
       reviewAsk:'ہمیں خوشی ہے کہ آپ کا تجربہ اچھا رہا! کیا آپ اسے گوگل پر شیئر کریں گے؟ اس سے ہمیں بہت مدد ملتی ہے۔',
@@ -528,7 +528,7 @@ html[lang=ur] .toast{line-height:2;}
       case 'single': return !!a.choice && (a.choice !== OTHER || !!String(a.other || '').trim());
       case 'multi': return a.choices && a.choices.length > 0 && (a.choices.indexOf(OTHER) < 0 || !!String(a.other || '').trim());
       case 'text': return !!String(a).trim();
-      case 'contact': return ['name','company','phone','email'].some(function(f){ return String(a[f] || '').trim(); });
+      case 'contact': return ['name','company','phone','email','city'].some(function(f){ return String(a[f] || '').trim(); });
     }
     return true;
   }
@@ -596,7 +596,7 @@ html[lang=ur] .toast{line-height:2;}
         return '<textarea id="text" maxlength="2000" placeholder="' + esc(t('typeHere')) + '" aria-labelledby="focus">' + esc(s) + '</textarea><div class="count" id="count">' + s.length + ' / 2000</div>';
       case 'contact':
         var c = a || {};
-        var types = { name:['text','name'], company:['text','organization'], phone:['tel','tel'], email:['email','email'] };
+        var types = { name:['text','name'], company:['text','organization'], phone:['tel','tel'], email:['email','email'], city:['text','address-level2'] };
         return q.fields.map(function(f){
           return '<label class="field"><span>' + esc(t(f)) + '</span><input class="in" data-field="' + f + '" type="' + types[f][0] + '" autocomplete="' + types[f][1] + '" maxlength="' + (f === 'email' ? 200 : 120) + '" value="' + esc(c[f] || '') + '"' + (f === 'phone' ? ' inputmode="tel"' : '') + '></label>';
         }).join('') + '<label class="check"><input type="checkbox" id="consent"' + (c.consent ? ' checked' : '') + '><span>' + esc(t('consent', { business:business() })) + '</span></label>';

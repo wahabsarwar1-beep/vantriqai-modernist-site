@@ -223,6 +223,13 @@ addresses, the email goes out the moment the answer arrives — which needs
 A delighted customer (NPS 9–10, or CSAT 5) is offered the Google review link
 on the thank-you screen.
 
+## Customers, and separate Pulse / Echo reports (v9.17)
+
+- **Customers** — CRM → Customers (pick a client, or all) and a **Customers** tab in every client's portal: search, segments (new, returning, regulars 5+, at risk, unhappy, no name, with email), city filter; each customer's page shows their profile (editable: name, phone, email, city, gender, age group, company, tags, notes, do-not-contact), every conversation with its transcript, and their survey answers. **All customers (Excel)** downloads everyone ever with every detail.
+- Where details come from: the WhatsApp profile name on each usage call (`contact_name`), `POST /api/webhooks/contact` (what the agent learned), survey answers, and edits. Automatic sources only fill blanks; a person's edit wins.
+- **Pulse** shows *Where your customers are* (cities, countries) and downloads the **Pulse report** only. **Echo** downloads the **Echo report** (`/api/surveys/report.xlsx`, portal `/api/portal/surveys/report.xlsx`) with a *Who answered* tab.
+- Surveys can ask **About you** questions — gender, age group, city (in consumer templates by default; Questions → Add a question → About you). Results split by each, and answers fill the customer's profile.
+
 ## The Pulse & Echo report (v9.16)
 
 **Download report (Excel)** — on every Vantriq Pulse view, in the CRM (one

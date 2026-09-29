@@ -4,7 +4,26 @@ const { recordQuotaCrossing } = require('../utils/quota');
 const { serviceStatusFor } = require('../utils/serviceStatus');
 const { sendMail, mailConfigured } = require('../utils/mailer');
 const S = require('../utils/surveys');
+const C = require('../utils/contacts');
 const router = express.Router();
+
+/**
+ * What a caller says about the customer, in whichever shape it sends it:
+ * { contact: { name, email, city, gender, age_band, company } } or the same
+ * fields at the top level (contact_name, contact_email, city, gender, …).
+ */
+function contactFields(body) {
+  const c = body && typeof body.contact === 'object' && body.contact ? body.contact : {};
+  return {
+    name: c.name || body.contact_name || body.name || '',
+    email: c.email || body.contact_email || body.email || '',
+    city: c.city || body.contact_city || body.city || '',
+    gender: c.gender || body.gender || '',
+    age_band: c.age_band || body.age_band || '',
+    company: c.company || body.contact_company || '',
+    phone: c.phone || body.contact_phone || '',
+  };
+}
 
 /**
  * POST /api/webhooks/usage
@@ -26,7 +45,10 @@ const router = express.Router();
  *   "output_tokens": 340,
  *   "messages_count": 1,
  *   "handoff": false,                    // optional — true if a human had to take over (drives AI containment)
- *   "occurred_at": "2026-08-16T10:32:00Z" // optional, defaults to now()
+ *   "occurred_at": "2026-08-16T10:32:00Z", // optional, defaults to now()
+ *   "contact_name": "Ayesha"             // optional — the customer's WhatsApp profile name; also contact_email,
+ *                                        // city, gender, age_band, or all of them as "contact": { … }.
+ *                                        // Fills blanks on the customer's profile; never overwrites.
  * }
  *
  * n8n gets input_tokens/output_tokens straight from the AI provider's
@@ -112,6 +134,11 @@ router.post('/usage', async (req, res) => {
     `select * from v_monthly_usage where client_id = $1 and period_month = $2::date`,
     [resolvedClientId, month]
   );
+
+  // Whatever the flow knows about the customer — the WhatsApp profile name at
+  // least — fills the blanks on their profile. Never fails the event.
+  await C.fillProfile(resolvedClientId, C.keyOf(session_id), contactFields(body), { source: resolvedChannel })
+    .catch((err) => console.error('[usage] contact profile not updated:', err.message));
 
   // Crossing the 80% line or the quota itself is recorded once per client per
   // month, for an admin to decide on. Service is never cut off here — running
@@ -358,23 +385,36 @@ router.post('/conversation', async (req, res) => {
     return res.status(400).json({ error: 'messages must contain at least one customer or agent turn' });
   }
 
+  // The ref is a client's (a lead filed as wa-<number>, or a customer), or
+  // one of a client's agents — the number a customer's customers write to.
   const { rows: clientRows } = await db.query(`select id from clients where external_ref = $1`, [externalRef]);
-  const clientId = clientRows[0] ? clientRows[0].id : null;
+  let clientId = clientRows[0] ? clientRows[0].id : null;
+  let agentId = null;
+  if (!clientId) {
+    const { rows: ag } = await db.query(`select id, client_id from client_agents where external_ref = $1`, [externalRef]);
+    if (ag[0]) { agentId = ag[0].id; clientId = ag[0].client_id; }
+  }
 
   const values = [];
+  // A batch shares one "now"; a millisecond apart each keeps the turns in the
+  // order they were said when a transcript is read back.
   const placeholders = messages.map((m, i) => {
-    const base = i * 6;
-    values.push(clientId, externalRef, sessionId, channel, m.role, m.content.slice(0, 8000));
-    return `($${base + 1},$${base + 2},$${base + 3},$${base + 4},$${base + 5},$${base + 6})`;
+    const base = i * 7;
+    values.push(clientId, externalRef, sessionId, channel, m.role, m.content.slice(0, 8000), agentId);
+    return `($${base + 1},$${base + 2},$${base + 3},$${base + 4},$${base + 5},$${base + 6},$${base + 7}, now() + interval '${i} milliseconds')`;
   });
 
   await db.query(
-    `insert into conversation_messages (client_id, external_ref, session_id, channel, role, content)
+    `insert into conversation_messages (client_id, external_ref, session_id, channel, role, content, agent_id, created_at)
      values ${placeholders.join(',')}`,
     values
   );
+  if (agentId && sessionId) {
+    await C.fillProfile(clientId, C.keyOf(sessionId), contactFields(body), { source: channel })
+      .catch((err) => console.error('[conversation] contact profile not updated:', err.message));
+  }
 
-  res.status(201).json({ ok: true, stored: messages.length, client_id: clientId });
+  res.status(201).json({ ok: true, stored: messages.length, client_id: clientId, agent_id: agentId });
 });
 
 /**
@@ -400,6 +440,53 @@ router.post('/conversation', async (req, res) => {
  *
  * At least one of score, nps or resolved is required.
  */
+/**
+ * POST /api/webhooks/contact
+ *
+ * What an agent learned about a customer during the conversation — "I'm
+ * Ayesha, from Lahore" — saved to their profile so it shows in the CRM, the
+ * business's portal (Customers) and every report.
+ *
+ * Body: { external_ref | agent_ref | client_id, session_id | phone,
+ *         name, email, city, gender, age_band, company }
+ * Fills blanks only: anything a person has typed into the profile stays.
+ */
+router.post('/contact', async (req, res) => {
+  const body = req.body || {};
+  let clientId = null;
+  try {
+    if (body.agent_ref || body.agent_id) {
+      const { rows } = body.agent_id
+        ? await db.query(`select client_id from client_agents where id = $1`, [body.agent_id])
+        : await db.query(`select client_id from client_agents where external_ref = $1`, [String(body.agent_ref).trim()]);
+      clientId = rows[0] ? rows[0].client_id : null;
+    } else if (body.client_id) {
+      const { rows } = await db.query(`select id from clients where id = $1`, [body.client_id]);
+      clientId = rows[0] ? rows[0].id : null;
+    } else if (body.external_ref) {
+      const ref = String(body.external_ref).trim();
+      const { rows } = await db.query(
+        `select id as client_id from clients where external_ref = $1
+         union all select client_id from client_agents where external_ref = $1 limit 1`, [ref]);
+      clientId = rows[0] ? rows[0].client_id : null;
+    } else {
+      return res.status(400).json({ error: 'external_ref, agent_ref or client_id is required' });
+    }
+  } catch (err) {
+    if (err.code === '22P02') return res.status(400).json({ error: 'That id is not valid.' });
+    throw err;
+  }
+  if (!clientId) return res.status(404).json({ error: 'No client or agent found for that reference.' });
+  const key = String(body.contact_key || '').trim() || C.keyOf(body.session_id) || C.phoneDigits(body.phone);
+  if (!key) return res.status(400).json({ error: 'session_id or phone is required, to know who this is.' });
+  // The number is who they are, not news about them: something else must come with it.
+  const fields = { ...contactFields(body), phone: '' };
+  const touched = await C.fillProfile(clientId, key, fields, { source: 'agent' });
+  if (!touched) return res.status(400).json({ error: 'Nothing to save: send at least one of name, email, city, gender, age_band, company.' });
+  const { rows } = await db.query(`select * from contacts where client_id = $1 and contact_key = $2`, [clientId, key]);
+  res.status(201).json({ ok: true, client_id: clientId, contact_key: key, profile: rows[0] });
+});
+
 router.post('/csat', (req, res, next) => recordCsat(req, res).catch((err) => {
   // A malformed uuid is the caller's mistake, not a server fault.
   if (err.code === '22P02') return res.status(400).json({ error: 'client_id or agent_id is not a valid id' });

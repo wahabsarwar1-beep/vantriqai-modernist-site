@@ -62,6 +62,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     ok(/like most/i.test(await p.innerText('.qtitle')), 'a promoter is asked what they liked — not what to improve');
     await p.fill('#text', 'Lovely chai <img src=x onerror=alert(1)>');
     await tap(p, '[data-act=next]');
+    ok(/Are you/i.test(await p.innerText('.qtitle')), 'then the optional "about you" questions: gender…');
+    await tap(p, '[data-opt=female]');
+    ok(/Which city/i.test(await p.innerText('.qtitle')), '…and city (v9.17)');
+    await tap(p, '[data-act=next]');
     ok(/get back to you/i.test(await p.innerText('.qtitle')), 'then the optional contact question');
     ok(/Submit/.test(await p.innerText('[data-act=next]')), 'which is last, so the button says Submit');
     await tap(p, '[data-act=next]');
@@ -107,6 +111,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     ok(/better/i.test(await p.innerText('.qtitle')), 'a detractor is asked what to improve');
     await p.fill('#text', 'Slow counter');
     await tap(p, '[data-act=next]');
+    await tap(p, '[data-act=next]'); // gender — optional, skipped
+    await tap(p, '[data-act=next]'); // city — optional, skipped
     await p.fill('[data-field=name]', 'Sana');
     await p.fill('[data-field=phone]', '12');
     await p.locator('[data-field=phone]').blur();
@@ -141,6 +147,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await tap(p, '[data-act=next]');
     await tap(p, '.pt[data-val="8"]');
     await tap(p, '[data-act=next]');
+    await tap(p, '[data-act=next]'); // gender — optional, skipped
+    await tap(p, '[data-act=next]'); // city — optional, skipped
     await tap(p, '[data-act=next]');
     await p.waitForSelector('.tick', { timeout: 10000 });
     ok(!!(await p.$('#restart')), 'a countdown to the next customer');

@@ -1778,3 +1778,58 @@ end $$;
 -- them in CRM → Settings → The VantriqAI app. See deploy/crm/ANDROID-APP.md.
 alter table settings add column if not exists android_package text not null default 'com.vantriqai.app';
 alter table settings add column if not exists android_sha256 text not null default '';
+
+-- =====================================================================
+-- v9.17 — Customers: who each business's customers are.
+--
+-- Activity (conversations, messages, first and last contact) is always
+-- worked out from usage_events, so it can never drift. What usage cannot
+-- say — a name, an email, the city, gender and age group, tags and notes —
+-- lives here, one row per customer of a client, keyed like analytics keys a
+-- contact: the WhatsApp number (session id without its date), or a web
+-- visitor's id. Rows appear the first time anything is known about someone.
+--
+-- Where it comes from: the WhatsApp profile name the agent passes with each
+-- message, a survey the customer answered (their own details, and the gender
+-- / city / age questions), and edits by staff in the CRM or by the business
+-- in its portal. Automatic sources only ever fill a blank; a person's edit
+-- always wins and is recorded with who made it.
+-- =====================================================================
+create table if not exists contacts (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  contact_key text not null,
+  name text not null default '',
+  phone text not null default '',
+  email text not null default '',
+  city text not null default '',
+  gender text not null default '',
+  age_band text not null default '',
+  company text not null default '',
+  tags text[] not null default '{}',
+  notes text not null default '',
+  do_not_contact boolean not null default false,
+  name_source text not null default '',
+  edited_by text not null default '',
+  edited_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (client_id, contact_key)
+);
+create index if not exists idx_contacts_client on contacts(client_id, updated_at desc);
+drop trigger if exists trg_contacts_updated on contacts;
+create trigger trg_contacts_updated before update on contacts
+  for each row execute function touch_updated_at();
+
+-- Echo's "about you" questions (a question marked profile: gender, city or
+-- age): the answer in words, kept on the response so results can be broken
+-- down by them without re-reading every answer.
+alter table survey_responses add column if not exists gender text not null default '';
+alter table survey_responses add column if not exists city text not null default '';
+alter table survey_responses add column if not exists age_band text not null default '';
+
+-- Which agent a transcript line came through, when it was logged against an
+-- agent's number rather than a client's, so a customer's own customers'
+-- conversations stay theirs and out of VantriqAI's sales view.
+alter table conversation_messages add column if not exists agent_id uuid references client_agents(id) on delete set null;
+create index if not exists idx_usage_client_session on usage_events(client_id, session_id);

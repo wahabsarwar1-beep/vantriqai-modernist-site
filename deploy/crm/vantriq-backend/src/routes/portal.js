@@ -10,7 +10,8 @@ const { requirePortalSession } = require('../middleware/portalAuth');
 const { hashToken } = require('../middleware/clientApiAuth');
 const { effectivePackage } = require('../utils/pkg');
 const { clientAnalytics } = require('../utils/analytics');
-const { clientReport, sendReport } = require('../utils/analyticsReport');
+const { pulseReport, contactsWorkbook, sendReport } = require('../utils/analyticsReport');
+const CT = require('../utils/contacts');
 const { acceptQuote, buildQuoteDocument } = require('./quotes');
 const surveysRoutes = require('./surveys');
 const { renderInvoicePdf, invoiceFilename } = require('../utils/invoicePdf');
@@ -242,20 +243,47 @@ router.get('/analytics', async (req, res, next) => {
 /**
  * GET /api/portal/analytics/report.xlsx?grain=…
  *
- * The dashboard as a workbook, with the detail behind it: this customer's
- * own contacts (by the number they wrote from — new, and who came back),
- * each conversation, and, with Vantriq Echo, every survey answer and
- * follow-up. Only ever this customer's own; see utils/analyticsReport.js.
+ * Pulse as a workbook, with the detail behind it: this customer's own
+ * contacts (by the number they wrote from — new, and who came back, with
+ * name, email and city when known), each conversation and its transcript.
+ * Only ever this customer's own; see utils/analyticsReport.js. Echo's
+ * report is at /api/portal/surveys/report.xlsx.
  */
 router.get('/analytics/report.xlsx', async (req, res, next) => {
   try {
     const client = req.portalClient;
-    sendReport(res, await clientReport(client, {
-      grain: String(req.query.grain || 'month'),
-      quota: await portalQuota(client),
-      echo: !!client.surveys_enabled,
-    }));
+    sendReport(res, await pulseReport(client, { grain: String(req.query.grain || 'month'), quota: await portalQuota(client) }));
   } catch (err) { next(err); }
+});
+
+/* ---------------------------- Customers ---------------------------- */
+// The business's own customers: everyone who talked to its agents or left
+// their details in a survey. Keyed by the number they wrote from — only ever
+// this client's; another client's customer is simply not found.
+
+/** GET /api/portal/contacts?q=&segment=&city=&sort=&limit=&offset= — the directory, searchable. */
+router.get('/contacts', async (req, res) => {
+  const q = req.query;
+  res.json(await CT.listContacts(req.portalClient.id, {
+    q: q.q, segment: q.segment, city: q.city, sort: q.sort, limit: q.limit, offset: q.offset,
+  }));
+});
+
+/** GET /api/portal/contacts/export.xlsx — every customer ever, every detail, every conversation. */
+router.get('/contacts/export.xlsx', async (req, res) => {
+  sendReport(res, await contactsWorkbook(req.portalClient));
+});
+
+/** GET /api/portal/contacts/:key — one customer: profile, every conversation and what was said, their survey answers. */
+router.get('/contacts/:key', async (req, res) => {
+  res.json(await CT.contactDetail(req.portalClient.id, req.params.key));
+});
+
+/** PATCH /api/portal/contacts/:key — name, email, city, gender, age group, company, tags, notes, do-not-contact. */
+router.patch('/contacts/:key', async (req, res) => {
+  await CT.contactDetail(req.portalClient.id, req.params.key);
+  await CT.editProfile(req.portalClient.id, req.params.key, req.body || {}, `${req.portalClient.company} (portal)`);
+  res.json(await CT.contactDetail(req.portalClient.id, req.params.key));
 });
 
 /* ---------------------------- Invoices ---------------------------- */

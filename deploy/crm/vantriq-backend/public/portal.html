@@ -22,6 +22,7 @@
 <script src="/vendor/chart/chart.umd.js"></script>
 <script src="/analytics-view.js"></script>
 <script src="/survey-studio.js"></script>
+<script src="/contacts-view.js"></script>
 <script src="/invoice-print.js"></script>
 <style>
 /* The portal is the only part of the CRM a customer ever sees, so it is set
@@ -447,6 +448,7 @@ async function boot(){
     const contracts = await api('/contracts').catch(()=>[]);
     data = { account, usage, invoices, ledger, packages, agents, bundles, quotes, contracts, activity: null, analytics: null };
     if(/^#surveys\b/.test(location.hash || '') && surveysOn()) currentTab = 'surveys';
+    if(/^#customers\b/.test(location.hash || '')) currentTab = 'customers';
     render();
   }catch(e){
     if(e.expired){ renderLogin('Your session has ended. Please sign in again.'); return; }
@@ -500,6 +502,7 @@ async function doLogin(){
     setSession(json.session);
     loginBusy = false;
     if(window.VQS) VQS.reset();
+    if(window.VQC) VQC.reset();
     boot();
   }catch(e){
     show('Could not reach the server. Check your connection and try again.');
@@ -537,6 +540,7 @@ async function doLogout(){
   // The survey studio keeps its own state between renders; the next person to
   // sign in on this browser must not see this account's surveys.
   if(window.VQS) VQS.reset();
+  if(window.VQC) VQC.reset();
   data = { account:null, usage:null, invoices:[], ledger:null, packages:null,
     agents:null, bundles:null, quotes:null, activity:null, apiTokens:null };
   currentTab = 'overview';
@@ -577,6 +581,7 @@ function render(){
       <div class="tabs">
         <div class="tab ${currentTab==='overview'?'active':''}" onclick="setTab('overview')">Overview</div>
         <div class="tab ${currentTab==='analytics'?'active':''}" onclick="setTab('analytics')" title="Vantriq Pulse — analytics">Pulse</div>
+        <div class="tab ${currentTab==='customers'?'active':''}" onclick="setTab('customers')" title="Your customers: who they are, every conversation, what they said">Customers</div>
         ${surveysOn()?`<div class="tab ${currentTab==='surveys'?'active':''}" onclick="setTab('surveys')" title="Vantriq Echo — customer-satisfaction surveys">Echo</div>`:''}
         <div class="tab ${currentTab==='agents'?'active':''}" onclick="setTab('agents')">My agents${data.agents&&data.agents.length?` <span class="tab-n">${data.agents.length}</span>`:''}</div>
         <div class="tab ${currentTab==='usage'?'active':''}" onclick="setTab('usage')">Usage</div>
@@ -598,6 +603,7 @@ function render(){
   `;
   if(currentTab==='usage') requestAnimationFrame(drawUsageChart);
   if(currentTab==='surveys') mountSurveys();
+  if(currentTab==='customers') mountCustomers();
   if(currentTab==='analytics'){
     if(!data.analytics) loadAnalytics();
     else if(!data.analytics.error) requestAnimationFrame(()=>VQA.drawConversations(data.analytics));
@@ -614,7 +620,7 @@ function setTab(t){
   if(currentTab==='surveys' && t!=='surveys' && window.VQS && VQS.hasUnsaved()
      && !confirm('You have unsaved survey changes. Leave without saving?')) return;
   currentTab=t;
-  try{ history.replaceState(null, '', t==='surveys' ? '#surveys' : location.pathname + location.search); }catch(e){}
+  try{ history.replaceState(null, '', t==='surveys' ? '#surveys' : t==='customers' ? '#customers' : location.pathname + location.search); }catch(e){}
   render();
 }
 
@@ -626,6 +632,7 @@ function renderTab(){
 function tabBody(){
   if(currentTab==='overview') return renderOverview();
   if(currentTab==='analytics') return renderAnalytics();
+  if(currentTab==='customers') return renderCustomers();
   if(currentTab==='surveys') return surveysOn() ? renderSurveys() : renderOverview();
   if(currentTab==='usage') return renderUsage();
   if(currentTab==='invoices') return renderInvoices();
@@ -726,9 +733,8 @@ function renderAnalytics(){
     <button class="btn btn-ghost" style="margin-top:10px;" onclick="data.analytics=null;render()">Try again</button></div>`;
   return productHead('Vantriq Pulse', 'Live analytics on every conversation — leads, busiest hours, satisfaction and what the AI resolved on its own.')
     + VQA.conversationsHTML(a, { audience:'portal', onGrain:'setAnalyticsGrain', onReport:'downloadAnalyticsReport', surveysEnabled: surveysOn(),
-      reportHint: surveysOn()
-        ? 'Every figure here, plus your contacts (new and returning), each conversation and every survey answer — a tab for each'
-        : 'Every figure here, plus your contacts (new and returning) and each conversation — a tab for each' });
+      reportLabel: 'Download Pulse report (Excel)',
+      reportHint: 'Every figure here, plus your customers (new and returning, who and where), each conversation and what was said — a tab for each' });
 }
 
 /** Pulse as an Excel workbook, at the period on screen. */
@@ -741,6 +747,23 @@ function downloadAnalyticsReport(){
 function productHead(name, line){
   return `<div style="margin:2px 0 14px;"><div style="font-family:var(--f-head);font-size:19px;font-weight:600;letter-spacing:-.01em;">${esc(name)}</div>
     <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">${esc(line)}</div></div>`;
+}
+
+/* ---- Customers: who they are, every conversation, what they said (/contacts-view.js) ---- */
+function renderCustomers(){
+  if(!window.VQC) return `<div class="card"><div class="empty">The Customers page could not load in this browser.</div></div>`;
+  return `<div id="vqc-root"></div>`;
+}
+function mountCustomers(){
+  const el = document.getElementById('vqc-root');
+  if(!el || !window.VQC) return;
+  VQC.mount(el, {
+    audience: 'portal',
+    api: (method, path, body) => api('/contacts' + path, { method, body: body !== undefined ? JSON.stringify(body) : undefined })
+      .catch(e => { if(e.expired){ renderLogin('Your session has ended. Please sign in again.'); } throw e; }),
+    download: (path, filename) => portalDownload('/contacts' + path, filename, 'Building your customer workbook…'),
+    toast: (msg, warn) => toast(msg, warn),
+  });
 }
 
 /* ---- Surveys: build, share and read customer-satisfaction surveys (/survey-studio.js) ---- */
