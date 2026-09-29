@@ -92,6 +92,22 @@ const LADDER = [
     'an admin gets the whole model, add-ons included', r.status);
   const starter = r.body.packages.find((p) => p.name === 'Starter');
 
+  // Vantriq Echo, priced on what it costs to run (v9.20.1).
+  const echo = r.body.addons.find((a) => a.key === 'echo');
+  const loc = r.body.addons.find((a) => a.key === 'echo-location');
+  ok(echo && Number(echo.setup_fee) === 12000 && Number(echo.monthly_fee) === 6000,
+    'Echo is PKR 12,000 setup + 6,000 a month for the first location', echo && `${echo.setup_fee} + ${echo.monthly_fee}`);
+  ok(loc && Number(loc.setup_fee) === 2000 && Number(loc.monthly_fee) === 1500,
+    'each further location is PKR 2,000 + 1,500 a month', loc && `${loc.setup_fee} + ${loc.monthly_fee}`);
+  ok(echo && echo.monthly_margin >= 0.7 && echo.setup_margin >= 0.5, 'Echo keeps a prudent margin (75% monthly, 53% setup)',
+    echo && `${echo.monthly_margin}, ${echo.setup_margin}`);
+  ok(loc && loc.monthly_margin >= 0.75 && loc.setup_margin >= 0.4, 'and so does each location (80% monthly, 44% setup)',
+    loc && `${loc.monthly_margin}, ${loc.setup_margin}`);
+  const chain = (n) => Number(echo.monthly_fee) + (n - 1) * Number(loc.monthly_fee);
+  const chainCost = (n) => Number(echo.est_monthly_cost) + (n - 1) * Number(loc.est_monthly_cost);
+  ok(chain(5) === 12000 && chain(10) === 19500 && (chain(10) - chainCost(10)) / chain(10) > 0.75,
+    'five branches pay 12,000 a month and ten 19,500, still above 75% margin', `${chain(5)}, ${chain(10)}`);
+
   r = await call('PUT', '/api/costing', { assumptions: { fx_usd_pkr: 300 } });
   const moved = r.body.packages.find((p) => p.name === 'Starter');
   ok(r.status === 200 && moved.cost_per_session > starter.cost_per_session, 'a new exchange rate re-costs every package', r.status);

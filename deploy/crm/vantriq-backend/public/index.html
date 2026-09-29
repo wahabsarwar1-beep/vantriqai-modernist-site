@@ -2279,7 +2279,9 @@ function addonPrice(a){
   if(a.price_basis==='included') return '<span style="color:var(--teal-dark);font-weight:600;">Included in every plan</span>';
   if(a.price_basis==='scope') return `<span style="color:var(--muted);white-space:normal;font-family:var(--f-body);font-size:12px;">${esc(a.price_note||'Priced on scope')}</span>`;
   const from = a.price_basis==='from' ? 'From ' : '';
-  return `${from}${fmtMoney(a.setup_fee)} setup · ${fmtMoney(a.monthly_fee)}/mo`;
+  const note = a.price_note && a.price_basis!=='from'
+    ? `<div style="font-family:var(--f-body);font-size:11px;color:var(--muted);white-space:normal;margin-top:2px;">${esc(a.price_note)}</div>` : '';
+  return `${from}${fmtMoney(a.setup_fee)} setup · ${fmtMoney(a.monthly_fee)}/mo${note}`;
 }
 function addonsHTML(){
   if(addonsData===null) return '';
@@ -2308,7 +2310,7 @@ function addonsHTML(){
       </table>
     </div>`;
   }).join('')}
-  ${admin?`<p class="footnote">Our cost is an estimate per add-on (model, voice and telephony usage at a typical volume); setup margin assumes build hours split evenly between founder and contracted time. Echo and Human Support are new since the August model — their prices are the September proposal; change any add-on through the API (PUT /api/addons/:id) until it has its own editor.</p>`:''}`;
+  ${admin?`<p class="footnote">Our cost is an estimate per add-on (model, voice and telephony usage at a typical volume); setup margin assumes build hours split evenly between founder and contracted time. Vantriq Echo is priced on what it costs to run — it has no AI or messaging cost of its own, only setup time and a short monthly review — so it is a base for the first location and a smaller step for each further one: PKR 6,000 a month for one branch, 12,000 for five, 19,500 for ten, at a monthly margin of 75% or more at every size. Human Support is new since the August model and carries the September proposal. Change any add-on through the API (PUT /api/addons/:id).</p>`:''}`;
 }
 
 function renderProducts(){
