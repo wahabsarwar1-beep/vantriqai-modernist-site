@@ -223,6 +223,18 @@ addresses, the email goes out the moment the answer arrives — which needs
 A delighted customer (NPS 9–10, or CSAT 5) is offered the Google review link
 on the thank-you screen.
 
+## The Echo dashboard (v9.18)
+
+The top of the Echo page (portal and CRM — pick a client, or all) is a full dashboard over every survey, by day, week, month, quarter or year, compared with the previous period at the same point — the same controls as Pulse:
+
+- **Headline tiles** with trend lines: answers, % satisfied, NPS, % resolved, unhappy customers, invites answered, customer effort, time to answer.
+- **Charts:** answers over time, satisfaction over time, NPS over time, how people scored (1–5), the 0–10 spread with promoters / passives / detractors.
+- **Breakdowns** with satisfaction, average and NPS for each: every survey, channel, location (or language), gender, age group, city.
+- **Personal links funnel** (sent → opened → answered) and page visits → answers.
+- **Words** that set unhappy and happy comments apart; **closing the loop** (waiting, contacted, resolved, typical time to reply, over 48 hours); **when people answer** (day × hour); latest comments; plain-English findings; every figure as a table; and **Download Echo report (Excel)** at the chosen period.
+
+API: `GET /api/surveys/dashboard?grain=&client_id=` (staff), `GET /api/portal/surveys/dashboard?grain=` (the client).
+
 ## Customers, and separate Pulse / Echo reports (v9.17)
 
 - **Customers** — CRM → Customers (pick a client, or all) and a **Customers** tab in every client's portal: search, segments (new, returning, regulars 5+, at risk, unhappy, no name, with email), city filter; each customer's page shows their profile (editable: name, phone, email, city, gender, age group, company, tags, notes, do-not-contact), every conversation with its transcript, and their survey answers. **All customers (Excel)** downloads everyone ever with every detail.

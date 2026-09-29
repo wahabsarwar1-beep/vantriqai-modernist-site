@@ -174,7 +174,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await page.waitForSelector('.vqs-scard', { timeout: 10000 });
     ok(await page.locator('.tab.active').innerText() === 'Echo', 'a #surveys link opens straight onto the tab');
     const home = await page.innerText('.vqs');
-    ok(/UI dine-in/.test(home) && /Waiting for follow-up\s*\n?\s*1/.test(home), 'the survey, and one unhappy customer waiting', home.slice(0, 300));
+    ok(/UI dine-in/.test(home) && /1 waiting for a reply/.test(home), 'the survey, and one unhappy customer waiting', home.slice(0, 300));
 
     await page.click('.vqs-btn.primary:has-text("New survey")');
     await page.click('.vqs-tpl[data-tpl="healthcare"]');

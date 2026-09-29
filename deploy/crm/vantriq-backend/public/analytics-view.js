@@ -141,6 +141,12 @@
 .vqa-table th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted,#6b645b);font-weight:700;}
 .vqa details summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--teal,#2f56d9);}
 .vqa-tablewrap{overflow-x:auto;}
+.vqe-break td{vertical-align:middle;}.vqe-break td:nth-child(2){text-align:left;}.vqe-break th:nth-child(2){text-align:left;}.vqe-break tr.muted td{color:var(--muted,#6b645b);}
+.vqe-mini{display:inline-block;vertical-align:middle;width:calc(100% - 64px);max-width:180px;height:8px;border-radius:4px;background:#f0ece5;overflow:hidden;margin-right:6px;}
+.vqe-mini div{height:100%;border-radius:4px;}.vqe-n{font-size:11.5px;color:var(--muted,#6b645b);white-space:nowrap;}
+.vqe-pill{display:inline-block;color:#fff;font-weight:700;font-size:11.5px;padding:2px 8px;border-radius:999px;min-width:38px;text-align:center;}
+.vqe-words{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;}.vqe-words span{border:1px solid;border-radius:999px;padding:3px 11px;font-weight:600;background:#fff;}
+.vqe-words small{opacity:.65;font-weight:500;font-size:11px;}
 .vqa-section{font-family:var(--f-head,inherit);font-size:15px;font-weight:600;margin:22px 0 10px;color:var(--text,#16151a);}
 @media (max-width:520px){.vqa-kpi .v{font-size:22px;}.vqa-bar{grid-template-columns:1fr auto;row-gap:5px;}.vqa-bar .tr{grid-column:1/-1;order:3;}}
 `;
@@ -682,10 +688,142 @@
     groupedChart('vqaWonLost', d.series, { key: 'won', label: 'Won', color: C.s1 }, { key: 'lost', label: 'Lost', color: C.s2 }, d.grain);
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Echo view — every survey together (portal and CRM)                 */
+  /* ------------------------------------------------------------------ */
+  function satColor(v){ return v == null ? '#bdb7ad' : v >= 80 ? '#2f7d5f' : v >= 60 ? '#7f9bf2' : v >= 40 ? '#d9a441' : '#b4402f'; }
+  function sign(v){ return v == null ? '—' : (v > 0 ? '+' : '') + v; }
+
+  /** One row per group: how many answered (bar), satisfied %, average, NPS. */
+  function breakdown(list, first){
+    if(!list || !list.length) return `<div class="vqa-empty">Nothing yet.</div>`;
+    const max = Math.max(...list.map(x => x.responses), 1);
+    return `<div style="overflow-x:auto;"><table class="vqa-table vqe-break"><thead><tr><th>${esc(first)}</th><th style="width:34%">Answers</th><th class="r">Satisfied</th><th class="r">Avg</th><th class="r">NPS</th></tr></thead><tbody>
+      ${list.slice(0, 10).map(x => `<tr${x.known === false ? ' class="muted"' : ''}><td><b>${esc(x.name)}</b></td>
+        <td><div class="vqe-mini"><div style="width:${(x.responses / max) * 100}%;background:${x.known === false ? '#bdb7ad' : C.s1}"></div></div><span class="vqe-n">${n(x.responses)}${x.share != null ? ` · ${x.share}%` : ''}</span></td>
+        <td class="r"><span class="vqe-pill" style="background:${satColor(x.csat)}">${x.csat == null ? '—' : x.csat + '%'}</span></td>
+        <td class="r">${x.csat_average == null ? '—' : x.csat_average}</td><td class="r">${sign(x.nps)}</td></tr>`).join('')}
+    </tbody></table></div>`;
+  }
+
+  function words(list, color){
+    if(!list || !list.length) return `<div class="vqa-empty" style="padding:10px;">Not enough comments yet.</div>`;
+    const max = Math.max(...list.map(w => w.n));
+    return `<div class="vqe-words">${list.map(w => `<span style="font-size:${12 + Math.round((w.n / max) * 8)}px;border-color:${color};color:${color}">${esc(w.word)} <small>${w.n}</small></span>`).join('')}</div>`;
+  }
+
+  function echoHTML(d, opts){
+    opts = opts || {};
+    const k = d.kpis, w = d.window, prev = d.period.previous_label, g = d.grain;
+    lastSeries = {
+      headers: ['Period', 'Answers', 'Satisfied %', 'Average (of 5)', 'NPS', 'Promoters', 'Passives', 'Detractors', 'Resolved %', 'Unhappy', 'Links sent', 'Links answered'],
+      rows: d.series.map(s => [bucketLabel(s.bucket, g, true), s.responses, s.csat == null ? '' : s.csat, s.csat_average == null ? '' : s.csat_average,
+        s.nps == null ? '' : s.nps, s.promoters, s.passives, s.detractors, s.resolution == null ? '' : s.resolution, s.unhappy, s.invites_sent, s.invites_answered]),
+    };
+    const note = `${esc(d.period.current_label)} so far (${d.period.elapsed_pct}% through) compared with ${esc(prev)} up to the same point · ${esc(d.time_zone.replace('Asia/', ''))} time`;
+    if(!w.responses){
+      return `<div class="vqa">${filters(g, opts.onGrain, note, opts)}<div class="vqa-card"><div class="vqa-empty">No survey answers in the ${esc(d.period.window_label.toLowerCase())} yet. Share a survey below — by QR code, link or WhatsApp — and this dashboard fills in as answers arrive.</div></div></div>`;
+    }
+    const npsTotal = w.promoters + w.passives + w.detractors;
+    const seg = (v) => npsTotal ? (v / npsTotal) * 100 : 0;
+    const f = d.followups;
+    const funnelRows = [
+      { name: 'Links sent', value: d.funnel.sent }, { name: 'Opened', value: d.funnel.opened, share: d.funnel.sent ? Math.round(d.funnel.opened / d.funnel.sent * 100) : null },
+      { name: 'Answered', value: d.funnel.answered, share: d.funnel.sent ? Math.round(d.funnel.answered / d.funnel.sent * 100) : null },
+    ];
+    const demo = d.demographics;
+    const demoCards = [['By gender', demo.gender, 'Gender'], ['By age group', demo.age, 'Age group'], ['By city', demo.city, 'City']].filter(x => x[1].length);
+    return `<div class="vqa vqe">
+      ${filters(g, opts.onGrain, note, opts)}
+      ${insightsCard(d.insights)}
+      <div class="vqa-grid vqa-kpis">
+        ${kpi({ label: 'Answers', value: n(k.responses.current), delta: k.responses.delta_pct, prevLabel: prev, projected: k.responses.projected, sparkValues: d.series.map(s => s.responses) })}
+        ${kpi({ label: 'Satisfied (4–5 of 5)', value: k.csat.current == null ? '—' : k.csat.current, unit: k.csat.current == null ? '' : '%', delta: k.csat.current == null ? undefined : k.csat.delta_pts, deltaUnit: 'pts', prevLabel: prev, foot: k.csat.average != null ? `Average ${k.csat.average} / 5 · ${n(k.csat.responses)} answers` : 'No scores this period', sparkValues: d.series.map(s => s.csat) })}
+        ${kpi({ label: 'Net Promoter Score', value: sign(k.nps.current), delta: k.nps.current == null ? undefined : k.nps.delta_pts, deltaUnit: 'pts', prevLabel: prev, foot: k.nps.responses ? `${n(k.nps.responses)} answers` : 'Not asked this period', sparkValues: d.series.map(s => s.nps) })}
+        ${kpi({ label: 'Problems resolved', value: k.resolution.current == null ? '—' : k.resolution.current, unit: k.resolution.current == null ? '' : '%', delta: k.resolution.current == null ? undefined : k.resolution.delta_pts, deltaUnit: 'pts', prevLabel: prev, foot: k.resolution.responses ? `${n(k.resolution.responses)} answers` : 'Not asked this period' })}
+        ${kpi({ label: 'Unhappy customers', value: n(k.unhappy.current), foot: `${k.unhappy.share == null ? 0 : k.unhappy.share}% of answers · ${n(f.open)} waiting for a reply`, sparkValues: d.series.map(s => s.unhappy) })}
+        ${kpi({ label: 'Invites answered', value: k.response_rate.current == null ? '—' : k.response_rate.current, unit: k.response_rate.current == null ? '' : '%', delta: k.response_rate.current == null ? undefined : k.response_rate.delta_pts, deltaUnit: 'pts', prevLabel: prev, foot: `${n(k.response_rate.sent)} personal links sent` })}
+        ${k.ces.current != null ? kpi({ label: 'Customer effort', value: k.ces.current, unit: ' / 7', foot: 'Higher is easier' }) : ''}
+        ${w.median_seconds != null ? kpi({ label: 'Time to answer', value: w.median_seconds < 60 ? w.median_seconds : Math.round(w.median_seconds / 60), unit: w.median_seconds < 60 ? ' sec' : ' min', foot: 'Median, whole survey' }) : ''}
+      </div>
+
+      <div class="vqa-grid vqa-two">
+        <div class="vqa-card"><h3>Answers over time</h3><div class="vqa-sub">${esc(d.period.window_label)} · ${n(w.responses)} in total · the pale bar is still under way</div>
+          <div class="vqa-plot"><canvas id="vqeResp" aria-label="Answers per period"></canvas></div></div>
+        <div class="vqa-card"><h3>Satisfaction over time</h3><div class="vqa-sub">Share scoring 4 or 5 · ${esc(d.period.window_label)} · ${w.csat == null ? '—' : w.csat + '%'} overall</div>
+          <div class="vqa-plot"><canvas id="vqeCsat" aria-label="Satisfaction per period"></canvas></div></div>
+      </div>
+
+      <div class="vqa-grid vqa-two">
+        <div class="vqa-card"><h3>How people scored their experience</h3><div class="vqa-sub">${n(w.csat_responses)} answers · average ${w.csat_average == null ? '—' : w.csat_average} / 5</div>
+          ${barList(d.distribution.slice().reverse().map(x => ({ name: ['😠 1', '🙁 2', '😐 3', '🙂 4', '😍 5'][x.score - 1], value: x.n, share: w.csat_responses ? Math.round(x.n / w.csat_responses * 100) : 0 })), { colors: SCORE.slice().reverse() })}</div>
+        <div class="vqa-card"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;"><div><h3>Would they recommend you?</h3><div class="vqa-sub">0–10 · ${n(w.nps_responses)} answers</div></div><div class="vqa-big">${sign(w.nps)}</div></div>
+          ${w.nps_responses ? `<div class="vqa-plot sm"><canvas id="vqeNpsDist" aria-label="How people answered 0 to 10"></canvas></div>
+          <div class="vqa-stack" role="img" aria-label="${w.detractors} detractors, ${w.passives} passives, ${w.promoters} promoters">
+            ${w.detractors ? `<div style="width:${seg(w.detractors)}%;background:${SCORE[0]}"></div>` : ''}${w.passives ? `<div style="width:${seg(w.passives)}%;background:${SCORE[2]}"></div>` : ''}${w.promoters ? `<div style="width:${seg(w.promoters)}%;background:${SCORE[4]}"></div>` : ''}
+          </div>${legend([[`Detractors 0–6 · ${n(w.detractors)}`, SCORE[0]], [`Passives 7–8 · ${n(w.passives)}`, SCORE[2]], [`Promoters 9–10 · ${n(w.promoters)}`, SCORE[4]]])}` : '<div class="vqa-empty">No survey asked "would you recommend us" in this period.</div>'}</div>
+      </div>
+
+      ${w.nps_responses ? `<div class="vqa-card" style="margin-bottom:14px;"><h3>Net Promoter Score over time</h3><div class="vqa-sub">From −100 to +100 · ${esc(d.period.window_label)}</div><div class="vqa-plot sm"><canvas id="vqeNps" aria-label="NPS per period"></canvas></div></div>` : ''}
+
+      <div class="vqa-grid vqa-two">
+        <div class="vqa-card"><h3>Every survey</h3><div class="vqa-sub">${esc(d.period.window_label)} · best and worst at a glance</div>${breakdown(d.surveys.filter(s => s.responses), 'Survey')}</div>
+        <div class="vqa-card"><h3>Personal links: sent → opened → answered</h3><div class="vqa-sub">After-chat WhatsApp invites and one-time links · ${esc(d.period.window_label)}</div>
+          ${d.funnel.sent ? barList(funnelRows, { colors: [FUNNEL[0], FUNNEL[2], FUNNEL[4]] }) : '<div class="vqa-empty">No personal links sent in this period.</div>'}
+          <div class="vqa-sub" style="margin:12px 0 0;">${w.views ? `${n(w.views)} survey page visits · ${w.completion_rate == null ? '—' : w.completion_rate + '%'} went on to answer` : ''}</div></div>
+      </div>
+
+      <div class="vqa-grid vqa-two">
+        <div class="vqa-card"><h3>By channel</h3><div class="vqa-sub">How the survey was answered</div>${breakdown(d.channels, 'Channel')}</div>
+        <div class="vqa-card"><h3>${d.locations.length ? 'By location' : 'By language'}</h3><div class="vqa-sub">${d.locations.length ? 'Branch or site, from the QR code or link' : 'English or Urdu'}</div>${breakdown(d.locations.length ? d.locations : d.languages, d.locations.length ? 'Location' : 'Language')}</div>
+      </div>
+
+      ${demoCards.length ? [demoCards.slice(0, 2), demoCards.slice(2)].filter(p => p.length).map(p => `<div class="vqa-grid ${p.length === 2 ? 'vqa-two' : ''}">${p.map(x => `<div class="vqa-card"><h3>${x[0]}</h3><div class="vqa-sub">From the survey's "about you" questions</div>${breakdown(x[1], x[2])}</div>`).join('')}</div>`).join('')
+        : `<div class="vqa-card" style="margin-bottom:14px;"><h3>Who answers</h3><div class="vqa-empty" style="padding:12px;">Add the <b>Gender</b>, <b>Age group</b> or <b>City</b> question to a survey (open it → Questions → Add a question → About you) to see how satisfaction differs between groups here.</div></div>`}
+
+      <div class="vqa-grid vqa-two">
+        <div class="vqa-card"><h3>What unhappy customers write about</h3><div class="vqa-sub">Words used most in comments scoring 1–2, NPS 0–6 or not resolved</div>${words(d.themes.unhappy, SCORE[0])}</div>
+        <div class="vqa-card"><h3>What happy customers love</h3><div class="vqa-sub">Words used most in comments scoring 4–5 or NPS 9–10</div>${words(d.themes.happy, C.s1)}</div>
+      </div>
+
+      <div class="vqa-grid vqa-two">
+        <div class="vqa-card"><h3>Closing the loop</h3><div class="vqa-sub">Every unhappy answer opens a follow-up</div>
+          ${barList([{ name: 'Waiting for a reply', value: f.open }, { name: 'Contacted', value: f.contacted }, { name: 'Resolved', value: f.resolved }], { colors: [SCORE[0], '#d9a441', '#2f7d5f'] })}
+          <div class="vqa-sub" style="margin:12px 0 0;">${f.median_hours_to_reply != null ? `Typical time to get back to them: <b>${f.median_hours_to_reply < 1 ? 'under an hour' : f.median_hours_to_reply < 48 ? f.median_hours_to_reply + ' hours' : Math.round(f.median_hours_to_reply / 24) + ' days'}</b>` : 'No follow-ups handled yet'}${f.overdue ? ` · <b style="color:${SCORE[0]}">${n(f.overdue)} waiting over 48 hours</b>` : ''}</div></div>
+        <div class="vqa-card"><h3>When people answer</h3><div class="vqa-sub">By day and hour (${esc(d.time_zone.replace('Asia/', ''))} time) · ${esc(d.period.window_label)}</div>${heatmap(d.heatmap, d.period.window_label)}</div>
+      </div>
+
+      ${d.recent_comments.length ? `<div class="vqa-card" style="margin-bottom:14px;"><h3>Latest comments</h3><div class="vqa-sub">What customers wrote, newest first</div><div class="vqa-feedback">
+        ${d.recent_comments.map(c => `<div class="vqa-fb"><div>“${esc(c.comment)}”</div><div class="m">${c.score != null ? `${'★'.repeat(c.score)}${'☆'.repeat(5 - c.score)} · ` : ''}${c.nps != null ? `NPS ${c.nps} · ` : ''}${c.resolved != null ? (c.resolved ? 'Resolved · ' : 'Not resolved · ') : ''}${esc(c.channel)} · ${esc(c.survey)} · ${esc(new Date(c.submitted_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }))}</div></div>`).join('')}
+      </div></div>` : ''}
+
+      <div class="vqa-card"><details><summary>See every figure as a table</summary>${table(lastSeries.headers, lastSeries.rows)}</details></div>
+    </div>`;
+  }
+
+  function drawEcho(d){
+    destroyCharts();
+    if(!d || !d.window || !d.window.responses || !chartReady()) return;
+    setChartFont();
+    columnChart('vqeResp', d.series, 'responses', 'Answers', d.grain);
+    lineChart('vqeCsat', d.series, 'csat', d.grain, { label: 'satisfied' });
+    if(d.window.nps_responses){
+      lineChart('vqeNps', d.series.map(s => ({ ...s, responses: s.nps_responses })), 'nps', d.grain, { min: -100, max: 100, suffix: '', label: 'NPS' });
+      mount('vqeNpsDist', {
+        type: 'bar',
+        data: { labels: d.nps_distribution.map(x => String(x.score)), datasets: [{ label: 'Answers', data: d.nps_distribution.map(x => x.n),
+          backgroundColor: d.nps_distribution.map(x => x.score <= 6 ? SCORE[0] : x.score <= 8 ? SCORE[2] : SCORE[4]), borderRadius: 4, maxBarThickness: 26 }] },
+        options: baseOptions({ plugins: { legend: { display: false }, tooltip: Object.assign(baseOptions().plugins.tooltip, {
+          callbacks: { title: (items) => `Scored ${items[0].label} of 10`, label: (ctx) => ` ${n(ctx.raw)} answers` } }) } }),
+      });
+    }
+  }
+
   window.VQA = {
     injectStyles,
     conversationsHTML, drawConversations,
     salesHTML, drawSales,
+    echoHTML, drawEcho,
     destroyCharts,
     grains: GRAINS,
   };
