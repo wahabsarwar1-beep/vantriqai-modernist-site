@@ -1841,3 +1841,171 @@ create index if not exists idx_usage_client_session on usage_events(client_id, s
 -- Vantriq Echo on. Set by staff on the client's page or by the client in
 -- their portal's template library.
 alter table clients add column if not exists industry text not null default '';
+
+-- =====================================================================
+-- v9.20 — PRODUCTS & PRICING, COSTED AT TODAY'S PRICES
+--
+-- The package ladder's prices are fixed by the business model and stay
+-- locked. What moves is what it costs us to serve them: model prices, the
+-- exchange rate, how many messages a conversation takes, how many hours a
+-- client needs. Until now one number stood for all of that —
+-- delivery_cost_full, typed in once from the August 2026 model — and it
+-- had gone stale: that model costed Gemini 3 Flash at Gemini 1.5 Flash's
+-- old price, and the live agents run on GPT-4o mini anyway.
+--
+-- So the cost side becomes a model the CRM computes (src/utils/
+-- costingEngine.js, behind the admin-only /api/costing) from inputs an
+-- admin can see and change:
+--
+--   products.*          each package's cost profile — the context its
+--                       agent reads per turn, the share of turns escalated
+--                       to the premium model, management and build hours,
+--                       how much of that is founder time, the usage a
+--                       client of that size typically has. NULL means "the
+--                       business model's value for a package of this name".
+--   settings.costing    the rate card and the assumptions (exchange rate,
+--                       bulk and premium model, token sizes, labour rates,
+--                       infrastructure, the steady-state client mix), as
+--                       overrides on the defaults in costingEngine.js.
+--
+-- delivery_cost_full and ai_model are now written BY the model (on every
+-- migrate and every change in Products & Pricing), so Financials and the
+-- dashboard read today's cost, not August's.
+-- =====================================================================
+alter table products add column if not exists context_tokens int;
+alter table products add column if not exists premium_share numeric;
+alter table products add column if not exists mgmt_hours numeric;
+alter table products add column if not exists build_hours numeric;
+alter table products add column if not exists founder_share numeric;
+alter table products add column if not exists typical_min int;
+alter table products add column if not exists typical_max int;
+alter table products add column if not exists bulk_model text;
+alter table products add column if not exists premium_model text;
+
+alter table settings add column if not exists costing jsonb not null default '{}'::jsonb;
+
+-- The add-ons catalogue: everything sold on top of a package, priced
+-- separately so a client is never repriced when the catalogue grows.
+--
+--   price_basis  fixed     the price below is the price
+--                from      a starting price; the scope can raise it
+--                included  part of every plan — shown, never charged
+--                scope     priced after scoping; setup/monthly are NULL
+--
+-- est_monthly_cost and est_build_hours are ours, not the client's: what
+-- serving the add-on costs, so its margin can be shown to an admin. They
+-- are never sent to staff, a customer or a document.
+create table if not exists catalog_addons (
+  id uuid primary key default gen_random_uuid(),
+  key text not null unique,
+  name text not null,
+  family text not null default 'capability'
+    check (family in ('capability','solution','insight','deployment')),
+  summary text not null default '',
+  setup_fee numeric,
+  monthly_fee numeric,
+  price_basis text not null default 'fixed'
+    check (price_basis in ('fixed','from','included','scope')),
+  price_note text not null default '',
+  availability text not null default '',
+  est_monthly_cost numeric not null default 0,
+  est_build_hours numeric not null default 0,
+  cost_note text not null default '',
+  is_new boolean not null default false,
+  sort_order int not null default 0,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+drop trigger if exists trg_catalog_addons_updated on catalog_addons;
+create trigger trg_catalog_addons_updated before update on catalog_addons
+  for each row execute function touch_updated_at();
+
+-- Seeded from the business model (capabilities and the four flagship
+-- solutions, at its prices) and the product range on vantriqai.com. Echo and
+-- Human Support are new since that model and carry the prices the September
+-- 2026 update of it proposes. Inserted once per key: an admin's edit is never
+-- overwritten by a later migrate.
+insert into catalog_addons
+  (key, name, family, summary, setup_fee, monthly_fee, price_basis, price_note, availability,
+   est_monthly_cost, est_build_hours, cost_note, is_new, sort_order)
+values
+  ('voice-understanding', 'Voice understanding', 'capability',
+   'Voice notes in Urdu, Punjabi, Sindhi, Pashto, English or a mix — understood, and answered back in natural speech when that suits the customer better.',
+   25000, 12000, 'fixed', '', 'Any package', 2500, 6,
+   'Transcription and spoken replies, at about 1,500 voice notes a month.', false, 10),
+  ('image-recognition', 'Image recognition', 'capability',
+   'A photo of a product, a damaged delivery, a prescription, a receipt or a meter reading — identified, and discussed intelligently.',
+   20000, 9000, 'fixed', '', 'Any package', 1500, 5,
+   'Vision input at about 1,000 images a month.', false, 20),
+  ('voice-call-agent', 'Voice call agent', 'capability',
+   'A real phone line answered in natural speech: questions handled, appointments booked, details captured, and the call transferred to a person when that is right.',
+   60000, 35000, 'fixed', '', 'Any package', 15000, 20,
+   'Real-time voice and telephony at about 1,000 call minutes a month; heavier use is priced per minute.', false, 30),
+  ('website-chat', 'Website & blog chat', 'capability',
+   'The same agent on your website, landing pages and blog — one brain, so the answer on WhatsApp matches the answer on your site.',
+   25000, 10000, 'fixed', '', 'Any package', 0, 4,
+   'Web conversations count against the package''s own allowance, so they add no model cost of their own.', false, 40),
+  ('lead-generation', 'AI lead generation', 'solution',
+   'Lead captured, enriched, qualified and scored, written to your CRM, followed up with personalised outreach — and your salesperson alerted the moment a high-value lead appears.',
+   90000, 45000, 'fixed', '', 'Any package', 4000, 30, 'Enrichment and model calls.', false, 110),
+  ('support-after-sales', 'AI support & after-sales', 'solution',
+   'Understands the issue, searches your documentation, looks up the order, raises the ticket and escalates — and at the top tier performs approved actions such as updating an address or logging a warranty claim.',
+   45000, 22000, 'from', 'From', 'Any package', 2500, 16, 'Model calls and ticketing.', false, 120),
+  ('sales-assistant', 'AI sales assistant', 'solution',
+   'Researches the account, scores the opportunity, drafts follow-ups, flags stalled deals and hands your salesperson a pre-meeting brief: pain points, past objections, decision maker, recommended approach.',
+   95000, 48000, 'fixed', '', 'Any package', 4000, 32, 'Research and model calls.', false, 130),
+  ('document-processing', 'AI document processing', 'solution',
+   'Invoices, contracts, purchase orders, receipts, CVs and forms — extracted, validated, pushed into your system of record and routed to the right department. Nobody retypes anything.',
+   85000, 40000, 'fixed', '', 'Any package', 5000, 28, 'Document parsing and model calls.', false, 140),
+  ('email-automation', 'Email automation', 'solution',
+   'Inbound email read, sorted and answered or routed to the right person; follow-ups drafted for approval.',
+   null, null, 'scope', 'Typically PKR 35,000–110,000 setup and 16,000–55,000 a month', 'Any package', 0, 0, '', false, 150),
+  ('recruitment', 'Recruitment', 'solution',
+   'CVs screened against the role, candidates shortlisted and interviews booked — with every decision left to your team.',
+   null, null, 'scope', 'Typically PKR 35,000–110,000 setup and 16,000–55,000 a month', 'Any package', 0, 0, '', false, 160),
+  ('marketing-content', 'Marketing content', 'solution',
+   'Posts, captions and campaign copy drafted in your brand voice, ready for your approval.',
+   null, null, 'scope', 'Typically PKR 35,000–110,000 setup and 16,000–55,000 a month', 'Any package', 0, 0, '', false, 170),
+  ('social-media', 'Social media management', 'solution',
+   'Comments and messages across your pages triaged, replies drafted, and posts scheduled.',
+   null, null, 'scope', 'Typically PKR 35,000–110,000 setup and 16,000–55,000 a month', 'Any package', 0, 0, '', false, 180),
+  ('reporting', 'Reporting', 'solution',
+   'Weekly and monthly reports assembled from your own systems and sent in plain language.',
+   null, null, 'scope', 'Typically PKR 35,000–110,000 setup and 16,000–55,000 a month', 'Any package', 0, 0, '', false, 190),
+  ('finance-operations', 'Finance operations', 'solution',
+   'Invoices matched, payments chased and reconciliations prepared for your accountant to review.',
+   null, null, 'scope', 'Typically PKR 35,000–110,000 setup and 16,000–55,000 a month', 'Any package', 0, 0, '', false, 200),
+  ('ecommerce-operations', 'E-commerce operations', 'solution',
+   'Orders, returns, stock alerts and abandoned carts handled end to end.',
+   null, null, 'scope', 'Typically PKR 35,000–110,000 setup and 16,000–55,000 a month', 'Any package', 0, 0, '', false, 210),
+  ('appointment-booking', 'Appointment booking', 'solution',
+   'Scheduling across branches, staff and rooms, with reminders, reschedules and no-show follow-up.',
+   null, null, 'scope', 'Typically PKR 35,000–110,000 setup and 16,000–55,000 a month', 'Any package', 0, 0, '', false, 220),
+  ('knowledge-assistant', 'Internal knowledge assistant', 'solution',
+   'A private assistant for your own staff, answering from your policies, manuals and past cases.',
+   null, null, 'scope', 'Typically PKR 35,000–110,000 setup and 16,000–55,000 a month', 'Any package', 0, 0, '', false, 230),
+  ('pulse', 'Vantriq Pulse', 'insight',
+   'Live analytics on every conversation: leads made and closed, time to close, busiest hours, satisfaction and what the AI resolved on its own — with an Excel report of all of it.',
+   0, 0, 'included', '', 'Every plan', 0, 0, '', true, 300),
+  ('customers', 'Customer directory', 'insight',
+   'Who your customers are — name, number, city — with every conversation and what they said, kept up to date by the agent itself.',
+   0, 0, 'included', '', 'Every plan', 0, 0, '', true, 310),
+  ('portal-app', 'Client portal & Android app', 'insight',
+   'Invoices, usage, statements, Pulse, customers and surveys in one sign-in — in the browser, or as the VantriqAI app on Android.',
+   0, 0, 'included', '', 'Every plan', 0, 0, '', true, 320),
+  ('echo', 'Vantriq Echo', 'insight',
+   'Customer-satisfaction surveys in English and Urdu — after a WhatsApp chat, by QR code, link, kiosk or on your site — from 28 ready-made industry templates, with every answer flowing into Pulse.',
+   15000, 8000, 'fixed', '', 'Any package', 300, 3,
+   'Runs on the CRM itself; survey messages sent through your own WhatsApp number are billed to you by your provider.', true, 330),
+  ('human-support', 'Human Support', 'insight',
+   'AI assist for your team: when a person takes over a chat, it hands them the summary, the customer''s history and a drafted reply in the customer''s language — they decide what is sent.',
+   20000, 15000, 'fixed', '', 'Any package', 2000, 6, 'A summary and a drafted reply per handover, at about 1,000 handovers a month.', true, 340),
+  ('private-deployment', 'Private deployment', 'deployment',
+   'The whole stack self-hosted on your own infrastructure, for strict data-residency requirements. Same agents; nothing leaves your network.',
+   null, null, 'scope', 'Priced after an infrastructure review', 'From Enterprise', 0, 0, '', false, 400),
+  ('custom-module', 'Custom module', 'deployment',
+   'The one thing only your business does, built during onboarding: your name for it, your tone, your rules, and your sign-off before it acts.',
+   null, null, 'scope', 'Priced on scope', 'From Scale', 0, 0, '', false, 410)
+on conflict (key) do nothing;
+

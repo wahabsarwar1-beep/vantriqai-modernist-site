@@ -255,7 +255,7 @@ tr.row-click:hover td{background:#FBFAF7;}
 .close-x{background:none;border:none;color:var(--muted);font-size:18px;line-height:1;padding:4px;}
 
 /* Product cards */
-.prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;}
+.prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px;}
 .prod-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;position:relative;}
 .prod-card .tier-tag{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--teal-dark);font-weight:700;}
 .prod-card h3{margin:4px 0 2px;font-size:19px;}
@@ -263,10 +263,27 @@ tr.row-click:hover td{background:#FBFAF7;}
 .prod-price{display:flex;align-items:baseline;gap:6px;margin-bottom:14px;}
 .prod-price .amt{font-family:var(--f-mono);font-size:20px;font-weight:600;}
 .prod-price .per{font-size:11.5px;color:var(--muted);}
-.prod-stat-row{display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-top:1px dashed var(--border);}
+.prod-stat-row{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:6px 0;border-top:1px dashed var(--border);}
+.prod-stat-row .v{text-align:right;}
 .prod-stat-row .k{color:var(--muted);}
 .prod-stat-row .v{font-weight:600;font-family:var(--f-mono);}
 .prod-actions{display:flex;gap:6px;margin-top:14px;}
+/* v9.20 — the cost side of a package: what serving it costs, what it keeps. */
+.prod-econ{margin-top:12px;padding:10px 12px 12px;background:var(--teal-light);border-radius:10px;}
+.prod-econ .prod-stat-row{border-top-color:rgba(47,86,217,.16);}
+.prod-econ-h{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--teal-dark);font-weight:700;margin-bottom:4px;}
+.prod-margin{padding:7px 0 5px;border-top:1px dashed rgba(47,86,217,.16);}
+.prod-margin-top{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);}
+.prod-margin-top strong{font-family:var(--f-mono);}
+.prod-margin-track{height:5px;background:rgba(22,21,26,.08);border-radius:99px;margin-top:5px;overflow:hidden;}
+.prod-margin-fill{height:100%;border-radius:99px;}
+.pricing-basis{margin-bottom:16px;}
+.kpi-mini{background:var(--paper);border:1px solid var(--border-2);border-radius:10px;padding:10px 12px;}
+.kpi-mini .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;}
+.kpi-mini .v{font-family:var(--f-head);font-size:17px;font-weight:600;margin-top:4px;}
+.kpi-mini .d{font-size:11px;color:var(--muted);margin-top:2px;}
+.pricing-flag{font-size:12px;padding:7px 10px;border-radius:8px;background:var(--amber-light);color:var(--amber-dark);}
+.pricing-flag.bad{background:var(--red-light);color:var(--red);}
 
 .empty{
   text-align:center;padding:50px 20px;color:var(--muted);
@@ -1169,7 +1186,7 @@ const VIEW_TITLES = {
   billing:['Billing & Invoices','Setup fees, retainers, and overage'],
   reps:['Sales Reps','Manage rep logins and see every rep\'s pipeline'],
   team:['Team','Internal logins for Vantriq AI employees'],
-  products:['Products & Pricing','Standard tiers are fixed by the model; only Enterprise+ is customisable'],
+  products:['Products & Pricing','Prices fixed by the business model — costed at today\'s AI prices, with each package\'s margin'],
   requests:['Package Requests','Changes customers have asked for from their portal'],
   procurement:['Procurement','Vendors, tools, and purchase orders behind delivery'],
   financials:['Financials','Contribution margin and forward projection — live clients and costs, assumed utilization'],
@@ -2132,30 +2149,194 @@ async function decideRequest(id, action){
 }
 
 /* ============================== PRODUCTS ============================== */
+/* Products & Pricing, the cost side (v9.20). Admins get the whole model from
+   /api/costing — what a session costs at today's model prices and exchange
+   rate, and what each package earns at the price the business model sets.
+   Everybody gets the add-ons catalogue; only admins see what those cost us. */
+let costingData = null;   // null = not loaded yet
+let addonsData = null;
+async function loadPricing(){
+  try{
+    const [costing, addons] = await Promise.all([
+      isAdmin() ? API.get('/api/costing') : Promise.resolve({}),
+      API.get('/api/addons'),
+    ]);
+    costingData = costing || {};
+    addonsData = addons || [];
+  }catch(e){
+    costingData = { error: e.message || 'Could not load the costing' };
+    addonsData = addonsData || [];
+  }
+  if(currentView==='products' && !openModal) render();
+}
+const pctText = v => v==null||!isFinite(v) ? '—' : (v*100).toFixed(1)+'%';
+const pkr2 = v => v==null ? '—' : 'PKR '+Number(v).toFixed(2);
+function marginTone(m){ return m==null ? 'var(--muted)' : m>=0.65 ? 'var(--teal-dark)' : m>=0.5 ? 'var(--text)' : 'var(--amber-dark)'; }
+function marginBar(label, m){
+  const w = Math.max(0, Math.min(100, (m||0)*100));
+  return `<div class="prod-margin">
+    <div class="prod-margin-top"><span>${esc(label)}</span><strong style="color:${marginTone(m)}">${pctText(m)}</strong></div>
+    <div class="prod-margin-track"><div class="prod-margin-fill" style="width:${w}%;background:${marginTone(m)};"></div></div>
+  </div>`;
+}
+function econFor(id){
+  return costingData && Array.isArray(costingData.packages) ? costingData.packages.find(r=>r.id===id) : null;
+}
+function productEconomicsHTML(p){
+  const e = econFor(p.id);
+  if(!e) return '';
+  const a = costingData.assumptions || {};
+  const util = Math.round((a.utilization||state.utilization||0.7)*100);
+  const head = e.headroom_high==null ? '—'
+    : e.headroom_low==null ? `${e.headroom_high}× typical use` : `${e.headroom_low}–${e.headroom_high}× typical use`;
+  return `<div class="prod-econ">
+    <div class="prod-econ-h">Cost to serve &amp; margin</div>
+    <div class="prod-stat-row"><span class="k">Cost per session</span><span class="v">${pkr2(e.cost_per_session)}</span></div>
+    <div class="prod-stat-row"><span class="k">Tokens per session</span><span class="v">${fmtNum(e.tokens.input)} in · ${fmtNum(e.tokens.output)} out</span></div>
+    <div class="prod-stat-row"><span class="k">AI at full use</span><span class="v">${fmtMoney(e.ai_full)} · ${pctText(e.ai_share_of_price)}</span></div>
+    <div class="prod-stat-row"><span class="k">Management labour</span><span class="v">${fmtMoney(e.mgmt_labour)} · ${e.mgmt_hours} h/mo</span></div>
+    ${marginBar('Margin if the whole allowance is used', e.margin_full)}
+    ${marginBar(`Margin at ${util}% use`, e.margin_util)}
+    <div class="prod-stat-row"><span class="k">Overage vs cost</span><span class="v" style="${e.overage_cover<2?'color:var(--amber-dark);':''}">${e.overage_cover}× cost</span></div>
+    <div class="prod-stat-row"><span class="k">Setup margin</span><span class="v">${pctText(e.setup_margin)} · ${e.build_hours} h build</span></div>
+    <div class="prod-stat-row"><span class="k">Allowance headroom</span><span class="v">${head}</span></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.45;">${esc(e.routing)}</div>
+  </div>`;
+}
+function pricingBasisHTML(){
+  if(!isAdmin()) return '';
+  if(costingData===null) return `<div class="card" style="margin-bottom:16px;color:var(--muted);">Costing the packages at today's prices…</div>`;
+  if(costingData.error) return `<div class="card" style="margin-bottom:16px;color:var(--red);">${esc(costingData.error)}</div>`;
+  const a = costingData.assumptions || {};
+  const rate = k => (costingData.rates||[]).find(r=>r.key===k) || {};
+  const ss = costingData.steady_state || {};
+  const shares = (costingData.packages||[]).map(r=>r.premium_share).filter(v=>v!=null);
+  const shareText = shares.length ? `${Math.round(Math.min(...shares)*100)}–${Math.round(Math.max(...shares)*100)}%` : '';
+  const flags = costingData.flags || [];
+  return `<div class="card pricing-basis">
+    <div style="display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-start;">
+      <div style="min-width:260px;flex:1;">
+        <div class="prod-econ-h" style="margin:0 0 4px;">Costed at today's prices</div>
+        <div style="font-size:13px;line-height:1.55;">
+          As of <strong>${fmtDate(a.as_of)}</strong> · USD/PKR <strong>${a.fx_usd_pkr}</strong> ·
+          <strong>${esc(rate(a.bulk_model).label||a.bulk_model)}</strong> for most turns, ${shareText} escalated to
+          <strong>${esc(rate(a.premium_model).label||a.premium_model)}</strong> · ${Math.round((a.utilization||0.7)*100)}% average utilisation
+        </div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:4px;">Package prices stay fixed by the business model. What moves is what serving them costs — every figure below is recomputed from the rate card, and Financials uses the same numbers.</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="openModal={type:'costing'};render()">${iconEdit(13)} Rates &amp; assumptions</button>
+    </div>
+    <div class="grid kpi-row" style="margin-top:14px;">
+      <div class="kpi-mini"><div class="l">Steady state (${ss.clients||0} clients)</div><div class="v">${fmtMoney(ss.revenue)}</div><div class="d">revenue a year</div></div>
+      <div class="kpi-mini"><div class="l">Contribution</div><div class="v">${pctText(ss.margin)}</div><div class="d">${fmtMoney(ss.contribution)} a year</div></div>
+      <div class="kpi-mini"><div class="l">AI · labour · infra</div><div class="v">${pctText(ss.ai_share)} · ${pctText(ss.labour_share)} · ${pctText(ss.infra_share)}</div><div class="d">of revenue</div></div>
+      <div class="kpi-mini"><div class="l">Management load</div><div class="v">${ss.mgmt_hours_month||0} h/mo</div><div class="d">${pctText(ss.fte_share)} of one person</div></div>
+    </div>
+    ${flags.length?`<div style="margin-top:12px;display:flex;flex-direction:column;gap:6px;">${flags.map(f=>`<div class="pricing-flag ${f.level==='bad'?'bad':''}">${esc(f.text)}</div>`).join('')}</div>`:''}
+  </div>`;
+}
+function unitEconomicsHTML(){
+  if(!isAdmin() || !costingData || !Array.isArray(costingData.packages) || !costingData.packages.length) return '';
+  const rows = costingData.packages;
+  const util = Math.round(((costingData.assumptions||{}).utilization||0.7)*100);
+  const a = costingData.assumptions || {};
+  return `
+  <div class="section-title"><div><h2>Unit economics</h2><div class="hint">What one conversation costs, and what each package keeps — the business model's tables, at today's prices</div></div></div>
+  <div class="table-wrap">
+    <table style="font-size:12.5px;">
+      <thead><tr><th>Package</th><th>Msgs / session</th><th>Cost / session</th><th>Sessions</th><th>AI at full use</th><th>AI % of price</th><th>Labour / mo</th><th>Margin (full)</th><th>Margin (${util}%)</th><th>Overage</th><th>Setup margin</th><th>Year one</th></tr></thead>
+      <tbody>
+      ${rows.map(r=>`<tr>
+        <td><strong>${esc(r.name)}</strong></td>
+        <td class="mono">${r.msgs_per_session}</td>
+        <td class="mono">${pkr2(r.cost_per_session)}</td>
+        <td class="mono">${fmtNum(r.quota)}</td>
+        <td class="mono">${fmtMoney(r.ai_full)}</td>
+        <td class="mono">${pctText(r.ai_share_of_price)}</td>
+        <td class="mono">${fmtMoney(r.mgmt_labour)}</td>
+        <td class="mono" style="color:${marginTone(r.margin_full)};font-weight:700;">${pctText(r.margin_full)}</td>
+        <td class="mono" style="color:${marginTone(r.margin_util)};font-weight:700;">${pctText(r.margin_util)}</td>
+        <td class="mono" style="white-space:nowrap;${r.overage_cover<2?'color:var(--amber-dark);':''}">PKR ${r.overage_rate} · ${r.overage_cover}×</td>
+        <td class="mono">${pctText(r.setup_margin)}</td>
+        <td class="mono">${pctText(r.year_one_margin)}</td>
+      </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>
+  <p class="footnote">A session is one customer conversation in a rolling 24 hours. Cost per session = the tokens it sends and receives
+    (system prompt and catalogue context of ${fmtNum(Math.min(...rows.map(r=>r.profile.context_tokens)))}–${fmtNum(Math.max(...rows.map(r=>r.profile.context_tokens)))} tokens per turn, the conversation so far,
+    ${a.user_tokens}-token messages and ${a.reply_tokens}-token replies), priced on the rate card and converted at USD/PKR ${a.fx_usd_pkr}. Labour: founder time at
+    ${fmtMoney(a.founder_rate)}/h, contracted time at ${fmtMoney(a.contractor_rate)}/h. Year one includes the setup fee, ${a.sales_hours_per_win} unbilled sales hours to win the client and
+    ${a.adhoc_hours_per_month} h a month of ad-hoc requests. Prompt caching is not assumed — it would only lower these costs.</p>`;
+}
+const ADDON_FAMILIES = [
+  ['capability','Capabilities','Switch on over any package — priced on their own, so a plan never changes when one is added'],
+  ['solution','Department solutions','Whole processes, not just conversations'],
+  ['insight','Insight & platform','What every client gets, and the new modules on top'],
+  ['deployment','Deployment','For the requirements a standard build does not cover'],
+];
+function addonPrice(a){
+  if(a.price_basis==='included') return '<span style="color:var(--teal-dark);font-weight:600;">Included in every plan</span>';
+  if(a.price_basis==='scope') return `<span style="color:var(--muted);white-space:normal;font-family:var(--f-body);font-size:12px;">${esc(a.price_note||'Priced on scope')}</span>`;
+  const from = a.price_basis==='from' ? 'From ' : '';
+  return `${from}${fmtMoney(a.setup_fee)} setup · ${fmtMoney(a.monthly_fee)}/mo`;
+}
+function addonsHTML(){
+  if(addonsData===null) return '';
+  const list = addonsData.filter(a=>a.active!==false);
+  if(!list.length) return '';
+  const admin = isAdmin();
+  return `
+  <div class="section-title"><div><h2>Add-ons catalogue</h2><div class="hint">Sold on top of a package and priced separately — the business model's capabilities and solutions, with Vantriq Pulse, Echo and Human Support</div></div></div>
+  ${ADDON_FAMILIES.map(([fam,label,hint])=>{
+    const items = list.filter(a=>a.family===fam);
+    if(!items.length) return '';
+    return `<div class="table-wrap" style="margin-bottom:12px;">
+      <table>
+        <thead><tr><th style="width:30%;">${esc(label)} <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0;">— ${esc(hint)}</span></th><th>Price</th><th>Available</th>${admin?'<th>Our cost / mo</th><th>Monthly margin</th><th>Setup margin</th>':''}</tr></thead>
+        <tbody>
+        ${items.map(a=>`<tr>
+          <td><strong>${esc(a.name)}</strong>${a.is_new?' <span class="pill pill-active" style="font-size:10px;padding:1px 7px;">New</span>':''}
+            <div style="font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.45;">${esc(a.summary)}</div></td>
+          <td class="mono" style="white-space:nowrap;max-width:260px;">${addonPrice(a)}</td>
+          <td style="font-size:12px;">${esc(a.availability||'')}</td>
+          ${admin?`<td class="mono">${a.price_basis==='fixed'||a.price_basis==='from'?fmtMoney(a.est_monthly_cost):'—'}</td>
+          <td class="mono" style="color:${marginTone(a.monthly_margin)};">${pctText(a.monthly_margin)}</td>
+          <td class="mono">${pctText(a.setup_margin)}</td>`:''}
+        </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  }).join('')}
+  ${admin?`<p class="footnote">Our cost is an estimate per add-on (model, voice and telephony usage at a typical volume); setup margin assumes build hours split evenly between founder and contracted time. Echo and Human Support are new since the August model — their prices are the September proposal; change any add-on through the API (PUT /api/addons/:id) until it has its own editor.</p>`:''}`;
+}
+
 function renderProducts(){
   const sorted = state.products.slice().sort((a,b)=>a.order-b.order);
   return `
+  ${pricingBasisHTML()}
   <div class="prod-grid">
     ${sorted.map(p=>`
       <div class="prod-card">
-        <div class="tier-tag">Tier ${p.order.toString().padStart(2,'0')}</div>
+        <div class="tier-tag">Tier ${p.order.toString().padStart(2,'0')}${p.name==='Scale'?' · most chosen':''}</div>
         <h3>${esc(p.name)}</h3>
         <div class="target">${esc(p.targetTier)}</div>
         <div class="prod-price"><span class="amt">${fmtMoney(p.setupFee)}</span><span class="per">setup</span></div>
         <div class="prod-price" style="margin-top:-8px;"><span class="amt" style="font-size:16px;color:var(--teal-dark)">${fmtMoney(p.retainer)}</span><span class="per">/month retainer</span></div>
+        <div class="prod-stat-row"><span class="k">Sessions / month</span><span class="v">${fmtNum(p.quota)} · ${fmtNum(p.quota/30)} a day</span></div>
+        <div class="prod-stat-row"><span class="k">Messages per session</span><span class="v">${fmtNum(p.msgsPerSession)}</span></div>
+        <div class="prod-stat-row"><span class="k">Overage rate</span><span class="v">${fmtMoney(p.overageRate)}/session</span></div>
+        <div class="prod-stat-row"><span class="k">Channels</span><span class="v" style="font-family:var(--f-body);font-weight:600;">${esc(p.channels)}</span></div>
         <div class="prod-stat-row"><span class="k">Automation</span><span class="v" style="font-family:var(--f-body);font-weight:600;">${esc(p.automation)}</span></div>
         <div class="prod-stat-row"><span class="k">Data layer</span><span class="v" style="font-family:var(--f-body);font-weight:600;">${esc(p.dataLayer)}</span></div>
-        <div class="prod-stat-row"><span class="k">AI model</span><span class="v" style="font-family:var(--f-body);font-weight:600;">${esc(p.aiModel)}</span></div>
-        <div class="prod-stat-row"><span class="k">Channels</span><span class="v" style="font-family:var(--f-body);font-weight:600;">${esc(p.channels)}</span></div>
-        <div class="prod-stat-row"><span class="k">Quota / month</span><span class="v">${fmtNum(p.quota)}</span></div>
-        <div class="prod-stat-row"><span class="k">Overage rate</span><span class="v">${fmtMoney(p.overageRate)}/session</span></div>
-        <div class="prod-stat-row"><span class="k">Est. delivery cost (100% quota)</span><span class="v">${fmtMoney(p.deliveryCostFull)}</span></div>
+        ${isAdmin()?'':`<div class="prod-stat-row"><span class="k">AI model</span><span class="v" style="font-family:var(--f-body);font-weight:600;">${esc(p.aiModel)}</span></div>`}
         <div class="prod-stat-row">
           <span class="k">Extra number</span>
           <span class="v">${p.extraAgentPrice>0
             ? `${fmtMoney(p.extraAgentPrice)}/mo after ${p.includedAgents}`
             : `<span style="color:var(--muted);font-weight:400;">Not charged</span>`}</span>
         </div>
+        ${productEconomicsHTML(p)}
         <div class="prod-actions">
           ${p.isStandard===false
             ? `<button class="btn btn-ghost btn-sm" onclick="openModal={type:'product',id:'${p.id}'};render()">${iconEdit(13)} Edit</button>`
@@ -2170,7 +2351,101 @@ function renderProducts(){
       <div style="font-size:11.5px;margin-top:4px;line-height:1.5;">Standard packages carry the resources set by the<br>business model. For anything bespoke, put the client<br>on <strong>Enterprise+</strong> and set custom terms on their record.</div>
     </div>
   </div>
+  ${unitEconomicsHTML()}
+  ${addonsHTML()}
   `;
+}
+
+/* Rates & assumptions — the inputs every cost on the page is computed from. */
+function costingModalHTML(){
+  if(!costingData || !costingData.assumptions) return '';
+  const a = costingData.assumptions;
+  const rates = costingData.rates || [];
+  const opt = (sel) => rates.map(r=>`<option value="${esc(r.key)}" ${r.key===sel?'selected':''}>${esc(r.label)} (${esc(r.vendor)})</option>`).join('');
+  return `
+  <div class="modal" style="max-width:760px;">
+    <div class="modal-head"><h3>Rates &amp; assumptions</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
+    <div class="modal-body">
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;line-height:1.6;">
+        Change a price when a vendor changes theirs, or the exchange rate when it moves. Saving re-costs every package at once —
+        margins here, and the delivery cost Financials uses. Package prices are not touched.
+      </p>
+      <div class="field-row">
+        <div class="field"><label>USD/PKR (costing rate)</label><input id="cs_fx" type="number" step="0.01" value="${a.fx_usd_pkr}"></div>
+        <div class="field"><label>Average utilisation (%)</label><input id="cs_util" type="number" min="10" max="100" step="1" value="${Math.round((a.utilization||0.7)*100)}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Bulk model — most turns</label><select id="cs_bulk">${opt(a.bulk_model)}</select></div>
+        <div class="field"><label>Premium model — escalated turns</label><select id="cs_prem">${opt(a.premium_model)}</select></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Founder rate (PKR/h)</label><input id="cs_founder" type="number" value="${a.founder_rate}"></div>
+        <div class="field"><label>Contractor rate (PKR/h)</label><input id="cs_contract" type="number" value="${a.contractor_rate}"></div>
+        <div class="field"><label>Infrastructure (PKR/mo)</label><input id="cs_infra" type="number" value="${a.infra_monthly}"></div>
+      </div>
+      <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin:10px 0 6px;">Model prices — USD per million tokens</label>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Model</th><th>Input</th><th>Output</th><th>Checked</th><th>Note</th></tr></thead>
+        <tbody>
+        ${rates.map(r=>`<tr>
+          <td><strong>${esc(r.label)}</strong><div style="font-size:11px;color:var(--muted);">${esc(r.vendor)} · ${esc(r.source||'')}</div></td>
+          <td style="width:92px;"><input class="cs-rate" data-key="${esc(r.key)}" data-side="input" type="number" step="0.001" min="0" value="${r.input}" style="width:84px;"></td>
+          <td style="width:92px;"><input class="cs-rate" data-key="${esc(r.key)}" data-side="output" type="number" step="0.001" min="0" value="${r.output}" style="width:84px;"></td>
+          <td style="font-size:11.5px;white-space:nowrap;">${r.as_of?fmtDate(r.as_of):'—'}</td>
+          <td style="font-size:11px;color:var(--muted);max-width:220px;">${esc(r.note||'')}</td>
+        </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-danger-ghost" style="margin-right:auto;" onclick="resetCosting()">Reset to the business model</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCosting()">${iconCheck(14)} Save and re-cost</button>
+    </div>
+  </div>`;
+}
+async function afterCostingChange(model){
+  costingData = model;
+  // delivery_cost_full and the routing line moved with it: Financials and the
+  // cards read them from the products list.
+  try{ state.products = (await API.get('/api/products')).map(productFromApi); }catch(e){}
+  try{ const s = await API.get('/api/settings'); state.utilization = +s.utilization; }catch(e){}
+}
+async function saveCosting(){
+  const v = id => (document.getElementById(id)||{}).value;
+  const rates = {};
+  const current = costingData.rates || [];
+  document.querySelectorAll('.cs-rate').forEach(el=>{
+    const r = current.find(x=>x.key===el.dataset.key);
+    if(!r) return;
+    const val = parseFloat(el.value);
+    if(Number.isFinite(val) && val !== Number(r[el.dataset.side])){
+      rates[r.key] = rates[r.key] || {};
+      rates[r.key][el.dataset.side] = val;
+    }
+  });
+  try{
+    const model = await API.put('/api/costing', {
+      rates,
+      utilization: (parseFloat(v('cs_util'))||70)/100,
+      assumptions: {
+        fx_usd_pkr: parseFloat(v('cs_fx')),
+        bulk_model: v('cs_bulk'), premium_model: v('cs_prem'),
+        founder_rate: parseFloat(v('cs_founder')), contractor_rate: parseFloat(v('cs_contract')),
+        infra_monthly: parseFloat(v('cs_infra')),
+      },
+    });
+    await afterCostingChange(model);
+    closeModal(); showToast('Re-costed at the new rates');
+  }catch(e){ showToast(e.message||'Could not save that','warn'); }
+}
+async function resetCosting(){
+  if(!confirm('Put every rate and assumption back to the business model\'s defaults?')) return;
+  try{
+    const model = await API.post('/api/costing/reset', { scope:'all' });
+    await afterCostingChange(model);
+    closeModal(); showToast('Back to the business model\'s rates');
+  }catch(e){ showToast(e.message||'Could not reset it','warn'); }
 }
 async function deleteProduct(id){
   const inUse = state.clients.some(c=>c.productId===id);
@@ -5271,6 +5546,7 @@ function renderModal(){
   else if(openModal.type==='teamUser') html = teamUserModalHTML();
   else if(openModal.type==='product') html = productModalHTML(openModal.id);
   else if(openModal.type==='productAddon') html = productAddonModalHTML(openModal.id);
+  else if(openModal.type==='costing') html = costingModalHTML();
   else if(openModal.type==='vendor') html = vendorModalHTML(openModal.id);
   else if(openModal.type==='po') html = poModalHTML();
   else if(openModal.type==='invoice') html = invoiceModalHTML();
@@ -7168,6 +7444,7 @@ function attachPostRenderHooks(){
   }
   if(currentView==='settings'){ refreshInternalAccountCard(); refreshEmailCard(); loadJurisdictions(); }
   if(currentView==='quotes' && quotesData===null) loadQuotes();
+  if(currentView==='products' && (costingData===null || addonsData===null)) loadPricing();
   // The client panel renders contracts too, so they have to be loaded when a
   // panel is open as well as when the tab is — otherwise a client shows
   // "Loading…" forever for want of anything to trigger the fetch.

@@ -43,6 +43,8 @@ const billingOpsRoutes = require('./routes/billingOps');
 const surveysRoutes = require('./routes/surveys');
 const publicSurveyApiRoutes = require('./routes/publicSurveyApi');
 const surveyPagesRoutes = require('./routes/surveyPages');
+const costingRoutes = require('./routes/costing');
+const addonsRoutes = require('./routes/addons');
 
 const app = express();
 
@@ -132,6 +134,12 @@ app.use('/api/contacts', requireScope('staff'), contactsRoutes);
 app.use('/api/surveys', requireScope('staff'), surveysRoutes);
 app.use('/api/quota', requireScope('staff'), quotaRoutes);
 app.use('/api/financials', requireScope('admin'), financialsRoutes);
+// What each package costs us to serve and what it earns: the rate card, the
+// assumptions, margins, the steady state. Admin only, like the financials.
+app.use('/api/costing', requireScope('admin'), costingRoutes);
+// The add-ons catalogue. Staff read it (the quote builder offers these as
+// lines); only an admin changes it or sees what an add-on costs us.
+app.use('/api/addons', requireScope('staff'), addonsRoutes);
 // The receipts ledger. Staff record what came in; they do not see the books.
 app.use('/api/payments', requireScope('staff'), paymentsRoutes);
 // P&L, income statement, balance sheet and the FBR position — admin only,
