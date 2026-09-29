@@ -89,7 +89,7 @@
     openQ: null, addingQ: false,
     grain: 'month', analytics: null,
     resp: null, rFilter: 'all', rLoc: '', rQ: '', rBusy: false, openResp: null,
-    invites: null, reportGrain: 'month',
+    invites: null, reportGrain: 'month', dash: null,
   };
 
   /* ------------------------------------------------------------------ */
@@ -136,8 +136,18 @@
   /* ------------------------------------------------------------------ */
   /* Loading                                                             */
   /* ------------------------------------------------------------------ */
+  function dashQuery(){
+    return '/dashboard?grain=' + encodeURIComponent(st.reportGrain) + (st.clientFilter ? '&client_id=' + encodeURIComponent(st.clientFilter) : '');
+  }
+  /** The Echo dashboard, at the period chosen on it. Repaints only the home page. */
+  function loadDash(){
+    var mine = dashQuery();
+    return api('GET', mine).then(function(d){ if (mine !== dashQuery()) return; st.dash = d; if (st.view === 'home') render(); })
+      .catch(function(e){ st.dash = { error: e.message || 'Could not load the dashboard.' }; if (st.view === 'home') render(); });
+  }
   function loadHome(){
     var q = st.clientFilter ? '?client_id=' + encodeURIComponent(st.clientFilter) : '';
+    loadDash();
     return Promise.all([api('GET', q), api('GET', '/overview' + q)]).then(function(r){
       st.list = r[0]; st.overview = r[1];
       // Repaint only the list. A survey open in the builder must not be
@@ -425,26 +435,17 @@
       + '<p>Ask customers how you did — by QR code on the table, a link on WhatsApp, a tablet at the counter or your website — and see every answer here the moment it arrives. Unhappy answers raise a follow-up so nobody slips through.</p></div>'
       + '<div class="vqs-row">'
       + (clients.length ? '<select data-a-change="client-filter" style="width:auto;min-width:180px;"><option value="">All clients</option>' + clients.map(function(c){ return '<option value="' + esc(c.id) + '"' + (st.clientFilter === c.id ? ' selected' : '') + '>' + esc(c.company) + '</option>'; }).join('') + '</select>' : '')
-      + '<select data-a-change="report-grain" title="Period for the Echo report" style="width:auto;">' + [['day', 'Last 30 days'], ['week', 'Last 12 weeks'], ['month', 'Last 12 months'], ['quarter', 'Last 8 quarters'], ['year', 'Last 5 years']].map(function(g){ return '<option value="' + g[0] + '"' + (st.reportGrain === g[0] ? ' selected' : '') + '>' + g[1] + '</option>'; }).join('') + '</select>'
-      + '<button class="vqs-btn" data-a="echo-report" title="Satisfaction, NPS, every survey and answer, who answered (gender, age, city), follow-ups and respondents — a tab for each">⬇ Echo report (Excel)</button>'
       + '<button class="vqs-btn primary" data-a="new">＋ New survey</button></div></div>';
     if (!st.list) return head + loading('Loading surveys…');
     if (st.list.error) return head + errorCard(st.list.error, 'reload-home');
     var surveys = st.list.surveys || [];
     if (!surveys.length) return head + emptyHome();
     var o = st.overview || {};
-    var trend = o.responses_prev_30d ? Math.round(((o.responses_30d - o.responses_prev_30d) / o.responses_prev_30d) * 100) : null;
     return head
-      + '<div class="vqs-kpis">'
-      + kpi('Responses, last 30 days', n(o.responses_30d), '', 'vs the 30 days before', o.responses_prev_30d ? chip(trend, '%') : '')
-      + kpi('Satisfied (4–5 of 5)', o.csat_30d == null ? '—' : o.csat_30d, o.csat_30d == null ? '' : '%', o.csat_responses_30d ? n(o.csat_responses_30d) + ' answers' : 'No answers yet')
-      + kpi('Net Promoter Score', sign(o.nps_30d), '', o.nps_responses_30d ? n(o.nps_responses_30d) + ' answers' : 'No answers yet')
-      + kpi('Waiting for follow-up', n((o.followups || {}).open), '', ((o.followups || {}).contacted ? n(o.followups.contacted) + ' contacted, not yet resolved' : 'Unhappy customers nobody has contacted'))
-      + kpi('Live surveys', n(o.live), '', n(o.surveys) + ' in total')
-      + '</div>'
+      + dashboard()
       + (o.followup_queue && o.followup_queue.length ? followupQueue(o.followup_queue) : '')
-      + demographicsCards(o.demographics_90d, 'Last 90 days, every survey')
-      + '<div class="vqs-grid vqs-g3" style="margin-top:14px;">' + surveys.map(surveyCard).join('') + '</div>';
+      + '<div class="vqs-spread" style="margin:18px 0 0;"><h3 style="margin:0;">Your surveys</h3><span class="sub" style="margin:0;">' + n(o.live) + ' live · ' + n(o.surveys) + ' in total</span></div>'
+      + '<div class="vqs-grid vqs-g3" style="margin-top:10px;">' + surveys.map(surveyCard).join('') + '</div>';
   }
 
   function surveyCard(s){
@@ -661,6 +662,16 @@
       + demographicsCards(a.demographics, a.period.window_label)
       + '<div class="vqs-grid vqs-g2" style="margin-top:14px;">' + a.questions.map(questionResult).join('') + (a.channels.length > 1 ? '<div class="vqs-card"><h3>Where answers came from</h3><div class="sub">' + esc(a.period.window_label) + '</div>' + bars(a.channels.map(function(c){ return { name: c.name, value: c.responses, share: Math.round(c.responses / w.responses * 100) }; })) + '</div>' : '') + '</div>'
       + (a.sampled ? '<p class="sub" style="margin-top:10px;">Question breakdowns use the latest 20,000 answers in the period; the headline figures use all of them.</p>' : '');
+  }
+
+  /** Echo's dashboard (drawn by analytics-view.js, the same kit as Pulse). */
+  function dashboard(){
+    if (!window.VQA) return '';
+    if (window.VQA.injectStyles) window.VQA.injectStyles();
+    if (!st.dash) return '<div class="vqs-card" style="margin-bottom:14px;"><div class="vqs-loading">Working out your results…</div></div>';
+    if (st.dash.error) return errorCard(st.dash.error, 'reload-dash');
+    return window.VQA.echoHTML(st.dash, { onGrain: 'VQS.dashGrain', onReport: 'VQS.echoReport', reportLabel: 'Download Echo report (Excel)',
+      reportHint: 'Satisfaction, NPS, every survey and answer, who answered (gender, age, city), follow-ups and respondents — a tab for each' });
   }
 
   /**
@@ -1148,6 +1159,7 @@
         var at = d.questions.findIndex(function(x){ return x.type === 'contact'; });
         if (at < 0) d.questions.push(pnew); else d.questions.splice(at, 0, pnew);
         st.addingQ = false; st.openQ = pnew.id; render(); pushPreview(pnew.id); break;
+      case 'reload-dash': st.dash = null; render(); loadDash(); break;
       case 'echo-report':
         host.download('/report.xlsx?grain=' + encodeURIComponent(st.reportGrain) + (st.clientFilter ? '&client_id=' + encodeURIComponent(st.clientFilter) : ''),
           'vantriq-echo-' + st.reportGrain + '-' + new Date().toISOString().slice(0, 10) + '.xlsx')
@@ -1224,7 +1236,7 @@
     var el = e.target, d = st.draft;
     if (el.hasAttribute('data-a-change')) {
       var which = el.getAttribute('data-a-change');
-      if (which === 'client-filter') { st.clientFilter = el.value; st.list = null; render(); loadHome(); }
+      if (which === 'client-filter') { st.clientFilter = el.value; st.list = null; st.dash = null; render(); loadHome(); }
       if (which === 'report-grain') { st.reportGrain = el.value; }
       if (which === 'resp-loc') { st.rLoc = el.value; loadResponses(true); }
       return;
@@ -1313,6 +1325,10 @@
     } else if (fresh) {
       fresh.addEventListener('load', function(){ pushPreview(st.openQ); });
     }
+    if (st.view === 'home' && st.dash && !st.dash.error && window.VQA) {
+      var dd = st.dash;
+      if (window.requestAnimationFrame) requestAnimationFrame(function(){ window.VQA.drawEcho(dd); }); else window.VQA.drawEcho(dd);
+    }
     if (st.view === 'survey' && st.tab === 'results' && st.analytics && !st.analytics.error) {
       if (window.requestAnimationFrame) requestAnimationFrame(drawCharts); else drawCharts();
     }
@@ -1341,7 +1357,13 @@
     mount: mount,
     open: function(id, tab){ openSurvey(id, tab); },
     hasUnsaved: function(){ return dirty(); },
-    reset: function(){ st.loaded = false; st.list = null; st.overview = null; st.view = 'home'; st.survey = null; st.draft = null; },
+    reset: function(){ st.loaded = false; st.list = null; st.overview = null; st.dash = null; st.view = 'home'; st.survey = null; st.draft = null; },
+    dashGrain: function(g){ st.reportGrain = g; loadDash(); },
+    echoReport: function(){
+      host.download('/report.xlsx?grain=' + encodeURIComponent(st.reportGrain) + (st.clientFilter ? '&client_id=' + encodeURIComponent(st.clientFilter) : ''),
+        'vantriq-echo-' + st.reportGrain + '-' + new Date().toISOString().slice(0, 10) + '.xlsx')
+        .catch(function(err){ toast(err.message || 'Could not build the report.', true); });
+    },
     destroyCharts: destroyCharts,
   };
 })();

@@ -86,6 +86,12 @@ router.get('/report.xlsx', async (req, res) => {
   sendReport(res, await echoReport(client, { grain }));
 });
 
+/** Echo's dashboard: every survey in view together, by period — trends, scores, funnel, breakdowns, findings. */
+router.get('/dashboard', async (req, res) => {
+  const { echoDashboard } = require('../utils/echoDashboard');
+  res.json(await echoDashboard({ clientId: scopeId(req), grain: String(req.query.grain || 'month') }));
+});
+
 /** The industry template gallery: restaurant, FMCG, telecom, healthcare and the rest. */
 router.get('/templates', (req, res) => res.json(S.templateSummaries()));
 
