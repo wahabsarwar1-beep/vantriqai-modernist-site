@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "VantriqAI CRM API",
-    "version": "9.20.1",
+    "version": "9.20.2",
     "description": "The CRM behind VantriqAI: clients, invoices, payments, quotes and proposals,\ncontracts, statements, and the webhook surface the AI agents write through.\n\n## Authentication\n\nTwo ways in, and one of them is for people:\n\n- **Staff session** — `Authorization: Bearer <token>`, issued by `POST /api/auth/verify`\n  after a password and an emailed one-time code. A staff member's role decides reach.\n- **API key** — `x-api-key: <key>`, for machines. Keys are scoped.\n\n## Scopes\n\nLeast to most: `webhook` < `automation` < `staff` < `admin`. A scope opens everything\nbelow it. The admin key opens everything and is intended as break-glass only — set\n`ALLOW_API_KEY_LOGIN=false` once staff accounts exist.\n\n## Automation writes through this API, never to the database\n\nn8n and any other integration must use these endpoints rather than connecting to\nPostgres. Tenancy, quota and tax rules live here; a direct write bypasses all three."
   },
   "servers": [
@@ -4410,7 +4410,7 @@
         "tags": [
           "costing"
         ],
-        "summary": "Products & Pricing, the cost side — admin only (mounted behind requireScope('admin') in src/index.js). Everything here is margin, which staff, automation keys and customers never see. GET /api/costing the whole model: rate card, assumptions, every package's economics, the steady state, the bulk-model what-if, flags PUT /api/costing change rates and/or assumptions { rates: {key: {input, output, ...}|null}, assumptions: {...}, utilization } PATCH /api/costing/packages/:id one package's cost profile POST /api/costing/reset back to the business model's defaults Package PRICES are not changed here — they stay locked to the business model (routes/products.js). Every change here re-costs every package and writes delivery_cost_full, so Financials moves with it.",
+        "summary": "Products & Pricing, the cost side — admin only (mounted behind requireScope('admin') in src/index.js). Everything here is margin, which staff, automation keys and customers never see. GET /api/costing the whole model: rate card, assumptions, every package's economics, the steady state, the bulk-model what-if, flags PUT /api/costing change rates and/or assumptions { rates: {key: {input, output, ...}|null}, assumptions: {...}, utilization } utilization is the costing's own typical use (0.1–1), not Financials' projection PATCH /api/costing/packages/:id one package's cost profile POST /api/costing/reset back to the business model's defaults Package PRICES are not changed here — they stay locked to the business model (routes/products.js). Every change here re-costs every package and writes delivery_cost_full, so Financials moves with it.",
         "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
         "parameters": [],
         "responses": {
@@ -12483,7 +12483,7 @@
         "tags": [
           "usage"
         ],
-        "summary": "POST /api/webhooks/conversation Stores what was actually said. The agents keep only a short in-memory buffer that a restart wipes, so without this the transcript behind a lead is gone by the time anyone opens the CRM to read it. Body: { external_ref, session_id, channel, messages: [{ role, content }] } role is \"customer\" or \"agent\". Unknown roles are dropped rather than failing the batch — a lost turn is better than a lost conversation.",
+        "summary": "POST /api/webhooks/conversation Stores what was actually said. The agents keep only a short in-memory buffer that a restart wipes, so without this the transcript behind a lead is gone by the time anyone opens the CRM to read it. Body: { external_ref, session_id, channel, messages: [{ role, content, at, id, delivered, error }] } role is \"customer\" or \"agent\". Unknown roles are dropped rather than failing the batch — a lost turn is better than a lost conversation. at when it was said: ISO 8601, or Unix seconds / milliseconds (WhatsApp's own timestamp). Defaults to now. A time more than a year back or in the future is not trusted, and now is used. id the channel's id for the message (a WhatsApp wamid). A message already stored under that id is skipped, so an n8n retry or a history backfill run twice never doubles a transcript. delivered false, with error, for a reply the agent wrote but the channel refused. Given at the top level it applies to the batch's agent lines. The customer's words are kept either way; a fresh failure emails the team, at most once an hour per agent.",
         "description": "Requires the **webhook** scope or higher. Webhook key. The narrowest scope — usage, lead and conversation ingestion only.",
         "parameters": [],
         "requestBody": {

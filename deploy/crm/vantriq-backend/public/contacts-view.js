@@ -47,6 +47,10 @@
   /* ------------------------------------------------------------------ */
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function n(v){ return v == null ? '—' : Math.round(v).toLocaleString('en-US'); }
+  // A transcript line as WhatsApp shows it: *bold* and _italic_ (escaped first, so only these tags are added).
+  function waText(s){
+    return esc(s).replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,!?:;]|$)/g, '$1<b>$2</b>').replace(/(^|[\s(])_([^_\n]+)_(?=[\s).,!?:;]|$)/g, '$1<i>$2</i>');
+  }
   function isCrm(){ return host && host.audience === 'crm'; }
   function toast(m, w){ if (host && host.toast) host.toast(m, w); }
   function when(d){ return d ? new Date(d).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'; }
@@ -129,6 +133,9 @@
       '.vqc-msg{max-width:82%;padding:8px 11px;border-radius:12px;font-size:13px;line-height:1.45;white-space:pre-wrap;word-wrap:break-word}',
       '.vqc-msg.customer{align-self:flex-start;background:#fff;border:1px solid var(--vqc-line)}.vqc-msg.agent{align-self:flex-end;background:#e8ecfd}',
       '.vqc-msg small{display:block;font-size:10.5px;color:var(--vqc-muted);margin-top:3px}',
+      '.vqc-msg.failed{background:#fdf1ef;border:1px dashed #d98676}.vqc-msg.failed small{color:#b3261e;font-weight:600}',
+      '.vqc-tag.bad{color:#b3261e;background:#fbe9e7}.vqc-msgs .none{font-size:12.5px;color:var(--vqc-muted);text-align:center;padding:6px}',
+      '.vqc-alert{border:1px solid #f0c9c2;background:#fdf1ef;color:#7a1f17;border-radius:12px;padding:10px 12px;font-size:13px;margin-bottom:10px}',
       '.vqc-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}.vqc-form label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--vqc-muted);min-width:0}',
       '.vqc-form input:not([type=checkbox]),.vqc-form select,.vqc-form textarea{width:100%}',
       '.vqc-form .full{grid-column:1/-1}.vqc-form textarea{min-height:80px;resize:vertical}',
@@ -248,15 +255,29 @@
       + kpi('Handed to a person', n(d.handoffs), d.agent ? 'agent: ' + esc(d.agent) : '')
       + '</div>';
     var convs = d.conversations_list || [];
-    var timeline = '<div class="vqc-card"><h3>Conversations</h3><div class="sub">Newest first' + (d.has_transcripts ? ' · tap one to read what was said' : ' · this agent does not send its messages to the CRM yet, so there is no transcript') + '</div>'
+    // Transcripts start when an agent began sending them; a conversation from
+    // before then has its counts but no words, and should say so plainly.
+    var since = d.transcripts_from ? day(d.transcripts_from) : '';
+    var subline = d.has_transcripts ? ' · tap one to read what was said' + (convs.some(function(cv){ return !(cv.transcript || []).length; }) && since ? ' · transcripts are kept from ' + since : '')
+      : since ? ' · transcripts are kept from ' + since + ' — these conversations are older'
+      : ' · this agent is not sending its messages to the CRM yet, so there is no transcript';
+    var notice = d.undelivered ? '<div class="vqc-alert"><b>' + n(d.undelivered) + (d.undelivered === 1 ? ' reply' : ' replies') + ' never reached this customer.</b> '
+      + (isCrm() ? 'The channel refused ' + (d.undelivered === 1 ? 'it' : 'them') + ' — the reason is under each one. ' : '')
+      + 'They may still be waiting for an answer' + (waLink(d) && !d.do_not_contact ? ': <a href="' + waLink(d) + '" target="_blank" rel="noopener">reply on WhatsApp</a>' : '') + '.</div>' : '';
+    var timeline = '<div class="vqc-card"><h3>Conversations</h3><div class="sub">Newest first' + esc(subline) + '</div>' + notice
       + (!convs.length ? '<div class="vqc-empty">No conversations — known from a survey only.</div>' : convs.map(function(cv, i){
         var open = st.openConv === i;
         var lines = cv.transcript || [];
         return '<div class="vqc-conv"><div class="h" data-a="conv" data-i="' + i + '"><span class="when">' + esc(when(cv.started)) + '</span>'
-          + '<span class="meta">' + esc([cv.visit ? (cv.visit === 1 ? 'First contact' : 'Visit ' + cv.visit) : '', cv.channel, cv.agent, n(cv.messages) + ' messages', cv.minutes ? cv.minutes + ' min' : ''].filter(Boolean).join(' · '))
+          + '<span class="meta">' + esc([cv.visit ? (cv.visit === 1 ? 'First contact' : 'Visit ' + cv.visit) : '', cv.channel, cv.agent, n(cv.messages) + (cv.messages === 1 ? ' message' : ' messages'), cv.minutes ? cv.minutes + ' min' : ''].filter(Boolean).join(' · '))
           + (cv.handoff ? ' · handed to a person' : '') + '</span>'
-          + (lines.length ? '<span class="vqc-tag">' + lines.length + ' lines ' + (open ? '▴' : '▾') + '</span>' : '') + '</div>'
-          + (open && lines.length ? '<div class="vqc-msgs">' + lines.map(function(m){ return '<div class="vqc-msg ' + (m.role === 'agent' ? 'agent' : 'customer') + '">' + esc(m.content) + '<small>' + (m.role === 'agent' ? 'Agent' : 'Customer') + ' · ' + esc(when(m.at)) + '</small></div>'; }).join('') + '</div>' : '')
+          + (cv.undelivered ? '<span class="vqc-tag bad">' + (cv.undelivered === 1 ? 'reply not delivered' : cv.undelivered + ' replies not delivered') + '</span>' : '')
+          + '<span class="vqc-tag">' + (lines.length ? lines.length + ' lines ' : 'no transcript ') + (open ? '▴' : '▾') + '</span></div>'
+          + (open ? '<div class="vqc-msgs">' + (lines.length ? lines.map(function(m){
+              var failed = m.role === 'agent' && m.delivered === false;
+              return '<div class="vqc-msg ' + (m.role === 'agent' ? 'agent' : 'customer') + (failed ? ' failed' : '') + '">' + waText(m.content) + '<small>'
+                + (failed ? 'Not delivered · ' + esc(when(m.at)) + ' — the customer never saw this' + (isCrm() && m.error ? '. ' + esc(m.error) : '') : (m.role === 'agent' ? 'Agent' : 'Customer') + ' · ' + esc(when(m.at))) + '</small></div>';
+            }).join('') : '<div class="none">No transcript for this conversation' + (since ? ' — the CRM keeps them from ' + esc(since) : '') + '. Its counts are above.</div>') + '</div>' : '')
           + '</div>';
       }).join('')) + '</div>';
     var answers = (d.survey_responses || []);

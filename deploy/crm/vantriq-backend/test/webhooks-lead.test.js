@@ -21,7 +21,7 @@ process.env.MAIL_FROM = 'support@vantriqai.com';
 delete process.env.LEAD_NOTIFY_EMAIL;
 
 // --- stubs ------------------------------------------------------------
-const state = { clients: [], products: [{ id: 'uuid-starter', sort_order: 1 }], conversations: [], stageHistory: [], settings: { lead_notify_emails: '' } };
+const state = { clients: [], products: [{ id: 'uuid-starter', sort_order: 1 }], conversations: [], alerts: {}, stageHistory: [], settings: { lead_notify_emails: '' } };
 const sent = [];
 let nextId = 1;
 
@@ -69,15 +69,36 @@ const dbStub = {
       return { rows: [] };
     }
     if (q.startsWith('insert into conversation_messages')) {
-      // One group of values per turn, as many as the statement names columns.
-      // created_at is computed in SQL, not sent as a value.
-      const cols = q.slice(q.indexOf('(') + 1, q.indexOf(')')).split(',').map((c) => c.trim()).filter((c) => c !== 'created_at');
+      // One group of values per turn, as many as the statement names columns
+      // (created_at's value is the time it was said, or null for now). A
+      // message id already stored is skipped, as the unique index does.
+      const cols = q.slice(q.indexOf('(') + 1, q.indexOf(')')).split(',').map((c) => c.trim());
+      const stored = [];
       for (let i = 0; i < params.length; i += cols.length) {
         const row = {};
         cols.forEach((c, j) => { row[c] = params[i + j]; });
+        if (row.external_id && state.conversations.some((x) => x.external_ref === row.external_ref && x.external_id === row.external_id)) continue;
+        row.created_at = row.created_at || new Date().toISOString();
         state.conversations.push(row);
+        stored.push(row);
       }
+      return { rows: stored };
+    }
+    // v9.20.2: at most one undelivered-reply email an hour per agent.
+    if (q.startsWith('update delivery_alerts')) {
+      const a = state.alerts[params[0]];
+      if (a && a.hoursAgo >= 1) { const missed = a.missed; state.alerts[params[0]] = { hoursAgo: 0, missed: 0 }; return { rows: [{ missed }] }; }
       return { rows: [] };
+    }
+    if (q.startsWith('insert into delivery_alerts')) {
+      const a = state.alerts[params[0]];
+      if (a) { a.missed += 1; return { rows: [{ fresh: false }] }; }
+      state.alerts[params[0]] = { hoursAgo: 0, missed: 0 };
+      return { rows: [{ fresh: true }] };
+    }
+    if (q.startsWith('select c.company, a.name as agent from clients c')) {
+      const c = state.clients.find((x) => x.id === params[0]);
+      return { rows: c ? [{ company: c.company, agent: null }] : [] };
     }
     throw new Error('unstubbed query: ' + q.slice(0, 90));
   },
@@ -222,6 +243,63 @@ const settle = () => new Promise((r) => setTimeout(r, 20));
   });
   assert.strictEqual(state.conversations.at(-1).channel, 'whatsapp');
   console.log('✓ an unknown channel falls back to a permitted one');
+
+  // 12. v9.20.2: the time it was said, and the channel's id, are kept; the
+  // same message sent twice (an n8n retry, a backfill run again) is stored once.
+  const said = Math.floor(Date.now() / 1000) - 3600;
+  r = await post('/api/webhooks/conversation', {
+    external_ref: '923001112233', session_id: '923005550000-2026-09-25', channel: 'whatsapp',
+    messages: [{ role: 'customer', content: 'Timings?', at: said, id: 'wamid.A' }, { role: 'agent', content: '9 to 9.', at: new Date(said * 1000 + 4000).toISOString(), id: 'wamid.B' }],
+  });
+  assert.strictEqual(r.status, 201);
+  assert.strictEqual(r.body.stored, 2);
+  assert.strictEqual(state.conversations.at(-2).created_at, new Date(said * 1000).toISOString(), 'Unix seconds become the time it was said');
+  assert.strictEqual(state.conversations.at(-2).external_id, 'wamid.A');
+  r = await post('/api/webhooks/conversation', {
+    external_ref: '923001112233', session_id: '923005550000-2026-09-25',
+    messages: [{ role: 'customer', content: 'Timings?', at: said, id: 'wamid.A' }, { role: 'agent', content: '9 to 9.', id: 'wamid.B' }],
+  });
+  assert.strictEqual(r.status, 200);
+  assert.deepStrictEqual([r.body.stored, r.body.duplicates], [0, 2]);
+  r = await post('/api/webhooks/conversation', { external_ref: '923001112233', messages: [{ role: 'customer', content: 'far future', at: '2999-01-01T00:00:00Z' }] });
+  assert.strictEqual(state.conversations.at(-1).created_at && state.conversations.at(-1).created_at.startsWith('2999'), false, 'a time in the future is not trusted');
+  console.log('✓ times and message ids are kept; a repeat is stored once; a future time is ignored');
+
+  // 13. A reply WhatsApp refused: the customer's words are kept, the reply is
+  // marked not delivered, and the team hears about it — once an hour.
+  sent.length = 0;
+  state.settings.lead_notify_emails = 'ops@vantriqai.com';
+  const refused = (content, extra = {}) => post('/api/webhooks/conversation', {
+    external_ref: '923001112233', session_id: '923701917578-2026-09-29', channel: 'whatsapp',
+    delivered: false, error: 'Cannot call API for app 1775 on behalf of user 1221',
+    messages: [{ role: 'customer', content }, { role: 'agent', content: 'Assalam o alaikum! We build AI agents…' }], ...extra,
+  });
+  r = await refused('Hi, I have an IT business');
+  await settle();
+  assert.strictEqual(r.status, 201);
+  assert.strictEqual(r.body.undelivered, 1);
+  assert.strictEqual(state.conversations.at(-2).delivered, true, 'the customer line is never "undelivered"');
+  assert.strictEqual(state.conversations.at(-1).delivered, false);
+  assert.match(state.conversations.at(-1).delivery_error, /Cannot call API/);
+  assert.strictEqual(sent.length, 1, 'one alert');
+  assert.deepStrictEqual(sent.map((m) => m.to), ['ops@vantriqai.com']);
+  assert.match(sent[0].subject, /not delivered: \+923701917578/);
+  assert.match(sent[0].text, /Hi, I have an IT business/);
+  assert.match(sent[0].text, /wa\.me\/923701917578/);
+  assert.match(sent[0].text, /System users/, 'a token error says where the fix is');
+  await refused('Hello?');
+  await settle();
+  assert.strictEqual(sent.length, 1, 'a second failure within the hour does not email again');
+  state.alerts['client-1'].hoursAgo = 2;
+  await refused('Anyone there?');
+  await settle();
+  assert.strictEqual(sent.length, 2, 'an hour later it does');
+  assert.match(sent[1].text, /1 more reply failed since the last email/);
+  await refused('Old one', { messages: [{ role: 'customer', content: 'Last week', at: said - 7 * 86400 }, { role: 'agent', content: 'x', at: said - 7 * 86400 + 5 }] });
+  state.alerts['client-1'].hoursAgo = 2;
+  await settle();
+  assert.strictEqual(sent.length, 2, 'a backfilled old failure is history, not an alert');
+  console.log('✓ a refused reply is kept as not delivered and alerts the team at most hourly');
 
   console.log('\nAll webhook lead/conversation tests passed.');
   server.close();
