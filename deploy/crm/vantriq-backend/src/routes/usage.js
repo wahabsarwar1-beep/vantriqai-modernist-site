@@ -489,9 +489,10 @@ async function teamRecipients() {
 }
 
 /**
- * Tells the team an agent wrote a reply the channel would not deliver. One
- * email an hour per agent while it lasts: the first says what broke, later
- * ones how many more customers went unanswered in between.
+ * Tells the team a customer went unanswered: the channel refused the reply, or
+ * the AI model never wrote one. One email an hour per agent while it lasts:
+ * the first says what broke, later ones how many more messages went
+ * unanswered in between.
  */
 async function notifyUndelivered({ ref, clientId, agentId, sessionId, channel, said, error, at }) {
   if (!mailConfigured()) return;
@@ -526,28 +527,33 @@ async function notifyUndelivered({ ref, clientId, agentId, sessionId, channel, s
   const key = C.keyOf(sessionId);
   const number = /^\d{8,15}$/.test(key) ? `+${key}` : key || 'unknown';
   const when = new Date(at || Date.now()).toLocaleString('en-GB', { timeZone: 'Asia/Karachi', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  // Two causes so far, each with its own fix: WhatsApp refusing the send (the
+  // access token), and the AI model refusing to write the reply (the API key).
+  const aiFailed = /AI model|OpenAI|API key/i.test(error) && !/Cannot call API/i.test(error);
   const lines = [
-    `${company ? `${company}'s ` : ''}${agent} wrote a reply, but ${channel === 'whatsapp' ? 'WhatsApp' : 'the channel'} refused to deliver it.`,
+    `${company ? `${company}'s ` : ''}${agent} could not answer a customer: ${aiFailed ? 'no reply was written' : 'the reply never reached them'}.`,
     '',
     `Customer:   ${number}`,
     `They said:  ${said ? `"${said.slice(0, 400)}"` : '(not recorded)'}`,
     `When:       ${when} (Karachi)`,
-    '',
-    `${channel === 'whatsapp' ? 'WhatsApp' : 'The channel'} said: ${error}`,
+    `Why:        ${error}`,
     '',
     'Until this is fixed, customers who write in are not being answered.',
     /^\d{8,15}$/.test(key) ? `Reply to this one yourself: https://wa.me/${key}` : '',
-    'The unsent reply and the whole conversation are in the CRM, under Customers.',
+    'The conversation is in the CRM, under Customers.',
     '',
-    /token|OAuth|access|permission|Cannot call API/i.test(error)
+    !aiFailed && /WhatsApp|Cannot call API|OAuth|token/i.test(error)
       ? 'This usually means the WhatsApp access token in n8n has expired or lost its access. Create a new one in Meta Business Settings → System users (permissions whatsapp_business_messaging and whatsapp_business_management), and paste it into n8n → Credentials → "WhatsApp account".'
       : '',
-    missed ? `${missed} more ${missed === 1 ? 'reply' : 'replies'} failed since the last email.` : '',
+    aiFailed
+      ? 'The AI service refused the request: check the OpenAI credential the agent uses in n8n (a revoked or mistyped API key, or no credit left on the OpenAI account).'
+      : '',
+    missed ? `${missed} more ${missed === 1 ? 'message' : 'messages'} went unanswered since the last email.` : '',
     'You get at most one of these an hour while the problem lasts.',
   ].filter((l, i, all) => l !== '' || (all[i - 1] !== '' && i > 0));
 
   await Promise.all(to.map((addr) =>
-    sendMail({ to: addr, subject: `Agent reply not delivered: ${number}${company ? ` (${company})` : ''}`, text: lines.join('\n') })
+    sendMail({ to: addr, subject: `Customer not answered: ${number}${company ? ` (${company})` : ''}`, text: lines.join('\n') })
   ));
 }
 

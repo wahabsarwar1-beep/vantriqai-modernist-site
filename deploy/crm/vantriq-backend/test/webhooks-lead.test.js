@@ -283,7 +283,7 @@ const settle = () => new Promise((r) => setTimeout(r, 20));
   assert.match(state.conversations.at(-1).delivery_error, /Cannot call API/);
   assert.strictEqual(sent.length, 1, 'one alert');
   assert.deepStrictEqual(sent.map((m) => m.to), ['ops@vantriqai.com']);
-  assert.match(sent[0].subject, /not delivered: \+923701917578/);
+  assert.match(sent[0].subject, /not answered: \+923701917578/);
   assert.match(sent[0].text, /Hi, I have an IT business/);
   assert.match(sent[0].text, /wa\.me\/923701917578/);
   assert.match(sent[0].text, /System users/, 'a token error says where the fix is');
@@ -294,12 +294,27 @@ const settle = () => new Promise((r) => setTimeout(r, 20));
   await refused('Anyone there?');
   await settle();
   assert.strictEqual(sent.length, 2, 'an hour later it does');
-  assert.match(sent[1].text, /1 more reply failed since the last email/);
+  assert.match(sent[1].text, /1 more message went unanswered since the last email/);
   await refused('Old one', { messages: [{ role: 'customer', content: 'Last week', at: said - 7 * 86400 }, { role: 'agent', content: 'x', at: said - 7 * 86400 + 5 }] });
   state.alerts['client-1'].hoursAgo = 2;
   await settle();
   assert.strictEqual(sent.length, 2, 'a backfilled old failure is history, not an alert');
   console.log('✓ a refused reply is kept as not delivered and alerts the team at most hourly');
+
+  // 14. The AI model failing to write a reply at all (a revoked OpenAI key)
+  // alerts the same way, and points at the AI credential, not WhatsApp.
+  state.alerts['client-1'].hoursAgo = 2;
+  await post('/api/webhooks/conversation', {
+    external_ref: '923001112233', session_id: '923455100726-2026-09-29', channel: 'whatsapp',
+    messages: [{ role: 'customer', content: 'hello' },
+      { role: 'agent', content: '(No reply was written: the AI model failed.)', delivered: false, error: 'The AI model failed: Your API key has been invalidated.' }],
+  });
+  await settle();
+  assert.strictEqual(sent.length, 3);
+  assert.match(sent[2].text, /could not answer a customer: no reply was written/);
+  assert.match(sent[2].text, /OpenAI credential/);
+  assert.doesNotMatch(sent[2].text, /System users/, 'no WhatsApp-token advice for an AI failure');
+  console.log('✓ an AI failure alerts too, with the right fix');
 
   console.log('\nAll webhook lead/conversation tests passed.');
   server.close();
