@@ -21,7 +21,7 @@ process.env.MAIL_FROM = 'support@vantriqai.com';
 delete process.env.LEAD_NOTIFY_EMAIL;
 
 // --- stubs ------------------------------------------------------------
-const state = { clients: [], products: [{ id: 'uuid-starter', sort_order: 1 }], conversations: [], alerts: {}, stageHistory: [], settings: { lead_notify_emails: '' } };
+const state = { clients: [], agents: [], usage: [], products: [{ id: 'uuid-starter', sort_order: 1 }], conversations: [], alerts: {}, stageHistory: [], settings: { lead_notify_emails: '' } };
 const sent = [];
 let nextId = 1;
 
@@ -64,9 +64,24 @@ const dbStub = {
       state.stageHistory.push({ client_id: params[0], comment: params[1] });
       return { rows: [] };
     }
-    // v9.17: a ref that is no client's may be one of a client's agents.
-    if (q.startsWith('select id, client_id from client_agents where external_ref')) {
-      return { rows: [] };
+    // v9.17: a ref that is no client's may be one of a client's agents; v9.20.4
+    // takes the agent named outright, by id or by ref, as /usage does.
+    if (q.startsWith('select id, client_id from client_agents where')) {
+      const byId = q.includes('id::text = $1');
+      const hit = state.agents.find((a) => (byId ? a.id === params[0] : a.external_ref === params[0]));
+      return { rows: hit ? [{ id: hit.id, client_id: hit.client_id }] : [] };
+    }
+    // v9.20.4: the day usage filed a chat under (the nearest in time), and who metered it.
+    if (q.startsWith('select session_id from usage_events where session_id = any')) {
+      const at = new Date(params[1]).getTime();
+      const hits = state.usage.filter((u) => params[0].includes(u.session_id))
+        .sort((a, b) => Math.abs(new Date(a.occurred_at) - at) - Math.abs(new Date(b.occurred_at) - at));
+      return { rows: hits.slice(0, 1).map((u) => ({ session_id: u.session_id })) };
+    }
+    if (q.startsWith('select distinct client_id, agent_id from usage_events where session_id')) {
+      const owners = new Map();
+      for (const u of state.usage.filter((x) => x.session_id === params[0])) owners.set(`${u.client_id}|${u.agent_id}`, { client_id: u.client_id, agent_id: u.agent_id });
+      return { rows: [...owners.values()] };
     }
     if (q.startsWith('insert into conversation_messages')) {
       // One group of values per turn, as many as the statement names columns
@@ -315,6 +330,48 @@ const settle = () => new Promise((r) => setTimeout(r, 20));
   assert.match(sent[2].text, /OpenAI credential/);
   assert.doesNotMatch(sent[2].text, /System users/, 'no WhatsApp-token advice for an AI failure');
   console.log('✓ an AI failure alerts too, with the right fix');
+
+  // 15. v9.20.4: a website chat. It sends its own id with no day, under a ref
+  // that is the chat's and no business's — and still lands with the agent
+  // that metered that chat, in the very conversation usage counted, even when
+  // the sender's clock had already moved on to tomorrow.
+  const dayOf = (offset) => new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10);
+  const chat = 'c9d5a29e-6f10-4fb4-b863-1226d518ca84';
+  state.clients.push({ id: 'client-web', external_ref: 'shopco', name: 'Shop Co', company: 'Shop Co' });
+  state.agents.push({ id: 'agent-web', client_id: 'client-web', external_ref: 'shop.example' });
+  state.usage.push(
+    { session_id: `${chat}-${dayOf(-1)}`, client_id: 'client-web', agent_id: 'agent-web', occurred_at: new Date(Date.now() - 30 * 3600000).toISOString() },
+    { session_id: `${chat}-${dayOf(1)}`, client_id: 'client-web', agent_id: 'agent-web', occurred_at: new Date().toISOString() },
+  );
+  r = await post('/api/webhooks/conversation', {
+    external_ref: `web-${chat}`, session_id: chat, channel: 'website',
+    messages: [{ role: 'customer', content: 'Appointment booking' }, { role: 'agent', content: 'Our Booking Agent…' }],
+  });
+  assert.strictEqual(r.status, 201);
+  assert.deepStrictEqual([r.body.client_id, r.body.agent_id], ['client-web', 'agent-web'], 'the agent that metered the chat owns it');
+  assert.strictEqual(state.conversations.at(-1).session_id, `${chat}-${dayOf(1)}`, 'the day usage filed it under');
+  assert.strictEqual(state.conversations.at(-1).channel, 'website');
+  // Two agents metering one session is a question, not an answer.
+  state.usage.push({ session_id: 'shared-2026-09-28', client_id: 'client-1', agent_id: null, occurred_at: new Date().toISOString() },
+    { session_id: 'shared-2026-09-28', client_id: 'client-web', agent_id: 'agent-web', occurred_at: new Date().toISOString() });
+  r = await post('/api/webhooks/conversation', { external_ref: 'nobody', session_id: 'shared-2026-09-28', messages: [{ role: 'customer', content: 'hm' }] });
+  assert.strictEqual(r.body.client_id, null, 'ambiguous usage attributes nothing');
+  // A chat never metered (the AI failed before it answered) names its agent
+  // outright, gets today's day, and the alert speaks of a web visitor.
+  sent.length = 0;
+  r = await post('/api/webhooks/conversation', {
+    external_ref: 'shop.example', agent_ref: 'shop.example', session_id: 'f00dbabe-0000-4000-8000-00000a1b2c3d', channel: 'website',
+    messages: [{ role: 'customer', content: 'Do you deliver to Lahore?' },
+      { role: 'agent', content: '(No reply was written: the AI model failed.)', delivered: false, error: 'The AI model failed: insufficient_quota' }],
+  });
+  await settle();
+  assert.deepStrictEqual([r.body.client_id, r.body.agent_id], ['client-web', 'agent-web']);
+  assert.strictEqual(state.conversations.at(-1).session_id, `f00dbabe-0000-4000-8000-00000a1b2c3d-${dayOf(0)}`);
+  assert.strictEqual(sent.length, 1);
+  assert.match(sent[0].subject, /not answered: Web visitor 1b2c3d \(Shop Co\)/);
+  assert.doesNotMatch(sent[0].text, /wa\.me/, 'no WhatsApp link for a web visitor');
+  assert.match(sent[0].text, /left their details/);
+  console.log('✓ a website chat lands with the agent that metered it, on the day usage counted it');
 
   console.log('\nAll webhook lead/conversation tests passed.');
   server.close();

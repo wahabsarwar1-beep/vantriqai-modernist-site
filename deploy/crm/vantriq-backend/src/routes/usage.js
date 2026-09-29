@@ -364,6 +364,16 @@ const isTrue = (v) => v === true || v === 'true';
  * role is "customer" or "agent". Unknown roles are dropped rather than
  * failing the batch — a lost turn is better than a lost conversation.
  *
+ *   external_ref  the client's ref, or one of its agents' (the number or site a
+ *                 customer's customers write to) — or name the agent outright
+ *                 with agent_ref / agent_id, exactly as /usage takes them. A ref
+ *                 the CRM does not know still lands with whichever agent
+ *                 metered the same session_id, when exactly one did.
+ *   session_id    the conversation: "<customer>-<YYYY-MM-DD>", as /usage names
+ *                 it. One sent without its day (a website chat's own id) gets
+ *                 the day /usage filed that chat under, or else the day its
+ *                 first line was said, UTC.
+ *
  *   at         when it was said: ISO 8601, or Unix seconds / milliseconds
  *              (WhatsApp's own timestamp). Defaults to now. A time more than
  *              a year back or in the future is not trusted, and now is used.
@@ -382,7 +392,7 @@ router.post('/conversation', async (req, res) => {
 
   const CHANNELS = ['whatsapp', 'website', 'instagram', 'voice', 'email'];
   const channel = CHANNELS.includes(body.channel) ? body.channel : 'whatsapp';
-  const sessionId = String(body.session_id || '').trim().slice(0, 200);
+  let sessionId = String(body.session_id || '').trim().slice(0, 200);
   const batchDelivered = !isFalse(body.delivered);
   const batchError = String(body.error || '').trim();
 
@@ -410,14 +420,53 @@ router.post('/conversation', async (req, res) => {
     return res.status(400).json({ error: 'messages must contain at least one customer or agent turn' });
   }
 
-  // The ref is a client's (a lead filed as wa-<number>, or a customer), or
-  // one of a client's agents — the number a customer's customers write to.
-  const { rows: clientRows } = await db.query(`select id from clients where external_ref = $1`, [externalRef]);
-  let clientId = clientRows[0] ? clientRows[0].id : null;
+  // A conversation is a customer and a day, the way usage names it. A website
+  // chat sends its own id with no day, and its words then never met its
+  // counts: the customer's page showed the conversation twice, once empty.
+  // The day is the one usage filed this chat under, whatever clock the sender
+  // keeps (never more than a day either side of UTC); failing that, the day
+  // its first line was said, UTC.
+  if (sessionId && !/-\d{4}-\d{2}-\d{2}$/.test(sessionId)) {
+    const first = messages.find((m) => m.at);
+    const at = first ? first.at : new Date();
+    const chat = sessionId.slice(0, 188); // room for the day within the 200 kept
+    const days = [-1, 0, 1].map((d) => `${chat}-${new Date(at.getTime() + d * 86400000).toISOString().slice(0, 10)}`);
+    const { rows: filed } = await db.query(
+      `select session_id from usage_events where session_id = any($1::text[])
+        order by abs(extract(epoch from occurred_at - $2::timestamptz)) limit 1`,
+      [days, at.toISOString()]
+    );
+    sessionId = filed[0] ? filed[0].session_id : days[1];
+  }
+
+  // Whose conversation? The agent named outright, as /usage takes it; or the
+  // ref is a client's (a lead filed as wa-<number>, or a customer) or one of a
+  // client's agents — the number or site a customer's customers write to.
+  let clientId = null;
   let agentId = null;
+  if (body.agent_id || body.agent_ref) {
+    const { rows: named } = body.agent_id
+      ? await db.query(`select id, client_id from client_agents where id::text = $1`, [String(body.agent_id)])
+      : await db.query(`select id, client_id from client_agents where external_ref = $1`, [String(body.agent_ref).trim()]);
+    if (named[0]) { agentId = named[0].id; clientId = named[0].client_id; }
+  }
+  if (!clientId) {
+    const { rows: clientRows } = await db.query(`select id from clients where external_ref = $1`, [externalRef]);
+    clientId = clientRows[0] ? clientRows[0].id : null;
+  }
   if (!clientId) {
     const { rows: ag } = await db.query(`select id, client_id from client_agents where external_ref = $1`, [externalRef]);
     if (ag[0]) { agentId = ag[0].id; clientId = ag[0].client_id; }
+  }
+  // A ref nobody knows still belongs to whoever metered this conversation —
+  // provided exactly one client's agent did. The website assistant logged its
+  // lines under 'web-<chat id>', no client's ref, and for weeks they were
+  // stored but belonged to no business, so no Customers page could show them.
+  if (!clientId && sessionId) {
+    const { rows: metered } = await db.query(
+      `select distinct client_id, agent_id from usage_events where session_id = $1`, [sessionId]
+    );
+    if (metered.length === 1) { clientId = metered[0].client_id; agentId = metered[0].agent_id; }
   }
 
   const COLS = ['client_id', 'external_ref', 'session_id', 'channel', 'role', 'content', 'agent_id', 'external_id', 'delivered', 'delivery_error', 'created_at'];
@@ -525,7 +574,9 @@ async function notifyUndelivered({ ref, clientId, agentId, sessionId, channel, s
   const company = who[0] && who[0].company ? who[0].company : '';
   const agent = (who[0] && who[0].agent) || `${channel} agent`;
   const key = C.keyOf(sessionId);
-  const number = /^\d{8,15}$/.test(key) ? `+${key}` : key || 'unknown';
+  const phone = /^\d{8,15}$/.test(key);
+  // A website visitor has no number: "Web visitor 1b2c3d", as Customers names them.
+  const number = phone ? `+${key}` : key ? C.labelOf(key) : 'unknown';
   const when = new Date(at || Date.now()).toLocaleString('en-GB', { timeZone: 'Asia/Karachi', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   // Two causes so far, each with its own fix: WhatsApp refusing the send (the
   // access token), and the AI model refusing to write the reply (the API key).
@@ -539,7 +590,8 @@ async function notifyUndelivered({ ref, clientId, agentId, sessionId, channel, s
     `Why:        ${error}`,
     '',
     'Until this is fixed, customers who write in are not being answered.',
-    /^\d{8,15}$/.test(key) ? `Reply to this one yourself: https://wa.me/${key}` : '',
+    phone ? `Reply to this one yourself: https://wa.me/${key}`
+      : channel === 'website' ? 'A website visitor can only be written back to if they left their details in the chat.' : '',
     'The conversation is in the CRM, under Customers.',
     '',
     !aiFailed && /WhatsApp|Cannot call API|OAuth|token/i.test(error)
