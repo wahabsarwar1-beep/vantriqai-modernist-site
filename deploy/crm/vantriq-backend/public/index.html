@@ -712,7 +712,9 @@ function clientFromApi(c){ return { id:c.id, name:c.name, company:c.company, ema
   customAutomation:c.custom_automation||'', customDataLayer:c.custom_data_layer||'',
   customAiModel:c.custom_ai_model||'', customChannels:c.custom_channels||'',
   apiAccessEnabled:!!c.api_access_enabled,
-  surveysEnabled:!!c.surveys_enabled, surveysEnabledAt:c.surveys_enabled_at||null, surveysEnabledBy:c.surveys_enabled_by||'' }; }
+  surveysEnabled:!!c.surveys_enabled, surveysEnabledAt:c.surveys_enabled_at||null, surveysEnabledBy:c.surveys_enabled_by||'',
+  // v9.19 — their industry: which Echo templates suit them ('' = not said).
+  industry:c.industry||'' }; }
 function clientToApi(c){
   const out = { name:c.name, company:c.company, email:c.email, phone:c.phone, external_ref:c.externalRef||null,
     product_id:c.productId||null, stage:c.stage, est_value:c.estValue, source:c.source, notes:c.notes,
@@ -5609,22 +5611,80 @@ async function revokePortalCredentials(clientId){
 
 // Customer-satisfaction surveys are an add-on: off for every client until an
 // admin switches them on here (PATCH /api/clients/:id/surveys). Staff see
-// the state; only an admin can change it.
+// the state; only an admin can change it. Any staff member can say which
+// industry the client is in (v9.19) — their templates then come first in the
+// Echo library, here and in their portal — and switching Echo on can make
+// their first survey from it, live, so they start with something to share.
+let echoIndustries = null, echoIndustriesBusy = false;
+function loadEchoIndustries(){
+  if(echoIndustries || echoIndustriesBusy) return;
+  echoIndustriesBusy = true;
+  API.get('/api/surveys/templates').then(list => {
+    echoIndustries = (list||[]).filter(t => t.is_industry);
+    echoIndustriesBusy = false;
+    if(openPanel) render();
+  }).catch(() => { echoIndustriesBusy = false; });
+}
+function echoIndustryName(key){
+  const t = (echoIndustries||[]).find(x => x.key === key);
+  return t ? `${t.icon} ${t.industry_label}` : '';
+}
+function clientIndustrySelect(c){
+  if(!echoIndustries){ loadEchoIndustries(); return `<div style="font-size:12px;color:var(--muted);margin-bottom:10px;"><span class="loading-dot"></span> Loading industries…</div>`; }
+  const groups = [];
+  echoIndustries.forEach(t => {
+    let g = groups.find(x => x.label === t.category_label);
+    if(!g){ g = { label: t.category_label, items: [] }; groups.push(g); }
+    g.items.push(t);
+  });
+  return `<label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:10px;">Industry
+      <select id="echo-industry-${c.id}" style="display:block;width:100%;margin-top:4px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:#FCFBF9;"
+        onchange="setClientIndustry('${c.id}',this.value)">
+        <option value="">${c.industry ? 'Not set' : 'Not set — choose their industry…'}</option>
+        ${groups.map(g => `<optgroup label="${esc(g.label)}">${g.items.map(t => `<option value="${esc(t.key)}" ${t.key===c.industry?'selected':''}>${esc(t.icon+' '+t.industry_label)}</option>`).join('')}</optgroup>`).join('')}
+      </select>
+      <span style="display:block;font-weight:400;font-size:11.5px;margin-top:4px;">Their industry’s survey templates come first in Vantriq Echo, here and in their portal.</span>
+    </label>`;
+}
 function clientSurveysCard(c){
   const on = !!c.surveysEnabled;
   const since = on && c.surveysEnabledAt ? ` since ${fmtDate(c.surveysEnabledAt)}${c.surveysEnabledBy?` (${esc(c.surveysEnabledBy)})`:''}` : '';
   const text = on
     ? `<div style="margin-bottom:6px;"><span class="pill pill-active"><span class="pill-dot"></span>On${since}</span></div>
        <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">
-         They have an <strong>Echo</strong> tab in their portal, you can build surveys for them in
-         <a href="#" style="color:var(--teal);font-weight:600;" onclick="event.preventDefault();openPanel=null;navigate('surveys')">Vantriq Echo</a>, and their agents can send after-chat surveys.</div>`
+         They have an <strong>Echo</strong> tab in their portal, with ready-made surveys for their industry. You can build surveys for them in
+         <a href="#" style="color:var(--teal);font-weight:600;" onclick="event.preventDefault();openEchoFor('${c.id}')">Vantriq Echo</a>, and their agents can send after-chat surveys.</div>`
     : `<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">Off. Vantriq Echo is an add-on: switch it on when this customer has signed up for it.
          Until then their portal has no Echo tab and no survey can be made or sent for them.</div>`;
-  if(!isAdmin()) return text + (on ? '' : `<div style="font-size:11.5px;color:var(--muted);">Only an admin can switch Vantriq Echo on.</div>`);
-  return text + `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+  const industry = clientIndustrySelect(c);
+  if(!isAdmin()) return text + industry + (on ? '' : `<div style="font-size:11.5px;color:var(--muted);">Only an admin can switch Vantriq Echo on.</div>`);
+  const starterName = echoIndustryName(c.industry) || '⭐ General satisfaction';
+  return text + industry + `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
       <input type="checkbox" ${on?'checked':''} onchange="setClientSurveys('${c.id}',this.checked)">
       Vantriq Echo switched on for this customer
-    </label>`;
+    </label>
+    ${on ? '' : `<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12.5px;color:var(--muted);margin:8px 0 0 2px;">
+      <input type="checkbox" id="echo-starter-${c.id}" checked style="margin-top:2px;">
+      <span>When switching on, also create their first survey from the <strong>${esc(starterName)}</strong> template — live in English and Urdu, with its QR code and link ready to share. Only if they have no survey yet.</span>
+    </label>`}`;
+}
+
+/** Vantriq Echo, looking at one client. */
+function openEchoFor(clientId){
+  openPanel = null;
+  if(window.VQS && VQS.showClient) VQS.showClient(clientId);
+  navigate('surveys');
+}
+
+async function setClientIndustry(clientId, industry){
+  const client = state.clients.find(c=>c.id===clientId);
+  try{
+    const r = await API.patch(`/api/clients/${clientId}/industry`, { industry });
+    if(client) client.industry = r.industry || '';
+    if(window.VQS && VQS.setIndustry) VQS.setIndustry(clientId, r.industry || '');
+    render();
+    showToast(r.industry ? `Industry saved — ${echoIndustryName(r.industry) || r.industry}` : 'Industry cleared');
+  }catch(e){ showToast(e.message||'Could not save the industry','warn'); render(); }
 }
 
 async function setClientSurveys(clientId, enabled){
@@ -5632,14 +5692,18 @@ async function setClientSurveys(clientId, enabled){
   if(!enabled && !confirm(`Switch Vantriq Echo off for ${client?client.company:'this customer'}?\n\nEvery survey they have is paused for their customers straight away, the Echo tab leaves their portal and no after-chat survey is sent. Their surveys and answers are kept, and come back when you switch it on again.`)){
     render(); return;
   }
+  const starterBox = document.getElementById(`echo-starter-${clientId}`);
+  const starter = !!(enabled && starterBox && starterBox.checked);
   try{
-    const r = await API.patch(`/api/clients/${clientId}/surveys`, { enabled });
+    const r = await API.patch(`/api/clients/${clientId}/surveys`, starter ? { enabled, starter_survey: true } : { enabled });
     if(client){ client.surveysEnabled = !!r.surveys_enabled; client.surveysEnabledAt = r.surveys_enabled_at; client.surveysEnabledBy = r.surveys_enabled_by||''; }
     if(window.VQS) VQS.reset();
     render();
-    showToast(enabled
-      ? 'Vantriq Echo switched on — they now have an Echo tab in their portal'
-      : `Vantriq Echo switched off${r.live_surveys?` — ${r.live_surveys} live survey${r.live_surveys===1?' is':'s are'} paused for respondents`:''}`);
+    showToast(!enabled
+      ? `Vantriq Echo switched off${r.live_surveys?` — ${r.live_surveys} live survey${r.live_surveys===1?' is':'s are'} paused for respondents`:''}`
+      : r.starter_survey
+        ? `Vantriq Echo switched on — “${r.starter_survey.title}” is live and ready to share`
+        : 'Vantriq Echo switched on — they now have an Echo tab in their portal');
   }catch(e){ showToast(e.message||'Could not change that','warn'); render(); }
 }
 
@@ -7214,7 +7278,7 @@ function mountSurveys(){
   VQS.mount(el, {
     audience: 'crm',
     clients: () => state.clients
-      .map(c => ({ id: c.id, company: c.company, email: c.email, surveys_enabled: !!c.surveysEnabled }))
+      .map(c => ({ id: c.id, company: c.company, email: c.email, surveys_enabled: !!c.surveysEnabled, industry: c.industry || '' }))
       .sort((a, b) => String(a.company).localeCompare(String(b.company))),
     // What to tell someone who wants a survey for a client that does not have them.
     enableHint: () => isAdmin()
@@ -7234,6 +7298,8 @@ function mountSurveys(){
       setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
     },
     toast: (msg, warn) => showToast(msg, warn ? 'warn' : undefined),
+    // An industry chosen in the Echo library is the client's, on their page too.
+    industryChanged: (id, industry) => { const c = state.clients.find(x => x.id === id); if(c) c.industry = industry || ''; },
   });
 }
 

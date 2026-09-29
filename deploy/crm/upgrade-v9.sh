@@ -422,6 +422,18 @@ else
   chk "v9.17 customers: the contacts table, and gender/city/age on survey answers" 4 \
     "select (select count(*) from information_schema.tables where table_name='contacts')
           + (select count(*) from information_schema.columns where table_name='survey_responses' and column_name in ('gender','city','age_band'))"
+  chk "v9.19 template library: each client's industry (clients.industry)" 1 \
+    "select count(*) from information_schema.columns where table_name='clients' and column_name='industry'"
+  # Every template in the library must open in its preview (the survey app,
+  # as a respondent sees it — never recorded), from inside the container.
+  if docker exec "$APP_CONTAINER" node -e "const T=require('/app/src/utils/surveyTemplates').templateSummaries();Promise.all(T.map(t=>fetch('http://127.0.0.1:8080/s/_template/'+t.key).then(r=>r.status))).then(s=>{const bad=s.filter(x=>x!==200).length;console.log('    '+T.length+' templates, '+(T.length-bad)+' open in preview');process.exit(bad||T.length<28?1:0)}).catch(e=>{console.error('    '+e.message);process.exit(1)})"; then
+    ok "the survey template library: every industry's template previews"
+  else
+    warn "a survey template did not open in preview — lines above"; FAILED=1
+  fi
+  INDUSTRIES=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
+    -c "select count(*) from clients where industry <> ''" 2>/dev/null || echo '?')
+  ok "clients with their industry set: $INDUSTRIES (their templates come first in Echo; set it on the client's page)"
   # The Excel workbooks — Pulse, Echo and the customer directory — are built
   # from this install's real data (read-only). Only whether each built is
   # printed: they hold customers' numbers and this log is public.
@@ -545,5 +557,11 @@ cat <<'NEXT'
      was said, their survey answers, tags and notes. Names arrive with the
      WhatsApp agent's usage calls (contact_name); cities and more through
      POST /api/webhooks/contact or a survey's About-you questions.
+
+  9. Survey templates (v9.19). Echo → New survey: 28 ready-made surveys on
+     eight shelves, in English and Urdu, each with a phone preview. Set a
+     client's industry on their page (CRM → Clients → the client → Vantriq
+     Echo): their templates come first, here and in their portal, and
+     switching Echo on can create their first survey from it, live.
 NEXT
 printf '\n'

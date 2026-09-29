@@ -1833,3 +1833,11 @@ alter table survey_responses add column if not exists age_band text not null def
 -- conversations stay theirs and out of VantriqAI's sales view.
 alter table conversation_messages add column if not exists agent_id uuid references client_agents(id) on delete set null;
 create index if not exists idx_usage_client_session on usage_events(client_id, session_id);
+
+-- v9.19 — the client's industry, as the key of the Echo survey template that
+-- fits them best (restaurant, pharmacy, …) or '' when nobody has said. It
+-- puts their industry's templates first in the Echo library (CRM and portal),
+-- and it is what the starter survey is made from when an admin switches
+-- Vantriq Echo on. Set by staff on the client's page or by the client in
+-- their portal's template library.
+alter table clients add column if not exists industry text not null default '';

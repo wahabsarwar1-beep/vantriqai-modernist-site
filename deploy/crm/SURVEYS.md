@@ -76,11 +76,25 @@ because its WhatsApp agent already sends the after-chat survey.
 Behind the tick box: `PATCH /api/clients/:id/surveys  { "enabled": true | false }`,
 admin only (an admin's session or the admin key; staff and automation keys get 403).
 
+**Industry and a starter survey (v9.19).** The same card has an **Industry**
+list (any staff member can set it: restaurant, pharmacy, bank, school… 25 in
+all). It puts that industry's templates first in the Echo library, in the CRM
+and in the client's portal. When an admin ticks Echo on, a second box —
+ticked by default — also creates the client's **first survey from their
+industry's template** (General satisfaction when no industry is set): live,
+in English and Urdu, in their name, unhappy answers emailed to the client's
+email, its link and QR code ready. It is only made when they have no survey
+yet, so switching Echo off and on again never makes a second.
+API: `PATCH /api/clients/:id/industry { "industry": "pharmacy" }` (`""` clears it);
+`PATCH /api/clients/:id/surveys { "enabled": true, "starter_survey": true[, "industry": "…"] }`
+— the reply's `starter_survey` names the survey made, or is `null`.
+
 ## Making a survey
 
 CRM → **Surveys** → **New survey** (choose the client — only clients with
 surveys switched on are listed), or the customer does it themselves in their
-portal. Pick the template closest to the business:
+portal. Pick the template closest to the business from the library (see
+[The template library](#the-template-library-v919)):
 
 | Template | Measures |
 |---|---|
@@ -93,6 +107,11 @@ portal. Pick the template closest to the business:
 | Bank & financial services | CSAT, resolved, effort, NPS |
 | School, college & university · Real estate · Car sales & service | CSAT, NPS (+ resolved for workshops) |
 | Courier & logistics · Salon, spa & fitness · Travel & tourism · Professional services | CSAT, NPS (+ effort / resolved) |
+| Pharmacy & medical store (v9.19) | CSAT, NPS, medicines in stock, pharmacist's advice, genuine products, prices, delivery |
+| Insurance & takaful · Software, IT & SaaS (v9.19) | CSAT, resolved, effort, NPS |
+| Events & conferences · Home services & repairs (v9.19) | CSAT, NPS (+ resolved for repairs) |
+| Government & public services · NGO & non-profit (v9.19) | CSAT, resolved, effort / NPS |
+| Manufacturing & B2B supplier · Website & app experience (v9.19) | CSAT, effort, NPS / resolved |
 | After a WhatsApp or chat conversation | CSAT, resolved, one comment — three taps |
 | General satisfaction · Start from scratch | CSAT, NPS / CSAT only |
 
@@ -223,6 +242,39 @@ addresses, the email goes out the moment the answer arrives — which needs
 A delighted customer (NPS 9–10, or CSAT 5) is offered the Google review link
 on the thank-you screen.
 
+## The template library (v9.19)
+
+28 ready-made surveys, one for each industry, on eight shelves — Food, hotels
+& travel · Shops & products · Health & wellbeing · Finance, property & cars ·
+Services & B2B · Education, public & non-profit · Chats, websites & apps · Any
+business. The same library in the CRM and in every client's portal (and so in
+the app):
+
+- **Where:** Echo → **New survey** (step 1 of 2), the whole Echo page while a
+  client has no survey yet (with *how it works*), and under *Your surveys*
+  afterwards (recommended ones and a way into every shelf). The portal's
+  Overview points to it.
+- **Your industry:** the customer picks theirs at the top of the library (in
+  the CRM: the client's, when a client is chosen). Their template then comes
+  first under **Recommended**, with the three that suit that industry best
+  (a pharmacy sees clinics, online delivery and the after-chat survey).
+- **Shelves and search** — "clinic", "delivery", "school", "courier parcel";
+  every word must match a name, description, question or common word for it.
+- **Preview** opens the template on a phone exactly as a customer sees it, in
+  the business's own name, in English or Urdu, tappable all the way through —
+  nothing answered there is saved or sent — beside every question it asks and
+  when follow-on questions appear. Arrows step through the other templates.
+- **Use this template** goes to step 2: name, languages, colours, branches,
+  review link and who gets unhappy answers; then **Create and go live**.
+
+API: `GET /api/surveys/templates` (every template: shelf, minutes, measures,
+questions in outline, related templates), `GET /api/surveys/templates/library
+[?client_id=]` (the same, with the shelves and the client's industry — portal:
+`/api/portal/surveys/templates/library`), `PATCH /api/surveys/industry
+{ industry, client_id }` (portal: `/api/portal/surveys/industry { industry }`,
+always their own). The preview page is `/s/_template/<template>?business=`
+— never recorded, and not indexed by search engines.
+
 ## The Echo dashboard (v9.18)
 
 The top of the Echo page (portal and CRM — pick a client, or all) is a full dashboard over every survey, by day, week, month, quarter or year, compared with the previous period at the same point — the same controls as Pulse:
@@ -309,10 +361,12 @@ since the last deploy.
 ## Tests
 
 ```bash
-node test/surveys.test.js       # 133 checks through the API
+node test/surveys.test.js       # 142 checks through the API
 node test/after-chat.test.js    # 30 checks: the after-chat rules, one yes per conversation
 node test/own-survey.test.js    # 24 checks: our own surveys are made once, and only once
 node test/survey-access.test.js # 28 checks: off by default, only an admin switches it, what off and on mean
-node test/surveys-ui.test.js    # 42 checks in a real browser
+node test/surveys-ui.test.js    # 44 checks in a real browser
+node test/templates.test.js     # 63 checks: the library, industries, the starter survey, the preview page
+node test/templates-ui.test.js  # 52 checks: the library in the portal, on a phone and in the CRM
 node test/report.test.js        # the Pulse & Echo workbook, tab by tab, against known contacts
 ```

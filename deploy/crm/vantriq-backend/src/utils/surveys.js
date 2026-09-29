@@ -27,7 +27,7 @@ const crypto = require('crypto');
 const ExcelJS = require('exceljs');
 const qrcode = require('qrcode-generator');
 const db = require('../db');
-const { templateByKey, templateSummaries } = require('./surveyTemplates');
+const { templateByKey, templateSummaries, templateCategories, isIndustry } = require('./surveyTemplates');
 const { GRAINS, TZ, normaliseGrain, periodBounds } = require('./analytics');
 const { fillProfile, phoneDigits, normCity, normGender, keyOf: contactKeyOf } = require('./contacts');
 const { sendMail, mailConfigured } = require('./mailer');
@@ -380,7 +380,7 @@ async function setSurveysEnabled(clientId, enabled, by = '') {
             surveys_enabled_at = case when $2 and not surveys_enabled then now() else surveys_enabled_at end,
             surveys_enabled_by = case when $2 and not surveys_enabled then $3 else surveys_enabled_by end
       where id = $1
-      returning id, company, surveys_enabled, surveys_enabled_at, surveys_enabled_by,
+      returning id, company, industry, surveys_enabled, surveys_enabled_at, surveys_enabled_by,
                 (select count(*)::int from surveys where client_id = $1) as surveys,
                 (select count(*)::int from surveys where client_id = $1 and status = 'live') as live_surveys`,
     [clientId, !!enabled, cleanStr(by, 200)]
@@ -390,8 +390,54 @@ async function setSurveysEnabled(clientId, enabled, by = '') {
 
 async function getClient(id) {
   if (!/^[0-9a-f-]{36}$/i.test(String(id || ''))) return null;
-  const { rows } = await db.query(`select id, company, name, email, surveys_enabled from clients where id = $1`, [id]);
+  const { rows } = await db.query(`select id, company, name, email, industry, surveys_enabled from clients where id = $1`, [id]);
   return rows[0] || null;
+}
+
+/**
+ * The client's industry: the key of the template that fits them, or '' for
+ * "not said". Anything else is refused, so the library can always find it.
+ */
+async function setClientIndustry(clientId, industry) {
+  const key = String(industry == null ? '' : industry).trim();
+  if (key && !isIndustry(key)) throw bad(`"${cleanStr(key, 40)}" is not one of the industries.`);
+  if (!/^[0-9a-f-]{36}$/i.test(String(clientId || ''))) return null;
+  const { rows } = await db.query(`update clients set industry = $2 where id = $1 returning id, company, industry`, [clientId, key]);
+  return rows[0] || null;
+}
+
+/**
+ * A live survey to start from, made when Echo is switched on: from the
+ * client's industry template (or General), in English and Urdu, with the
+ * client's email for unhappy answers. Only for a client with no survey yet —
+ * switching Echo off and on again never makes a second.
+ */
+async function createStarterSurvey(clientId, by = '') {
+  const client = await getClient(clientId);
+  if (!client || !client.surveys_enabled) return null;
+  const { rows } = await db.query(`select count(*)::int as n from surveys where client_id = $1`, [clientId]);
+  if (rows[0].n > 0) return null;
+  const tpl = isIndustry(client.industry) ? client.industry : 'general';
+  return createSurvey({ client, template: tpl, createdBy: by });
+}
+
+/**
+ * A template as its respondents would see it, before any survey is made from
+ * it — the library's Preview. The definition createSurvey would save, in the
+ * shape the survey page reads, with the business's name in place of
+ * {business}. It has no address, so it can never be answered for real.
+ */
+function templatePreview(key, { business = '' } = {}) {
+  const tpl = templateByKey(key);
+  if (!tpl) return null;
+  const name = cleanStr(business, 120) || 'Your business';
+  const def = normalizeSurvey({}, {
+    title: `${tpl.name} survey`, status: 'live', industry: tpl.key,
+    languages: ['en', 'ur'], default_language: 'en', display_name: name,
+    brand_color: '#2f56d9', logo_url: '', content: tpl.content, questions: tpl.questions,
+    locations: [], review_url: '', alert_emails: '', closes_at: null, response_limit: null,
+  });
+  return { ...publicSurvey({ ...def, slug: null, company: name }), template: { key: tpl.key, icon: tpl.icon, name: tpl.name } };
 }
 
 /** A new survey from a template, for one client. */
@@ -1860,7 +1906,7 @@ module.exports = {
   SurveyError, LANGUAGES, TYPES, CHANNELS, CHANNEL_NAMES, SLUG_RE,
   templateSummaries,
   normalizeSurvey, normalizeAnswers, conditionMet, metricsOf, demographicsOf, needsFollowUp, isPromoter, themesOf, answerText, readableAnswers,
-  getSurvey, getSurveyBySlug, getClient, setSurveysEnabled, createSurvey, updateSurvey, duplicateSurvey, deleteSurvey,
+  getSurvey, getSurveyBySlug, getClient, setSurveysEnabled, setClientIndustry, createStarterSurvey, templateCategories, templatePreview, createSurvey, updateSurvey, duplicateSurvey, deleteSurvey,
   OWN_SURVEY_SLUG, OWN_CHAT_SURVEY_SLUG, ensureOwnSurvey, ensureOwnSurveys,
   isClosed, publicSurvey, publicBase, linksFor, withLinks, inviteMessage, qrSvg, escapeHtml, estimateMinutes,
   customerKey, chatRules, chatVerdict, chatInvite, nextLocalHour, inSendingHours,
