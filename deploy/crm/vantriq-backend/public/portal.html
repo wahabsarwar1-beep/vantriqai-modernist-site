@@ -683,6 +683,14 @@ function renderOverview(){
   <div class="card" style="background:var(--teal-light);border-color:#BFE3D8;">
     <div style="font-size:13px;color:var(--teal-dark);font-weight:600;">✓ Your account is fully paid up. Nothing due right now.</div>
   </div>`}
+  ${surveysOn() ? `
+  <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;">
+    <div style="flex:1 1 320px;">
+      <h3 style="margin:0 0 4px;">📚 Customer surveys, ready for your industry</h3>
+      <div style="font-size:13px;color:var(--muted);line-height:1.55;">Vantriq Echo has a ready-made satisfaction survey for every industry — restaurants, shops, clinics, pharmacies, banks, schools and more — in English and Urdu. Preview one as your customers will see it, and share it by QR code, link or WhatsApp in a minute.</div>
+    </div>
+    <button class="btn btn-primary" onclick="setTab('surveys')">Open Echo</button>
+  </div>` : ''}
 
   <div class="two-up">
   <div class="card">

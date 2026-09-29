@@ -155,6 +155,9 @@ router.get('/account', async (req, res) => {
     // on for this account (clients.js PATCH /:id/surveys); the portal shows no
     // Surveys tab until then.
     surveys_enabled: !!client.surveys_enabled,
+    // Their industry ('' until someone says): their templates come first in
+    // the Echo library. They change it there (PATCH /api/portal/surveys/industry).
+    industry: client.industry || '',
     // ai_model is intentionally omitted — internal delivery detail.
     package: eff ? {
       name: eff.name, retainer: eff.retainer, setup_fee: eff.setup_fee,

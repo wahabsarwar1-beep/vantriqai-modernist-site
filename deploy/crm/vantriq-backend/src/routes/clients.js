@@ -5,7 +5,7 @@ const { hashPassword, generatePassword } = require('../utils/password');
 const { billOnActivation } = require('../utils/billing');
 const { quotaStatus } = require('../utils/quota');
 const { blockAutomation, isAdminRequest } = require('../middleware/auth');
-const { setSurveysEnabled } = require('../utils/surveys');
+const { setSurveysEnabled, setClientIndustry, createStarterSurvey } = require('../utils/surveys');
 const router = express.Router();
 
 const FIELDS = [
@@ -476,7 +476,7 @@ router.patch('/:id/api-access', async (req, res) => {
 });
 
 /**
- * PATCH /api/clients/:id/surveys  { enabled: true|false }
+ * PATCH /api/clients/:id/surveys  { enabled: true|false[, industry, starter_survey: true] }
  *
  * Customer-satisfaction surveys are an add-on, off for every client until an
  * admin turns them on here — the same pattern as API access above. On: the
@@ -484,11 +484,36 @@ router.patch('/:id/api-access', async (req, res) => {
  * and their agents' after-chat invites are answered. Off: every survey they
  * have is paused for respondents at once, the tab disappears and invites are
  * refused; the surveys and their answers are kept for when it comes back on.
+ * With starter_survey, switching on also makes a live survey from their
+ * industry's template (General when none is set) — only if they have none.
  */
 router.patch('/:id/surveys', async (req, res) => {
   if (!isAdminRequest(req)) return res.status(403).json({ error: 'Only an admin can switch Vantriq Echo on or off for a client.' });
+  const body = req.body || {};
   const by = req.user ? (req.user.name || req.user.email) : 'admin key';
-  const row = await setSurveysEnabled(req.params.id, !!(req.body || {}).enabled, by);
+  // v9.19: the industry can be set in the same call, and switching on can
+  // make a live starter survey from it (only when they have none yet).
+  if ('industry' in body && !(await setClientIndustry(req.params.id, body.industry))) return res.status(404).json({ error: 'Client not found' });
+  const row = await setSurveysEnabled(req.params.id, !!body.enabled, by);
+  if (!row) return res.status(404).json({ error: 'Client not found' });
+  let starter = null;
+  if (row.surveys_enabled && body.starter_survey === true) {
+    const s = await createStarterSurvey(row.id, by);
+    if (s) {
+      starter = { id: s.id, slug: s.slug, title: s.title, industry: s.industry };
+      row.surveys += 1;
+      if (s.status === 'live') row.live_surveys += 1;
+    }
+  }
+  res.json({ ...row, starter_survey: starter });
+});
+
+/**
+ * PATCH /api/clients/:id/industry { industry } — which Echo template fits this
+ * client ('' to clear). Puts their industry's surveys first in the library.
+ */
+router.patch('/:id/industry', async (req, res) => {
+  const row = await setClientIndustry(req.params.id, (req.body || {}).industry);
   if (!row) return res.status(404).json({ error: 'Client not found' });
   res.json(row);
 });

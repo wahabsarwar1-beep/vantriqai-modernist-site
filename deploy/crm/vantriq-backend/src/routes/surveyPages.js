@@ -10,6 +10,7 @@ const { clientIp } = require('../utils/clientIp');
  *   GET /s/:slug                         the survey app
  *   GET /s/:slug/qr.svg[?loc=&size=]     a QR code for the table, the counter or the receipt
  *   GET /s/:slug/poster[?loc=&layout=]   a printable A4 poster, or four table cards to a sheet
+ *   GET /s/_template/:key                a library template, as a preview (never recorded)
  *
  * The survey app is rendered on the server with the survey already inside it,
  * so it paints on the first response — a respondent standing at a counter on
@@ -54,6 +55,34 @@ const STATE_TITLE = {
 // are matched — WhatsApp's previewer sends "WhatsApp/2.x", while a page opened
 // inside WhatsApp's browser is an ordinary browser user agent.
 const LINK_PREVIEW = /^WhatsApp\/|facebookexternalhit|facebookcatalog|meta-externalagent|Twitterbot|Slackbot|TelegramBot|Discordbot|LinkedInBot|SkypeUriPreview|Googlebot|bingbot|Applebot|redditbot|Pinterestbot|Embedly|vkShare/i;
+
+/**
+ * GET /s/_template/:key[?business=&lang=] — a library template in the survey
+ * app, as a respondent would see it, for the studio's Preview before any
+ * survey exists. Always a preview: nothing is recorded, counted or saved.
+ * The "_" keeps the path clear of every survey address, which cannot use one.
+ */
+router.get('/_template/:key', (req, res) => {
+  const pub = S.templatePreview(req.params.key, { business: req.query.business });
+  const title = pub ? `${pub.display_name} — ${pub.template.name} survey (preview)` : 'Survey template not found';
+  const html = fill(surveyTemplate(), {
+    LANG: 'en',
+    DIR: 'ltr',
+    TITLE: S.escapeHtml(title),
+    DESCRIPTION: S.escapeHtml('A Vantriq Echo survey template, as your customers would see it.'),
+    THEME: '#2f56d9',
+    URL: S.escapeHtml(`${S.publicBase(req)}/s/_template/${encodeURIComponent(req.params.key)}`),
+    OG_IMAGE: '',
+    KIOSK_APP: '',
+    DATA: scriptJson({ state: pub ? 'ok' : 'not_found', preview: true, survey: pub, invite: null, slug: null }),
+  });
+  res.status(pub ? 200 : 404)
+    .set('Cache-Control', 'no-store')
+    .set('X-Content-Type-Options', 'nosniff')
+    .set('X-Robots-Tag', 'noindex')
+    .set('Referrer-Policy', 'strict-origin-when-cross-origin')
+    .type('html').send(html);
+});
 
 router.get('/:slug', async (req, res) => {
   const survey = await S.getSurveyBySlug(req.params.slug);

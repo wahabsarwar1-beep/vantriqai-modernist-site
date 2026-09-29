@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "VantriqAI CRM API",
-    "version": "9.18.1",
+    "version": "9.19.0",
     "description": "The CRM behind VantriqAI: clients, invoices, payments, quotes and proposals,\ncontracts, statements, and the webhook surface the AI agents write through.\n\n## Authentication\n\nTwo ways in, and one of them is for people:\n\n- **Staff session** — `Authorization: Bearer <token>`, issued by `POST /api/auth/verify`\n  after a password and an emailed one-time code. A staff member's role decides reach.\n- **API key** — `x-api-key: <key>`, for machines. Keys are scoped.\n\n## Scopes\n\nLeast to most: `webhook` < `automation` < `staff` < `admin`. A scope opens everything\nbelow it. The admin key opens everything and is intended as break-glass only — set\n`ALLOW_API_KEY_LOGIN=false` once staff accounts exist.\n\n## Automation writes through this API, never to the database\n\nn8n and any other integration must use these endpoints rather than connecting to\nPostgres. Tenancy, quota and tax rules live here; a direct write bypasses all three."
   },
   "servers": [
@@ -3154,6 +3154,66 @@
         ]
       }
     },
+    "/api/clients/{id}/industry": {
+      "patch": {
+        "tags": [
+          "clients"
+        ],
+        "summary": "PATCH /api/clients/:id/industry { industry } — which Echo template fits this client ('' to clear). Puts their industry's surveys first in the library.",
+        "description": "Requires the **automation** scope or higher. Automation key or any staff session. Clients, invoices, packages, agents.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
     "/api/clients/{id}/portal-credentials": {
       "delete": {
         "tags": [
@@ -3473,7 +3533,7 @@
         "tags": [
           "clients"
         ],
-        "summary": "PATCH /api/clients/:id/surveys { enabled: true|false } Customer-satisfaction surveys are an add-on, off for every client until an admin turns them on here — the same pattern as API access above. On: the client gets a Surveys tab in their portal, staff can build surveys for them, and their agents' after-chat invites are answered. Off: every survey they have is paused for respondents at once, the tab disappears and invites are refused; the surveys and their answers are kept for when it comes back on.",
+        "summary": "PATCH /api/clients/:id/surveys { enabled: true|false[, industry, starter_survey: true] } Customer-satisfaction surveys are an add-on, off for every client until an admin turns them on here — the same pattern as API access above. On: the client gets a Surveys tab in their portal, staff can build surveys for them, and their agents' after-chat invites are answered. Off: every survey they have is paused for respondents at once, the tab disappears and invites are refused; the surveys and their answers are kept for when it comes back on. With starter_survey, switching on also makes a live survey from their industry's template (General when none is set) — only if they have none.",
         "description": "Requires the **automation** scope or higher. Automation key or any staff session. Clients, invoices, packages, agents.",
         "parameters": [
           {
@@ -7781,6 +7841,50 @@
         "security": []
       }
     },
+    "/api/portal/surveys/industry": {
+      "patch": {
+        "tags": [
+          "surveys"
+        ],
+        "summary": "PATCH { industry[, client_id] } — which industry's templates fit this business ('' for \"not said\"). A customer sets their own; staff name the client.",
+        "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
+        "parameters": [],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": []
+      }
+    },
     "/api/portal/surveys/overview": {
       "get": {
         "tags": [
@@ -7853,6 +7957,39 @@
           "surveys"
         ],
         "summary": "The industry template gallery: restaurant, FMCG, telecom, healthcare and the rest.",
+        "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/portal/surveys/templates/library": {
+      "get": {
+        "tags": [
+          "surveys"
+        ],
+        "summary": "The template library as the studio shows it: every template, the shelves they sit on, and whose library it is — the client's industry puts their own templates first. A customer's is always their own; staff pass ?client_id= (without it there is no \"your industry\").",
         "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
         "parameters": [],
         "responses": {
@@ -11152,6 +11289,57 @@
         ]
       }
     },
+    "/api/surveys/industry": {
+      "patch": {
+        "tags": [
+          "surveys"
+        ],
+        "summary": "PATCH { industry[, client_id] } — which industry's templates fit this business ('' for \"not said\"). A customer sets their own; staff name the client.",
+        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "parameters": [],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
     "/api/surveys/overview": {
       "get": {
         "tags": [
@@ -11238,6 +11426,46 @@
           "surveys"
         ],
         "summary": "The industry template gallery: restaurant, FMCG, telecom, healthcare and the rest.",
+        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/surveys/templates/library": {
+      "get": {
+        "tags": [
+          "surveys"
+        ],
+        "summary": "The template library as the studio shows it: every template, the shelves they sit on, and whose library it is — the client's industry puts their own templates first. A customer's is always their own; staff pass ?client_id= (without it there is no \"your industry\").",
         "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
         "parameters": [],
         "responses": {
