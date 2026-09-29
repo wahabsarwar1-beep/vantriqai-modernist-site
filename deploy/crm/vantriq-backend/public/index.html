@@ -2220,7 +2220,7 @@ function pricingBasisHTML(){
         <div style="font-size:13px;line-height:1.55;">
           As of <strong>${fmtDate(a.as_of)}</strong> · USD/PKR <strong>${a.fx_usd_pkr}</strong> ·
           <strong>${esc(rate(a.bulk_model).label||a.bulk_model)}</strong> for most turns, ${shareText} escalated to
-          <strong>${esc(rate(a.premium_model).label||a.premium_model)}</strong> · ${Math.round((a.utilization||0.7)*100)}% average utilisation
+          <strong>${esc(rate(a.premium_model).label||a.premium_model)}</strong> · typical use ${Math.round((a.utilization||0.7)*100)}% of the allowance
         </div>
         <div style="font-size:11.5px;color:var(--muted);margin-top:4px;">Package prices stay fixed by the business model. What moves is what serving them costs — every figure below is recomputed from the rate card, and Financials uses the same numbers.</div>
       </div>
@@ -2374,7 +2374,7 @@ function costingModalHTML(){
       </p>
       <div class="field-row">
         <div class="field"><label>USD/PKR (costing rate)</label><input id="cs_fx" type="number" step="0.01" value="${a.fx_usd_pkr}"></div>
-        <div class="field"><label>Average utilisation (%)</label><input id="cs_util" type="number" min="10" max="100" step="1" value="${Math.round((a.utilization||0.7)*100)}"></div>
+        <div class="field"><label>Typical use of the allowance (%)</label><input id="cs_util" type="number" min="10" max="100" step="1" value="${Math.round((a.utilization||0.7)*100)}"><div style="font-size:11px;color:var(--muted);margin-top:3px;">The business model assumes 70%. Separate from the projection setting on Financials.</div></div>
       </div>
       <div class="field-row">
         <div class="field"><label>Bulk model — most turns</label><select id="cs_bulk">${opt(a.bulk_model)}</select></div>
@@ -2411,7 +2411,6 @@ async function afterCostingChange(model){
   // delivery_cost_full and the routing line moved with it: Financials and the
   // cards read them from the products list.
   try{ state.products = (await API.get('/api/products')).map(productFromApi); }catch(e){}
-  try{ const s = await API.get('/api/settings'); state.utilization = +s.utilization; }catch(e){}
 }
 async function saveCosting(){
   const v = id => (document.getElementById(id)||{}).value;

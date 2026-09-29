@@ -116,6 +116,26 @@ const LADDER = [
     `${prod[0].delivery_cost_full} vs ${moved.ai_full}`);
   ok(/GPT-4o mini; 2% escalated to Claude Sonnet 5\.5/.test(prod[0].ai_model), 'the routing line on the package is the model\'s', prod[0].ai_model);
 
+  // Financials' projection setting must not leak into the business model's
+  // typical-use margin (production runs Financials at a cautious 100%).
+  const { rows: su } = await db.query(`select utilization from settings where id = 1`);
+  await db.query(`update settings set utilization = 1 where id = 1`);
+  try {
+    r = await call('GET', '/api/costing');
+    const st = r.body.packages.find((p) => p.name === 'Starter');
+    ok(r.body.assumptions.utilization === 0.7 && st.margin_util > st.margin_full,
+      'typical use stays the business model\'s 70% whatever Financials projects at',
+      `${r.body.assumptions.utilization}, ${st.margin_util} vs ${st.margin_full}`);
+  } finally {
+    await db.query(`update settings set utilization = $1 where id = 1`, [su[0].utilization]);
+  }
+  r = await call('PUT', '/api/costing', { utilization: 0.5 });
+  ok(r.status === 200 && r.body.assumptions.utilization === 0.5, 'typical use can be changed in Rates & assumptions', r.status);
+  const { rows: su2 } = await db.query(`select utilization from settings where id = 1`);
+  ok(Number(su2[0].utilization) === Number(su[0].utilization), 'without touching the Financials projection setting', su2[0].utilization);
+  r = await call('PUT', '/api/costing', { utilization: 5 });
+  ok(r.status === 400, 'a utilisation over 100% is refused', r.status);
+
   r = await call('PATCH', `/api/costing/packages/${starter.id}`, { premium_share: 1.5 });
   ok(r.status === 400, 'a premium share over 100% is refused', r.status);
   r = await call('PATCH', `/api/costing/packages/${starter.id}`, { mgmt_hours: 2 });
