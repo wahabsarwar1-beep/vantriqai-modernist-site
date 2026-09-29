@@ -92,7 +92,27 @@ const api = (method, p, b) => fetch(B + p, { method, headers: AH, body: b ? JSON
       const frame = page.frameLocator('#vqs-tpl-frame');
       await frame.locator('h1').first().waitFor({ timeout: 8000 });
       ok((await frame.locator('h1').first().innerText()) === shop.company, 'the phone shows the survey in their own business name');
-      ok(/answers are not saved/i.test(await frame.locator('.ribbon').innerText()), 'marked as a preview');
+      const cap = await page.innerText('.vqs-modal .vqs-phone-cap');
+      ok(/^Preview/.test(cap) && /Nothing answered here is saved/.test(cap), 'labelled as a preview under the phone', cap);
+      // v9.19.1: a real phone — the page is laid out on a 390-point screen with
+      // its status bar and home bar, then the phone is drawn smaller.
+      const inside = await frame.locator('html').evaluate(() => ({
+        w: innerWidth, cw: document.documentElement.clientWidth, device: document.documentElement.classList.contains('in-device'),
+        ribbon: (() => { const r = document.querySelector('.ribbon'); return r ? getComputedStyle(r).display : 'none'; })(),
+        name: (() => { const b = document.querySelector('.bname'); return b ? b.scrollHeight <= b.clientHeight + 1 && b.textContent : ''; })(),
+      }));
+      ok(inside.w === 390 && inside.device, 'inside, the page is laid out for a real 390-point phone screen', JSON.stringify(inside));
+      ok(inside.cw === 390, 'with no desktop scroll bar', String(inside.cw));
+      ok(inside.ribbon === 'none', 'and the screen shows only what a customer sees');
+      ok(inside.name === shop.company, 'the business name in full, not cut short', String(inside.name));
+      const dev = await page.$eval('.vqs-modal .vqs-dev', (d) => {
+        const r = d.getBoundingClientRect();
+        return { w: r.width, h: r.height, s: Number(getComputedStyle(d).getPropertyValue('--s')), bar: d.querySelector('.vqs-dev-bar').textContent,
+          island: !!d.querySelector('.vqs-dev-island'), home: !!d.querySelector('.vqs-dev-home') };
+      });
+      ok(dev.w > 250 && dev.w <= 300 && Math.abs(dev.h / dev.w - (844 * dev.s + 22) / (390 * dev.s + 22)) < 0.01,
+        'drawn as a whole phone, in a phone\'s proportions', JSON.stringify(dev));
+      ok(/9:41/.test(dev.bar) && dev.island && dev.home, 'with its status bar, camera island and home bar');
       const qs = await page.$$eval('.vqs-qlist li', (els) => els.map((e) => e.innerText));
       ok(qs.length === 10 && qs.some((q) => q.includes(shop.company)), 'beside it, every question it asks, in their name', qs.join(' | '));
       ok(qs.some((q) => /only if they score 0–8 out of 10/.test(q)), 'with when follow-on questions are asked');
@@ -161,13 +181,39 @@ const api = (method, p, b) => fetch(B + p, { method, headers: AH, body: b ? JSON
       const box = await m.$eval('.vqs-modal-box', (b) => { const r = b.getBoundingClientRect(); return [r.left, r.width]; });
       ok(box[0] === 0 && box[1] === 390, 'the preview fills the phone', box.join());
       const x = await m.$eval('.vqs-modal-x', (b) => b.getBoundingClientRect().bottom);
-      const phoneTop = await m.$eval('.vqs-modal .vqs-phone', (p) => p.getBoundingClientRect().top);
-      ok(x <= phoneTop, 'with its close button clear of the phone', `${x} vs ${phoneTop}`);
+      const phone = await m.$eval('.vqs-modal .vqs-dev', (p) => { const r = p.getBoundingClientRect(); return [r.top, r.left, r.right]; });
+      ok(x <= phone[0], 'with its close button clear of the phone', `${x} vs ${phone[0]}`);
+      ok(phone[1] >= 16 && phone[2] <= 374, 'and the whole phone on the screen', phone.join());
+      const pf = await m.frameLocator('#vqs-tpl-frame').locator('html').evaluate(() => innerWidth);
+      ok(pf === 390, 'still a real phone\'s layout inside', String(pf));
       await m.tap('.vqs-modal-x');
       await m.tap('#vqs-lib button[data-a="lib-open"][data-cat="all"]');
       await m.waitForSelector('#vqs-lib-grid .vqs-tcard');
       ok(await m.evaluate(() => document.documentElement.scrollWidth) <= 390, 'and so does the full library');
       await ctx.close();
+    }
+
+    console.log('\n== a small laptop screen ==');
+    {
+      const page = await browser.newPage({ viewport: { width: 1280, height: 700 } });
+      page.on('pageerror', (e) => errors.push(`small: ${e.message}`));
+      await page.goto(`${B}/portal.html#surveys`);
+      await signIn(page);
+      await page.waitForSelector('#vqs-lib .vqs-tcard', { timeout: 10000 });
+      await page.click('#vqs-lib .vqs-tcard[data-tpl="pharmacy"] button[data-a="tpl-preview"]');
+      await page.waitForSelector('.vqs-modal .vqs-dev', { timeout: 5000 });
+      const cap = await page.$eval('.vqs-modal .vqs-phone-cap', (c) => c.getBoundingClientRect().bottom);
+      ok(cap <= 700, 'the phone shrinks so it and its label fit the window', String(cap));
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.waitForTimeout(400);
+      const grown = await page.$eval('.vqs-modal .vqs-dev', (d) => d.getBoundingClientRect().width);
+      ok(Math.abs(grown - 300) < 0.5, 'and grows back when the window does', String(grown));
+      await page.close();
+      const live = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+      const made = (await api('GET', `/api/surveys?client_id=${shop.id}`)).surveys[0];
+      await live.goto(`${B}/s/${made.slug}?device=1`);
+      ok(!(await live.evaluate(() => document.documentElement.classList.contains('in-device'))), 'a live survey link never takes on the studio\'s phone mode');
+      await live.close();
     }
 
     console.log('\n== the CRM ==');

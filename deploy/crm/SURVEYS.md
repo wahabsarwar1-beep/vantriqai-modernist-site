@@ -264,6 +264,15 @@ the app):
   the business's own name, in English or Urdu, tappable all the way through —
   nothing answered there is saved or sent — beside every question it asks and
   when follow-on questions appear. Arrows step through the other templates.
+- **A real phone (v9.19.1).** The preview — and the live preview beside the
+  question builder — is a true-to-life phone: the page is laid out on a
+  390 × 844 screen (an everyday iPhone; most Androids are within a few
+  points), under a status bar and camera island and above the home bar, with
+  no desktop scroll bar, and the whole phone is drawn smaller to fit the
+  window. What is on its screen is exactly what a customer sees; "preview" is
+  said underneath instead. (The survey app only does this for a preview
+  opened with `device=1`; a live link never does.) A long business name now
+  wraps to a second line on every phone rather than being cut short.
 - **Use this template** goes to step 2: name, languages, colours, branches,
   review link and who gets unhappy answers; then **Create and go live**.
 
@@ -365,8 +374,8 @@ node test/surveys.test.js       # 142 checks through the API
 node test/after-chat.test.js    # 30 checks: the after-chat rules, one yes per conversation
 node test/own-survey.test.js    # 24 checks: our own surveys are made once, and only once
 node test/survey-access.test.js # 28 checks: off by default, only an admin switches it, what off and on mean
-node test/surveys-ui.test.js    # 44 checks in a real browser
+node test/surveys-ui.test.js    # 45 checks in a real browser
 node test/templates.test.js     # 63 checks: the library, industries, the starter survey, the preview page
-node test/templates-ui.test.js  # 52 checks: the library in the portal, on a phone and in the CRM
+node test/templates-ui.test.js  # 63 checks: the library and its phone preview in the portal, on a phone, a small laptop and the CRM
 node test/report.test.js        # the Pulse & Echo workbook, tab by tab, against known contacts
 ```

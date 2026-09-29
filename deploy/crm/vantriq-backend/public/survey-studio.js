@@ -374,9 +374,23 @@
       '.vqs-logic{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12.5px;}',
       '.vqs-logic select{width:auto;min-width:120px;flex:1 1 140px;}',
       '.vqs-phone-wrap{position:sticky;top:14px;}',
-      '.vqs-phone{width:100%;max-width:340px;height:640px;border-radius:38px;border:10px solid #16151a;background:#16151a;overflow:hidden;box-shadow:0 30px 60px -30px rgba(22,21,26,.5);margin:0 auto;}',
-      '.vqs-phone iframe{width:100%;height:100%;border:0;border-radius:28px;background:#fff;}',
-      '.vqs-phone-cap{text-align:center;font-size:11.5px;color:var(--muted,#6b645b);margin-top:8px;}',
+      '.vqs-phone-cap{text-align:center;font-size:11.5px;color:var(--muted,#6b645b);margin:12px auto 0;max-width:300px;line-height:1.45;}',
+      /* a real phone: the page inside is laid out on a 390 x 844 screen, then the whole phone is drawn at --s */
+      '.vqs-dev{--s:.72;position:relative;box-sizing:content-box;width:calc(390px * var(--s));height:calc(844px * var(--s));padding:11px;margin:0 auto;border-radius:calc(55px * var(--s) + 11px);'
+        + 'background:linear-gradient(150deg,#46464c 0%,#1b1b1f 14%,#0c0c0e 55%,#232327 88%,#3a3a40 100%);'
+        + 'box-shadow:inset 0 0 0 1.5px #5d5d64,inset 0 0 0 3.5px #0a0a0b,0 1px 2px rgba(0,0,0,.18),0 26px 50px -22px rgba(22,21,26,.55),0 60px 90px -60px rgba(22,21,26,.45);}',
+      '.vqs-dev::before,.vqs-dev::after{content:"";position:absolute;width:3px;background:linear-gradient(90deg,#1c1c1f,#3d3d43);}',
+      '.vqs-dev::before{left:-3px;top:calc(844px * var(--s) * .2 + 11px);height:calc(844px * var(--s) * .07);border-radius:2px 0 0 2px;box-shadow:0 calc(844px * var(--s) * .095) 0 #2a2a2e;}',
+      '.vqs-dev::after{right:-3px;top:calc(844px * var(--s) * .25 + 11px);height:calc(844px * var(--s) * .11);border-radius:0 2px 2px 0;}',
+      '.vqs-dev-screen{position:relative;width:100%;height:100%;border-radius:calc(55px * var(--s));overflow:hidden;background:#f7f5f1;isolation:isolate;box-shadow:0 0 0 1px #000;}',
+      '.vqs-dev-vp{position:absolute;top:0;left:0;width:390px;height:844px;transform:scale(var(--s));transform-origin:0 0;}',
+      '.vqs-dev-vp iframe{display:block;width:390px;height:844px;border:0;background:#f7f5f1;}',
+      '.vqs-dev-bar{position:absolute;top:0;left:0;right:0;height:54px;display:flex;align-items:center;justify-content:space-between;padding:3px 28px 0 46px;pointer-events:none;'
+        + 'font:600 16.5px/1 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;letter-spacing:-.01em;color:#0b0b0c;}',
+      '.vqs-dev-bar .ic{display:inline-flex;align-items:center;gap:6px;}',
+      '.vqs-dev-bar svg{display:block;}',
+      '.vqs-dev-island{position:absolute;top:11px;left:50%;width:122px;height:35px;margin-left:-61px;border-radius:20px;background:#000;pointer-events:none;}',
+      '.vqs-dev-home{position:absolute;bottom:8px;left:50%;width:136px;height:5px;margin-left:-68px;border-radius:3px;background:rgba(11,11,12,.85);pointer-events:none;}',
       /* share */
       '.vqs-url{display:flex;gap:8px;align-items:center;background:var(--border-2,#f0ece5);border-radius:12px;padding:8px 8px 8px 12px;}',
       '.vqs-url code{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--f-mono,monospace);font-size:12.5px;}',
@@ -430,13 +444,12 @@
       '.vqs-modal-box{position:relative;background:var(--card,#fff);color:var(--text,#16151a);border-radius:20px;max-width:900px;width:100%;max-height:calc(100vh - 36px);overflow:auto;padding:22px;box-shadow:0 30px 80px rgba(0,0,0,.35);}',
       '.vqs-modal-x{position:absolute;top:12px;right:12px;border:0;background:var(--border-2,#f0ece5);width:34px;height:34px;border-radius:50%;font-size:20px;line-height:1;cursor:pointer;color:var(--text,#16151a);z-index:1;}',
       '.vqs-modal-grid{display:grid;grid-template-columns:320px minmax(0,1fr);gap:24px;align-items:start;}',
-      '.vqs-modal .vqs-phone{height:600px;}',
       '.vqs-modal h2{padding-right:36px;}',
       '.vqs-qlist{margin:6px 0 14px;padding:0 0 0 22px;font-size:13px;line-height:1.5;}',
       '.vqs-qlist li{margin:0 0 5px;}',
       '.vqs-qlist .cond{font-size:11.5px;color:var(--muted,#6b645b);}',
       '.vqs-steppers{display:flex;justify-content:space-between;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border-2,#f0ece5);}',
-      '@media (max-width:760px){.vqs-modal{padding:0;align-items:stretch;}.vqs-modal-box{border-radius:0;max-height:100vh;height:100%;padding:56px 16px 16px;}.vqs-modal-grid{grid-template-columns:1fr;}.vqs-modal .vqs-phone{height:540px;max-width:100%;border-width:6px;border-radius:26px;}}',
+      '@media (max-width:760px){.vqs-modal{padding:0;align-items:stretch;}.vqs-modal-box{border-radius:0;max-height:100vh;height:100%;padding:56px 16px 16px;}.vqs-modal-grid{grid-template-columns:1fr;}}',
     ].join('\n');
     var el = document.createElement('style');
     el.id = 'vqs-styles';
@@ -705,7 +718,8 @@
     if (!x) return '';
     var name = ctxCompany() || 'Your business';
     var ind = industryOf(ctxClientId());
-    var src = '/s/_template/' + encodeURIComponent(x.key) + '?business=' + encodeURIComponent(name);
+    var src = '/s/_template/' + encodeURIComponent(x.key) + '?device=1&business=' + encodeURIComponent(name);
+    var narrow = window.innerWidth <= 760;
     var list = st.templates.filter(tplMatches);
     if (!list.some(function(y){ return y.key === x.key; })) list = st.templates;
     var at = list.findIndex(function(y){ return y.key === x.key; });
@@ -714,8 +728,9 @@
       + '<div class="vqs-modal-box" role="dialog" aria-modal="true" aria-labelledby="vqs-tpl-h">'
       + '<button type="button" class="vqs-modal-x" data-a="tpl-close" aria-label="Close the preview">×</button>'
       + '<div class="vqs-modal-grid">'
-      + '<div><div class="vqs-phone"><iframe id="vqs-tpl-frame" title="The ' + esc(x.name) + ' survey, as a customer sees it" src="' + esc(src) + '"></iframe></div>'
-      + '<div class="vqs-phone-cap">Tap through it as a customer would — nothing answered here is saved.</div></div>'
+      + '<div>' + device('<iframe id="vqs-tpl-frame" title="The ' + esc(x.name) + ' survey, as a customer sees it" src="' + esc(src) + '"></iframe>',
+        narrow ? Math.min(340, window.innerWidth - 32) : 300, narrow ? 0 : 150)
+      + '<div class="vqs-phone-cap">Preview — tap through it as a customer would. Nothing answered here is saved.</div></div>'
       + '<div>'
       + '<div class="vqs-row"><span class="vqs-tico">' + esc(x.icon) + '</span><span class="vqs-tag">' + esc(x.category_label) + '</span>'
       + (x.key === ind ? '<span class="vqs-tag best">✓ Your industry</span>' : '') + (x.popular ? '<span class="vqs-tag pop">Popular</span>' : '') + '</div>'
@@ -752,6 +767,7 @@
     var wasOpen = !!modalEl.firstChild;
     if (html && !wasOpen) modalFrom = document.activeElement;
     modalEl.innerHTML = html ? '<div class="vqs">' + html + '</div>' : '';
+    if (html) fitDevices(modalEl);
     document.body.classList.toggle('vqs-noscroll', !!html);
     if (html) { var x = modalEl.querySelector('.vqs-modal-x'); if (x) x.focus(); }
     else if (wasOpen && modalFrom && document.body.contains(modalFrom)) { try { modalFrom.focus(); } catch (e) { /* gone */ } }
@@ -1224,11 +1240,45 @@
     return q;
   }
 
+  /* ---------------------------- A real phone ---------------------------- */
+  // A preview is the page as it really is on a phone: laid out on a 390 x 844
+  // screen (an everyday iPhone; most Androids are within a few points of it),
+  // under a status bar and camera island and above the home bar, then the
+  // whole phone is drawn smaller to fit. Never the page squeezed into a box.
+  var PHONE_W = 390, PHONE_H = 844, BEZEL = 11;
+  var SB_SIGNAL = '<svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="7.5" width="3.2" height="4.5" rx="1"/><rect x="4.9" y="5" width="3.2" height="7" rx="1"/><rect x="9.8" y="2.5" width="3.2" height="9.5" rx="1"/><rect x="14.7" y="0" width="3.2" height="12" rx="1"/></svg>';
+  var SB_WIFI = '<svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.4c2.3 0 4.4.9 6 2.4l1.2-1.3A10.3 10.3 0 0 0 8.5.6 10.3 10.3 0 0 0 1.3 3.5l1.2 1.3a8.5 8.5 0 0 1 6-2.4z"/><path d="M8.5 5.9c1.4 0 2.6.5 3.6 1.4l1.2-1.3a6.9 6.9 0 0 0-9.6 0l1.2 1.3c1-.9 2.2-1.4 3.6-1.4z"/><path d="M8.5 9.3c.5 0 1 .2 1.3.5L8.5 11.2 7.2 9.8c.3-.3.8-.5 1.3-.5z"/></svg>';
+  var SB_BATTERY = '<svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".38"/><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"/><path d="M25 4.4v4.2a2.3 2.3 0 0 0 0-4.2z" fill="currentColor" opacity=".4"/></svg>';
+  /** How small to draw the phone: as wide as the room allows, and short enough to fit the window when asked. */
+  function phoneScale(maxW, fitH){
+    var sc = (maxW - 2 * BEZEL) / PHONE_W;
+    if (fitH) sc = Math.min(sc, (window.innerHeight - fitH - 2 * BEZEL) / PHONE_H);
+    return Math.max(0.42, Math.min(0.86, sc));
+  }
+  function device(iframe, maxW, fitH){
+    return '<div class="vqs-dev" data-max-w="' + maxW + '"' + (fitH ? ' data-fit-h="' + fitH + '"' : '') + ' style="--s:' + phoneScale(maxW, fitH).toFixed(4) + '">'
+      + '<div class="vqs-dev-screen"><div class="vqs-dev-vp">' + iframe
+      + '<div class="vqs-dev-bar" aria-hidden="true"><span>9:41</span><span class="ic">' + SB_SIGNAL + SB_WIFI + SB_BATTERY + '</span></div>'
+      + '<div class="vqs-dev-island" aria-hidden="true"></div><div class="vqs-dev-home" aria-hidden="true"></div>'
+      + '</div></div></div>';
+  }
+  /** Once drawn: fit each phone to the room it really has (a narrow column, a small window). */
+  function fitDevices(scope){
+    if (!scope) return;
+    var list = scope.querySelectorAll('.vqs-dev');
+    for (var i = 0; i < list.length; i++) {
+      var el = list[i], maxW = Number(el.getAttribute('data-max-w')) || 320;
+      var room = el.parentNode ? el.parentNode.clientWidth : 0;
+      el.style.setProperty('--s', phoneScale(room ? Math.min(maxW, room) : maxW, Number(el.getAttribute('data-fit-h')) || 0).toFixed(4));
+    }
+  }
+
   /* ---------------------------- Live phone preview ---------------------------- */
   function phone(){
     var s = st.survey;
-    return '<div class="vqs-phone-wrap"><div class="vqs-phone"><iframe id="vqs-preview" title="Live preview" src="/s/' + encodeURIComponent(s.slug) + '?preview=1"></iframe></div>'
-      + '<div class="vqs-phone-cap">Live preview — nothing you do here is recorded</div></div>';
+    return '<div class="vqs-phone-wrap">'
+      + device('<iframe id="vqs-preview" title="Live preview" src="/s/' + encodeURIComponent(s.slug) + '?preview=1&device=1"></iframe>', 332, 64)
+      + '<div class="vqs-phone-cap">Live preview, as it looks on a customer’s phone — nothing you do here is recorded</div></div>';
   }
   var previewTimer = null, pendingGoto = null;
   function pushPreview(goto){
@@ -1636,6 +1686,7 @@
     } else if (fresh) {
       fresh.addEventListener('load', function(){ pushPreview(st.openQ); });
     }
+    if (fresh) fitDevices(root);
     if (st.view === 'home' && st.dash && !st.dash.error && window.VQA) {
       var dd = st.dash;
       if (window.requestAnimationFrame) requestAnimationFrame(function(){ window.VQA.drawEcho(dd); }); else window.VQA.drawEcho(dd);
@@ -1660,7 +1711,15 @@
       el.addEventListener('keydown', onKey);
       el.__vqs = true;
     }
-    if (!mount.docKeys) { document.addEventListener('keydown', onDocKey); mount.docKeys = true; }
+    if (!mount.docKeys) {
+      document.addEventListener('keydown', onDocKey);
+      var fitT = null;
+      window.addEventListener('resize', function(){
+        clearTimeout(fitT);
+        fitT = setTimeout(function(){ fitDevices(root); fitDevices(modalEl); }, 120);
+      });
+      mount.docKeys = true;
+    }
     if (!st.loaded) { st.loaded = true; loadHome(); loadTemplates().catch(function(){}); }
     render();
   }

@@ -194,6 +194,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const frame = page.frameLocator('#vqs-preview');
     const previewTitle = await frame.locator('.qtitle').innerText().catch(() => '');
     ok(previewTitle === 'How was your visit today?', 'the phone preview shows the edit as it is typed', previewTitle);
+    const phoneW = await frame.locator('html').evaluate(() => innerWidth);
+    ok(phoneW === 390 && !!(await page.$('.vqs-phone-wrap .vqs-dev .vqs-dev-bar')), 'on a real phone\'s screen, with its status bar (v9.19.1)', String(phoneW));
     ok(!!(await page.$('#vqs-savebar')), 'and the save bar appears');
     await page.click('.vqs-savebar .vqs-btn.primary');
     await page.waitForFunction(() => !document.getElementById('vqs-savebar'), null, { timeout: 8000 }).catch(() => {});
