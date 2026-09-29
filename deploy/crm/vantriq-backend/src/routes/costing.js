@@ -14,6 +14,8 @@ const router = express.Router();
  *   PUT    /api/costing                 change rates and/or assumptions
  *                                       { rates: {key: {input, output, ...}|null},
  *                                         assumptions: {...}, utilization }
+ *                                       utilization is the costing's own typical
+ *                                       use (0.1–1), not Financials' projection
  *   PATCH  /api/costing/packages/:id    one package's cost profile
  *   POST   /api/costing/reset           back to the business model's defaults
  *
@@ -27,16 +29,12 @@ router.get('/', async (req, res) => {
 });
 
 router.put('/', async (req, res) => {
-  const body = req.body || {};
+  const body = { ...(req.body || {}) };
+  if (body.utilization !== undefined) {
+    body.assumptions = { ...(body.assumptions || {}), utilization: body.utilization };
+  }
   const { stored } = await C.inputs();
   const next = C.applyChange(stored, body);
-  if (body.utilization !== undefined) {
-    const u = Number(body.utilization);
-    if (!Number.isFinite(u) || u < 0.1 || u > 1) {
-      throw new C.CostingError(400, 'Utilisation must be between 10% and 100%.');
-    }
-    await db.query(`update settings set utilization = $1 where id = 1`, [u]);
-  }
   await db.query(`update settings set costing = $1::jsonb where id = 1`, [JSON.stringify(next)]);
   await C.syncDeliveryCosts();
   res.json(await C.costingModel());

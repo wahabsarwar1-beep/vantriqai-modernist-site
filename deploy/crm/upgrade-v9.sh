@@ -440,6 +440,11 @@ else
   ADDONS=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
     -c "select count(*) from catalog_addons where active" 2>/dev/null || echo '?')
   ok "add-ons in the catalogue: $ADDONS (capabilities, solutions, Pulse, Echo, Human Support…)"
+  ECHO_PRICE=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At -F '|' \
+    -c "select coalesce(max(case when key='echo' then setup_fee::int||' + '||monthly_fee::int||'/mo' end),'missing'),
+               coalesce(max(case when key='echo-location' then setup_fee::int||' + '||monthly_fee::int||'/mo' end),'missing')
+          from catalog_addons" 2>/dev/null || echo '?|?')
+  ok "Vantriq Echo price: first location PKR ${ECHO_PRICE%|*}, each further location PKR ${ECHO_PRICE#*|}"
   # The costing model, as the Products & Pricing page shows it: every package
   # costed at today's model prices. Prints costs and margins — which are ours,
   # not customers' data — so an unexpected figure is visible in the log.
@@ -585,5 +590,9 @@ cat <<'NEXT'
      the steady state. "Rates & assumptions" changes a model price or the
      exchange rate and re-costs everything, Financials included. Prices
      themselves stay locked to the business model.
+
+ 11. Vantriq Echo pricing (v9.20.1): PKR 12,000 setup + 6,000/month for the
+     first location, 2,000 + 1,500/month for each further one; more than 10
+     priced on scope. Why, and the margins: deploy/crm/SURVEYS.md.
 NEXT
 printf '\n'

@@ -48,6 +48,50 @@ addresses over the public internet and prints what a visitor gets.
 
 ---
 
+## What Echo costs a client, and why (v9.20.1)
+
+Echo is an add-on on any package, priced in the CRM's add-ons catalogue
+(Products & Pricing → Add-ons catalogue):
+
+| | Setup (one-time) | Monthly |
+|---|---|---|
+| Vantriq Echo — first location, unlimited surveys and responses | PKR 12,000 | PKR 6,000 |
+| Each additional location (branch, outlet, site) | PKR 2,000 | PKR 1,500 |
+| More than 10 locations | priced on scope | priced on scope |
+
+So one branch pays PKR 6,000 a month, five pay 12,000 and ten pay 19,500.
+
+**Why it is priced this way.** Echo has no AI or messaging cost of its own.
+Its themes are counted words, not generated. Survey messages go out on the
+client's own WhatsApp number and their provider bills them. What it costs
+us is time:
+- about 2.5 hours to set up: branding, the first survey, QR posters, the
+  after-chat hook and a handover;
+- about 30 minutes a month of results review and support;
+- about 30 minutes more to set up each extra location, plus a few minutes a
+  month to look after it.
+
+Costed as in the business model (founder and contracted time split evenly,
+PKR 2,250 an hour), that is:
+
+| | Setup margin | Monthly margin |
+|---|---|---|
+| First location | 53% | 75% |
+| Each extra location | 44% | 80% |
+
+At any size the monthly margin stays at 75% or more. Even if the founder
+does all of it (PKR 3,000 an hour), the margins stay near 69% monthly and
+38% on setup.
+
+The entry price sits below every capability add-on: image recognition is
+9,000 a month, web chat 10,000 and voice 12,000. That makes Echo an easy
+yes for a single-branch Starter client (+30% on a 20,000 plan). A chain
+pays in step with what it gets and with what it takes to serve.
+
+If a deal needs a sweetener, waive the setup rather than cut the monthly.
+Waiving it costs about PKR 5,600 once; a lower monthly costs the same
+every month.
+
 ## Switching surveys on for a client (admin)
 
 Surveys are a service a client signs up for, not something every account has.

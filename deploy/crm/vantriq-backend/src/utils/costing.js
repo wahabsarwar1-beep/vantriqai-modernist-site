@@ -18,13 +18,16 @@ class CostingError extends Error {
 async function inputs() {
   const [{ rows: products }, { rows: s }] = await Promise.all([
     db.query(`select * from products where archived = false order by sort_order asc, created_at asc`),
-    db.query(`select costing, utilization from settings where id = 1`),
+    db.query(`select costing from settings where id = 1`),
   ]);
   const row = s[0] || {};
+  // Utilisation is the costing's own assumption (the business model's 70%
+  // unless an admin changes it here), NOT the projection knob on Financials.
+  // Sharing that one meant a Financials set to a cautious 100% turned every
+  // "margin at typical use" into a second "margin at full use".
   return {
     products,
     stored: row.costing && typeof row.costing === 'object' ? row.costing : {},
-    utilization: Number(row.utilization) || engine.ASSUMPTIONS.utilization,
   };
 }
 
@@ -49,8 +52,8 @@ function addonEconomics(addon, a) {
 
 /** The whole model: every package's economics, the steady state, the what-if, the flags. */
 async function costingModel({ withAddons = true } = {}) {
-  const { products, stored, utilization } = await inputs();
-  const model = engine.model(products, stored, { utilization });
+  const { products, stored } = await inputs();
+  const model = engine.model(products, stored);
   if (withAddons) {
     const { rows } = await db.query(`select * from catalog_addons order by sort_order, name`);
     model.addons = rows.map((r) => ({ ...r, ...addonEconomics(r, model.assumptions) }));
@@ -85,6 +88,7 @@ async function syncDeliveryCosts() {
 
 const LIMITS = {
   fx_usd_pkr: [50, 2000, 'The exchange rate'],
+  utilization: [0.1, 1, 'Utilisation'],
   user_tokens: [1, 5000, 'Tokens in a customer message'],
   reply_tokens: [1, 5000, 'Tokens in a reply'],
   founder_rate: [0, 100000, 'The founder hourly rate'],

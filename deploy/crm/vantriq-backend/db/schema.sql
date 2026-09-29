@@ -1995,9 +1995,13 @@ values
    'Invoices, usage, statements, Pulse, customers and surveys in one sign-in — in the browser, or as the VantriqAI app on Android.',
    0, 0, 'included', '', 'Every plan', 0, 0, '', true, 320),
   ('echo', 'Vantriq Echo', 'insight',
-   'Customer-satisfaction surveys in English and Urdu — after a WhatsApp chat, by QR code, link, kiosk or on your site — from 28 ready-made industry templates, with every answer flowing into Pulse.',
-   15000, 8000, 'fixed', '', 'Any package', 300, 3,
-   'Runs on the CRM itself; survey messages sent through your own WhatsApp number are billed to you by your provider.', true, 330),
+   'Customer-satisfaction surveys in English and Urdu — after a WhatsApp chat, by QR code, link, kiosk or on your site — from 28 ready-made industry templates, with alerts on unhappy customers, follow-ups, and every answer flowing into Pulse.',
+   12000, 6000, 'fixed', 'First location included · unlimited surveys and responses', 'Any package', 1500, 2.5,
+   'No AI or messaging cost of its own: themes are counted, not generated, and survey messages go out on the client''s own WhatsApp number, billed by their provider. The cost is people: about 2.5 hours to set up (branding, the first survey, QR posters, the after-chat hook, a handover) and about 30 minutes a month of results review and support, plus a share of the server.', true, 330),
+  ('echo-location', 'Vantriq Echo — additional location', 'insight',
+   'Another branch, outlet or site on Echo: its own survey link, QR poster and kiosk, and its own line in every result, so branches can be compared like for like.',
+   2000, 1500, 'fixed', 'Per location, up to 10 · more than 10 priced on scope', 'With Vantriq Echo', 300, 0.5,
+   'About 30 minutes to set up each location and a few minutes a month after that.', true, 335),
   ('human-support', 'Human Support', 'insight',
    'AI assist for your team: when a person takes over a chat, it hands them the summary, the customer''s history and a drafted reply in the customer''s language — they decide what is sent.',
    20000, 15000, 'fixed', '', 'Any package', 2000, 6, 'A summary and a drafted reply per handover, at about 1,000 handovers a month.', true, 340),
@@ -2009,3 +2013,31 @@ values
    null, null, 'scope', 'Priced on scope', 'From Scale', 0, 0, '', false, 410)
 on conflict (key) do nothing;
 
+-- v9.20.1 — Vantriq Echo, priced on what it costs to run.
+--
+-- v9.20.0 seeded Echo at a provisional 15,000 setup + 8,000 a month, flat,
+-- whatever the size of the business. Echo has no AI or messaging cost of its
+-- own — the cost is setup time and a short monthly review, and both grow with
+-- the number of locations. So it is now PKR 12,000 + 6,000 a month for the
+-- first location (unlimited surveys and responses) and PKR 2,000 + 1,500 a
+-- month for each further one: about a 75% monthly and a 50% setup margin at
+-- any size, and a single branch pays less than it did while a chain pays in
+-- step with what it gets. More than ten locations is priced on scope.
+--
+-- Once, and only where Echo still carries the provisional figures: a price an
+-- admin has already set is theirs, and is never overwritten.
+do $$
+begin
+  if exists (select 1 from applied_migrations where name = 'v9_20_1_echo_pricing') then
+    return;
+  end if;
+  update catalog_addons set
+      setup_fee = 12000, monthly_fee = 6000,
+      price_note = 'First location included · unlimited surveys and responses',
+      est_monthly_cost = 1500, est_build_hours = 2.5,
+      summary = 'Customer-satisfaction surveys in English and Urdu — after a WhatsApp chat, by QR code, link, kiosk or on your site — from 28 ready-made industry templates, with alerts on unhappy customers, follow-ups, and every answer flowing into Pulse.',
+      cost_note = 'No AI or messaging cost of its own: themes are counted, not generated, and survey messages go out on the client''s own WhatsApp number, billed by their provider. The cost is people: about 2.5 hours to set up (branding, the first survey, QR posters, the after-chat hook, a handover) and about 30 minutes a month of results review and support, plus a share of the server.'
+   where key = 'echo' and setup_fee = 15000 and monthly_fee = 8000;
+  insert into applied_migrations (name, note)
+  values ('v9_20_1_echo_pricing', 'Vantriq Echo: 12,000 + 6,000/mo for the first location, 2,000 + 1,500/mo per further location.');
+end $$;

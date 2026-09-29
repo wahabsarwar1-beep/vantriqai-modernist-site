@@ -92,6 +92,22 @@ const LADDER = [
     'an admin gets the whole model, add-ons included', r.status);
   const starter = r.body.packages.find((p) => p.name === 'Starter');
 
+  // Vantriq Echo, priced on what it costs to run (v9.20.1).
+  const echo = r.body.addons.find((a) => a.key === 'echo');
+  const loc = r.body.addons.find((a) => a.key === 'echo-location');
+  ok(echo && Number(echo.setup_fee) === 12000 && Number(echo.monthly_fee) === 6000,
+    'Echo is PKR 12,000 setup + 6,000 a month for the first location', echo && `${echo.setup_fee} + ${echo.monthly_fee}`);
+  ok(loc && Number(loc.setup_fee) === 2000 && Number(loc.monthly_fee) === 1500,
+    'each further location is PKR 2,000 + 1,500 a month', loc && `${loc.setup_fee} + ${loc.monthly_fee}`);
+  ok(echo && echo.monthly_margin >= 0.7 && echo.setup_margin >= 0.5, 'Echo keeps a prudent margin (75% monthly, 53% setup)',
+    echo && `${echo.monthly_margin}, ${echo.setup_margin}`);
+  ok(loc && loc.monthly_margin >= 0.75 && loc.setup_margin >= 0.4, 'and so does each location (80% monthly, 44% setup)',
+    loc && `${loc.monthly_margin}, ${loc.setup_margin}`);
+  const chain = (n) => Number(echo.monthly_fee) + (n - 1) * Number(loc.monthly_fee);
+  const chainCost = (n) => Number(echo.est_monthly_cost) + (n - 1) * Number(loc.est_monthly_cost);
+  ok(chain(5) === 12000 && chain(10) === 19500 && (chain(10) - chainCost(10)) / chain(10) > 0.75,
+    'five branches pay 12,000 a month and ten 19,500, still above 75% margin', `${chain(5)}, ${chain(10)}`);
+
   r = await call('PUT', '/api/costing', { assumptions: { fx_usd_pkr: 300 } });
   const moved = r.body.packages.find((p) => p.name === 'Starter');
   ok(r.status === 200 && moved.cost_per_session > starter.cost_per_session, 'a new exchange rate re-costs every package', r.status);
@@ -99,6 +115,26 @@ const LADDER = [
   ok(Number(prod[0].delivery_cost_full) === moved.ai_full, 'and writes the delivery cost Financials reads',
     `${prod[0].delivery_cost_full} vs ${moved.ai_full}`);
   ok(/GPT-4o mini; 2% escalated to Claude Sonnet 5\.5/.test(prod[0].ai_model), 'the routing line on the package is the model\'s', prod[0].ai_model);
+
+  // Financials' projection setting must not leak into the business model's
+  // typical-use margin (production runs Financials at a cautious 100%).
+  const { rows: su } = await db.query(`select utilization from settings where id = 1`);
+  await db.query(`update settings set utilization = 1 where id = 1`);
+  try {
+    r = await call('GET', '/api/costing');
+    const st = r.body.packages.find((p) => p.name === 'Starter');
+    ok(r.body.assumptions.utilization === 0.7 && st.margin_util > st.margin_full,
+      'typical use stays the business model\'s 70% whatever Financials projects at',
+      `${r.body.assumptions.utilization}, ${st.margin_util} vs ${st.margin_full}`);
+  } finally {
+    await db.query(`update settings set utilization = $1 where id = 1`, [su[0].utilization]);
+  }
+  r = await call('PUT', '/api/costing', { utilization: 0.5 });
+  ok(r.status === 200 && r.body.assumptions.utilization === 0.5, 'typical use can be changed in Rates & assumptions', r.status);
+  const { rows: su2 } = await db.query(`select utilization from settings where id = 1`);
+  ok(Number(su2[0].utilization) === Number(su[0].utilization), 'without touching the Financials projection setting', su2[0].utilization);
+  r = await call('PUT', '/api/costing', { utilization: 5 });
+  ok(r.status === 400, 'a utilisation over 100% is refused', r.status);
 
   r = await call('PATCH', `/api/costing/packages/${starter.id}`, { premium_share: 1.5 });
   ok(r.status === 400, 'a premium share over 100% is refused', r.status);

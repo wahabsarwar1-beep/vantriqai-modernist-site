@@ -87,7 +87,7 @@ module.exports = (function () {
     reply_tokens: 80,             // the agent's reply
     founder_rate: 3000,           // PKR per hour — an opportunity cost, not cash
     contractor_rate: 1500,        // PKR per hour — contracted build and support
-    utilization: 0.70,            // share of the allowance an average client uses (Settings)
+    utilization: 0.70,            // share of the allowance a typical client uses (the business model's figure)
     infra_monthly: 1668,          // one server: n8n, the CRM, Postgres — the whole business
     sales_hours_per_win: 5,       // unbilled selling to win one client
     adhoc_hours_per_month: 0.5,   // unplanned requests beyond the management budget
@@ -359,7 +359,7 @@ module.exports = (function () {
    *
    * @param {object[]} products  rows from the products table
    * @param {object}   stored    { rates: {key: {...}}, assumptions: {...} } overrides
-   * @param {object}   extra     values that live elsewhere (utilization from Settings)
+   * @param {object}   extra     values to force over the stored ones (tests, what-ifs)
    */
   function model(products, stored, extra, today) {
     const s = stored && typeof stored === 'object' ? stored : {};
