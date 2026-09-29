@@ -274,7 +274,16 @@ async function allContacts(clientId = null) {
        left join talk on talk.client_id = b.client_id and talk.key = b.key
        left join contacts p on p.client_id = b.client_id and p.contact_key = b.key
        left join sat on sat.client_id = b.client_id and sat.key = b.key
-       left join clients l on c.is_internal and l.external_ref = 'wa-' || b.key
+       -- VantriqAI's own customers are its leads: filed as wa-<number> by the
+       -- WhatsApp agent, web-<chat id>-<time> by the website assistant (one
+       -- lead each time the visitor gives their details; the latest wins).
+       left join lateral (
+         select l.name, l.email, l.company, l.stage, l.source from clients l
+          where c.is_internal and not l.is_internal
+            and (l.external_ref in ('wa-' || b.key, 'web-' || b.key)
+                 or left(l.external_ref, length(b.key) + 5) = 'web-' || b.key || '-')
+          order by l.created_at desc limit 1
+       ) l on true
       order by greatest(act.last_at, talk.last_at) desc nulls last, p.updated_at desc nulls last`,
     [clientId]
   );
@@ -418,7 +427,7 @@ async function contactDetail(clientId, key) {
          from conversation_messages m left join client_agents a on a.id = m.agent_id
         where (${CONTACT_OF('m.session_id')} = $2
                and (m.client_id = $1 or m.agent_id in (select id from client_agents where client_id = $1)))
-           or ($3 and m.external_ref = 'wa-' || $2)
+           or ($3 and m.external_ref in ('wa-' || $2, 'web-' || $2))
         order by m.created_at desc limit 2000`,
       [clientId, k, internal]
     ),
@@ -501,7 +510,82 @@ async function contactDetail(clientId, key) {
   };
 }
 
+/* ------------------------------------------------------------------ */
+/* Website chats nobody owned                                           */
+/* ------------------------------------------------------------------ */
+
+const DAY_MS = 86400000;
+const dayOf = (t, offset = 0) => new Date(new Date(t).getTime() + offset * DAY_MS).toISOString().slice(0, 10);
+
+/**
+ * Puts website chat lines that belong to no business where they belong.
+ *
+ * Until v9.20.4 the website assistant filed each chat's lines under the
+ * chat's own id ('web-<chat id>') with no day: a ref no business owns. The
+ * lines were stored, but no Customers page could show them — and on the first
+ * days, when that id was also a new lead's ref, they were filed under the lead
+ * instead of the business whose agent had the conversation.
+ *
+ * Each line goes to the agent that metered the same chat, in the conversation
+ * usage counted it under (the nearest in time, a day either side). A chat
+ * never metered — the AI failed before it answered — goes to VantriqAI's own
+ * website assistant, the only agent that ever wrote these refs. Runs on every
+ * migrate; a line already placed is never touched again.
+ */
+async function placeOrphanTranscripts(q = db) {
+  const { rows } = await q.query(
+    `select m.id, m.session_id, m.external_ref, m.created_at
+       from conversation_messages m
+      where m.agent_id is null and m.channel = 'website' and m.external_ref like 'web-%'
+        and (m.client_id is null
+             or exists (select 1 from clients l where l.id = m.client_id and not l.is_internal and l.external_ref = m.external_ref))`
+  );
+  const out = { found: rows.length, metered: 0, assistant: 0, left: 0 };
+  if (!rows.length) return out;
+
+  const keyFor = (m) => keyOf(m.session_id || m.external_ref.slice(4));
+  const candidates = [...new Set(rows.flatMap((m) => [-1, 0, 1].map((d) => `${keyFor(m)}-${dayOf(m.created_at, d)}`)))];
+  const { rows: usage } = await q.query(
+    `select session_id, client_id, agent_id, occurred_at from usage_events
+      where session_id = any($1::text[]) and agent_id is not null`,
+    [candidates]
+  );
+  const { rows: site } = await q.query(
+    `select a.id, a.client_id from client_agents a join clients c on c.id = a.client_id
+      where c.is_internal and a.kind = 'website'`
+  );
+  const assistant = site.length === 1 ? site[0] : null;
+
+  const ids = []; const sessions = []; const clients = []; const agents = [];
+  for (const m of rows) {
+    const key = keyFor(m);
+    const at = new Date(m.created_at).getTime();
+    const near = usage
+      .filter((u) => keyOf(u.session_id) === key && Math.abs(new Date(u.occurred_at).getTime() - at) <= 1.5 * DAY_MS)
+      .sort((a, b) => Math.abs(new Date(a.occurred_at).getTime() - at) - Math.abs(new Date(b.occurred_at).getTime() - at))[0];
+    if (near) {
+      ids.push(m.id); sessions.push(near.session_id); clients.push(near.client_id); agents.push(near.agent_id);
+      out.metered++;
+    } else if (assistant) {
+      ids.push(m.id); sessions.push(`${key}-${dayOf(m.created_at)}`); clients.push(assistant.client_id); agents.push(assistant.id);
+      out.assistant++;
+    } else {
+      out.left++;
+    }
+  }
+  if (ids.length) {
+    await q.query(
+      `update conversation_messages m
+          set session_id = x.session_id, client_id = x.client_id, agent_id = x.agent_id
+         from unnest($1::uuid[], $2::text[], $3::uuid[], $4::uuid[]) as x(id, session_id, client_id, agent_id)
+        where m.id = x.id and m.agent_id is null`,
+      [ids, sessions, clients, agents]
+    );
+  }
+  return out;
+}
+
 module.exports = {
   ContactError, CONTACT_OF, keyOf, phoneDigits, normCity, normGender, normAge, AGE_BANDS, countryOf, labelOf,
-  cleanAuto, fillProfile, editProfile, allContacts, listContacts, contactDetail, SEGMENTS,
+  cleanAuto, fillProfile, editProfile, allContacts, listContacts, contactDetail, placeOrphanTranscripts, SEGMENTS,
 };

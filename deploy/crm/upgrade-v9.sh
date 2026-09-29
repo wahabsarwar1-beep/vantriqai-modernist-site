@@ -474,6 +474,20 @@ else
           from conversation_messages" 2>/dev/null || echo '?|?|?|?')
   IFS='|' read -r T_ALL T_WEEK T_FAILED T_LAST <<< "$TRANSCRIPTS"
   ok "transcript lines kept: $T_ALL ($T_WEEK in the last 7 days, latest $T_LAST Karachi time); agent replies not delivered: $T_FAILED"
+  # v9.20.4: website chats, counts only. The migrate above placed every line a
+  # website chat had filed under no business; any still unplaced is stored but
+  # shows on no Customers page, so it is worth a warning — not a failed deploy.
+  WEBCHATS=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At -F '|' \
+    -c "select count(*), count(distinct regexp_replace(session_id, '-[0-9]{4}-[0-9]{2}-[0-9]{2}\$', '')) filter (where agent_id is not null),
+               count(*) filter (where agent_id is null and client_id is null),
+               coalesce(to_char(max(created_at) at time zone 'Asia/Karachi', 'DD Mon HH24:MI'), 'never')
+          from conversation_messages where channel = 'website'" 2>/dev/null || echo '?|?|?|?')
+  IFS='|' read -r W_ALL W_VISITORS W_LOOSE W_LAST <<< "$WEBCHATS"
+  if [ "$W_LOOSE" = "0" ]; then
+    ok "website chat lines: $W_ALL from $W_VISITORS visitors, each with its business (latest $W_LAST Karachi time)"
+  else
+    warn "website chat lines: $W_ALL, of which $W_LOOSE belong to no business — stored, but on no Customers page"
+  fi
   # Whether an unhappy answer is actually emailed to anyone. Reported, never
   # failed on — and this log is public, so it says yes or no, nothing more.
   MAIL_SET=$(docker exec "$APP_CONTAINER" node -e "require('dotenv').config();process.stdout.write(require('/app/src/utils/mailer').mailDiagnosis().configured?'yes':'no')" 2>/dev/null || echo '?')
@@ -613,5 +627,12 @@ cat <<'NEXT'
      once an hour per agent, with the fix for that cause. n8n sends each
      WhatsApp message's id, so a retry or a history backfill never stores a
      line twice.
+
+ 13. Website chats (v9.20.4). Someone who chats on a client's website is a
+     customer like any other: Customers → "Web visitor 1b2c3d" (their name
+     once they give it), every line of the chat on their page — in the CRM
+     and in that client's portal. Chats stored under no business before now
+     were placed on this deploy (counted above). New client agents copy the
+     transcript step from the wiring kit: vantriq-backend/n8n/README.md.
 NEXT
 printf '\n'

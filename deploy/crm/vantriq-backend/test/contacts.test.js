@@ -241,6 +241,65 @@ async function makeClient(tag) {
       'a line backfilled later still reads in the order it was said', nd2.conversations_list[0].transcript.map((l) => l.content).join(' | '));
     const bd = (await call('GET', `/api/contacts/${c1.id}/${P.bilal}`)).body;
     ok(!bd.has_transcripts && bd.transcripts_from, 'Bilal has no transcript, but the page can say since when they are kept', JSON.stringify({ h: bd.has_transcripts, f: bd.transcripts_from }));
+
+    console.log('\n== v9.20.4: website visitors ==');
+    // Client one's website assistant meters a chat under the chat's own id and
+    // a day, and sends the words under its site — the way n8n now does.
+    const web = (await post('/api/agents', { client_id: c1.id, name: 'one Website', kind: 'website', external_ref: `contacts-site-${stamp}.example` })).body;
+    ok(web && web.id, 'client one also has a website assistant', JSON.stringify(web));
+    const chat = `c0ffee00-${stamp}-4a5b`;
+    const chatDay = `${chat}-${day(at(0, 10))}`;
+    await post('/api/webhooks/usage', { agent_ref: web.external_ref, session_id: chatDay, channel: 'website', messages_count: 1, occurred_at: at(0, 10).toISOString() });
+    const wt = await post('/api/webhooks/conversation', { external_ref: web.external_ref, session_id: chatDay, channel: 'website',
+      messages: [{ role: 'customer', content: 'Do you take bookings online?', at: at(0, 10).toISOString(), id: `${chat}:1:in` },
+        { role: 'agent', content: 'Yes — our Booking Agent does.', at: at(0, 9).toISOString(), id: `${chat}:1:out` }] });
+    ok(wt.status === 201 && wt.body.client_id === c1.id && wt.body.agent_id === web.id, 'a website chat sent under the site lands with its business', JSON.stringify(wt.body));
+
+    // What the website assistant did before v9.20.4: the chat's own id as the
+    // ref, no day — no business's, so nobody's Customers page showed it. And
+    // on its first days, filed under the lead the same chat had just created.
+    require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
+    const db = require('../src/db');
+    const CT = require('../src/utils/contacts');
+    const legacy = (clientId, ref, session, when, lines) => Promise.all(lines.map(([role, content], i) => db.query(
+      `insert into conversation_messages (client_id, external_ref, session_id, channel, role, content, created_at)
+       values ($1, $2, $3, 'website', $4, $5, $6)`, [clientId, ref, session, role, content, new Date(when.getTime() + i * 1000)])));
+    await legacy(null, `web-${chat}`, chat, at(0, 12), [['customer', 'Hi'], ['agent', 'Hello! What does your business do?']]);
+    const chat2 = `beef0000-${stamp}-9c8d`;
+    const lead1 = (await post('/api/webhooks/lead', { external_ref: `web-${chat2}`, name: 'Zara', company: 'Zara Studio', channel: 'website' })).body;
+    const lead2 = (await post('/api/webhooks/lead', { external_ref: `web-${chat2}-${stamp}`, name: 'Zara Ahmed', company: 'Zara Studio', email: 'zara@example.com', channel: 'website' })).body;
+    await db.query(`update clients set created_at = now() - interval '1 minute' where id = $1`, [lead1.client_id]);
+    await legacy(lead1.client_id, `web-${chat2}`, chat2, at(2), [['customer', 'Can it answer in Urdu?'], ['agent', 'Haan ji — English, Urdu or Roman Urdu.']]);
+
+    const placed = await CT.placeOrphanTranscripts();
+    ok(placed.metered >= 2 && placed.assistant >= 2 && placed.left === 0, 'the repair places them: by who metered the chat, else with the website assistant', JSON.stringify(placed));
+    const { rows: mine } = await db.query(`select client_id, agent_id, session_id from conversation_messages where external_ref = $1`, [`web-${chat}`]);
+    ok(mine.length === 2 && mine.every((m) => m.client_id === c1.id && m.agent_id === web.id && m.session_id === chatDay),
+      'lines metered by client one\'s assistant join the conversation usage counted', JSON.stringify(mine));
+    const { rows: [internal] } = await db.query(`select c.id, a.id as agent from clients c join client_agents a on a.client_id = c.id and a.kind = 'website' where c.is_internal`);
+    const { rows: zaraLines } = await db.query(`select client_id, agent_id, session_id from conversation_messages where external_ref = $1`, [`web-${chat2}`]);
+    ok(zaraLines.length === 2 && zaraLines.every((m) => m.client_id === internal.id && m.agent_id === internal.agent && m.session_id === `${chat2}-${day(at(2))}`),
+      'a chat never metered, once filed under its lead, goes to VantriqAI\'s website assistant', JSON.stringify(zaraLines));
+    ok((await CT.placeOrphanTranscripts()).found === 0, 'run again, there is nothing left to place');
+
+    const WL = byKey((await call('GET', `/api/contacts?client_id=${c1.id}`)).body)[chat];
+    ok(WL && WL.conversations === 1 && WL.label === `Web visitor ${chat.slice(-6)}` && WL.channels.includes('Website') && WL.agent === 'one Website',
+      'the web visitor is one customer with one conversation', JSON.stringify(WL));
+    const wd = (await call('GET', `/api/contacts/${c1.id}/${chat}`)).body;
+    ok(wd.conversations_list.length === 1 && wd.conversations_list[0].transcript.map((l) => l.content).join(' | ')
+      === 'Hi | Hello! What does your business do? | Do you take bookings online? | Yes — our Booking Agent does.',
+      'their page reads the whole chat, old lines and new, in order, in one conversation', JSON.stringify(wd.conversations_list.map((c) => [c.session_id, c.transcript.length])));
+    const pw = (await call('GET', '/api/portal/contacts', null, PH)).body;
+    const pwd = (await call('GET', `/api/portal/contacts/${chat}`, null, PH)).body;
+    ok(pw.contacts.some((c) => c.key === chat) && pwd.conversations_list[0].transcript.length === 4, 'the business sees the visitor and the chat in its portal', JSON.stringify(pw.contacts.map((c) => c.key)));
+    const ZL = byKey((await call('GET', `/api/contacts?client_id=${internal.id}`)).body)[chat2];
+    ok(ZL && ZL.name === 'Zara Ahmed' && ZL.email === 'zara@example.com' && ZL.conversations === 1 && ZL.in_crm,
+      'VantriqAI\'s own visitor carries the name from their latest lead', JSON.stringify(ZL));
+    const zd = (await call('GET', `/api/contacts/${internal.id}/${chat2}`)).body;
+    ok(zd.conversations_list.length === 1 && zd.conversations_list[0].transcript.length === 2 && zd.conversations_list[0].channel === 'Website', 'and their page has the chat', JSON.stringify(zd.conversations_list));
+    await db.query(`delete from conversation_messages where external_ref in ($1, $2)`, [`web-${chat}`, `web-${chat2}`]);
+    for (const l of [lead1, lead2]) if (l && l.client_id) await call('DELETE', `/api/clients/${l.client_id}`);
+    await db.pool.end();
   } finally {
     for (const c of [c1, c2]) if (c && c.id) await call('DELETE', `/api/clients/${c.id}`);
     console.log('\n(cleanup: clients deleted)');

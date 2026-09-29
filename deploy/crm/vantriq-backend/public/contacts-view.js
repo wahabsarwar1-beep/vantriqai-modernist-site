@@ -68,7 +68,7 @@
   }
   function initials(c){
     var src = (c.name || '').trim();
-    if (!src) return c.key && /^\d/.test(c.key) ? '#' : '?';
+    if (!src) return c.key && /^\d/.test(c.key) ? '#' : (c.channels || []).indexOf('Website') >= 0 ? '\ud83c\udf10' : '?';
     var p = src.split(/\s+/);
     return ((p[0] || '')[0] + ((p[1] || '')[0] || '')).toUpperCase();
   }
@@ -215,7 +215,7 @@
       : '<div style="overflow-x:auto;"><table class="vqc-table"><thead><tr><th>Customer</th>' + (isCrm() && !st.clientId ? '<th class="vqc-hide-sm">Customer of</th>' : '')
         + '<th class="vqc-hide-sm">City</th><th></th><th class="n">Conversations</th><th class="n">Last contact</th><th class="n vqc-hide-sm">Satisfaction</th></tr></thead><tbody>'
         + rows.map(function(c, i){
-          return '<tr class="r" data-a="open" data-i="' + i + '"><td><div class="vqc-who">' + avatar(c) + '<div><b>' + esc(c.name || c.label) + '</b><small>' + esc(c.name ? c.label : (c.email || c.country || '')) + (c.email && c.name ? ' · ' + esc(c.email) : '') + '</small></div></div></td>'
+          return '<tr class="r" data-a="open" data-i="' + i + '"><td><div class="vqc-who">' + avatar(c) + '<div><b>' + esc(c.name || c.label) + '</b><small>' + esc(c.name ? c.label : (c.email || c.country || (c.channels || []).join(', '))) + (c.email && c.name ? ' · ' + esc(c.email) : '') + '</small></div></div></td>'
             + (isCrm() && !st.clientId ? '<td class="vqc-hide-sm">' + esc(c.client_company) + '</td>' : '')
             + '<td class="vqc-hide-sm">' + (c.city ? esc(c.city) : '<span class="vqc-muted">—</span>') + '</td>'
             + '<td>' + tags(c) + '</td>'
@@ -238,9 +238,12 @@
     if (!d) return back + '<div class="vqc-card"><div class="vqc-empty">Loading…</div></div>';
     if (d.error) return back + '<div class="vqc-card"><div class="vqc-empty">' + esc(d.error) + '</div></div>';
     var wa = waLink(d);
+    // A web visitor may be known by nothing but where they wrote from.
+    var known = [d.name ? d.label : '', d.email, d.city, d.country].filter(Boolean);
+    if (!known.length) known = (d.channels || []).slice(0, 1);
     var head = '<div class="vqc-card"><div class="vqc-head">' + avatar(d, true)
-      + '<div class="t"><h2>' + esc(d.name || d.label) + '</h2><div class="sub" style="margin:2px 0 4px;">' + esc([d.name ? d.label : '', d.email, d.city, d.country].filter(Boolean).join(' · '))
-      + (isCrm() ? ' · customer of <b>' + esc(d.client_company) + '</b>' : '') + '</div><div>' + tags(d) + '</div></div>'
+      + '<div class="t"><h2>' + esc(d.name || d.label) + '</h2><div class="sub" style="margin:2px 0 4px;">' + esc(known.join(' · '))
+      + (isCrm() ? (known.length ? ' · ' : '') + 'customer of <b>' + esc(d.client_company) + '</b>' : '') + '</div><div>' + tags(d) + '</div></div>'
       + '<div class="vqc-row">'
       + (wa && !d.do_not_contact ? '<a class="vqc-btn" href="' + wa + '" target="_blank" rel="noopener">WhatsApp</a>' : '')
       + (d.email && !d.do_not_contact ? '<a class="vqc-btn" href="mailto:' + esc(d.email) + '">Email</a>' : '')

@@ -307,16 +307,18 @@ just ended.
 
 **Vantriq — CRM wiring kit (copy these nodes)**,
 `n8n.vantriqai.com/workflow/nGQkFd2GZ9yD4DFY`, is not meant to run. It holds the
-three nodes every consumer workflow needs, wired in the right order and
-annotated: open it, select the nodes, copy them, and paste them into the
-WhatsApp or website-chat workflow you are onboarding.
+nodes every consumer workflow needs, wired in the right order and annotated:
+open it, select the nodes, copy them, and paste them into the WhatsApp or
+website-chat workflow you are onboarding.
 
 ```
 [trigger] -> [identify the conversation] -> [may we answer?] -> [paused?]
                                                                   |  |
-                        your reply generation  <-------------------  +--> [holding reply]
-                                 |
+                        your reply generation  <-------------------  +--> [holding reply] --+
+                                 |                                                          |
                                  +--> [record this conversation] -> [crossed a threshold?] -> [alert]
+                                 |                                                          |
+                                 +--> [save what was said]  <-------------------------------+
 ```
 
 Two things about it are deliberate and should survive being pasted:
@@ -334,12 +336,39 @@ Two things about it are deliberate and should survive being pasted:
 
 `vantriq-crm-wiring-kit.json` in this folder is the same kit as a file.
 
+### What was said: the transcript
+
+**`Vantriq: save what was said`** posts the customer's words and the reply to
+`/api/webhooks/conversation`, under the same `external_ref` and `session_id` as
+the meter. That is the whole contract: the CRM files the lines inside the
+conversation the meter counted, and the business reads them under
+**Customers** — in the CRM, and in its own portal. Without this node the portal
+knows that a customer wrote, never what they asked.
+
+- **Website chats.** A chat trigger's request carries no number, so in
+  *identify this conversation* replace `"set-your-site-here"` with the site,
+  exactly as the website agent's **External ref** in the CRM (`clinic.pk`). The
+  visitor's chat id (`sessionId`) is the customer; the CRM shows them as
+  *Web visitor 1b2c3d* until a name is known.
+- **Ids.** Every line carries an id — the WhatsApp `wamid`, or the chat id and
+  the execution id — so an n8n retry never stores a line twice.
+- **When the reply fails**, post the customer's words anyway, with the reply as
+  `delivered: false` and `error: "<why>"`. The CRM keeps them, marks the reply
+  not delivered and emails the team, at most once an hour per agent. Both of
+  VantriqAI's own assistants do this for a refused send and for an AI failure:
+  copy from them.
+- **A safety net, not a way to wire.** A transcript under a ref the CRM does not
+  know still lands with whichever agent metered the same `session_id`, and a
+  `session_id` sent without its day gets the day the meter filed it under. That
+  keeps an older workflow's lines visible; a new one should send the meter's
+  values.
+
 ## What is wired, and what is not
 
 | Workflow | State |
 |---|---|
-| Vantriq Assistant — WhatsApp AI Sales Consultant | **Gate and meter wired.** Needs the credential. |
-| Vantriq — Website Assistant (vantriqai.com) | **Gate and meter wired.** Needs the credential, and needs activating. |
+| Vantriq Assistant — WhatsApp AI Sales Consultant | **Gate, meter and transcript wired**, a refused or unwritten reply included. |
+| Vantriq — Website Assistant (vantriqai.com) | **Gate, meter and transcript wired**, AI failures and paused replies included. Active. |
 | Business Growth Engine (V3 Final / Importable) | Not wired — see below. |
 | Digital Marketing Manager | Not wired — see below. |
 
@@ -394,9 +423,15 @@ Three things were wrong with the workflow itself, all fixed:
   **`Vantriq: reply`** sits last and re-emits the agent's output.
 
 `external_ref` is the constant `vantriqai.com` rather than a phone number — a
-website has no per-client identifier in the request. Attributing this traffic
-needs a client in the CRM whose External ref is exactly that; without one the
-webhook answers 404 and the node continues, which is harmless.
+website has no per-client identifier in the request. It is the External ref of
+Vantriq AI's own *Website assistant* agent (created by `npm run seed-internal`),
+so the usage lands there, and since CRM v9.20.4 so does every line of the chat:
+**Vantriq: save transcript** sends the visitor's words and the reply under that
+ref and the meter's session id, with the reply marked not written when the AI
+fails. Each visitor is then a customer under Customers, named from their latest
+lead once they give their details. Before v9.20.4 the lines went under
+`'web-' + sessionId`, a ref no business owned: stored, shown nowhere. The
+v9.20.4 migrate moved them to the agent that metered each chat.
 
 **Both gates fail open on thrown errors, not just bad status codes.** `neverError`
 only covers HTTP responses; a missing credential or an unreachable CRM throws,

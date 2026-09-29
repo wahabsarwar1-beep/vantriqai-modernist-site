@@ -29,6 +29,15 @@ async function run() {
   console.log(`Packages costed at ${model.as_of} prices (${model.assumptions.bulk_model} bulk, `
     + `USD/PKR ${model.assumptions.fx_usd_pkr}): ${changed} updated.`);
 
+  // v9.20.4: website chat lines filed under a chat id no business owns go to
+  // the agent that had the conversation, so its Customers page shows them.
+  const { placeOrphanTranscripts } = require('./contacts');
+  const placed = await placeOrphanTranscripts();
+  if (placed.found) {
+    console.log(`Website transcripts placed: ${placed.metered} with the agent that metered the chat, `
+      + `${placed.assistant} with the website assistant, ${placed.left} left unplaced.`);
+  }
+
   await db.pool.end();
   console.log('Done.');
 }

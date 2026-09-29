@@ -29,19 +29,43 @@
             {
               "id": "ref",
               "name": "vq_external_ref",
-              "value": "={{ $json.entry?.[0]?.changes?.[0]?.value?.metadata?.display_phone_number ?? $json.vq_external_ref ?? \"\" }}",
+              "value": "={{ ($json.entry?.[0]?.changes?.[0]?.value ?? $json).metadata?.display_phone_number ?? $json.vq_external_ref ?? \"set-your-site-here\" }}",
               "type": "string"
             },
             {
               "id": "consumer",
               "name": "vq_consumer",
-              "value": "={{ $json.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.from ?? $json.from ?? \"\" }}",
+              "value": "={{ ($json.entry?.[0]?.changes?.[0]?.value ?? $json).messages?.[0]?.from ?? $json.from ?? $json.sessionId ?? \"\" }}",
               "type": "string"
             },
             {
               "id": "session",
               "name": "vq_session_id",
-              "value": "={{ ($json.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.from ?? $json.from ?? \"unknown\") + \"-\" + $now.toFormat(\"yyyy-MM-dd\") }}",
+              "value": "={{ (($json.entry?.[0]?.changes?.[0]?.value ?? $json).messages?.[0]?.from ?? $json.from ?? $json.sessionId ?? \"unknown\") + \"-\" + $now.toFormat(\"yyyy-MM-dd\") }}",
+              "type": "string"
+            },
+            {
+              "id": "channel",
+              "name": "vq_channel",
+              "value": "={{ $json.chatInput !== undefined ? \"website\" : \"whatsapp\" }}",
+              "type": "string"
+            },
+            {
+              "id": "said",
+              "name": "vq_said",
+              "value": "={{ ($json.entry?.[0]?.changes?.[0]?.value ?? $json).messages?.[0]?.text?.body ?? $json.chatInput ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "said_id",
+              "name": "vq_said_id",
+              "value": "={{ ($json.entry?.[0]?.changes?.[0]?.value ?? $json).messages?.[0]?.id ?? ($json.sessionId ? $json.sessionId + \":\" + $execution.id : \"\") }}",
+              "type": "string"
+            },
+            {
+              "id": "said_at",
+              "name": "vq_said_at",
+              "value": "={{ ($json.entry?.[0]?.changes?.[0]?.value ?? $json).messages?.[0]?.timestamp ?? $now.toISO() }}",
               "type": "string"
             }
           ]
@@ -173,7 +197,7 @@
         "sendBody": true,
         "contentType": "json",
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ external_ref: $(\"Vantriq: identify this conversation\").item.json.vq_external_ref, session_id: $(\"Vantriq: identify this conversation\").item.json.vq_session_id, channel: \"whatsapp\", ai_model: $json.model ?? \"\", input_tokens: $json.usage?.input_tokens ?? $json.usage?.prompt_tokens ?? 0, output_tokens: $json.usage?.output_tokens ?? $json.usage?.completion_tokens ?? 0, messages_count: 1 }) }}",
+        "jsonBody": "={{ JSON.stringify({ external_ref: $(\"Vantriq: identify this conversation\").item.json.vq_external_ref, session_id: $(\"Vantriq: identify this conversation\").item.json.vq_session_id, channel: $(\"Vantriq: identify this conversation\").item.json.vq_channel, ai_model: $json.model ?? \"\", input_tokens: $json.usage?.input_tokens ?? $json.usage?.prompt_tokens ?? 0, output_tokens: $json.usage?.output_tokens ?? $json.usage?.completion_tokens ?? 0, messages_count: 1 }) }}",
         "options": {
           "timeout": 5000,
           "response": {
@@ -230,6 +254,36 @@
       "parameters": {}
     },
     {
+      "id": "5f0c2a8e-7d41-4b6e-9a2f-3c8d1e6b4a70",
+      "name": "Vantriq: save what was said",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1344,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://crm_app:8080/api/webhooks/conversation",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => { const who = $(\"Vantriq: identify this conversation\").item.json; const reply = String($json.output ?? $json.text ?? $json.reply_text ?? $json.message?.content ?? \"\"); const messages = []; if (who.vq_said) messages.push({ role: \"customer\", content: who.vq_said, id: who.vq_said_id || undefined, at: who.vq_said_at || undefined }); if (reply) messages.push({ role: \"agent\", content: reply, id: who.vq_said_id ? who.vq_said_id + \":reply\" : undefined }); return JSON.stringify({ external_ref: who.vq_external_ref, session_id: who.vq_session_id, channel: who.vq_channel, messages }); })() }}",
+        "options": {
+          "timeout": 5000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "The customer's words and the reply, under the same external_ref and session_id as the meter, so the business reads the conversation under Customers (CRM and portal). Reads the reply from output / text / reply_text / message.content - point it at your reply node's field if yours differs."
+    },
+    {
       "id": "e5c01b2d-1bce-4839-b5ca-319b7bf8cf44",
       "name": "Sticky Note 401598e6",
       "type": "n8n-nodes-base.stickyNote",
@@ -239,10 +293,10 @@
         -400
       ],
       "parameters": {
-        "content": "## Vantriq CRM wiring kit — copy these nodes into your consumer workflows\n\nThese are the only three nodes a consumer workflow needs to be billed correctly. Select them, Ctrl+C, and paste into the WhatsApp / website-chat workflow.\n\n**Two credentials, both Custom Auth (templated), template {\"headers\":{\"x-api-key\":\"{{api_key}}\"}}:**\n- Vantriq usage webhook key — webhook scope. Used by both nodes here.\n- Vantriq automation key — automation scope. Used by the monthly billing run only.\n\nCreate them on the box: docker exec crm_app npm run create-key -- \"n8n usage webhook\" webhook",
+        "content": "## Vantriq CRM wiring kit — copy these nodes into your consumer workflows\n\nEvery consumer workflow — WhatsApp or website chat — needs these: **identify** the conversation, the **gate** before a reply is written, the **meter** after it is sent, and the **transcript**, so the business can read what was said under Customers, in the CRM and in its portal. Select them, Ctrl+C, and paste into the workflow you are onboarding.\n\n**Two credentials, both Custom Auth (templated), template {\"headers\":{\"x-api-key\":\"{{api_key}}\"}}:**\n- Vantriq usage webhook key — webhook scope. Used by every CRM node here.\n- Vantriq automation key — automation scope. Used by the monthly billing run only.\n\nCreate them on the box: docker exec crm_app npm run create-key -- \"n8n usage webhook\" webhook",
         "color": 4,
-        "width": 1740,
-        "height": 260
+        "width": 2420,
+        "height": 280
       }
     },
     {
@@ -275,6 +329,22 @@
         "color": 5,
         "width": 660,
         "height": 320
+      }
+    },
+    {
+      "id": "a3e1c9d4-2b7f-4e58-8c61-9f0d2e4b7a15",
+      "name": "Sticky Note 7d2e91c4",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1740,
+        360
+      ],
+      "parameters": {
+        "content": "### 3. The transcript — so the business sees what was said\n\nWithout it the CRM knows a customer wrote, never what they asked. It posts the customer's words and the reply under the SAME external_ref and session_id as the meter, so the lines sit inside the conversation the meter counted: Customers → the customer, in the CRM and in the client's portal.\n\nWebsite chat: the request carries no number, so in *identify this conversation* replace \"set-your-site-here\" with the site, exactly as the website agent's External ref in the CRM (e.g. clinic.pk). The visitor's chat id is the customer.\n\nIf the reply can fail (an AI node's error output, a send that is refused), still post the customer's words, with the reply as delivered: false and error: the reason. The CRM keeps them and emails the team.\n\nFails soft like the meter: a CRM outage costs the lines, never the conversation.",
+        "color": 6,
+        "width": 640,
+        "height": 380
       }
     }
   ],
@@ -337,6 +407,11 @@
             "node": "Vantriq: record this conversation",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "Vantriq: save what was said",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
@@ -357,6 +432,17 @@
         [
           {
             "node": "ALERT YOURSELF (Slack / email / WhatsApp)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send this instead of a reply": {
+      "main": [
+        [
+          {
+            "node": "Vantriq: save what was said",
             "type": "main",
             "index": 0
           }
