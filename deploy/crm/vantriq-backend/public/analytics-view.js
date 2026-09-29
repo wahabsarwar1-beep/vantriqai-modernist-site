@@ -721,9 +721,10 @@
         s.nps == null ? '' : s.nps, s.promoters, s.passives, s.detractors, s.resolution == null ? '' : s.resolution, s.unhappy, s.invites_sent, s.invites_answered]),
     };
     const note = `${esc(d.period.current_label)} so far (${d.period.elapsed_pct}% through) compared with ${esc(prev)} up to the same point · ${esc(d.time_zone.replace('Asia/', ''))} time`;
-    if(!w.responses){
-      return `<div class="vqa">${filters(g, opts.onGrain, note, opts)}<div class="vqa-card"><div class="vqa-empty">No survey answers in the ${esc(d.period.window_label.toLowerCase())} yet. Share a survey below — by QR code, link or WhatsApp — and this dashboard fills in as answers arrive.</div></div></div>`;
-    }
+    // With no answers yet the whole dashboard still shows, at zero, so it is
+    // clear what will fill in — with one line saying how to get there.
+    const waiting = !w.responses ? `<div class="vqa-card" style="margin-bottom:14px;border-left:4px solid ${C.s1};"><h3>Waiting for the first answer</h3>
+      <div class="vqa-sub" style="margin:4px 0 0;">No survey answers in the ${esc(d.period.window_label.toLowerCase())} yet. Share a survey below — by QR code, link or WhatsApp — and every tile, chart and breakdown here fills in the moment answers arrive.</div></div>` : '';
     const npsTotal = w.promoters + w.passives + w.detractors;
     const seg = (v) => npsTotal ? (v / npsTotal) * 100 : 0;
     const f = d.followups;
@@ -735,6 +736,7 @@
     const demoCards = [['By gender', demo.gender, 'Gender'], ['By age group', demo.age, 'Age group'], ['By city', demo.city, 'City']].filter(x => x[1].length);
     return `<div class="vqa vqe">
       ${filters(g, opts.onGrain, note, opts)}
+      ${waiting}
       ${insightsCard(d.insights)}
       <div class="vqa-grid vqa-kpis">
         ${kpi({ label: 'Answers', value: n(k.responses.current), delta: k.responses.delta_pct, prevLabel: prev, projected: k.responses.projected, sparkValues: d.series.map(s => s.responses) })}
@@ -761,13 +763,13 @@
           ${w.nps_responses ? `<div class="vqa-plot sm"><canvas id="vqeNpsDist" aria-label="How people answered 0 to 10"></canvas></div>
           <div class="vqa-stack" role="img" aria-label="${w.detractors} detractors, ${w.passives} passives, ${w.promoters} promoters">
             ${w.detractors ? `<div style="width:${seg(w.detractors)}%;background:${SCORE[0]}"></div>` : ''}${w.passives ? `<div style="width:${seg(w.passives)}%;background:${SCORE[2]}"></div>` : ''}${w.promoters ? `<div style="width:${seg(w.promoters)}%;background:${SCORE[4]}"></div>` : ''}
-          </div>${legend([[`Detractors 0–6 · ${n(w.detractors)}`, SCORE[0]], [`Passives 7–8 · ${n(w.passives)}`, SCORE[2]], [`Promoters 9–10 · ${n(w.promoters)}`, SCORE[4]]])}` : '<div class="vqa-empty">No survey asked "would you recommend us" in this period.</div>'}</div>
+          </div>${legend([[`Detractors 0–6 · ${n(w.detractors)}`, SCORE[0]], [`Passives 7–8 · ${n(w.passives)}`, SCORE[2]], [`Promoters 9–10 · ${n(w.promoters)}`, SCORE[4]]])}` : (w.responses ? '<div class="vqa-empty">No survey asked "would you recommend us" in this period.</div>' : '<div class="vqa-empty">The 0–10 spread and Net Promoter Score appear with the first answers.</div>')}</div>
       </div>
 
       ${w.nps_responses ? `<div class="vqa-card" style="margin-bottom:14px;"><h3>Net Promoter Score over time</h3><div class="vqa-sub">From −100 to +100 · ${esc(d.period.window_label)}</div><div class="vqa-plot sm"><canvas id="vqeNps" aria-label="NPS per period"></canvas></div></div>` : ''}
 
       <div class="vqa-grid vqa-two">
-        <div class="vqa-card"><h3>Every survey</h3><div class="vqa-sub">${esc(d.period.window_label)} · best and worst at a glance</div>${breakdown(d.surveys.filter(s => s.responses), 'Survey')}</div>
+        <div class="vqa-card"><h3>Every survey</h3><div class="vqa-sub">${esc(d.period.window_label)} · best and worst at a glance</div>${breakdown(d.surveys.some(s => s.responses) ? d.surveys.filter(s => s.responses) : d.surveys, 'Survey')}</div>
         <div class="vqa-card"><h3>Personal links: sent → opened → answered</h3><div class="vqa-sub">After-chat WhatsApp invites and one-time links · ${esc(d.period.window_label)}</div>
           ${d.funnel.sent ? barList(funnelRows, { colors: [FUNNEL[0], FUNNEL[2], FUNNEL[4]] }) : '<div class="vqa-empty">No personal links sent in this period.</div>'}
           <div class="vqa-sub" style="margin:12px 0 0;">${w.views ? `${n(w.views)} survey page visits · ${w.completion_rate == null ? '—' : w.completion_rate + '%'} went on to answer` : ''}</div></div>
@@ -803,7 +805,7 @@
 
   function drawEcho(d){
     destroyCharts();
-    if(!d || !d.window || !d.window.responses || !chartReady()) return;
+    if(!d || !d.window || !chartReady()) return;
     setChartFont();
     columnChart('vqeResp', d.series, 'responses', 'Answers', d.grain);
     lineChart('vqeCsat', d.series, 'csat', d.grain, { label: 'satisfied' });
