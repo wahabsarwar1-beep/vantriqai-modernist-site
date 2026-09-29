@@ -606,11 +606,12 @@ cat <<'NEXT'
      priced on scope. Why, and the margins: deploy/crm/SURVEYS.md.
 
  12. Transcripts (v9.20.2). Customers → a customer → Conversations: every
-     line in the order it was said, at the time it was said. A reply the
-     channel refused (an expired WhatsApp token, a closed 24-hour window)
-     is kept and marked "not delivered" — the customer's own words are never
-     lost — and the team is emailed at once, at most once an hour per agent.
-     n8n sends each WhatsApp message's id, so a retry or a history backfill
-     never stores a line twice.
+     line in the order it was said, at the time it was said. A customer who
+     went unanswered — WhatsApp refused the reply (an expired access token)
+     or the AI never wrote one (a revoked OpenAI key) — is kept, with the
+     reply marked "not delivered", and the team is emailed at once, at most
+     once an hour per agent, with the fix for that cause. n8n sends each
+     WhatsApp message's id, so a retry or a history backfill never stores a
+     line twice.
 NEXT
 printf '\n'
