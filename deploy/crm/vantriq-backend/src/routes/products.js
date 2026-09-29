@@ -37,8 +37,13 @@ router.get('/', async (req, res) => {
   // delivery_cost_full is what a package costs us to run — Financials data. It
   // is withheld from everyone but an admin, which covers staff sessions and
   // the automation key alike; neither has any use for our margin.
+  // The cost profile (v9.20) is the same kind of figure — what serving the
+  // package takes — and is withheld the same way.
   if (!isAdminRequest(req)) {
-    return res.json(rows.map(({ delivery_cost_full, ...rest }) => rest));
+    return res.json(rows.map(({
+      delivery_cost_full, context_tokens, premium_share, mgmt_hours, build_hours, founder_share,
+      bulk_model, premium_model, ...rest
+    }) => rest));
   }
   res.json(rows);
 });

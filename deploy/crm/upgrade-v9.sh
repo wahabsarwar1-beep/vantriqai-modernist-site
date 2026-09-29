@@ -434,6 +434,20 @@ else
   INDUSTRIES=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
     -c "select count(*) from clients where industry <> ''" 2>/dev/null || echo '?')
   ok "clients with their industry set: $INDUSTRIES (their templates come first in Echo; set it on the client's page)"
+  chk "v9.20 pricing: package cost profiles, the stored rate card, the add-ons catalogue" 3 \
+    "select (select count(*) from information_schema.columns where table_name='products' and column_name in ('context_tokens','premium_share'))
+          + (select count(*) from information_schema.columns where table_name='settings' and column_name='costing')"
+  ADDONS=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
+    -c "select count(*) from catalog_addons where active" 2>/dev/null || echo '?')
+  ok "add-ons in the catalogue: $ADDONS (capabilities, solutions, Pulse, Echo, Human Support…)"
+  # The costing model, as the Products & Pricing page shows it: every package
+  # costed at today's model prices. Prints costs and margins — which are ours,
+  # not customers' data — so an unexpected figure is visible in the log.
+  if docker exec "$APP_CONTAINER" node -e "require('dotenv').config();require('/app/src/utils/costing').costingModel({withAddons:false}).then(m=>{console.log('    costed '+m.as_of+' at USD/PKR '+m.assumptions.fx_usd_pkr+', bulk '+m.assumptions.bulk_model+', premium '+m.assumptions.premium_model);for(const r of m.packages)console.log('    '+r.name.padEnd(12)+' '+r.msgs_per_session+' msgs/session  PKR '+r.cost_per_session.toFixed(2)+'/session  margin '+(r.margin_full*100).toFixed(1)+'% full, '+(r.margin_util*100).toFixed(1)+'% at '+Math.round(m.assumptions.utilization*100)+'%');console.log('    steady state: '+(m.steady_state.margin*100).toFixed(1)+'% contribution on PKR '+m.steady_state.revenue.toLocaleString('en-US'));for(const f of m.flags)console.log('    note: '+f.text);process.exit(m.packages.length&&m.packages.every(r=>r.cost_per_session>0)?0:1)}).catch(e=>{console.error('    '+e.message);process.exit(1)})"; then
+    ok "every package is costed at today's prices (Products & Pricing, and Financials' delivery cost)"
+  else
+    warn "the costing model did not run — lines above"; FAILED=1
+  fi
   # The Excel workbooks — Pulse, Echo and the customer directory — are built
   # from this install's real data (read-only). Only whether each built is
   # printed: they hold customers' numbers and this log is public.
@@ -563,5 +577,13 @@ cat <<'NEXT'
      client's industry on their page (CRM → Clients → the client → Vantriq
      Echo): their templates come first, here and in their portal, and
      switching Echo on can create their first survey from it, live.
+
+ 10. Products & Pricing (v9.20). Every package now shows its messages per
+     session, what a session costs at today's AI prices, and its margin —
+     at full use and at average use — with overage cover, setup margin and
+     headroom; below it the unit-economics table, the add-ons catalogue and
+     the steady state. "Rates & assumptions" changes a model price or the
+     exchange rate and re-costs everything, Financials included. Prices
+     themselves stay locked to the business model.
 NEXT
 printf '\n'
