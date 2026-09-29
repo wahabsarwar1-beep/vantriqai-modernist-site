@@ -24,6 +24,7 @@
 <script src="/vendor/chart/chart.umd.js"></script>
 <script src="/analytics-view.js"></script>
 <script src="/survey-studio.js"></script>
+<script src="/contacts-view.js"></script>
 <script src="/invoice-print.js"></script>
 <style>
 /* The console is set in VantriqAI's own palette — the cream ground, ink
@@ -950,6 +951,7 @@ const NAV = [
     {id:'dashboard', label:'Dashboard', icon:iconGrid},
     {id:'analytics', label:'Vantriq Pulse', icon:iconTrend},
     {id:'surveys', label:'Vantriq Echo', icon:iconSurvey},
+    {id:'customers', label:'Customers', icon:iconPeople},
   ]},
   {group:'Revenue', items:[
     {id:'pipeline', label:'Pipeline', icon:iconFunnel},
@@ -1014,6 +1016,7 @@ function iconMail(size){ return icon('<rect x="2.5" y="5" width="19" height="14"
 function iconQuote(){ return icon('<path d="M6 3h9l5 5v13a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M15 3v5h5"/><path d="M9 13h6M9 17h4"/>'); }
 function iconContract(){ return icon('<path d="M7 3h7l4 4v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h4"/><circle cx="16.5" cy="17.5" r="2.6"/>'); }
 function iconBolt(){ return icon('<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'); }
+function iconPeople(){ return icon('<circle cx="12" cy="7.5" r="3.5"/><path d="M5 20c0-3.9 3.1-6.5 7-6.5s7 2.6 7 6.5"/><path d="M3 11.5h2.5M18.5 11.5H21"/>'); }
 function iconSurvey(){ return icon('<rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 8h5M8 12.5h8M8 17h4"/><path d="M15.5 6.5l1.2 1.2 2.3-2.4"/>'); }
 function iconInbox(size){ return icon('<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/>', size); }
 
@@ -1158,6 +1161,7 @@ const VIEW_TITLES = {
   dashboard:['Dashboard','Where the business stands right now'],
   analytics:['Vantriq Pulse','Analytics — leads, conversations and customer satisfaction, by day, week, month, quarter or year'],
   surveys:['Vantriq Echo','Customer-satisfaction surveys for every client — results, follow-ups and sharing'],
+  customers:['Customers','Every client\'s customers — who they are, every conversation and what was said, their survey answers'],
   pipeline:['Pipeline','Move deals from lead to active client'],
   clients:['Clients','Every active and past account'],
   billing:['Billing & Invoices','Setup fees, retainers, and overage'],
@@ -1211,6 +1215,7 @@ function renderView(){
     case 'dashboard': return renderDashboard();
     case 'analytics': return renderAnalytics();
     case 'surveys': return window.VQS ? '<div id="vqs-root"></div>' : '<div class="card"><div class="empty">The Vantriq Echo page could not load in this browser.</div></div>';
+    case 'customers': return window.VQC ? '<div id="vqc-root"></div>' : '<div class="card"><div class="empty">The Customers page could not load in this browser.</div></div>';
     case 'pipeline': return renderPipeline();
     case 'clients': return renderClients();
     case 'billing': return renderBilling();
@@ -1429,14 +1434,14 @@ function renderAnalytics(){
   if(!cur) return tabs + picker + `<div class="card" style="text-align:center;color:var(--muted);padding:32px;">Working out the numbers…</div>`;
   if(cur.error) return tabs + picker + `<div class="card" style="color:var(--red);">${esc(cur.error)}
     <button class="btn btn-ghost btn-sm" style="margin-left:8px;" onclick="analyticsData=null;render()">Try again</button></div>`;
-  const opts = { onGrain:'setAnalyticsGrain', onReport:'downloadAnalyticsReport' };
+  const opts = { onGrain:'setAnalyticsGrain', onReport:'downloadAnalyticsReport', reportLabel:'Download Pulse report (Excel)' };
   if(analyticsTab==='sales') return tabs + VQA.salesHTML(cur.data, { ...opts,
     reportHint:'Every lead, the funnel, sources and each prospect conversation — a tab for each' });
   if(analyticsTab==='platform') return tabs + VQA.conversationsHTML(cur.data, { ...opts, audience:'platform',
-    reportHint:'Every customer side by side, then every contact (new and returning), conversation and survey answer — a tab for each' });
+    reportHint:'Every customer side by side, then every contact (new and returning), conversation and transcript — a tab for each. Survey results are in the Echo report.' });
   const shown = state.clients.find(c=>c.id===analyticsClientId);
   return tabs + picker + VQA.conversationsHTML(cur.data, { ...opts, audience:'crm', surveysEnabled: shown ? !!shown.surveysEnabled : undefined,
-    reportHint:'Pulse and Echo for this customer: every figure, their contacts (new and returning), conversations and survey answers — a tab for each' });
+    reportHint:'Pulse for this customer: every figure, their contacts (new and returning, who and where), conversations and transcripts — a tab for each' });
 }
 
 /**
@@ -1450,8 +1455,8 @@ async function downloadAnalyticsReport(){
     : analyticsTab==='platform' ? `/api/analytics/platform/report.xlsx?grain=${g}`
     : `/api/analytics/clients/${encodeURIComponent(analyticsClientId)}/report.xlsx?grain=${g}`;
   const shown = state.clients.find(c=>c.id===analyticsClientId);
-  const who = analyticsTab==='sales' ? 'sales' : analyticsTab==='platform' ? 'echo-all-customers'
-    : 'echo-' + (String((shown && shown.company) || 'customer').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40) || 'customer');
+  const who = analyticsTab==='sales' ? 'sales' : analyticsTab==='platform' ? 'all-customers'
+    : (String((shown && shown.company) || 'customer').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40) || 'customer');
   showToast('Building the report…');
   try{
     const headers = {};
@@ -7040,6 +7045,7 @@ function attachPostRenderHooks(){
   if(currentView==='analytics') requestAnimationFrame(drawAnalytics);
   else if(window.VQA) VQA.destroyCharts();
   if(currentView==='surveys') mountSurveys();
+  if(currentView==='customers') mountCustomers();
   else if(window.VQS) VQS.destroyCharts();
   // Views whose data is too heavy to pull on every page load fetch on first
   // sight and then keep what they have until something changes it.
@@ -7231,8 +7237,35 @@ function mountSurveys(){
   });
 }
 
+/** Customers (/contacts-view.js): our clients' customers, the same screens each client has in its portal. */
+function mountCustomers(){
+  const el = document.getElementById('vqc-root');
+  if(!el || !window.VQC) return;
+  VQC.mount(el, {
+    audience: 'crm',
+    clients: () => state.clients.filter(c => c.stage === 'active' || c.isInternal)
+      .map(c => ({ id: c.id, company: c.company + (c.isInternal ? ' (VantriqAI)' : '') }))
+      .sort((a, b) => String(a.company).localeCompare(String(b.company))),
+    api: (method, path, body) => API.req(method, '/api/contacts' + path, body),
+    download: async (path, filename) => {
+      showToast('Building the customer workbook…');
+      const headers = {};
+      if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
+      else if(API.key) headers['x-api-key'] = API.key;
+      const res = await fetch(API.base + '/api/contacts' + path, { headers });
+      if(!res.ok){ const err = await res.json().catch(()=>null); throw new Error((err&&err.error) || `Export failed (${res.status})`); }
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    },
+    toast: (msg, warn) => showToast(msg, warn ? 'warn' : undefined),
+  });
+}
+
 async function signOut(){
   if(window.VQS) VQS.reset();
+  if(window.VQC) VQC.reset();
   try{ if(API.session) await fetch(API.base+'/api/auth/logout',{method:'POST',headers:{'Authorization':'Bearer '+API.session}}); }catch(e){}
   API.clearConfig(); authUser=null; apiConnected=false;
   API.base = window.location.origin;

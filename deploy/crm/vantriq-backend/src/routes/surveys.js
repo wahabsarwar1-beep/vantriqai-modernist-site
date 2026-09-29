@@ -66,6 +66,26 @@ function scopeId(req) {
   return id;
 }
 
+/**
+ * The Echo workbook: satisfaction, NPS, every survey and answer, who
+ * answered (gender, age group, city), follow-ups and respondents — for one
+ * client (the portal's own, or ?client_id= in the CRM) or every client.
+ */
+router.get('/report.xlsx', async (req, res) => {
+  const { echoReport, sendReport } = require('../utils/analyticsReport');
+  const grain = String(req.query.grain || 'month');
+  let client = null;
+  if (isPortal(req)) client = req.portalClient;
+  else {
+    const id = scopeId(req);
+    if (id) {
+      client = await S.getClient(id);
+      if (!client) throw new S.SurveyError(404, 'Client not found');
+    }
+  }
+  sendReport(res, await echoReport(client, { grain }));
+});
+
 /** The industry template gallery: restaurant, FMCG, telecom, healthcare and the rest. */
 router.get('/templates', (req, res) => res.json(S.templateSummaries()));
 

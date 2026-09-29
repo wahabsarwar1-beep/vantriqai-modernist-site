@@ -1,33 +1,30 @@
 const ExcelJS = require('exceljs');
 const db = require('../db');
-const { clientAnalytics, platformAnalytics, salesAnalytics, periodBounds, GRAINS, TZ, normaliseGrain } = require('./analytics');
-const { answerText } = require('./surveys');
+const { clientAnalytics, platformAnalytics, salesAnalytics, satisfactionAnalytics, periodBounds, GRAINS, TZ, normaliseGrain } = require('./analytics');
+const { answerText, demographicsOf } = require('./surveys');
+const { countryOf } = require('./contacts');
 
 /**
- * The Excel reports behind "Download report" on Vantriq Pulse (analytics)
- * and Vantriq Echo (surveys) — one workbook, one tab per subject.
+ * The Excel workbooks behind the download buttons — each product its own:
  *
- * The dashboards show counts; a report is where someone goes to act on them,
- * so it also carries the detail behind every count: each contact (new or
- * coming back, first and last visit, how often), each conversation, each
- * survey answer and follow-up. Every figure on the dashboard is here, worked
- * out by the same engine (utils/analytics.js), so the two never disagree.
+ *   pulseReport(client)     Vantriq Pulse: conversations, contacts (new and
+ *                           returning, who they are, where), transcripts,
+ *                           channels, agents, busiest times. client null =
+ *                           every customer (CRM → All customers).
+ *   echoReport(client)      Vantriq Echo: satisfaction, NPS, every survey and
+ *                           answer, who answered (gender, age, city),
+ *                           follow-ups, respondents.
+ *   contactsWorkbook(client) the customer directory, all time: everyone, with
+ *                           every detail known, every conversation and line.
+ *   salesReport()           VantriqAI's own leads and sales (CRM → Sales).
  *
- * Three workbooks:
- *   clientReport(client)   one customer — the CRM's Customer view, the
- *                          customer's own portal, and their API
- *   clientReport(null)     every customer together (CRM → All customers)
- *   salesReport()          VantriqAI's own leads and sales (CRM → Sales)
+ * Every figure on a dashboard is here, worked out by the same engine
+ * (utils/analytics.js, utils/surveys.js), so the two never disagree.
  *
- * Contacts are shown by the number they wrote from. A customer's report
- * lists their own customers — the people who messaged their agent, which
- * the business needs in order to follow up — and never anyone else's. This
- * is the one place a customer gets numbers rather than counts; the
- * dashboards and the JSON API still carry counts only.
- *
- * A customer without Vantriq Echo gets the satisfaction answers other tools
- * post (they are part of Pulse), but no surveys, survey answers or
- * follow-ups — the same line the portal's Echo tab draws.
+ * Unlike the dashboards, these name people: a WhatsApp contact by the number
+ * they wrote from, with whatever else is known. A customer's workbook holds
+ * only their own customers — the business needs them to follow up — and
+ * never anyone else's.
  */
 
 const ROW_LIMIT = 20000;
@@ -333,20 +330,33 @@ async function contactRows(clientId, b, { echo = true } = {}) {
     [clientId]
   );
   const nameOf = new Map(named.rows.map((s) => [`${s.client_id}|${s.contact}`, s]));
+  // Everything a person or an agent has recorded about them (v9.17).
+  const { rows: prof } = await db.query(
+    `select * from contacts where ($1::uuid is null or client_id = $1)`, [clientId]);
+  const profileOf = new Map(prof.map((p) => [`${p.client_id}|${p.contact_key}`, p]));
 
   const now = Date.now();
   return rows.map((r) => {
     const lead = r.is_internal ? leads.get(r.contact) : null;
     const s = satOf.get(`${r.client_id}|${r.contact}`);
     const nm = nameOf.get(`${r.client_id}|${r.contact}`);
+    const pf = profileOf.get(`${r.client_id}|${r.contact}`) || {};
     const isNewWindow = new Date(r.first_at) >= new Date(b.window_start);
     const isNewCurrent = new Date(r.first_at) >= new Date(b.cur_start);
     return {
       client_id: r.client_id,
       contact_key: r.contact,
       contact: contactLabel(r.contact),
-      name: (lead && (lead.name && lead.name !== '—' ? lead.name : '')) || (nm && nm.name) || '',
-      email: (lead && lead.email) || (nm && nm.email) || '',
+      name: pf.name || (lead && (lead.name && lead.name !== '—' ? lead.name : '')) || (nm && nm.name) || '',
+      email: pf.email || (lead && lead.email) || (nm && nm.email) || '',
+      city: pf.city || '',
+      gender: pf.gender || '',
+      age_band: pf.age_band || '',
+      their_company: pf.company || (lead && lead.company) || '',
+      country: countryOf(r.contact),
+      tags: (pf.tags || []).join(', '),
+      notes: pf.notes || '',
+      do_not_contact: pf.do_not_contact ? 'Yes' : '',
       company: r.company,
       in_crm: lead ? `${STAGE[lead.stage] || lead.stage}${lead.source ? ` · ${lead.source}` : ''}` : '',
       // First seen before the window: a returning customer. First seen in
@@ -535,7 +545,23 @@ async function echoData(clientId, b, { echo = true } = {}) {
       return `${title}: ${answerText(q, r.answers[q.id])}`;
     })
     .join('  ·  ');
+  // People who left their details, one row each (by phone, else email, else name).
+  const people = new Map();
+  for (const r of responses.rows) {
+    const phone = r.contact_phone || (r.invite_session ? contactLabel(contactKey(r.invite_session)) : '');
+    const id = (phone || r.contact_email || r.contact_name || '').toLowerCase().replace(/\s+/g, '');
+    if (!id || !(r.contact_name || r.contact_phone || r.contact_email)) continue;
+    if (!people.has(id)) {
+      people.set(id, { name: r.contact_name, phone, email: r.contact_email, company: r.company, city: r.city, gender: r.gender, age_band: r.age_band,
+        consent: yn(r.contact_consent), n: 0, last: local(r.submitted_at), score: r.score, nps: r.nps });
+    }
+    const p = people.get(id);
+    p.n += 1;
+    for (const f of ['name', 'email', 'city', 'gender', 'age_band']) if (!p[f]) p[f] = f === 'name' ? r.contact_name : f === 'email' ? r.contact_email : r[f];
+  }
   return {
+    raw: responses.rows.slice(0, ROW_LIMIT),
+    respondents: [...people.values()],
     surveys: surveys.rows.map((s) => ({
       title: s.title,
       company: s.company,
@@ -569,6 +595,7 @@ async function echoData(clientId, b, { echo = true } = {}) {
       contact_phone: r.contact_phone || (r.invite_session ? contactLabel(contactKey(r.invite_session)) : ''),
       contact_email: r.contact_email || '',
       consent: r.contact_name || r.contact_phone || r.contact_email ? yn(r.contact_consent) : '',
+      gender: r.gender || '', city: r.city || '', age_band: r.age_band || '',
       followup: r.followup_status === 'none' ? '' : cap(r.followup_status),
       note: r.followup_note || '',
       seconds: r.duration_sec,
@@ -600,40 +627,87 @@ async function echoData(clientId, b, { echo = true } = {}) {
 }
 
 /* ------------------------------------------------------------------ */
-/* One customer, or every customer: Vantriq Pulse + Vantriq Echo        */
+/* Vantriq Pulse — conversations and the people behind them            */
 /* ------------------------------------------------------------------ */
+
+const PROFILE_COLS = [
+  { header: 'Email', key: 'email', width: 24, fmt: 'text' },
+  { header: 'City', key: 'city', width: 14, fmt: 'text' },
+  { header: 'Country', key: 'country', width: 14, fmt: 'text' },
+  { header: 'Gender', key: 'gender', width: 10, fmt: 'center' },
+  { header: 'Age group', key: 'age_band', width: 10, fmt: 'center' },
+  { header: 'Their company', key: 'their_company', width: 18, fmt: 'text' },
+  { header: 'Tags', key: 'tags', width: 18, fmt: 'text' },
+  { header: 'Do not contact', key: 'do_not_contact', width: 9, fmt: 'center' },
+  { header: 'Notes', key: 'notes', width: 30, fmt: 'text' },
+];
+
+/** Where people are: cities from their profiles, countries from the number they wrote from. */
+function whereRows(contacts, field) {
+  const m = new Map();
+  for (const c of contacts) {
+    const k = c[field] || '';
+    if (!m.has(k)) m.set(k, { name: k || (field === 'city' ? 'Not known yet' : 'Web or unknown'), people: 0, fresh: 0, back: 0, conversations: 0, messages: 0 });
+    const g = m.get(k);
+    g.people += 1; g.conversations += c.conv_window; g.messages += c.msgs_window;
+    if (c.new_window) g.fresh += 1;
+    if (c.returning) g.back += 1;
+  }
+  return [...m.entries()].map(([k, g]) => ({ ...g, known: !!k, share: pctOf(g.people, contacts.length) }))
+    .sort((a, b) => (a.known === b.known ? b.people - a.people : a.known ? -1 : 1));
+}
+
+/** Transcript lines logged in the window, oldest last. Only when an agent sends them. */
+async function transcriptRows(clientId, b) {
+  const { rows } = await db.query(
+    `select m.created_at, m.session_id, m.external_ref, m.role, m.content, m.channel, c.company
+       from conversation_messages m left join clients c on c.id = m.client_id
+      where m.created_at >= $2
+        and ($1::uuid is null or m.client_id = $1 or m.agent_id in (select id from client_agents where client_id = $1))
+      order by m.created_at desc limit ${ROW_LIMIT + 1}`,
+    [clientId, b.window_start]
+  );
+  return rows.map((m) => ({
+    at: local(m.created_at),
+    contact: /^wa-\d+$/.test(m.external_ref || '') && !m.session_id ? `+${m.external_ref.slice(3)}` : contactLabel(contactKey(m.session_id || m.external_ref)),
+    company: m.company || '',
+    who: m.role === 'agent' ? 'Agent' : 'Customer',
+    channel: CHANNEL[m.channel] || m.channel,
+    text: String(m.content || '').slice(0, 4000),
+  }));
+}
 
 /**
  * @param {object|null} client  { id, company } — null for every customer
- * @param {object} opts         { grain, quota, echo } — echo false leaves
- *                              out surveys, survey answers and follow-ups
+ * @param {object} opts         { grain, quota }
  * @returns {Promise<{ buffer: Buffer, filename: string }>}
  */
-async function clientReport(client, { grain, quota = null, echo: echoOn = true } = {}) {
+async function pulseReport(client, { grain, quota = null } = {}) {
   grain = normaliseGrain(grain);
   const all = !client;
   const d = all ? await platformAnalytics({ grain }) : await clientAnalytics(client.id, { grain, quota });
   const b = await periodBounds(grain);
-  const [contacts, conversations, echo, customers] = await Promise.all([
-    contactRows(all ? null : client.id, b, { echo: echoOn }),
+  const [contacts, conversations, customers, lines] = await Promise.all([
+    contactRows(all ? null : client.id, b),
     conversationRows(all ? null : client.id, b),
-    echoData(all ? null : client.id, b, { echo: echoOn }),
     all ? customerRows(b) : Promise.resolve(null),
+    transcriptRows(all ? null : client.id, b),
   ]);
   const g = GRAINS[grain];
   const who = all ? 'All customers' : client.company;
   const window = g.window.toLowerCase();
   const context = `${g.window} by ${grain} · ${d.period.current_label} is ${d.period.elapsed_pct}% through and is compared with ${d.period.previous_label} up to the same point · ${TZ.replace('Asia/', '')} time · generated ${new Date().toLocaleString('en-GB', { timeZone: TZ, dateStyle: 'medium', timeStyle: 'short' })}`;
   const wb = newBook();
-  wb.title = `Vantriq Pulse & Echo — ${who}`;
+  wb.title = `Vantriq Pulse — ${who}`;
   const k = d.kpis;
-  const s = d.satisfaction;
   const withCo = all ? [{ header: 'Customer', key: 'company', width: 26, fmt: 'text' }] : [];
+  const cities = whereRows(contacts, 'city');
+  const countries = whereRows(contacts, 'country');
 
   /* --- Summary --- */
   const sum = addSheet(wb, 'Summary', { landscape: true });
-  let r = titleBlock(sum, `Vantriq Pulse & Echo — ${who}`, context, 6);
-  r = sectionTitle(sum, r, 'Vantriq Pulse — conversations and contacts');
+  let r = titleBlock(sum, `Vantriq Pulse — ${who}`, context, 6);
+  r = sectionTitle(sum, r, 'Conversations and contacts');
   const m = (label, x, fmt = 'int', extra = {}) => ({
     label, cur: x.current, prev: x.previous, chg: x.delta_pct ?? null, full: x.previous_full ?? null, proj: x.projected ?? null, fmt, ...extra,
   });
@@ -660,9 +734,11 @@ async function clientReport(client, { grain, quota = null, echo: echoOn = true }
     { label: 'People who messaged', v: wt.contacts, note: '' },
     { label: 'New contacts', v: wt.new_contacts, note: wt.contacts ? `${pctOf(wt.new_contacts, wt.contacts)}% of people` : '' },
     { label: 'Contacts who came back', v: contacts.filter((c) => c.returning).length, note: 'more than one conversation' },
+    { label: 'Known by name', v: contacts.filter((c) => c.name).length, note: contacts.length ? `${pctOf(contacts.filter((c) => c.name).length, contacts.length)}% of people` : '' },
+    { label: 'With an email address', v: contacts.filter((c) => c.email).length, note: '' },
+    { label: 'City known', v: contacts.filter((c) => c.city).length, note: '' },
   ]);
 
-  // How loyal the people in the window are: all-time conversations each.
   r = sectionTitle(sum, r, 'How often people come back');
   const bands = [
     ['Once — never came back', (n) => n === 1],
@@ -690,6 +766,13 @@ async function clientReport(client, { grain, quota = null, echo: echoOn = true }
     { header: 'Last contact', key: 'last_at', width: 19, fmt: 'datetime' },
   ], loyal, { emptyText: `Nobody active in the ${window} has come back for a second conversation yet.` });
 
+  r = sectionTitle(sum, r, 'Where they are — top cities');
+  r = table(sum, r, [
+    { header: 'City', key: 'name', width: 34, fmt: 'text' },
+    { header: 'People', key: 'people', width: 20, fmt: 'int', bar: true },
+    { header: 'Share %', key: 'share', width: 20, fmt: 'pct' },
+  ], cities.slice(0, 8), { emptyText: 'No cities known yet.' });
+
   if (d.quota) {
     r = sectionTitle(sum, r, 'This month against the package');
     r = table(sum, r, [
@@ -703,70 +786,35 @@ async function clientReport(client, { grain, quota = null, echo: echoOn = true }
     ]);
   }
 
-  r = sectionTitle(sum, r, 'Vantriq Echo — customer satisfaction');
-  const sk = s.kpis;
-  r = kpiTable(sum, r, d, [
-    { label: 'Satisfied (4–5 of 5), %', cur: sk.csat.current, prev: sk.csat.previous, chg: sk.csat.delta_pts, fmt: 'pct', chgFmt: 'signed' },
-    { label: 'Average satisfaction (of 5)', cur: sk.csat.average, prev: null, chg: null, fmt: 'dec', good: null },
-    { label: 'Satisfaction answers', cur: sk.csat.responses, prev: null, chg: null, good: null },
-    { label: 'Net Promoter Score', cur: sk.nps.current, prev: sk.nps.previous, chg: sk.nps.delta_pts, fmt: 'int', chgFmt: 'signed' },
-    { label: 'Promoters (9–10)', cur: sk.nps.promoters, prev: null, chg: null, good: null },
-    { label: 'Passives (7–8)', cur: sk.nps.passives, prev: null, chg: null, good: null },
-    { label: 'Detractors (0–6)', cur: sk.nps.detractors, prev: null, chg: null, good: null },
-    { label: 'Problem resolved, %', cur: sk.resolution.current, prev: sk.resolution.previous, chg: sk.resolution.delta_pts, fmt: 'pct', chgFmt: 'signed' },
-  ]);
-  const sw = s.window;
-  r = table(sum, r, [
-    { header: `${g.window}`, key: 'label', width: 34, fmt: 'text' },
-    { header: 'Value', key: 'v', width: 20, fmt: 'dec' },
-  ], [
-    { label: 'Satisfied, % of answers', v: sw.csat },
-    { label: 'Average satisfaction (of 5)', v: sw.csat_average },
-    { label: 'Satisfaction answers', v: sw.csat_responses },
-    { label: 'Net Promoter Score', v: sw.nps },
-    { label: 'NPS answers', v: sw.nps_responses },
-    { label: 'Problem resolved, %', v: sw.resolution },
-    ...(echoOn ? [
-      { label: 'Echo surveys', v: echo.surveys.length },
-      { label: 'Follow-ups still open', v: echo.followups.filter((f) => f.status !== 'Resolved').length },
-    ] : []),
-  ]);
-  if (!echoOn) {
-    r = notesList(sum, r, [{ tone: 'info', text: 'Vantriq Echo — your own customer-satisfaction surveys by QR code, link or WhatsApp, with follow-ups for unhappy answers — is not switched on for this account. Ask VantriqAI to switch it on.' }]);
-  }
-
   r = sectionTitle(sum, r, 'What stands out');
-  r = notesList(sum, r, d.insights.length ? d.insights : ['Not enough activity yet to say anything with confidence.']);
+  const pulseInsights = (d.insights || []).filter((i) => !/satisf|NPS|survey|recommend|resolved/i.test(i.text || ''));
+  r = notesList(sum, r, pulseInsights.length ? pulseInsights : ['Not enough activity yet to say anything with confidence.']);
 
   r = sectionTitle(sum, r, 'In this workbook');
   const tabs = [
     ['Trend', `Every figure for each ${grain} of the ${window}`],
     ...(all ? [['Customers', 'Each customer side by side']] : []),
-    ['Contacts', 'Everyone who messaged in the period, with their whole history'],
+    ['Contacts', 'Everyone who messaged in the period: who they are, where, and their whole history'],
     ['New contacts', 'People whose first ever conversation was in the period'],
     ['Returning contacts', 'People who came back — more than one conversation'],
     ['Conversations', 'Every conversation: when, who, which channel and agent, how long'],
+    ['Transcripts', 'What was said, line by line, where the agent sends its messages to the CRM'],
+    ['Cities & countries', 'Where people are, with conversations from each'],
     ['Channels', 'Where conversations came in'],
     ['Agents', 'Which agent handled them'],
     ['Busiest times', 'Conversations by day of the week and hour'],
-    ...(echoOn ? [
-      ['Echo summary', 'Satisfaction scores, NPS and every survey\'s results'],
-      ['Echo responses', 'Every survey answer, question by question'],
-    ] : [['Satisfaction', 'Satisfaction scores and NPS']]),
-    ['All answers', 'Every satisfaction answer, from surveys and anything else that sends them'],
-    ...(echoOn ? [['Follow-ups', 'Unhappy customers: who, what they said, and where each follow-up stands']] : []),
-    ['Comments', 'Everything customers wrote'],
     ['Definitions', 'How each figure is worked out'],
   ];
   r = table(sum, r, [{ header: 'Tab', key: 't', width: 34, fmt: 'text' }, { header: 'What it holds', key: 'w', fmt: 'text' }],
     tabs.map(([t, w]) => ({ t, w })), { spanTo: 6 });
   sum.getColumn(1).width = 36;
+  sum.getCell(r, 1).value = 'Satisfaction and survey results are in the Vantriq Echo report (Echo → Download Echo report).';
+  sum.getCell(r, 1).font = { italic: true, color: { argb: C.muted } };
 
   /* --- Trend --- */
   const tr = addSheet(wb, 'Trend', { freeze: 4, landscape: true });
-  let tRow = titleBlock(tr, `Trend — ${who}`, `Each ${grain} of the ${window}. The last row is the ${grain} still under way.`, 13);
-  const satSeries = s.series || [];
-  tRow = table(tr, tRow, [
+  const tRow = titleBlock(tr, `Trend — ${who}`, `Each ${grain} of the ${window}. The last row is the ${grain} still under way.`, 8);
+  table(tr, tRow, [
     { header: 'Period', key: 'p', width: 22, fmt: 'text' },
     { header: 'Conversations', key: 'conv', width: 14, fmt: 'int', bar: true },
     { header: 'Messages', key: 'msgs', width: 12, fmt: 'int' },
@@ -775,27 +823,16 @@ async function clientReport(client, { grain, quota = null, echo: echoOn = true }
     { header: 'New contacts', key: 'newc', width: 12, fmt: 'int', bar: true },
     { header: 'Returning contacts', key: 'ret', width: 12, fmt: 'int' },
     { header: 'New, % of people', key: 'newpct', width: 12, fmt: 'pct' },
-    { header: 'Satisfaction answers', key: 'ans', width: 13, fmt: 'int' },
-    { header: 'Satisfied %', key: 'csat', width: 11, fmt: 'pct' },
-    { header: 'Average (of 5)', key: 'avg', width: 11, fmt: 'dec' },
-    { header: 'NPS answers', key: 'npsn', width: 11, fmt: 'int' },
-    { header: 'NPS', key: 'nps', width: 9, fmt: 'int' },
-  ], d.series.map((x, i) => {
-    const y = satSeries[i] || {};
-    return {
-      p: periodLabel(x.bucket, grain), conv: x.conversations, msgs: x.messages,
-      mpc: x.conversations ? Math.round((x.messages / x.conversations) * 10) / 10 : null,
-      contacts: x.contacts, newc: x.new_contacts, ret: x.returning_contacts,
-      newpct: pctOf(x.new_contacts, x.contacts), ans: y.responses || 0, csat: y.csat, avg: y.csat_average,
-      npsn: y.nps_responses || 0, nps: y.nps,
-    };
-  }), { totals: { label: `${g.window}`, conv: 'sum', msgs: 'sum', newc: 'sum', ans: 'sum', npsn: 'sum' } });
+  ], d.series.map((x) => ({
+    p: periodLabel(x.bucket, grain), conv: x.conversations, msgs: x.messages,
+    mpc: x.conversations ? Math.round((x.messages / x.conversations) * 10) / 10 : null,
+    contacts: x.contacts, newc: x.new_contacts, ret: x.returning_contacts, newpct: pctOf(x.new_contacts, x.contacts),
+  })), { totals: { label: `${g.window}`, conv: 'sum', msgs: 'sum', newc: 'sum' } });
 
   /* --- Customers (every customer only) --- */
   if (customers) {
     const cu = addSheet(wb, 'Customers', { freeze: 4, landscape: true });
-    let cRow = titleBlock(cu, 'Customers side by side', `Over the ${window}; "${d.period.current_label}" is the period under way.`, 14);
-    table(cu, cRow, [
+    table(cu, titleBlock(cu, 'Customers side by side', `Over the ${window}; "${d.period.current_label}" is the period under way.`, 10), [
       { header: 'Customer', key: 'company', width: 30, fmt: 'text' },
       { header: 'Stage', key: 'stage', width: 12, fmt: 'center' },
       { header: 'Conversations', key: 'conversations', width: 14, fmt: 'int', bar: true },
@@ -806,11 +843,7 @@ async function clientReport(client, { grain, quota = null, echo: echoOn = true }
       { header: 'New', key: 'new_contacts', width: 9, fmt: 'int' },
       { header: 'Returning', key: 'returning', width: 10, fmt: 'int' },
       { header: 'Last activity', key: 'last_at', width: 19, fmt: 'datetime' },
-      { header: 'Echo', key: 'echo', width: 8, fmt: 'center' },
-      { header: 'Satisfaction answers', key: 'answers', width: 13, fmt: 'int' },
-      { header: 'Satisfied %', key: 'csat', width: 11, fmt: 'pct' },
-      { header: 'NPS', key: 'nps', width: 8, fmt: 'int' },
-    ], customers, { filter: true, totals: { label: 'All customers', conversations: 'sum', conversations_current: 'sum', messages: 'sum', contacts: 'sum', new_contacts: 'sum', returning: 'sum', answers: 'sum' } });
+    ], customers, { filter: true, totals: { label: 'All customers', conversations: 'sum', conversations_current: 'sum', messages: 'sum', contacts: 'sum', new_contacts: 'sum', returning: 'sum' } });
   }
 
   /* --- Contacts, new, returning --- */
@@ -830,10 +863,7 @@ async function clientReport(client, { grain, quota = null, echo: echoOn = true }
     { header: 'Days since last contact', key: 'since_last', width: 12, fmt: 'int' },
     { header: 'Channels', key: 'channels', width: 14, fmt: 'text' },
     { header: 'Agent', key: 'agents', width: 24, fmt: 'text' },
-    { header: 'Satisfaction answers', key: 'answers', width: 12, fmt: 'int' },
-    { header: 'Last score (1–5)', key: 'last_score', width: 10, fmt: 'int' },
-    { header: 'Last NPS (0–10)', key: 'last_nps', width: 10, fmt: 'int' },
-    { header: 'Email', key: 'email', width: 22, fmt: 'text' },
+    ...PROFILE_COLS,
     { header: 'In the CRM as', key: 'in_crm', width: 22, fmt: 'text' },
   ];
   const ct = addSheet(wb, 'Contacts', { freeze: 4, landscape: true });
@@ -855,7 +885,7 @@ async function clientReport(client, { grain, quota = null, echo: echoOn = true }
       { header: 'Average days between visits', key: 'avg_gap', width: 13, fmt: 'dec' },
     ]), back, { filter: true, emptyText: `Nobody came back for a second conversation in the ${window} yet.` });
 
-  /* --- Conversations --- */
+  /* --- Conversations, transcripts --- */
   const cv = addSheet(wb, 'Conversations', { freeze: 4, landscape: true });
   table(cv, titleBlock(cv, `Conversations — ${who}`, `Every conversation that started in the ${window}, newest first. A WhatsApp conversation is one customer's 24-hour window.`, 12), [
     { header: 'Started', key: 'started', width: 19, fmt: 'datetime' },
@@ -871,9 +901,36 @@ async function clientReport(client, { grain, quota = null, echo: echoOn = true }
     { header: 'Handed to a person', key: 'handoff', width: 11, fmt: 'center' },
   ], conversations, { filter: true, emptyText: `No conversations in the ${window}.` });
 
+  const tx = addSheet(wb, 'Transcripts', { freeze: 4, landscape: true });
+  table(tx, titleBlock(tx, `Transcripts — ${who}`, `What was said in the ${window}, newest first — for agents that send their messages to the CRM (POST /api/webhooks/conversation).`, 6), [
+    { header: 'When', key: 'at', width: 19, fmt: 'datetime' },
+    { header: 'Contact', key: 'contact', width: 18, fmt: 'text' },
+    ...withCo,
+    { header: 'Who', key: 'who', width: 10, fmt: 'center' },
+    { header: 'Channel', key: 'channel', width: 11, fmt: 'center' },
+    { header: 'Message', key: 'text', width: 90, fmt: 'text', wrap: true },
+  ], lines, { filter: true, emptyText: `No transcripts in the ${window}: this agent does not send its messages to the CRM yet.` });
+
+  /* --- Where --- */
+  const wh = addSheet(wb, 'Cities & countries');
+  let wRow = titleBlock(wh, `Where they are — ${who}`, `People active in the ${window}. Cities come from what customers told the agent or a survey, or what someone typed on their profile; countries from the number they wrote from.`, 7);
+  const whereCols = (first) => [
+    { header: first, key: 'name', width: 26, fmt: 'text' },
+    { header: 'People', key: 'people', width: 11, fmt: 'int', bar: true },
+    { header: 'Share %', key: 'share', width: 10, fmt: 'pct' },
+    { header: 'New', key: 'fresh', width: 9, fmt: 'int' },
+    { header: 'Came back', key: 'back', width: 10, fmt: 'int' },
+    { header: 'Conversations', key: 'conversations', width: 14, fmt: 'int' },
+    { header: 'Messages', key: 'messages', width: 11, fmt: 'int' },
+  ];
+  wRow = sectionTitle(wh, wRow, 'Cities', 7);
+  wRow = table(wh, wRow, whereCols('City'), cities, { totals: { label: 'Everyone', people: 'sum', fresh: 'sum', back: 'sum', conversations: 'sum', messages: 'sum' }, emptyText: 'Nobody active in the period.' });
+  wRow = sectionTitle(wh, wRow, 'Countries', 7);
+  table(wh, wRow, whereCols('Country'), countries, { totals: { label: 'Everyone', people: 'sum', conversations: 'sum' }, emptyText: 'Nobody active in the period.' });
+
   /* --- Channels, agents --- */
   const chByContacts = new Map();
-  for (const c of contacts) for (const ch of c.channels.split(', ')) chByContacts.set(ch, (chByContacts.get(ch) || 0) + 1);
+  for (const c of contacts) for (const chn of c.channels.split(', ')) chByContacts.set(chn, (chByContacts.get(chn) || 0) + 1);
   const ch = addSheet(wb, 'Channels');
   table(ch, titleBlock(ch, `Channels — ${who}`, `Where conversations came in over the ${window}.`, 6), [
     { header: 'Channel', key: 'name', width: 20, fmt: 'text' },
@@ -900,9 +957,16 @@ async function clientReport(client, { grain, quota = null, echo: echoOn = true }
     per: a.conversations ? Math.round((a.messages / a.conversations) * 10) / 10 : null,
   })));
 
-  /* --- Busiest times --- */
+  heatSheet(wb, d, who, window);
+  definitions(wb, grain, 'pulse');
+
+  const buffer = Buffer.from(await wb.xlsx.writeBuffer());
+  return { buffer, filename: `vantriq-pulse-${all ? 'all-customers' : safeName(client.company)}-${grain}-${new Date().toISOString().slice(0, 10)}.xlsx` };
+}
+
+function heatSheet(wb, d, who, window) {
   const hm = addSheet(wb, 'Busiest times', { landscape: true });
-  let hRow = titleBlock(hm, `Busiest times — ${who}`, `Conversations started, by day of the week and hour (${TZ.replace('Asia/', '')} time), over the ${window}. Darker is busier.`, 26);
+  const hRow = titleBlock(hm, `Busiest times — ${who}`, `Conversations started, by day of the week and hour (${TZ.replace('Asia/', '')} time), over the ${window}. Darker is busier.`, 26);
   const heat = d.heatmap;
   const hdr = hm.getRow(hRow);
   hdr.getCell(1).value = 'Day';
@@ -931,78 +995,230 @@ async function clientReport(client, { grain, quota = null, echo: echoOn = true }
     ref: `B${gridTop}:Y${gridTop + 6}`,
     rules: [{ type: 'colorScale', priority: 1, cfvo: [{ type: 'min' }, { type: 'max' }], color: [{ argb: 'FFFFFFFF' }, { argb: 'FF2F56D9' }] }],
   });
+}
 
-  /* --- Echo --- */
-  const es = addSheet(wb, echoOn ? 'Echo summary' : 'Satisfaction', { tab: 'FF7A3FB0', landscape: true });
-  let eRow = titleBlock(es, echoOn ? `Vantriq Echo — ${who}` : `Customer satisfaction — ${who}`,
-    `Customer satisfaction over the ${window}: how people scored${echoOn ? ', and every survey\'s results' : ''}.`, 16);
-  eRow = sectionTitle(es, eRow, 'How people scored their experience (1–5)', 4);
+/* ------------------------------------------------------------------ */
+/* Vantriq Echo — satisfaction and surveys                              */
+/* ------------------------------------------------------------------ */
+
+/** A few plain facts about who is happier, from groups big enough to mean something. */
+function echoFindings(demo, sw) {
+  const out = [];
+  const big = (list) => list.filter((x) => x.known && x.csat != null && x.responses >= 5);
+  for (const [field, word] of [['city', 'in'], ['gender', 'among'], ['age', 'among people aged']]) {
+    const g = big(demo[field] || []);
+    if (g.length >= 2) {
+      const lo = g.reduce((a, x) => (x.csat < a.csat ? x : a));
+      const hi = g.reduce((a, x) => (x.csat > a.csat ? x : a));
+      if (hi.csat - lo.csat >= 10) {
+        out.push({ tone: 'warn', text: `Satisfaction is lowest ${word} ${lo.name} (${lo.csat}% satisfied, ${lo.responses} answers) and highest ${word} ${hi.name} (${hi.csat}%).` });
+      }
+    }
+  }
+  if (sw.nps != null && sw.nps_responses >= 5) out.push({ tone: sw.nps >= 30 ? 'up' : sw.nps < 0 ? 'down' : 'info', text: `Net Promoter Score over the period is ${sw.nps > 0 ? '+' : ''}${sw.nps} from ${sw.nps_responses} answers.` });
+  if (sw.csat != null && sw.csat_responses >= 5) out.push({ tone: sw.csat >= 80 ? 'up' : sw.csat < 60 ? 'down' : 'info', text: `${sw.csat}% of ${sw.csat_responses} people scored their experience 4 or 5 out of 5 (average ${sw.csat_average}).` });
+  return out;
+}
+
+async function echoReport(client, { grain } = {}) {
+  grain = normaliseGrain(grain);
+  const all = !client;
+  const b = await periodBounds(grain);
+  const [s, echo] = await Promise.all([
+    satisfactionAnalytics(all ? null : client.id, grain, b, { withCompany: all }),
+    echoData(all ? null : client.id, b, { echo: true }),
+  ]);
+  const g = GRAINS[grain];
+  const who = all ? 'All customers' : client.company;
+  const window = g.window.toLowerCase();
+  const period = { current_label: g.current, previous_label: g.previous, elapsed_pct: Math.round(b.elapsed_frac * 100) };
+  const d = { period };
+  const wb = newBook();
+  wb.title = `Vantriq Echo — ${who}`;
+  const withCo = all ? [{ header: 'Customer', key: 'company', width: 26, fmt: 'text' }] : [];
+  const demo = demographicsOf(echo.raw);
+  const sw = s.window;
+  const sk = s.kpis;
+
+  /* --- Summary --- */
+  const sum = addSheet(wb, 'Summary', { landscape: true, tab: 'FF7A3FB0' });
+  let r = titleBlock(sum, `Vantriq Echo — ${who}`, `${g.window} by ${grain} · ${period.current_label} is ${period.elapsed_pct}% through and is compared with ${g.previous} up to the same point · generated ${new Date().toLocaleString('en-GB', { timeZone: TZ, dateStyle: 'medium', timeStyle: 'short' })}`, 6);
+  r = sectionTitle(sum, r, 'Customer satisfaction');
+  r = kpiTable(sum, r, d, [
+    { label: 'Satisfied (4–5 of 5), %', cur: sk.csat.current, prev: sk.csat.previous, chg: sk.csat.delta_pts, fmt: 'pct', chgFmt: 'signed' },
+    { label: 'Average satisfaction (of 5)', cur: sk.csat.average, prev: null, chg: null, fmt: 'dec', good: null },
+    { label: 'Satisfaction answers', cur: sk.csat.responses, prev: null, chg: null, good: null },
+    { label: 'Net Promoter Score', cur: sk.nps.current, prev: sk.nps.previous, chg: sk.nps.delta_pts, fmt: 'int', chgFmt: 'signed' },
+    { label: 'Promoters (9–10)', cur: sk.nps.promoters, prev: null, chg: null, good: null },
+    { label: 'Passives (7–8)', cur: sk.nps.passives, prev: null, chg: null, good: null },
+    { label: 'Detractors (0–6)', cur: sk.nps.detractors, prev: null, chg: null, good: null },
+    { label: 'Problem resolved, %', cur: sk.resolution.current, prev: sk.resolution.previous, chg: sk.resolution.delta_pts, fmt: 'pct', chgFmt: 'signed' },
+  ]);
+  const inv = echo.surveys.reduce((a, x) => ({ sent: a.sent + x.inv_sent, answered: a.answered + x.inv_answered }), { sent: 0, answered: 0 });
+  r = sectionTitle(sum, r, `${g.window} in total`);
+  r = table(sum, r, [
+    { header: 'Figure', key: 'label', width: 34, fmt: 'text' },
+    { header: 'Value', key: 'v', width: 20, fmt: 'dec' },
+  ], [
+    { label: 'Survey answers', v: echo.responses.length },
+    { label: 'Satisfied, % of answers', v: sw.csat },
+    { label: 'Average satisfaction (of 5)', v: sw.csat_average },
+    { label: 'Net Promoter Score', v: sw.nps },
+    { label: 'NPS answers', v: sw.nps_responses },
+    { label: 'Problem resolved, %', v: sw.resolution },
+    { label: 'Personal survey links sent', v: inv.sent },
+    { label: 'Answered, % of links sent', v: pctOf(inv.answered, inv.sent) },
+    { label: 'Surveys', v: echo.surveys.length },
+    { label: 'Live surveys', v: echo.surveys.filter((x) => x.status === 'Live').length },
+    { label: 'Follow-ups still open', v: echo.followups.filter((f) => f.status !== 'Resolved').length },
+    { label: 'People who left their details', v: echo.respondents.length },
+  ]);
+  r = sectionTitle(sum, r, 'What stands out');
+  const found = echoFindings(demo, sw);
+  r = notesList(sum, r, found.length ? found : ['Not enough answers yet to say anything with confidence.']);
+  r = sectionTitle(sum, r, 'In this workbook');
+  table(sum, r, [{ header: 'Tab', key: 't', width: 34, fmt: 'text' }, { header: 'What it holds', key: 'w', fmt: 'text' }], [
+    ['Trend', `Satisfaction and NPS for each ${grain} of the ${window}`],
+    ['Scores', 'How people scored (1–5) and the NPS groups'],
+    ['Who answered', 'Satisfaction by gender, age group and city'],
+    ['Surveys', 'Every survey: answers, satisfaction, NPS, links sent and response rate'],
+    ['Responses', 'Every survey answer, question by question, with who answered'],
+    ['By location & channel', 'Satisfaction by branch and by how the survey was answered'],
+    ['All answers', 'Every satisfaction answer, from surveys and anything else that sends them'],
+    ['Follow-ups', 'Unhappy customers: who, what they said, and where each follow-up stands'],
+    ['Comments', 'Everything customers wrote'],
+    ['Respondents', 'Everyone who left their name, number or email'],
+    ['Definitions', 'How each figure is worked out'],
+  ].map(([t, w]) => ({ t, w })), { spanTo: 6 });
+  sum.getColumn(1).width = 36;
+
+  /* --- Trend --- */
+  const tr = addSheet(wb, 'Trend', { freeze: 4, tab: 'FF7A3FB0' });
+  table(tr, titleBlock(tr, `Satisfaction trend — ${who}`, `Each ${grain} of the ${window}; the last row is still under way.`, 6), [
+    { header: 'Period', key: 'p', width: 22, fmt: 'text' },
+    { header: 'Satisfaction answers', key: 'ans', width: 14, fmt: 'int', bar: true },
+    { header: 'Satisfied %', key: 'csat', width: 12, fmt: 'pct' },
+    { header: 'Average (of 5)', key: 'avg', width: 12, fmt: 'dec' },
+    { header: 'NPS answers', key: 'npsn', width: 12, fmt: 'int' },
+    { header: 'NPS', key: 'nps', width: 9, fmt: 'int' },
+  ], (s.series || []).map((x) => ({ p: periodLabel(x.bucket, grain), ans: x.responses || 0, csat: x.csat, avg: x.csat_average, npsn: x.nps_responses || 0, nps: x.nps })),
+  { totals: { label: g.window, ans: 'sum', npsn: 'sum' } });
+
+  /* --- Scores --- */
+  const es = addSheet(wb, 'Scores', { tab: 'FF7A3FB0' });
+  let eRow = titleBlock(es, `How people scored — ${who}`, `Over the ${window}.`, 4);
+  eRow = sectionTitle(es, eRow, 'Their experience (1–5)', 3);
   const distTotal = s.distribution.reduce((a, x) => a + x.n, 0);
   eRow = table(es, eRow, [
     { header: 'Score', key: 'label', width: 26, fmt: 'text' },
     { header: 'Answers', key: 'n', width: 12, fmt: 'int', bar: true },
     { header: 'Share %', key: 'share', width: 10, fmt: 'pct' },
-  ], [5, 4, 3, 2, 1].map((sc) => {
-    const x = s.distribution[sc - 1];
-    return { label: `${sc} — ${SCORE_LABEL[sc]}`, n: x.n, share: pctOf(x.n, distTotal) };
-  }), { totals: { label: 'All scores', n: 'sum' } });
-  eRow = sectionTitle(es, eRow, 'Would they recommend you? (NPS)', 4);
+  ], [5, 4, 3, 2, 1].map((sc) => ({ label: `${sc} — ${SCORE_LABEL[sc]}`, n: s.distribution[sc - 1].n, share: pctOf(s.distribution[sc - 1].n, distTotal) })),
+  { totals: { label: 'All scores', n: 'sum' } });
+  eRow = sectionTitle(es, eRow, 'Would they recommend you? (NPS)', 3);
   const npsTotal = sw.nps_responses || 0;
-  eRow = table(es, eRow, [
+  table(es, eRow, [
     { header: 'Group', key: 'label', width: 26, fmt: 'text' },
     { header: 'Answers', key: 'n', width: 12, fmt: 'int', bar: true },
     { header: 'Share %', key: 'share', width: 10, fmt: 'pct' },
-  ], [
+  ], npsTotal ? [
     { label: 'Promoters (9–10)', n: sw.promoters || 0, share: pctOf(sw.promoters || 0, npsTotal) },
     { label: 'Passives (7–8)', n: sw.passives || 0, share: pctOf(sw.passives || 0, npsTotal) },
     { label: 'Detractors (0–6)', n: sw.detractors || 0, share: pctOf(sw.detractors || 0, npsTotal) },
     { label: 'Net Promoter Score', n: sw.nps, share: null },
-  ]);
-  if (echoOn) {
-    eRow = sectionTitle(es, eRow, 'Every survey', 16);
-    table(es, eRow, [
-      { header: 'Survey', key: 'title', width: 30, fmt: 'text' },
-      ...withCo,
-      { header: 'Status', key: 'status', width: 14, fmt: 'center' },
-      { header: `Answers (${window})`, key: 'responses', width: 12, fmt: 'int', bar: true },
-      { header: 'Answers, all time', key: 'responses_all', width: 11, fmt: 'int' },
-      { header: 'Satisfied %', key: 'csat', width: 10, fmt: 'pct' },
-      { header: 'Average (of 5)', key: 'csat_avg', width: 10, fmt: 'dec' },
-      { header: 'NPS', key: 'nps', width: 8, fmt: 'int' },
-      { header: 'Resolved %', key: 'resolution', width: 10, fmt: 'pct' },
-      { header: 'Invites sent', key: 'inv_sent', width: 10, fmt: 'int' },
-      { header: 'Opened', key: 'inv_opened', width: 9, fmt: 'int' },
-      { header: 'Answered', key: 'inv_answered', width: 10, fmt: 'int' },
-      { header: 'Response rate %', key: 'rate', width: 11, fmt: 'pct' },
-      { header: 'Open follow-ups', key: 'followups', width: 11, fmt: 'int' },
-      { header: 'Last answer', key: 'last_at', width: 19, fmt: 'datetime' },
-      { header: 'Address', key: 'address', width: 26, fmt: 'text' },
-    ], echo.surveys, { emptyText: 'No Echo surveys yet.' });
+  ] : [], { emptyText: `No "would you recommend us" answers in the ${window}.` });
 
-    const er = addSheet(wb, 'Echo responses', { tab: 'FF7A3FB0', freeze: 4, landscape: true });
-    table(er, titleBlock(er, `Echo responses — ${who}`, `Every survey answer in the ${window}, newest first. "Answers" spells out every question; contact details are only what the customer chose to give.`, 14), [
-      { header: 'Submitted', key: 'submitted', width: 19, fmt: 'datetime' },
-      { header: 'Survey', key: 'survey', width: 24, fmt: 'text' },
-      ...withCo,
-      { header: 'Location', key: 'location', width: 14, fmt: 'text' },
-      { header: 'Channel', key: 'channel', width: 11, fmt: 'center' },
-      { header: 'Language', key: 'language', width: 10, fmt: 'center' },
-      { header: 'Satisfaction (1–5)', key: 'score', width: 11, fmt: 'int' },
-      { header: 'NPS (0–10)', key: 'nps', width: 9, fmt: 'int' },
-      { header: 'Effort (1–7)', key: 'ces', width: 9, fmt: 'int' },
-      { header: 'Resolved', key: 'resolved', width: 9, fmt: 'center' },
-      { header: 'Comment', key: 'comment', width: 40, fmt: 'text', wrap: true },
-      { header: 'Name', key: 'contact_name', width: 18, fmt: 'text' },
-      { header: 'Phone', key: 'contact_phone', width: 16, fmt: 'text' },
-      { header: 'Email', key: 'contact_email', width: 22, fmt: 'text' },
-      { header: 'Happy to be contacted', key: 'consent', width: 11, fmt: 'center' },
-      { header: 'Follow-up', key: 'followup', width: 11, fmt: 'center' },
-      { header: 'Follow-up note', key: 'note', width: 26, fmt: 'text', wrap: true },
-      { header: 'Seconds to answer', key: 'seconds', width: 10, fmt: 'int' },
-      { header: 'Answers', key: 'answers', width: 80, fmt: 'text', wrap: true },
-    ], echo.responses, { filter: true, emptyText: `No survey answers in the ${window}.` });
-  }
+  /* --- Who answered --- */
+  const wa = addSheet(wb, 'Who answered', { tab: 'FF7A3FB0' });
+  let wRow = titleBlock(wa, `Who answered — ${who}`, `Survey answers in the ${window}, by what people told us about themselves ("about you" questions and their contact details). Groups with few answers move a lot — read the Answers column first.`, 7);
+  const demoCols = (first) => [
+    { header: first, key: 'name', width: 24, fmt: 'text' },
+    { header: 'Answers', key: 'responses', width: 11, fmt: 'int', bar: true },
+    { header: 'Share %', key: 'share', width: 10, fmt: 'pct' },
+    { header: 'Satisfied %', key: 'csat', width: 12, fmt: 'pct' },
+    { header: 'Average (of 5)', key: 'csat_average', width: 12, fmt: 'dec' },
+    { header: 'NPS', key: 'nps', width: 8, fmt: 'int' },
+  ];
+  const none = 'Nobody has answered this yet — add the "Gender", "Age group" or "City" question to a survey (Echo → a survey → Questions → Add a question).';
+  wRow = sectionTitle(wa, wRow, 'Gender', 6);
+  wRow = table(wa, wRow, demoCols('Gender'), demo.gender, { emptyText: none });
+  wRow = sectionTitle(wa, wRow, 'Age group', 6);
+  wRow = table(wa, wRow, demoCols('Age group'), demo.age, { emptyText: none });
+  wRow = sectionTitle(wa, wRow, 'City', 6);
+  table(wa, wRow, demoCols('City'), demo.city, { emptyText: none });
 
+  /* --- Surveys --- */
+  const sv = addSheet(wb, 'Surveys', { tab: 'FF7A3FB0', landscape: true, freeze: 4 });
+  table(sv, titleBlock(sv, `Every survey — ${who}`, `Results over the ${window}.`, 16), [
+    { header: 'Survey', key: 'title', width: 30, fmt: 'text' },
+    ...withCo,
+    { header: 'Status', key: 'status', width: 14, fmt: 'center' },
+    { header: `Answers (${window})`, key: 'responses', width: 12, fmt: 'int', bar: true },
+    { header: 'Answers, all time', key: 'responses_all', width: 11, fmt: 'int' },
+    { header: 'Satisfied %', key: 'csat', width: 10, fmt: 'pct' },
+    { header: 'Average (of 5)', key: 'csat_avg', width: 10, fmt: 'dec' },
+    { header: 'NPS', key: 'nps', width: 8, fmt: 'int' },
+    { header: 'Resolved %', key: 'resolution', width: 10, fmt: 'pct' },
+    { header: 'Invites sent', key: 'inv_sent', width: 10, fmt: 'int' },
+    { header: 'Opened', key: 'inv_opened', width: 9, fmt: 'int' },
+    { header: 'Answered', key: 'inv_answered', width: 10, fmt: 'int' },
+    { header: 'Response rate %', key: 'rate', width: 11, fmt: 'pct' },
+    { header: 'Open follow-ups', key: 'followups', width: 11, fmt: 'int' },
+    { header: 'Last answer', key: 'last_at', width: 19, fmt: 'datetime' },
+    { header: 'Created', key: 'created', width: 13, fmt: 'date' },
+    { header: 'Address', key: 'address', width: 26, fmt: 'text' },
+  ], echo.surveys, { filter: true, emptyText: 'No Echo surveys yet.' });
+
+  /* --- Responses --- */
+  const er = addSheet(wb, 'Responses', { tab: 'FF7A3FB0', freeze: 4, landscape: true });
+  table(er, titleBlock(er, `Every answer — ${who}`, `Every survey answer in the ${window}, newest first. "Answers" spells out every question; contact details are only what the customer chose to give.`, 14), [
+    { header: 'Submitted', key: 'submitted', width: 19, fmt: 'datetime' },
+    { header: 'Survey', key: 'survey', width: 24, fmt: 'text' },
+    ...withCo,
+    { header: 'Location', key: 'location', width: 14, fmt: 'text' },
+    { header: 'Channel', key: 'channel', width: 11, fmt: 'center' },
+    { header: 'Language', key: 'language', width: 10, fmt: 'center' },
+    { header: 'Satisfaction (1–5)', key: 'score', width: 11, fmt: 'int' },
+    { header: 'NPS (0–10)', key: 'nps', width: 9, fmt: 'int' },
+    { header: 'Effort (1–7)', key: 'ces', width: 9, fmt: 'int' },
+    { header: 'Resolved', key: 'resolved', width: 9, fmt: 'center' },
+    { header: 'Comment', key: 'comment', width: 40, fmt: 'text', wrap: true },
+    { header: 'Name', key: 'contact_name', width: 18, fmt: 'text' },
+    { header: 'Phone', key: 'contact_phone', width: 16, fmt: 'text' },
+    { header: 'Email', key: 'contact_email', width: 22, fmt: 'text' },
+    { header: 'Gender', key: 'gender', width: 10, fmt: 'center' },
+    { header: 'Age group', key: 'age_band', width: 10, fmt: 'center' },
+    { header: 'City', key: 'city', width: 13, fmt: 'text' },
+    { header: 'Happy to be contacted', key: 'consent', width: 11, fmt: 'center' },
+    { header: 'Follow-up', key: 'followup', width: 11, fmt: 'center' },
+    { header: 'Follow-up note', key: 'note', width: 26, fmt: 'text', wrap: true },
+    { header: 'Seconds to answer', key: 'seconds', width: 10, fmt: 'int' },
+    { header: 'Answers', key: 'answers', width: 80, fmt: 'text', wrap: true },
+  ], echo.responses, { filter: true, emptyText: `No survey answers in the ${window}.` });
+
+  /* --- By location & channel --- */
+  const lc = addSheet(wb, 'By location & channel', { tab: 'FF7A3FB0' });
+  let lRow = titleBlock(lc, `By location and channel — ${who}`, `Survey answers in the ${window}.`, 6);
+  const groupBy = (field, blank) => {
+    const m2 = new Map();
+    for (const x of echo.raw) {
+      const key = x[field] || blank;
+      if (!m2.has(key)) m2.set(key, { name: field === 'channel' ? (CHANNEL[key] || key) : key, responses: 0, n: 0, sat: 0, sum: 0, pn: 0, pro: 0, det: 0 });
+      const gg = m2.get(key);
+      gg.responses += 1;
+      if (x.score != null) { gg.n += 1; gg.sum += x.score; if (x.score >= 4) gg.sat += 1; }
+      if (x.nps != null) { gg.pn += 1; if (x.nps >= 9) gg.pro += 1; if (x.nps <= 6) gg.det += 1; }
+    }
+    return [...m2.values()].map((x) => ({ name: x.name, responses: x.responses, share: pctOf(x.responses, echo.raw.length), csat: pctOf(x.sat, x.n),
+      csat_average: x.n ? Math.round((x.sum / x.n) * 100) / 100 : null, nps: x.pn ? Math.round(((x.pro - x.det) / x.pn) * 100) : null }))
+      .sort((a, z) => z.responses - a.responses);
+  };
+  lRow = sectionTitle(lc, lRow, 'Location (branch)', 6);
+  lRow = table(lc, lRow, demoCols('Location'), groupBy('location_name', 'Not specified'), { emptyText: 'No answers in the period.' });
+  lRow = sectionTitle(lc, lRow, 'How it was answered', 6);
+  table(lc, lRow, demoCols('Channel'), groupBy('channel', 'link'), { emptyText: 'No answers in the period.' });
+
+  /* --- All answers, follow-ups, comments --- */
   const aa = addSheet(wb, 'All answers', { tab: 'FF7A3FB0', freeze: 4 });
   table(aa, titleBlock(aa, `Every satisfaction answer — ${who}`, `What the satisfaction figures are counted from: Echo surveys, and any other tool that posts answers to the CRM, in the ${window}.`, 9), [
     { header: 'Answered', key: 'answered', width: 19, fmt: 'datetime' },
@@ -1016,24 +1232,22 @@ async function clientReport(client, { grain, quota = null, echo: echoOn = true }
     { header: 'Comment', key: 'comment', width: 50, fmt: 'text', wrap: true },
   ], echo.answers, { filter: true, emptyText: `No satisfaction answers in the ${window}.` });
 
-  if (echoOn) {
-    const fu = addSheet(wb, 'Follow-ups', { tab: 'FFB3261E', freeze: 4, landscape: true });
-    table(fu, titleBlock(fu, `Follow-ups — ${who}`, 'Every unhappy answer (satisfaction 1–2, NPS 0–6 or "not resolved"): open ones first, then contacted, then resolved.', 12), [
-      { header: 'Submitted', key: 'submitted', width: 19, fmt: 'datetime' },
-      { header: 'Status', key: 'status', width: 11, fmt: 'center' },
-      { header: 'Days waiting', key: 'waiting', width: 9, fmt: 'int' },
-      { header: 'Survey', key: 'survey', width: 22, fmt: 'text' },
-      ...withCo,
-      { header: 'Satisfaction', key: 'score', width: 10, fmt: 'int' },
-      { header: 'NPS', key: 'nps', width: 7, fmt: 'int' },
-      { header: 'Resolved', key: 'resolved', width: 9, fmt: 'center' },
-      { header: 'What they said', key: 'comment', width: 40, fmt: 'text', wrap: true },
-      { header: 'Contact', key: 'contact', width: 28, fmt: 'text' },
-      { header: 'Note', key: 'note', width: 30, fmt: 'text', wrap: true },
-      { header: 'By', key: 'by', width: 18, fmt: 'text' },
-      { header: 'Updated', key: 'updated', width: 19, fmt: 'datetime' },
-    ], echo.followups, { filter: true, emptyText: 'No unhappy answers — nothing to follow up.' });
-  }
+  const fu = addSheet(wb, 'Follow-ups', { tab: 'FFB3261E', freeze: 4, landscape: true });
+  table(fu, titleBlock(fu, `Follow-ups — ${who}`, 'Every unhappy answer (satisfaction 1–2, NPS 0–6 or "not resolved"): open ones first, then contacted, then resolved.', 12), [
+    { header: 'Submitted', key: 'submitted', width: 19, fmt: 'datetime' },
+    { header: 'Status', key: 'status', width: 11, fmt: 'center' },
+    { header: 'Days waiting', key: 'waiting', width: 9, fmt: 'int' },
+    { header: 'Survey', key: 'survey', width: 22, fmt: 'text' },
+    ...withCo,
+    { header: 'Satisfaction', key: 'score', width: 10, fmt: 'int' },
+    { header: 'NPS', key: 'nps', width: 7, fmt: 'int' },
+    { header: 'Resolved', key: 'resolved', width: 9, fmt: 'center' },
+    { header: 'What they said', key: 'comment', width: 40, fmt: 'text', wrap: true },
+    { header: 'Contact', key: 'contact', width: 28, fmt: 'text' },
+    { header: 'Note', key: 'note', width: 30, fmt: 'text', wrap: true },
+    { header: 'By', key: 'by', width: 18, fmt: 'text' },
+    { header: 'Updated', key: 'updated', width: 19, fmt: 'datetime' },
+  ], echo.followups, { filter: true, emptyText: 'No unhappy answers — nothing to follow up.' });
 
   const cm = addSheet(wb, 'Comments', { tab: 'FF7A3FB0', freeze: 4 });
   table(cm, titleBlock(cm, `What customers wrote — ${who}`, `Every comment left with a satisfaction answer in the ${window}, newest first.`, 7), [
@@ -1046,10 +1260,171 @@ async function clientReport(client, { grain, quota = null, echo: echoOn = true }
     { header: 'From', key: 'source', width: 28, fmt: 'text' },
   ], echo.answers.filter((a) => a.comment), { emptyText: `No comments in the ${window}.` });
 
-  definitions(wb, grain);
+  const rp = addSheet(wb, 'Respondents', { tab: 'FF7A3FB0', freeze: 4, landscape: true });
+  table(rp, titleBlock(rp, `Respondents — ${who}`, `Everyone who left their name, number or email in a survey in the ${window}, with their latest answer.`, 11), [
+    { header: 'Name', key: 'name', width: 20, fmt: 'text' },
+    { header: 'Phone', key: 'phone', width: 16, fmt: 'text' },
+    { header: 'Email', key: 'email', width: 24, fmt: 'text' },
+    ...withCo,
+    { header: 'City', key: 'city', width: 13, fmt: 'text' },
+    { header: 'Gender', key: 'gender', width: 10, fmt: 'center' },
+    { header: 'Age group', key: 'age_band', width: 10, fmt: 'center' },
+    { header: 'Happy to be contacted', key: 'consent', width: 11, fmt: 'center' },
+    { header: 'Answers', key: 'n', width: 9, fmt: 'int' },
+    { header: 'Latest answer', key: 'last', width: 19, fmt: 'datetime' },
+    { header: 'Latest satisfaction', key: 'score', width: 11, fmt: 'int' },
+    { header: 'Latest NPS', key: 'nps', width: 9, fmt: 'int' },
+  ], echo.respondents, { filter: true, emptyText: `Nobody left their details in the ${window}.` });
+
+  definitions(wb, grain, 'echo');
+  const buffer = Buffer.from(await wb.xlsx.writeBuffer());
+  return { buffer, filename: `vantriq-echo-${all ? 'all-customers' : safeName(client.company)}-${grain}-${new Date().toISOString().slice(0, 10)}.xlsx` };
+}
+
+/* ------------------------------------------------------------------ */
+/* Every customer, ever — the directory as a workbook                   */
+/* ------------------------------------------------------------------ */
+
+async function contactsWorkbook(client) {
+  const { allContacts } = require('./contacts');
+  const all = !client;
+  const who = all ? 'All customers' : client.company;
+  const list = await allContacts(all ? null : client.id);
+  const [sessions, lines] = await Promise.all([
+    db.query(
+      `select u.client_id, c.company, u.session_id, regexp_replace(u.session_id, '-\\d{4}-\\d{2}-\\d{2}$', '') as contact,
+              min(u.occurred_at) as started, max(u.occurred_at) as ended, coalesce(sum(u.messages_count), 0)::int as msgs,
+              count(*)::int as replies, mode() within group (order by u.channel) as channel,
+              (array_agg(a.name order by u.occurred_at) filter (where a.name is not null))[1] as agent, bool_or(u.handoff) as handoff
+         from usage_events u join clients c on c.id = u.client_id left join client_agents a on a.id = u.agent_id
+        where ($1::uuid is null or u.client_id = $1)
+        group by u.client_id, c.company, u.session_id order by started desc limit ${ROW_LIMIT + 1}`,
+      [all ? null : client.id]
+    ),
+    db.query(
+      `select m.created_at, m.session_id, m.external_ref, m.role, m.content, m.channel, c.company
+         from conversation_messages m left join clients c on c.id = m.client_id
+        where ($1::uuid is null or m.client_id = $1 or m.agent_id in (select id from client_agents where client_id = $1))
+        order by m.created_at desc limit ${ROW_LIMIT + 1}`,
+      [all ? null : client.id]
+    ),
+  ]);
+  const byKey = new Map(list.map((c) => [`${c.client_id}|${c.key}`, c]));
+  const wb = newBook();
+  wb.title = `Customer directory — ${who}`;
+  const withCo = all ? [{ header: 'Customer of', key: 'client_company', width: 24, fmt: 'text' }] : [];
+  const seg = (c, s) => (c.segments.includes(s) ? 'Yes' : '');
+
+  const ws = addSheet(wb, 'Customers', { freeze: 4, landscape: true });
+  const rows = list.map((c) => ({
+    ...c, first_at: local(c.first_at), last_at: local(c.last_at), channels: c.channels.join(', '), tags: c.tags.join(', '),
+    dnc: c.do_not_contact ? 'Yes' : '', vip: seg(c, 'vip'), at_risk: seg(c, 'at_risk'), unhappy: seg(c, 'unhappy'),
+    edited_at: local(c.edited_at),
+  }));
+  table(ws, titleBlock(ws, `Customer directory — ${who}`, `Every customer ever: ${list.length} ${list.length === 1 ? 'person' : 'people'} — anyone who talked to an agent, answered a survey with their details, or was added by hand. Generated ${new Date().toLocaleString('en-GB', { timeZone: TZ, dateStyle: 'medium', timeStyle: 'short' })}.`, 14), [
+    { header: 'Contact', key: 'label', width: 18, fmt: 'text' },
+    { header: 'Name', key: 'name', width: 20, fmt: 'text' },
+    ...withCo,
+    { header: 'Phone', key: 'phone', width: 16, fmt: 'text' },
+    { header: 'Email', key: 'email', width: 24, fmt: 'text' },
+    { header: 'City', key: 'city', width: 13, fmt: 'text' },
+    { header: 'Country', key: 'country', width: 14, fmt: 'text' },
+    { header: 'Gender', key: 'gender', width: 10, fmt: 'center' },
+    { header: 'Age group', key: 'age_band', width: 10, fmt: 'center' },
+    { header: 'Their company', key: 'company', width: 18, fmt: 'text' },
+    { header: 'Status', key: 'status', width: 13, fmt: 'center' },
+    { header: 'First contact', key: 'first_at', width: 19, fmt: 'datetime' },
+    { header: 'Last contact', key: 'last_at', width: 19, fmt: 'datetime' },
+    { header: 'Days since', key: 'days_since', width: 9, fmt: 'int' },
+    { header: 'Conversations', key: 'conversations', width: 12, fmt: 'int', bar: true },
+    { header: 'Last 30 days', key: 'conversations_30d', width: 10, fmt: 'int' },
+    { header: 'Messages', key: 'messages', width: 10, fmt: 'int' },
+    { header: 'Handed to a person', key: 'handoffs', width: 10, fmt: 'int' },
+    { header: 'Channels', key: 'channels', width: 14, fmt: 'text' },
+    { header: 'Agent', key: 'agent', width: 22, fmt: 'text' },
+    { header: 'Satisfaction answers', key: 'answers', width: 11, fmt: 'int' },
+    { header: 'Last score (1–5)', key: 'last_score', width: 10, fmt: 'int' },
+    { header: 'Last NPS', key: 'last_nps', width: 9, fmt: 'int' },
+    { header: 'Regular (5+)', key: 'vip', width: 9, fmt: 'center' },
+    { header: 'At risk', key: 'at_risk', width: 8, fmt: 'center' },
+    { header: 'Unhappy', key: 'unhappy', width: 9, fmt: 'center' },
+    { header: 'Tags', key: 'tags', width: 18, fmt: 'text' },
+    { header: 'Do not contact', key: 'dnc', width: 9, fmt: 'center' },
+    { header: 'Notes', key: 'notes', width: 30, fmt: 'text', wrap: true },
+    { header: 'In the CRM as', key: 'in_crm', width: 20, fmt: 'text' },
+    { header: 'Name from', key: 'name_source', width: 11, fmt: 'center' },
+    { header: 'Last edited by', key: 'edited_by', width: 18, fmt: 'text' },
+  ], rows, { filter: true, emptyText: 'No customers yet.' });
+
+  const sg = addSheet(wb, 'Segments');
+  let sRow = titleBlock(sg, `Segments — ${who}`, 'How the directory breaks down. The same groups as the Customers screen.', 4);
+  const count = (f) => list.filter(f).length;
+  sRow = table(sg, sRow, [
+    { header: 'Group', key: 'g', width: 40, fmt: 'text' },
+    { header: 'People', key: 'n', width: 12, fmt: 'int', bar: true },
+    { header: 'Share %', key: 's', width: 10, fmt: 'pct' },
+  ], [
+    ['Everyone', () => true],
+    ['New — first contact in the last 30 days', (c) => c.segments.includes('new')],
+    ['Returning — two conversations or more', (c) => c.segments.includes('returning')],
+    ['Regulars — five conversations or more', (c) => c.segments.includes('vip')],
+    ['At risk — came back before, quiet for 60+ days', (c) => c.segments.includes('at_risk')],
+    ['Unhappy — last score 1–2 or NPS 0–6', (c) => c.segments.includes('unhappy')],
+    ['Known only from a survey', (c) => c.segments.includes('survey_only')],
+    ['Known by name', (c) => !!c.name],
+    ['With an email address', (c) => !!c.email],
+    ['City known', (c) => !!c.city],
+    ['Marked do not contact', (c) => c.do_not_contact],
+  ].map(([gname, f]) => ({ g: gname, n: count(f), s: pctOf(count(f), list.length) })));
+  const tallyBy = (field, blank) => {
+    const m2 = new Map();
+    for (const c of list) { const k2 = c[field] || blank; m2.set(k2, (m2.get(k2) || 0) + 1); }
+    return [...m2.entries()].map(([name, n]) => ({ name, n, s: pctOf(n, list.length) })).sort((a, z) => (a.name === blank) - (z.name === blank) || z.n - a.n);
+  };
+  for (const [title, field, blank] of [['City', 'city', 'Not known yet'], ['Country', 'country', 'Web or unknown'], ['Gender', 'gender', 'Not known'], ['Age group', 'age_band', 'Not known']]) {
+    sRow = sectionTitle(sg, sRow, title, 3);
+    sRow = table(sg, sRow, [
+      { header: title, key: 'name', width: 40, fmt: 'text' },
+      { header: 'People', key: 'n', width: 12, fmt: 'int', bar: true },
+      { header: 'Share %', key: 's', width: 10, fmt: 'pct' },
+    ], tallyBy(field, blank));
+  }
+
+  const cv = addSheet(wb, 'Conversations', { freeze: 4, landscape: true });
+  table(cv, titleBlock(cv, `Every conversation — ${who}`, 'All time, newest first.', 10), [
+    { header: 'Started', key: 'started', width: 19, fmt: 'datetime' },
+    { header: 'Last reply', key: 'ended', width: 19, fmt: 'datetime' },
+    { header: 'Contact', key: 'contact', width: 18, fmt: 'text' },
+    { header: 'Name', key: 'name', width: 18, fmt: 'text' },
+    ...(all ? [{ header: 'Customer of', key: 'company', width: 24, fmt: 'text' }] : []),
+    { header: 'Channel', key: 'channel', width: 11, fmt: 'center' },
+    { header: 'Agent', key: 'agent', width: 22, fmt: 'text' },
+    { header: 'Messages', key: 'msgs', width: 10, fmt: 'int' },
+    { header: 'Replies sent', key: 'replies', width: 10, fmt: 'int' },
+    { header: 'Handed to a person', key: 'handoff', width: 11, fmt: 'center' },
+  ], sessions.rows.map((x) => {
+    const c = byKey.get(`${x.client_id}|${x.contact}`) || {};
+    return { started: local(x.started), ended: local(x.ended), contact: contactLabel(x.contact), name: c.name || '', company: x.company,
+      channel: CHANNEL[x.channel] || x.channel, agent: x.agent || 'Main agent', msgs: x.msgs, replies: x.replies, handoff: x.handoff == null ? '' : x.handoff ? 'Yes' : 'No' };
+  }), { filter: true, emptyText: 'No conversations yet.' });
+
+  const tx = addSheet(wb, 'Transcripts', { freeze: 4, landscape: true });
+  table(tx, titleBlock(tx, `Transcripts — ${who}`, 'Every message the agents sent to the CRM, newest first.', 6), [
+    { header: 'When', key: 'at', width: 19, fmt: 'datetime' },
+    { header: 'Contact', key: 'contact', width: 18, fmt: 'text' },
+    ...(all ? [{ header: 'Customer of', key: 'company', width: 24, fmt: 'text' }] : []),
+    { header: 'Who', key: 'who', width: 10, fmt: 'center' },
+    { header: 'Channel', key: 'channel', width: 11, fmt: 'center' },
+    { header: 'Message', key: 'text', width: 90, fmt: 'text', wrap: true },
+  ], lines.rows.map((m) => ({
+    at: local(m.created_at),
+    contact: /^wa-\d+$/.test(m.external_ref || '') && !m.session_id ? `+${m.external_ref.slice(3)}` : contactLabel(contactKey(m.session_id || m.external_ref)),
+    company: m.company || '', who: m.role === 'agent' ? 'Agent' : 'Customer', channel: CHANNEL[m.channel] || m.channel,
+    text: String(m.content || '').slice(0, 4000),
+  })), { filter: true, emptyText: 'No transcripts yet: the agents do not send their messages to the CRM.' });
 
   const buffer = Buffer.from(await wb.xlsx.writeBuffer());
-  return { buffer, filename: `vantriq-pulse-echo-${all ? 'all-customers' : safeName(client.company)}-${grain}-${new Date().toISOString().slice(0, 10)}.xlsx` };
+  return { buffer, filename: `vantriq-customers-${all ? 'all' : safeName(client.company)}-${new Date().toISOString().slice(0, 10)}.xlsx` };
 }
 
 function bucketOf(localDate, grain) {
@@ -1070,27 +1445,35 @@ function bucketOf(localDate, grain) {
   return `${y}-${pad(m + 1)}-${pad(d)}`;
 }
 
-function definitions(wb, grain) {
+function definitions(wb, grain, kind = 'pulse') {
   const df = addSheet(wb, 'Definitions', { tab: 'FF6B645B' });
-  const r = titleBlock(df, 'How the figures are worked out', 'The same rules as the Vantriq Pulse and Echo dashboards, so the workbook and the screen always agree.', 2);
-  table(df, r, [
-    { header: 'Figure', key: 'f', width: 32, fmt: 'text' },
-    { header: 'Meaning', key: 'm', width: 100, fmt: 'text', wrap: true },
-  ], [
+  const r = titleBlock(df, 'How the figures are worked out', `The same rules as the Vantriq ${kind === 'echo' ? 'Echo' : 'Pulse'} dashboard, so the workbook and the screen always agree.`, 2);
+  const period = { f: 'Period, "same point"', m: `Figures are calendar ${grain}s in ${TZ.replace('Asia/', '')} time. The period under way is compared with the previous one only up to the same point, never a part period against a whole one.` };
+  const pulse = [
     { f: 'Conversation', m: 'One customer\'s conversation with an agent. On WhatsApp it is that customer\'s 24-hour window, however many messages it holds.' },
     { f: 'Contact / person', m: 'Someone who messaged — on WhatsApp, the number they wrote from. The same number on another day is the same person.' },
     { f: 'New contact', m: 'Their very first conversation ever falls in the period. The dashboard\'s "New contacts (leads)".' },
     { f: 'Returning contact', m: 'On the dashboard and the Trend tab: active in a period, first seen before it. In the Contacts tabs, "Returning" is someone first seen before the whole window, and "New, came back" someone first seen in it who has since had another conversation; the Returning contacts tab lists both — everyone who came back.' },
     { f: 'Messages handled', m: 'Messages the agent answered, as each agent reports them.' },
-    { f: `Period, "same point"`, m: `Figures are calendar ${grain}s in ${TZ.replace('Asia/', '')} time. The period under way is compared with the previous one only up to the same point, never a part period against a whole one.` },
+    period,
     { f: 'On pace for', m: 'Where the period under way ends at its current pace — shown once a tenth of it has passed.' },
     { f: 'Handled fully by AI', m: 'Conversations the agent finished without passing to a person, for agents that report hand-offs.' },
+    { f: 'Name, email, city, gender, age group', m: 'What the customer told the agent or a survey, their WhatsApp profile name, or what someone typed on their profile in the CRM or the portal. Automatic sources only fill a blank; a person\'s edit always wins.' },
+    { f: 'Country', m: 'From the dialling code of the number they wrote from. Web visitors have none.' },
+  ];
+  const echo = [
     { f: 'Satisfied %', m: 'Share of satisfaction answers that were 4 or 5 out of 5 (the usual CSAT). The average score is alongside, since 4.1 and 4.6 both count as satisfied.' },
     { f: 'Net Promoter Score', m: 'Of people who answered "would you recommend us" (0–10): % promoters (9–10) minus % detractors (0–6). From −100 to +100.' },
     { f: 'Resolved %', m: 'Share of "was your problem sorted?" answers that were yes.' },
     { f: 'Response rate', m: 'Personal survey links answered ÷ links sent (after-chat WhatsApp invites and one-time links).' },
     { f: 'Follow-up', m: 'Opened automatically for an unhappy answer (satisfaction 1–2, NPS 0–6, or not resolved) and worked through to resolved.' },
-  ]);
+    { f: 'Gender, age group, city', m: 'From a survey\'s "about you" questions (and the city a customer typed in their contact details). "Not given" is everyone who skipped the question or was not asked it.' },
+    period,
+  ];
+  table(df, r, [
+    { header: 'Figure', key: 'f', width: 32, fmt: 'text' },
+    { header: 'Meaning', key: 'm', width: 100, fmt: 'text', wrap: true },
+  ], kind === 'echo' ? echo : pulse);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1120,6 +1503,7 @@ async function salesReport({ grain } = {}) {
     `with m as (
        select m.*, coalesce(nullif(m.session_id, ''), m.external_ref || ':' || to_char(m.created_at at time zone 'UTC', 'YYYY-MM-DD')) as sess
          from conversation_messages m where m.created_at >= $1
+          and not exists (select 1 from clients x where x.id = m.client_id and not x.is_internal and x.stage = 'active')
      ),
      g as (
        select sess, min(created_at) as started, max(created_at) as ended,
@@ -1132,7 +1516,8 @@ async function salesReport({ grain } = {}) {
      )
      select g.*, c.company, c.name, c.stage
        from g left join clients c
-         on c.id = g.client_id or (g.client_id is null and g.external_ref <> '' and c.external_ref = g.external_ref)
+         on c.external_ref = case when g.external_ref like 'wa-%' then g.external_ref
+                                  else 'wa-' || regexp_replace(split_part(g.sess, ':', 1), '-\\d{4}-\\d{2}-\\d{2}$', '') end
       order by g.started desc limit ${ROW_LIMIT}`,
     [b.window_start]
   );
@@ -1247,4 +1632,4 @@ function sendReport(res, { buffer, filename }) {
   res.send(buffer);
 }
 
-module.exports = { clientReport, salesReport, sendReport, periodLabel, contactLabel };
+module.exports = { pulseReport, echoReport, contactsWorkbook, salesReport, sendReport, periodLabel, contactLabel };

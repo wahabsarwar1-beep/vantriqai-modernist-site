@@ -64,12 +64,18 @@ const dbStub = {
       state.stageHistory.push({ client_id: params[0], comment: params[1] });
       return { rows: [] };
     }
+    // v9.17: a ref that is no client's may be one of a client's agents.
+    if (q.startsWith('select id, client_id from client_agents where external_ref')) {
+      return { rows: [] };
+    }
     if (q.startsWith('insert into conversation_messages')) {
-      for (let i = 0; i < params.length; i += 6) {
-        state.conversations.push({
-          client_id: params[i], external_ref: params[i + 1], session_id: params[i + 2],
-          channel: params[i + 3], role: params[i + 4], content: params[i + 5],
-        });
+      // One group of values per turn, as many as the statement names columns.
+      // created_at is computed in SQL, not sent as a value.
+      const cols = q.slice(q.indexOf('(') + 1, q.indexOf(')')).split(',').map((c) => c.trim()).filter((c) => c !== 'created_at');
+      for (let i = 0; i < params.length; i += cols.length) {
+        const row = {};
+        cols.forEach((c, j) => { row[c] = params[i + j]; });
+        state.conversations.push(row);
       }
       return { rows: [] };
     }

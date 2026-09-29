@@ -165,7 +165,7 @@
         ${GRAINS.map(([g, l]) => `<button type="button" class="${g === grain ? 'on' : ''}" aria-pressed="${g === grain}" onclick="${onGrain}('${g}')">${l}</button>`).join('')}
       </div>
       <div class="vqa-note">${note}</div>
-      ${opts.onReport ? `<button type="button" class="vqa-btn" onclick="${opts.onReport}()" title="${esc(opts.reportHint || 'Every figure on this page, and the people and conversations behind them — a tab for each')}">Download report (Excel)</button>` : ''}
+      ${opts.onReport ? `<button type="button" class="vqa-btn" onclick="${opts.onReport}()" title="${esc(opts.reportHint || 'Every figure on this page, and the people and conversations behind them — a tab for each')}">${esc(opts.reportLabel || 'Download report (Excel)')}</button>` : ''}
     </div>`;
   }
 
@@ -236,6 +236,30 @@
         <div class="tr"><div class="fl" style="width:${(r.value / max) * 100}%;background:${colors ? colors[i] : color};"></div></div>
         <div class="vl">${esc(valueFmt(r.value))}${r.share != null ? `<span>${r.share}%</span>` : ''}${extra ? `<span>${esc(extra(r))}</span>` : ''}</div>
       </div>`).join('')}</div>`;
+  }
+
+  /** Where the people are: cities from their profiles, countries from their numbers, and how much is known. */
+  function whereHTML(d, audience){
+    if(!d.cities || !d.profile_coverage) return '';
+    const cov = d.profile_coverage;
+    const grey = '#bdb7ad';
+    const rows = (list) => list.slice(0, 8).map(x => ({ name: x.name, value: x.contacts, share: x.share_pct, known: x.known }));
+    const colorsOf = (list) => list.slice(0, 8).map(x => x.known ? C.s1 : grey);
+    const where = audience === 'portal' ? 'on their page under Customers' : 'on their profile (Customers)';
+    return `<div class="vqa-grid vqa-two">
+      <div class="vqa-card">
+        <h3>Where your customers are</h3>
+        <div class="vqa-sub">People who messaged, by city · ${esc(d.period.window_label)} · ${n(cov.with_city)} of ${n(cov.contacts)} known</div>
+        ${barList(rows(d.cities), { colors: colorsOf(d.cities) })}
+        <div class="vqa-sub" style="margin:10px 0 0;">A city comes from what the customer tells your agent or a survey, or what you add ${where}.</div>
+      </div>
+      <div class="vqa-card">
+        <h3>Countries</h3>
+        <div class="vqa-sub">From the number they wrote from · ${esc(d.period.window_label)}</div>
+        ${barList(rows(d.countries), { colors: colorsOf(d.countries) })}
+        <div class="vqa-sub" style="margin:10px 0 0;">Known about them: name ${n(cov.with_name)} · email ${n(cov.with_email)} · city ${n(cov.with_city)} — of ${n(cov.contacts)} people.</div>
+      </div>
+    </div>`;
   }
 
   function heatmap(grid, windowLabel){
@@ -547,6 +571,8 @@
           ${barList(agentRows)}
         </div>
       </div>
+
+      ${whereHTML(d, audience)}
 
       <div class="vqa-card" style="margin-bottom:14px;">
         <h3>When people message</h3>

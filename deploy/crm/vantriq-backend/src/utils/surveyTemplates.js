@@ -62,6 +62,30 @@ const loved = (en, ur, cond = { q: 'nps', op: 'gte', v: 9 }) => ({
   show_if: cond,
 });
 
+// "About you": optional, near the end, and saved to the customer's profile as
+// well as splitting the results (profile: gender / city / age).
+const gender = () => ({
+  id: 'gender', type: 'single', required: false, profile: 'gender',
+  title: L('Are you…', 'آپ…'),
+  options: [['male', 'Male', 'مرد'], ['female', 'Female', 'خاتون'], ['prefer_not', 'Prefer not to say', 'بتانا نہیں چاہتے']]
+    .map(([id, en, ur]) => ({ id, label: L(en, ur) })),
+});
+const CITIES = [['karachi', 'Karachi', 'کراچی'], ['lahore', 'Lahore', 'لاہور'], ['islamabad', 'Islamabad', 'اسلام آباد'],
+  ['rawalpindi', 'Rawalpindi', 'راولپنڈی'], ['faisalabad', 'Faisalabad', 'فیصل آباد'], ['multan', 'Multan', 'ملتان'],
+  ['peshawar', 'Peshawar', 'پشاور'], ['quetta', 'Quetta', 'کوئٹہ'], ['hyderabad', 'Hyderabad', 'حیدرآباد'],
+  ['sialkot', 'Sialkot', 'سیالکوٹ'], ['gujranwala', 'Gujranwala', 'گوجرانوالہ']];
+const city = () => ({
+  id: 'city', type: 'single', required: false, profile: 'city', allow_other: true,
+  title: L('Which city are you in?', 'آپ کس شہر میں ہیں؟'),
+  options: CITIES.map(([id, en, ur]) => ({ id, label: L(en, ur) })),
+});
+const age = () => ({
+  id: 'age', type: 'single', required: false, profile: 'age',
+  title: L('Your age group', 'آپ کی عمر کا گروپ'),
+  options: [['u18', 'Under 18', '18 سے کم'], ['18_24', '18–24', '18–24'], ['25_34', '25–34', '25–34'], ['35_44', '35–44', '35–44'],
+    ['45_54', '45–54', '45–54'], ['55_64', '55–64', '55–64'], ['65p', '65+', '65+']].map(([id, en, ur]) => ({ id, label: L(en, ur) })),
+});
+
 const contact = (fields = ['name', 'phone']) => ({
   id: 'contact', type: 'contact', required: false, fields,
   title: L('Would you like us to get back to you?', 'کیا آپ چاہتے ہیں کہ ہم آپ سے رابطہ کریں؟'),
@@ -106,6 +130,8 @@ const TEMPLATES = [
       nps(),
       improve(),
       loved(),
+      gender(),
+      city(),
       contact(),
     ],
   },
@@ -141,6 +167,9 @@ const TEMPLATES = [
       nps('How likely are you to recommend {business} products to a friend or family member?',
         'اس بات کا کتنا امکان ہے کہ آپ {business} کی مصنوعات کی سفارش کسی دوست یا رشتہ دار سے کریں گے؟'),
       improve('How could we make this product better?', 'ہم اس پروڈکٹ کو کیسے بہتر بنا سکتے ہیں؟'),
+      age(),
+      gender(),
+      city(),
       contact(),
     ],
   },
@@ -208,6 +237,8 @@ const TEMPLATES = [
       ]),
       nps(),
       improve(),
+      gender(),
+      city(),
       contact(),
     ],
   },
@@ -240,6 +271,8 @@ const TEMPLATES = [
       yesno('understood', 'Did you understand your diagnosis and treatment plan?', 'کیا آپ کو اپنی تشخیص اور علاج کا طریقہ سمجھ آیا؟'),
       nps(),
       improve(),
+      gender(),
+      city(),
       contact(),
     ],
   },
@@ -263,6 +296,8 @@ const TEMPLATES = [
       nps(),
       improve(),
       loved(),
+      gender(),
+      city(),
       contact(),
     ],
   },
@@ -346,6 +381,8 @@ const TEMPLATES = [
       ]),
       nps(),
       improve(),
+      gender(),
+      city(),
       contact(),
     ],
   },
@@ -428,6 +465,8 @@ const TEMPLATES = [
       ]),
       nps(),
       improve(),
+      gender(),
+      city(),
       contact(),
     ],
   },
@@ -451,6 +490,8 @@ const TEMPLATES = [
       ces('How easy was it to send or receive your parcel?', 'پارسل بھیجنا یا وصول کرنا کتنا آسان تھا؟'),
       nps(),
       improve(),
+      gender(),
+      city(),
       contact(),
     ],
   },
@@ -480,6 +521,8 @@ const TEMPLATES = [
       nps(),
       improve(),
       loved(),
+      gender(),
+      city(),
       contact(),
     ],
   },
@@ -563,6 +606,9 @@ const TEMPLATES = [
       nps(),
       improve(),
       loved(),
+      age(),
+      gender(),
+      city(),
       contact(),
     ],
   },
@@ -604,4 +650,5 @@ function templateSummaries() {
   }));
 }
 
-module.exports = { TEMPLATES, templateByKey, templateSummaries };
+module.exports = {
+  ABOUT_YOU: { gender, city, age }, TEMPLATES, templateByKey, templateSummaries };

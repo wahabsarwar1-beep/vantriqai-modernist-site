@@ -29,6 +29,7 @@ const qrcode = require('qrcode-generator');
 const db = require('../db');
 const { templateByKey, templateSummaries } = require('./surveyTemplates');
 const { GRAINS, TZ, normaliseGrain, periodBounds } = require('./analytics');
+const { fillProfile, phoneDigits, normCity, normGender, keyOf: contactKeyOf } = require('./contacts');
 const { sendMail, mailConfigured } = require('./mailer');
 
 /* ------------------------------------------------------------------ */
@@ -52,7 +53,11 @@ const LANGUAGES = {
 };
 const TYPES = ['csat', 'nps', 'ces', 'rating', 'rating_grid', 'single', 'multi', 'yesno', 'text', 'contact'];
 const RANGE = { csat: [1, 5], rating: [1, 5], nps: [0, 10], ces: [1, 7] };
-const CONTACT_FIELDS = ['name', 'company', 'phone', 'email'];
+const CONTACT_FIELDS = ['name', 'company', 'phone', 'email', 'city'];
+// "About you" questions whose answer also goes on the customer's profile and
+// splits the results: gender and age group are a single choice, city a single
+// choice or typed text.
+const PROFILE_FIELDS = { gender: ['single'], city: ['single', 'text'], age: ['single'] };
 const STATUSES = ['draft', 'live', 'paused', 'closed'];
 const CHANNELS = ['link', 'qr', 'whatsapp', 'sms', 'email', 'kiosk', 'embed', 'web'];
 const CHANNEL_NAMES = {
@@ -207,7 +212,8 @@ function normalizeQuestion(raw, i, ctx) {
     if (raw.allow_other === true) q.allow_other = true;
   }
   if (type === 'yesno' && raw.metric === 'resolved') q.metric = 'resolved';
-  if (type === 'text') q.multiline = raw.multiline !== false;
+  if (PROFILE_FIELDS[raw.profile] && PROFILE_FIELDS[raw.profile].includes(type)) q.profile = raw.profile;
+  if (type === 'text') q.multiline = q.profile ? false : raw.multiline !== false;
   if (type === 'contact') {
     const f = Array.isArray(raw.fields) ? CONTACT_FIELDS.filter((x) => raw.fields.includes(x)) : [];
     q.fields = f.length ? f : ['name', 'phone'];
@@ -994,11 +1000,24 @@ function normalizeAnswers(questions, raw) {
 
 /** The headline figures, lifted out of the answers. The first question of each kind is the headline. */
 function metricsOf(questions, answers) {
-  const m = { score: null, nps: null, ces: null, resolved: null, comment: '', contact: null };
+  const m = { score: null, nps: null, ces: null, resolved: null, comment: '', contact: null, gender: '', city: '', age_band: '' };
   const texts = [];
   for (const q of questions) {
     const a = answers[q.id];
     if (a === undefined) continue;
+    if (q.profile) {
+      // In English whatever language it was answered in, so results group.
+      let v = '';
+      if (q.type === 'text') v = String(a);
+      else if (a && typeof a === 'object') {
+        if (a.choice === OTHER) v = String(a.other || 'Other');
+        else { const o = (q.options || []).find((x) => x.id === a.choice); v = o ? pickText(o.label, 'en') : ''; }
+      }
+      v = v.trim().slice(0, 60);
+      const field = q.profile === 'age' ? 'age_band' : q.profile;
+      if (v && !m[field]) m[field] = field === 'city' ? normCity(v) : field === 'gender' ? normGender(v) : v;
+      continue;
+    }
     if (q.type === 'csat' && m.score == null) m.score = a;
     else if (q.type === 'nps' && m.nps == null) m.nps = a;
     else if (q.type === 'ces' && m.ces == null) m.ces = a;
@@ -1007,6 +1026,7 @@ function metricsOf(questions, answers) {
     else if (q.type === 'contact' && !m.contact) m.contact = a;
   }
   m.comment = texts.join('\n\n').slice(0, 2000);
+  if (!m.city && m.contact && m.contact.city) m.city = normCity(m.contact.city);
   return m;
 }
 
@@ -1033,7 +1053,7 @@ function answerText(q, a, lang = 'en') {
       case 'multi': return a.choices.map((c) => (c === OTHER ? `Other: ${a.other}` : opt(c))).join(', ');
       case 'yesno': return a ? 'Yes' : 'No';
       case 'text': return String(a);
-      case 'contact': return ['name', 'company', 'phone', 'email'].filter((f) => a[f]).map((f) => a[f]).join(' · ')
+      case 'contact': return ['name', 'company', 'phone', 'email', 'city'].filter((f) => a[f]).map((f) => a[f]).join(' · ')
         + (a.consent ? ' (happy to be contacted)' : '');
       default: return typeof a === 'object' ? JSON.stringify(a) : String(a);
     }
@@ -1091,14 +1111,14 @@ async function recordResponse(survey, body = {}, { invite = null } = {}) {
     const { rows } = await conn.query(
       `insert into survey_responses (survey_id, client_id, submission_id, answers, score, nps, ces, resolved, comment,
          location_id, location_name, channel, language, contact_name, contact_phone, contact_email, contact_consent,
-         duration_sec, followup_status)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+         duration_sec, followup_status, gender, city, age_band)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
        on conflict (survey_id, submission_id) where submission_id is not null do nothing
        returning *`,
       [survey.id, survey.client_id, submissionId, JSON.stringify(answers), m.score, m.nps, m.ces, m.resolved, m.comment,
         loc ? loc.id : '', loc ? loc.name : '', channel, language,
         contact.name || '', contact.phone || '', contact.email || '', contact.consent === true,
-        duration, needsFollowUp(m) ? 'open' : 'none']
+        duration, needsFollowUp(m) ? 'open' : 'none', m.gender, m.city, m.age_band]
     );
     if (!rows[0]) {
       await conn.query('rollback');
@@ -1126,6 +1146,16 @@ async function recordResponse(survey, body = {}, { invite = null } = {}) {
       if (!rowCount) throw new SurveyError(409, 'This link has already been used to answer. Thank you!');
     }
     await conn.query('commit');
+    // What they told us about themselves goes on their customer profile —
+    // blanks only. Keyed by the chat the invite followed, or else by the
+    // phone number they typed. Best-effort: the answer is already safe.
+    const key = invite && invite.session_id ? contactKeyOf(invite.session_id) : phoneDigits(contact.phone);
+    if (key) {
+      await fillProfile(survey.client_id, key, {
+        name: contact.name, phone: contact.phone, email: contact.email, company: contact.company,
+        city: m.city, gender: m.gender, age_band: m.age_band,
+      }, { source: 'survey' }).catch((e) => console.error('[surveys] profile not updated:', e.message));
+    }
     return { response, duplicate: false };
   } catch (err) {
     await conn.query('rollback').catch(() => {});
@@ -1289,6 +1319,34 @@ async function listSurveys({ clientId = null, base = '' } = {}) {
 }
 
 /** The numbers above the list: the last 30 days across every survey in view, and who is waiting for a reply. */
+/**
+ * Who answered, split by what they told us about themselves: gender, city
+ * and age group, each with how satisfied that group is. Only groups someone
+ * actually answered for; "Not asked" collects the rest so shares add up.
+ */
+function demographicsOf(rows) {
+  const split = (field) => {
+    const m = new Map();
+    for (const r of rows) {
+      const k = r[field] || '';
+      if (!m.has(k)) m.set(k, { name: k || 'Not given', responses: 0, csat_n: 0, csat_sat: 0, csat_sum: 0, nps_n: 0, pro: 0, det: 0 });
+      const g = m.get(k);
+      g.responses += 1;
+      if (r.score != null) { g.csat_n += 1; g.csat_sum += r.score; if (r.score >= 4) g.csat_sat += 1; }
+      if (r.nps != null) { g.nps_n += 1; if (r.nps >= 9) g.pro += 1; if (r.nps <= 6) g.det += 1; }
+    }
+    const list = [...m.entries()].map(([k, g]) => ({
+      name: g.name, known: !!k, responses: g.responses, share: pctOf(g.responses, rows.length),
+      csat: pctOf(g.csat_sat, g.csat_n), csat_average: g.csat_n ? round2(g.csat_sum / g.csat_n) : null,
+      nps: npsOf(g.pro, g.det, g.nps_n),
+    })).sort((a, b) => (a.known === b.known ? b.responses - a.responses : a.known ? -1 : 1));
+    return list.some((g) => g.known) ? list : [];
+  };
+  const order = ['Under 18', '18–24', '25–34', '35–44', '45–54', '55–64', '65+'];
+  const age = split('age_band').sort((a, b) => (order.indexOf(a.name) + 1 || 99) - (order.indexOf(b.name) + 1 || 99));
+  return { gender: split('gender'), city: split('city'), age };
+}
+
 async function overview({ clientId = null } = {}) {
   const [tot, follow] = await Promise.all([
     db.query(
@@ -1318,8 +1376,15 @@ async function overview({ clientId = null } = {}) {
     ),
   ]);
   const t = tot.rows[0];
+  const { rows: demo } = await db.query(
+    `select score, nps, gender, city, age_band from survey_responses
+      where ($1::uuid is null or client_id = $1) and submitted_at >= now() - interval '90 days'
+      order by submitted_at desc limit 20000`,
+    [clientId || null]
+  );
   return {
     surveys: t.surveys, live: t.live,
+    demographics_90d: demographicsOf(demo),
     responses_30d: t.responses_30d, responses_prev_30d: t.responses_prev_30d,
     csat_30d: pctOf(t.csat_sat, t.csat_n), csat_responses_30d: t.csat_n,
     nps_30d: npsOf(t.nps_pro, t.nps_det, t.nps_n), nps_responses_30d: t.nps_n,
@@ -1593,7 +1658,7 @@ async function surveyAnalytics(survey, { grain } = {}) {
       [survey.id, b.window_start]
     ),
     db.query(
-      `select answers, score, nps, ces, resolved, comment, location_id, location_name, channel, submitted_at
+      `select answers, score, nps, ces, resolved, comment, location_id, location_name, channel, submitted_at, gender, city, age_band
          from survey_responses where survey_id = $1 and submitted_at >= $2
         order by submitted_at desc limit 20000`,
       [survey.id, b.window_start]
@@ -1672,6 +1737,7 @@ async function surveyAnalytics(survey, { grain } = {}) {
 
   const followups = { open: 0, contacted: 0, resolved: 0 };
   for (const f of followR.rows) followups[f.s] = f.n;
+  const demographics = demographicsOf(rows);
 
   const texts = (pred) => rows.filter(pred).map((r) => r.comment).filter(Boolean);
   const themes = {
@@ -1697,6 +1763,7 @@ async function surveyAnalytics(survey, { grain } = {}) {
     questions,
     locations,
     channels,
+    demographics,
     invites: { sent: inv.sent, opened: inv.opened, answered: inv.answered, response_rate: pctOf(inv.answered, inv.sent) },
     followups,
     themes,
@@ -1792,7 +1859,7 @@ async function exportWorkbook(survey) {
 module.exports = {
   SurveyError, LANGUAGES, TYPES, CHANNELS, CHANNEL_NAMES, SLUG_RE,
   templateSummaries,
-  normalizeSurvey, normalizeAnswers, conditionMet, metricsOf, needsFollowUp, isPromoter, themesOf, answerText,
+  normalizeSurvey, normalizeAnswers, conditionMet, metricsOf, demographicsOf, needsFollowUp, isPromoter, themesOf, answerText, readableAnswers,
   getSurvey, getSurveyBySlug, getClient, setSurveysEnabled, createSurvey, updateSurvey, duplicateSurvey, deleteSurvey,
   OWN_SURVEY_SLUG, OWN_CHAT_SURVEY_SLUG, ensureOwnSurvey, ensureOwnSurveys,
   isClosed, publicSurvey, publicBase, linksFor, withLinks, inviteMessage, qrSvg, escapeHtml, estimateMinutes,

@@ -51,6 +51,21 @@
     text: ['Is there anything else you would like to tell us?', 'کیا آپ ہمیں کچھ اور بتانا چاہیں گے؟'],
     contact: ['Would you like us to get back to you?', 'کیا آپ چاہتے ہیں کہ ہم آپ سے رابطہ کریں؟'],
   };
+  // "About you": answers that split the results and go on the customer's profile.
+  var CITIES = [['karachi', 'Karachi', 'کراچی'], ['lahore', 'Lahore', 'لاہور'], ['islamabad', 'Islamabad', 'اسلام آباد'], ['rawalpindi', 'Rawalpindi', 'راولپنڈی'],
+    ['faisalabad', 'Faisalabad', 'فیصل آباد'], ['multan', 'Multan', 'ملتان'], ['peshawar', 'Peshawar', 'پشاور'], ['quetta', 'Quetta', 'کوئٹہ'],
+    ['hyderabad', 'Hyderabad', 'حیدرآباد'], ['sialkot', 'Sialkot', 'سیالکوٹ'], ['gujranwala', 'Gujranwala', 'گوجرانوالہ']];
+  var PROFILE_Q = {
+    gender: { icon: '⚧', label: 'Gender', hint: 'Male, female or prefer not to say — see satisfaction by gender.',
+      q: { type: 'single', profile: 'gender', title: { en: 'Are you…', ur: 'آپ…' },
+        options: [['male', 'Male', 'مرد'], ['female', 'Female', 'خاتون'], ['prefer_not', 'Prefer not to say', 'بتانا نہیں چاہتے']] } },
+    age: { icon: '🎂', label: 'Age group', hint: 'Under 18 to 65+ — see satisfaction by age.',
+      q: { type: 'single', profile: 'age', title: { en: 'Your age group', ur: 'آپ کی عمر کا گروپ' },
+        options: [['u18', 'Under 18', '18 سے کم'], ['18_24', '18–24', '18–24'], ['25_34', '25–34', '25–34'], ['35_44', '35–44', '35–44'], ['45_54', '45–54', '45–54'], ['55_64', '55–64', '55–64'], ['65p', '65+', '65+']] } },
+    city: { icon: '📍', label: 'City', hint: 'Pakistan\'s main cities, or type another — see satisfaction by city.',
+      q: { type: 'single', profile: 'city', allow_other: true, title: { en: 'Which city are you in?', ur: 'آپ کس شہر میں ہیں؟' }, options: CITIES } },
+  };
+  var PROFILE_NAME = { gender: 'gender', age: 'age group', city: 'city' };
   var RANGE = { csat: [1, 5], rating: [1, 5], nps: [0, 10], ces: [1, 7] };
   var OTHER = '__other';
   var STATUS = {
@@ -74,7 +89,7 @@
     openQ: null, addingQ: false,
     grain: 'month', analytics: null,
     resp: null, rFilter: 'all', rLoc: '', rQ: '', rBusy: false, openResp: null,
-    invites: null,
+    invites: null, reportGrain: 'month',
   };
 
   /* ------------------------------------------------------------------ */
@@ -410,6 +425,8 @@
       + '<p>Ask customers how you did — by QR code on the table, a link on WhatsApp, a tablet at the counter or your website — and see every answer here the moment it arrives. Unhappy answers raise a follow-up so nobody slips through.</p></div>'
       + '<div class="vqs-row">'
       + (clients.length ? '<select data-a-change="client-filter" style="width:auto;min-width:180px;"><option value="">All clients</option>' + clients.map(function(c){ return '<option value="' + esc(c.id) + '"' + (st.clientFilter === c.id ? ' selected' : '') + '>' + esc(c.company) + '</option>'; }).join('') + '</select>' : '')
+      + '<select data-a-change="report-grain" title="Period for the Echo report" style="width:auto;">' + [['day', 'Last 30 days'], ['week', 'Last 12 weeks'], ['month', 'Last 12 months'], ['quarter', 'Last 8 quarters'], ['year', 'Last 5 years']].map(function(g){ return '<option value="' + g[0] + '"' + (st.reportGrain === g[0] ? ' selected' : '') + '>' + g[1] + '</option>'; }).join('') + '</select>'
+      + '<button class="vqs-btn" data-a="echo-report" title="Satisfaction, NPS, every survey and answer, who answered (gender, age, city), follow-ups and respondents — a tab for each">⬇ Echo report (Excel)</button>'
       + '<button class="vqs-btn primary" data-a="new">＋ New survey</button></div></div>';
     if (!st.list) return head + loading('Loading surveys…');
     if (st.list.error) return head + errorCard(st.list.error, 'reload-home');
@@ -426,6 +443,7 @@
       + kpi('Live surveys', n(o.live), '', n(o.surveys) + ' in total')
       + '</div>'
       + (o.followup_queue && o.followup_queue.length ? followupQueue(o.followup_queue) : '')
+      + demographicsCards(o.demographics_90d, 'Last 90 days, every survey')
       + '<div class="vqs-grid vqs-g3" style="margin-top:14px;">' + surveys.map(surveyCard).join('') + '</div>';
   }
 
@@ -640,8 +658,30 @@
         + (w.detractors ? '<div style="width:' + seg(w.detractors) + '%;background:' + NPS_C.det + '"></div>' : '') + (w.passives ? '<div style="width:' + seg(w.passives) + '%;background:' + NPS_C.pas + '"></div>' : '') + (w.promoters ? '<div style="width:' + seg(w.promoters) + '%;background:' + NPS_C.pro + '"></div>' : '') + '</div>'
         + '<div class="vqs-legend"><span><i style="background:' + NPS_C.det + '"></i>Detractors 0–6 · ' + w.detractors + '</span><span><i style="background:' + NPS_C.pas + '"></i>Passives 7–8 · ' + w.passives + '</span><span><i style="background:' + NPS_C.pro + '"></i>Promoters 9–10 · ' + w.promoters + '</span></div></div>' : '')
       + (a.locations.length ? locationsCard(a) : '')
+      + demographicsCards(a.demographics, a.period.window_label)
       + '<div class="vqs-grid vqs-g2" style="margin-top:14px;">' + a.questions.map(questionResult).join('') + (a.channels.length > 1 ? '<div class="vqs-card"><h3>Where answers came from</h3><div class="sub">' + esc(a.period.window_label) + '</div>' + bars(a.channels.map(function(c){ return { name: c.name, value: c.responses, share: Math.round(c.responses / w.responses * 100) }; })) + '</div>' : '') + '</div>'
       + (a.sampled ? '<p class="sub" style="margin-top:10px;">Question breakdowns use the latest 20,000 answers in the period; the headline figures use all of them.</p>' : '');
+  }
+
+  /**
+   * Who answered, by gender, age group and city — each group's share of the
+   * answers and how satisfied it is. Nothing to show until a survey asks.
+   */
+  function demographicsCards(demo, sub){
+    demo = demo || {};
+    var parts = [['gender', 'By gender'], ['age', 'By age group'], ['city', 'By city']].filter(function(x){ return demo[x[0]] && demo[x[0]].length; });
+    if (!parts.length) {
+      return '<div class="vqs-card" style="margin-top:14px;"><h3>Who answers</h3><div class="sub">Gender, age group and city</div>'
+        + '<div class="vqs-empty" style="padding:12px;">Add the <b>Gender</b>, <b>Age group</b> or <b>City</b> question to a survey (open it → Questions → Add a question → About you) to see how satisfaction differs between groups. Answers also fill in the customer\'s profile.</div></div>';
+    }
+    return '<div class="vqs-grid vqs-g3" style="margin-top:14px;">' + parts.map(function(x){
+      var list = demo[x[0]].slice(0, 8);
+      return '<div class="vqs-card"><h3>' + x[1] + '</h3><div class="sub">' + esc(sub) + ' · bar: how many answered · figure: % satisfied</div>'
+        + bars(list.map(function(g){
+          return { name: g.name + ' (' + n(g.responses) + ')', value: g.responses, color: g.known ? undefined : '#bdb7ad',
+            label: g.csat != null ? g.csat + '% 😊' : '—' };
+        })) + '</div>';
+    }).join('') + '</div>';
   }
 
   function locationsCard(a){
@@ -793,6 +833,8 @@
       + qs.map(function(q, i){ return questionEditor(q, i, qs); }).join('')
       + (st.addingQ ? '<div class="vqs-card" style="margin-top:10px;"><div class="vqs-spread" style="margin-bottom:10px;"><h3>Add a question</h3><button class="vqs-link" data-a="add-cancel">Cancel</button></div><div class="vqs-types">'
         + Object.keys(QTYPES).map(function(t){ return '<button data-a="add-q" data-type="' + t + '"><span style="font-size:18px;">' + QTYPES[t].icon + '</span><span><b>' + esc(QTYPES[t].label) + '</b><span>' + esc(QTYPES[t].hint) + '</span></span></button>'; }).join('')
+        + '</div><div class="sub" style="margin:14px 0 8px;"><b>About you</b> — optional, saved to the customer\'s profile, and splits your results</div><div class="vqs-types">'
+        + Object.keys(PROFILE_Q).map(function(k){ var pq = PROFILE_Q[k]; var has = qs.some(function(x){ return x.profile === k; }); return '<button data-a="add-profile" data-p="' + k + '"' + (has ? ' disabled title="This survey already asks it"' : '') + '><span style="font-size:18px;">' + pq.icon + '</span><span><b>' + esc(pq.label) + '</b><span>' + esc(has ? 'Already in this survey.' : pq.hint) + '</span></span></button>'; }).join('')
         + '</div></div>'
         : '<div style="margin-top:12px;"><button class="vqs-btn" data-a="add-open"' + (qs.length >= 40 ? ' disabled' : '') + '>＋ Add a question</button></div>')
       + '</div>' + phone() + '</div>';
@@ -807,6 +849,7 @@
       + '<span class="qt">' + esc(title) + '</span>'
       + (q.show_if ? '<span class="vqs-tag" title="Only shown to some people">⑂ logic</span>' : '')
       + (q.required ? '<span class="vqs-tag" style="background:#fbeee4;color:#94512b;">required</span>' : '')
+      + (q.profile ? '<span class="vqs-tag" style="background:#e8ecfd;color:#1f3a95;" title="The answer is saved to the customer\'s profile and splits the results">about you · ' + esc(PROFILE_NAME[q.profile] || q.profile) + '</span>' : '')
       + '<span class="ty">' + esc(t.label) + '</span>'
       + '<button class="vqs-mini" data-a="move-q" data-i="' + i + '" data-d="-1" title="Move up"' + (i === 0 ? ' disabled' : '') + '>↑</button>'
       + '<button class="vqs-mini" data-a="move-q" data-i="' + i + '" data-d="1" title="Move down"' + (i === qs.length - 1 ? ' disabled' : '') + '>↓</button>'
@@ -828,8 +871,8 @@
       body += '<label class="vqs-check"><input type="checkbox" data-q-bool="' + i + '" data-k="metric_resolved"' + (q.metric === 'resolved' ? ' checked' : '') + '>Counts towards “Resolved” — “No” opens a follow-up</label>';
     }
     if (q.type === 'contact') {
-      body += '<div class="vqs-f"><span>Ask for</span>' + ['name', 'phone', 'email', 'company'].map(function(f){
-        return '<label class="vqs-check"><input type="checkbox" data-q-field="' + i + '" data-field="' + f + '"' + ((q.fields || []).indexOf(f) >= 0 ? ' checked' : '') + '>' + { name: 'Name', phone: 'Phone / WhatsApp', email: 'Email', company: 'Business name' }[f] + '</label>';
+      body += '<div class="vqs-f"><span>Ask for</span>' + ['name', 'phone', 'email', 'company', 'city'].map(function(f){
+        return '<label class="vqs-check"><input type="checkbox" data-q-field="' + i + '" data-field="' + f + '"' + ((q.fields || []).indexOf(f) >= 0 ? ' checked' : '') + '>' + { name: 'Name', phone: 'Phone / WhatsApp', email: 'Email', company: 'Business name', city: 'City' }[f] + '</label>';
       }).join('') + '<div class="sub" style="margin:4px 0 0;">Respondents also tick whether you may contact them.</div></div>';
     }
     body += logicEditor(q, i, qs)
@@ -1096,6 +1139,20 @@
       case 'add-cancel': st.addingQ = false; render(); break;
       case 'add-q':
         var q = newQuestion(ds.type); d.questions.push(q); st.addingQ = false; st.openQ = q.id; render(); pushPreview(q.id); break;
+      case 'add-profile':
+        var pq = PROFILE_Q[ds.p].q;
+        var pnew = { id: ds.p === 'age' ? 'age' : ds.p, type: pq.type, profile: pq.profile, required: false, title: clone(pq.title),
+          options: pq.options.map(function(o){ return { id: o[0], label: { en: o[1], ur: o[2] } }; }) };
+        if (pq.allow_other) pnew.allow_other = true;
+        if (d.questions.some(function(x){ return x.id === pnew.id; })) pnew.id = rid('q');
+        var at = d.questions.findIndex(function(x){ return x.type === 'contact'; });
+        if (at < 0) d.questions.push(pnew); else d.questions.splice(at, 0, pnew);
+        st.addingQ = false; st.openQ = pnew.id; render(); pushPreview(pnew.id); break;
+      case 'echo-report':
+        host.download('/report.xlsx?grain=' + encodeURIComponent(st.reportGrain) + (st.clientFilter ? '&client_id=' + encodeURIComponent(st.clientFilter) : ''),
+          'vantriq-echo-' + st.reportGrain + '-' + new Date().toISOString().slice(0, 10) + '.xlsx')
+          .catch(function(err){ toast(err.message || 'Could not build the report.', true); });
+        break;
       case 'dup-q':
         var copyQ = clone(d.questions[Number(ds.i)]); copyQ.id = rid('q'); delete copyQ.show_if;
         d.questions.splice(Number(ds.i) + 1, 0, copyQ); st.openQ = copyQ.id; render(); pushPreview(copyQ.id); break;
@@ -1168,6 +1225,7 @@
     if (el.hasAttribute('data-a-change')) {
       var which = el.getAttribute('data-a-change');
       if (which === 'client-filter') { st.clientFilter = el.value; st.list = null; render(); loadHome(); }
+      if (which === 'report-grain') { st.reportGrain = el.value; }
       if (which === 'resp-loc') { st.rLoc = el.value; loadResponses(true); }
       return;
     }
@@ -1190,7 +1248,7 @@
       var cq = d.questions[Number(el.getAttribute('data-q-field'))], f = el.getAttribute('data-field');
       var fields = (cq.fields || []).filter(function(x){ return x !== f; });
       if (el.checked) fields.push(f);
-      cq.fields = ['name', 'phone', 'email', 'company'].filter(function(x){ return fields.indexOf(x) >= 0; });
+      cq.fields = ['name', 'phone', 'email', 'company', 'city'].filter(function(x){ return fields.indexOf(x) >= 0; });
       if (!cq.fields.length) { cq.fields = ['name']; toast('Keep at least one detail to ask for.', true); }
       render(); pushPreview(cq.id); return;
     }

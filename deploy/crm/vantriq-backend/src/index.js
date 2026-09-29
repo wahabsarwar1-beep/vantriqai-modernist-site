@@ -19,6 +19,7 @@ const expensesRoutes = require('./routes/expenses');
 const usageRoutes = require('./routes/usage');
 const dashboardRoutes = require('./routes/dashboard');
 const analyticsRoutes = require('./routes/analytics');
+const contactsRoutes = require('./routes/contacts');
 const financialsRoutes = require('./routes/financials');
 const settingsRoutes = require('./routes/settings');
 const portalRoutes = require('./routes/portal');
@@ -124,6 +125,8 @@ app.use('/api/package-requests', requireScope('staff'), packageRequestsRoutes);
 app.use('/api/expenses', requireScope('admin'), expensesRoutes);
 app.use('/api/dashboard', requireScope('staff'), dashboardRoutes);
 app.use('/api/analytics', requireScope('staff'), analyticsRoutes);
+// Our clients' own customers: the directory each client also sees in its portal.
+app.use('/api/contacts', requireScope('staff'), contactsRoutes);
 // Every client's surveys, their results and follow-ups. The same router is
 // mounted for customers at /api/portal/surveys, scoped to their own.
 app.use('/api/surveys', requireScope('staff'), surveysRoutes);

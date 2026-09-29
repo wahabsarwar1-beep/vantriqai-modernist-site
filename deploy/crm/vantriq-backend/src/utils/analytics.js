@@ -1,4 +1,5 @@
 const db = require('../db');
+const { countryOf } = require('./contacts');
 
 /**
  * Conversation, contact and satisfaction analytics.
@@ -212,8 +213,20 @@ async function conversationAnalytics(clientId, grain, b) {
     [...base, b.cur_start]
   );
 
-  const [series, kpi, channels, agents, heat, clients] = await Promise.all(
-    [seriesQ, kpiQ, channelQ, agentQ, heatQ, clientsQ].map((q) => q && q.then((r) => r.rows))
+  // Who the people are, as far as their profiles say (v9.17): city, and
+  // whether a name or email is known. Country comes from the number itself.
+  const whoQ = db.query(
+    `${CTE}
+     select sx.client_id, ${CONTACT_OF('sx.session_id')} as key, count(*)::int as conversations,
+            max(p.city) as city, bool_or(p.name <> '') as has_name, bool_or(p.email <> '') as has_email
+       from sx left join contacts p on p.client_id = sx.client_id and p.contact_key = ${CONTACT_OF('sx.session_id')}
+      where true ${TOUCH}
+      group by 1, 2`,
+    base
+  );
+
+  const [series, kpi, channels, agents, heat, clients, who] = await Promise.all(
+    [seriesQ, kpiQ, channelQ, agentQ, heatQ, clientsQ, whoQ].map((q) => q && q.then((r) => r.rows))
   );
   const k = kpi[0];
   const frac = b.elapsed_frac;
@@ -271,7 +284,35 @@ async function conversationAnalytics(clientId, grain, b) {
       share_pct: totalWindow ? round1((a.conversations / totalWindow) * 100) : 0,
     })),
     heatmap, // [isodow-1][hour] = conversations started, over the window
+    ...whereFrom(who),
     ...(clients ? { top_clients: clients } : {}),
+  };
+}
+
+/** Cities and countries of the people active in the window, and how much is known about them. */
+function whereFrom(who) {
+  const group = (keyFn, blank) => {
+    const m = new Map();
+    for (const w of who) {
+      const k = keyFn(w) || '';
+      if (!m.has(k)) m.set(k, { name: k || blank, known: !!k, contacts: 0, conversations: 0 });
+      const g = m.get(k);
+      g.contacts += 1;
+      g.conversations += w.conversations;
+    }
+    return [...m.values()]
+      .map((g) => ({ ...g, share_pct: who.length ? round1((g.contacts / who.length) * 100) : 0 }))
+      .sort((a, b) => (a.known === b.known ? b.contacts - a.contacts : a.known ? -1 : 1));
+  };
+  return {
+    cities: group((w) => w.city, 'Not known yet'),
+    countries: group((w) => countryOf(w.key), 'Web or unknown'),
+    profile_coverage: {
+      contacts: who.length,
+      with_name: who.filter((w) => w.has_name).length,
+      with_email: who.filter((w) => w.has_email).length,
+      with_city: who.filter((w) => w.city).length,
+    },
   };
 }
 
@@ -599,6 +640,8 @@ async function salesAnalytics({ grain } = {}) {
               to_char(date_trunc($2, m.created_at at time zone $3), 'YYYY-MM-DD') as bucket
          from conversation_messages m
         where m.created_at >= $1
+          -- A customer's own customers' conversations are theirs, not our sales.
+          and not exists (select 1 from clients x where x.id = m.client_id and not x.is_internal and x.stage = 'active')
         order by m.created_at`,
       [b.window_start, grain, TZ]
     ),
@@ -761,4 +804,4 @@ async function platformAnalytics({ grain } = {}) {
   };
 }
 
-module.exports = { clientAnalytics, salesAnalytics, platformAnalytics, GRAINS, TZ, normaliseGrain, periodBounds };
+module.exports = { clientAnalytics, salesAnalytics, platformAnalytics, satisfactionAnalytics, GRAINS, TZ, normaliseGrain, periodBounds };
