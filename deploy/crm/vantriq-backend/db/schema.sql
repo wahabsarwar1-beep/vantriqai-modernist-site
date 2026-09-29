@@ -2041,3 +2041,28 @@ begin
   insert into applied_migrations (name, note)
   values ('v9_20_1_echo_pricing', 'Vantriq Echo: 12,000 + 6,000/mo for the first location, 2,000 + 1,500/mo per further location.');
 end $$;
+
+-- v9.20.2 — transcripts that are complete, in order, and honest about
+-- replies that never arrived.
+--
+-- external_id: the channel's own id for the message (a WhatsApp wamid). The
+--   same message sent twice — n8n retrying after a timeout, or a history
+--   backfill run again — is stored once.
+-- delivered: false when the agent wrote a reply but the channel refused it
+--   (WhatsApp rejected the token, the 24-hour window had closed, …). The
+--   customer's words are still kept, and the customer's page shows the reply
+--   as not delivered, so nobody assumes they were answered.
+-- delivery_error: what the channel said, for whoever has to fix it.
+alter table conversation_messages add column if not exists external_id text;
+alter table conversation_messages add column if not exists delivered boolean not null default true;
+alter table conversation_messages add column if not exists delivery_error text not null default '';
+create unique index if not exists uq_conv_external_id
+  on conversation_messages(external_ref, external_id) where external_id is not null;
+
+-- When the team was last told that an agent's replies are failing, so one
+-- outage is one email an hour rather than one per customer message.
+create table if not exists delivery_alerts (
+  ref text primary key,
+  last_sent_at timestamptz not null default now(),
+  failures_since integer not null default 0
+);

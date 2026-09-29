@@ -660,7 +660,7 @@ function whereRows(contacts, field) {
 /** Transcript lines logged in the window, oldest last. Only when an agent sends them. */
 async function transcriptRows(clientId, b) {
   const { rows } = await db.query(
-    `select m.created_at, m.session_id, m.external_ref, m.role, m.content, m.channel, c.company
+    `select m.created_at, m.session_id, m.external_ref, m.role, m.content, m.channel, m.delivered, c.company
        from conversation_messages m left join clients c on c.id = m.client_id
       where m.created_at >= $2
         and ($1::uuid is null or m.client_id = $1 or m.agent_id in (select id from client_agents where client_id = $1))
@@ -671,7 +671,7 @@ async function transcriptRows(clientId, b) {
     at: local(m.created_at),
     contact: /^wa-\d+$/.test(m.external_ref || '') && !m.session_id ? `+${m.external_ref.slice(3)}` : contactLabel(contactKey(m.session_id || m.external_ref)),
     company: m.company || '',
-    who: m.role === 'agent' ? 'Agent' : 'Customer',
+    who: m.role === 'agent' ? (m.delivered === false ? 'Agent (not delivered)' : 'Agent') : 'Customer',
     channel: CHANNEL[m.channel] || m.channel,
     text: String(m.content || '').slice(0, 4000),
   }));
@@ -906,7 +906,7 @@ async function pulseReport(client, { grain, quota = null } = {}) {
     { header: 'When', key: 'at', width: 19, fmt: 'datetime' },
     { header: 'Contact', key: 'contact', width: 18, fmt: 'text' },
     ...withCo,
-    { header: 'Who', key: 'who', width: 10, fmt: 'center' },
+    { header: 'Who', key: 'who', width: 14, fmt: 'center', wrap: true },
     { header: 'Channel', key: 'channel', width: 11, fmt: 'center' },
     { header: 'Message', key: 'text', width: 90, fmt: 'text', wrap: true },
   ], lines, { filter: true, emptyText: `No transcripts in the ${window}: this agent does not send its messages to the CRM yet.` });
@@ -1302,7 +1302,7 @@ async function contactsWorkbook(client) {
       [all ? null : client.id]
     ),
     db.query(
-      `select m.created_at, m.session_id, m.external_ref, m.role, m.content, m.channel, c.company
+      `select m.created_at, m.session_id, m.external_ref, m.role, m.content, m.channel, m.delivered, c.company
          from conversation_messages m left join clients c on c.id = m.client_id
         where ($1::uuid is null or m.client_id = $1 or m.agent_id in (select id from client_agents where client_id = $1))
         order by m.created_at desc limit ${ROW_LIMIT + 1}`,
@@ -1413,13 +1413,13 @@ async function contactsWorkbook(client) {
     { header: 'When', key: 'at', width: 19, fmt: 'datetime' },
     { header: 'Contact', key: 'contact', width: 18, fmt: 'text' },
     ...(all ? [{ header: 'Customer of', key: 'company', width: 24, fmt: 'text' }] : []),
-    { header: 'Who', key: 'who', width: 10, fmt: 'center' },
+    { header: 'Who', key: 'who', width: 14, fmt: 'center', wrap: true },
     { header: 'Channel', key: 'channel', width: 11, fmt: 'center' },
     { header: 'Message', key: 'text', width: 90, fmt: 'text', wrap: true },
   ], lines.rows.map((m) => ({
     at: local(m.created_at),
     contact: /^wa-\d+$/.test(m.external_ref || '') && !m.session_id ? `+${m.external_ref.slice(3)}` : contactLabel(contactKey(m.session_id || m.external_ref)),
-    company: m.company || '', who: m.role === 'agent' ? 'Agent' : 'Customer', channel: CHANNEL[m.channel] || m.channel,
+    company: m.company || '', who: m.role === 'agent' ? (m.delivered === false ? 'Agent (not delivered)' : 'Agent') : 'Customer', channel: CHANNEL[m.channel] || m.channel,
     text: String(m.content || '').slice(0, 4000),
   })), { filter: true, emptyText: 'No transcripts yet: the agents do not send their messages to the CRM.' });
 

@@ -233,24 +233,49 @@ async function allContacts(clientId = null) {
          from csat_responses where session_id <> '' and ($1::uuid is null or client_id = $1)
         group by 1, 2
      ),
+     -- Conversations an agent logged the transcript of but never metered —
+     -- a reply the channel refused, or an agent that does not report usage.
+     -- Lines logged against an agent only: a lead's chat filed under wa-<number>
+     -- is VantriqAI's sales conversation, not a customer's customer.
+     talk as (
+       select m.client_id, ${CONTACT_OF('m.session_id')} as key,
+              min(m.created_at) as first_at, max(m.created_at) as last_at,
+              count(distinct m.session_id)::int as conversations,
+              count(distinct m.session_id) filter (where m.created_at >= now() - interval '30 days')::int as conv_30d,
+              count(*) filter (where m.role = 'customer')::int as messages,
+              string_agg(distinct m.channel, ',') as channels,
+              (array_agg(a.name order by m.created_at desc) filter (where a.name is not null))[1] as agent
+         from conversation_messages m left join client_agents a on a.id = m.agent_id
+        where m.agent_id is not null and m.client_id is not null and m.session_id <> ''
+          and ($1::uuid is null or m.client_id = $1)
+          and not exists (select 1 from usage_events u where u.client_id = m.client_id and u.session_id = m.session_id)
+        group by 1, 2
+     ),
      base as (
        select client_id, key from act
+       union
+       select client_id, key from talk
        union
        select client_id, contact_key from contacts where ($1::uuid is null or client_id = $1)
      )
      select b.client_id, b.key, c.company as client_company, c.is_internal,
             p.name, p.phone, p.email, p.city, p.gender, p.age_band, p.company, p.tags, p.notes, p.do_not_contact,
             p.name_source, p.edited_by, p.edited_at,
-            act.first_at, act.last_at, act.conversations, act.conv_30d, act.messages, act.channels, act.agent, act.handoffs,
+            least(act.first_at, talk.first_at) as first_at, greatest(act.last_at, talk.last_at) as last_at,
+            nullif(coalesce(act.conversations, 0) + coalesce(talk.conversations, 0), 0) as conversations,
+            coalesce(act.conv_30d, 0) + coalesce(talk.conv_30d, 0) as conv_30d,
+            nullif(coalesce(act.messages, 0) + coalesce(talk.messages, 0), 0) as messages,
+            concat_ws(',', act.channels, talk.channels) as channels, coalesce(act.agent, talk.agent) as agent, act.handoffs,
             sat.answers, sat.last_score, sat.last_nps, sat.avg_score, sat.last_answer_at,
             l.name as lead_name, l.email as lead_email, l.company as lead_company, l.stage as lead_stage, l.source as lead_source
        from base b
        join clients c on c.id = b.client_id
        left join act on act.client_id = b.client_id and act.key = b.key
+       left join talk on talk.client_id = b.client_id and talk.key = b.key
        left join contacts p on p.client_id = b.client_id and p.contact_key = b.key
        left join sat on sat.client_id = b.client_id and sat.key = b.key
        left join clients l on c.is_internal and l.external_ref = 'wa-' || b.key
-      order by act.last_at desc nulls last, p.updated_at desc nulls last`,
+      order by greatest(act.last_at, talk.last_at) desc nulls last, p.updated_at desc nulls last`,
     [clientId]
   );
   return rows.map(shape);
@@ -292,7 +317,7 @@ function shape(r) {
     first_at: r.first_at, last_at: r.last_at,
     conversations: convs, conversations_30d: r.conv_30d || 0, messages: r.messages || 0,
     handoffs: r.handoffs || 0,
-    channels: String(r.channels || '').split(',').filter(Boolean).map((c) => CHANNEL[c] || c),
+    channels: [...new Set(String(r.channels || '').split(',').filter(Boolean).map((c) => CHANNEL[c] || c))],
     agent: r.agent || (convs ? 'Main agent' : ''),
     days_since: r.last_at ? Math.floor((now - new Date(r.last_at)) / DAY) : null,
     answers: r.answers || 0,
@@ -366,6 +391,8 @@ function coverage(all) {
 /* One customer                                                          */
 /* ------------------------------------------------------------------ */
 
+const undelivered = (lines) => (lines || []).filter((l) => l.role === 'agent' && l.delivered === false).length;
+
 async function contactDetail(clientId, key) {
   const k = String(key || '');
   const all = await allContacts(clientId);
@@ -374,7 +401,7 @@ async function contactDetail(clientId, key) {
   const { rows: cl } = await db.query(`select is_internal from clients where id = $1`, [clientId]);
   const internal = !!(cl[0] && cl[0].is_internal);
 
-  const [sessions, messages, surveys, answers] = await Promise.all([
+  const [sessions, messages, surveys, answers, since] = await Promise.all([
     db.query(
       `select u.session_id, min(u.occurred_at) as started, max(u.occurred_at) as ended,
               coalesce(sum(u.messages_count), 0)::int as messages, count(*)::int as replies,
@@ -387,8 +414,8 @@ async function contactDetail(clientId, key) {
       [clientId, k]
     ),
     db.query(
-      `select m.session_id, m.role, m.content, m.channel, m.created_at
-         from conversation_messages m
+      `select m.session_id, m.role, m.content, m.channel, m.created_at, m.delivered, m.delivery_error, a.name as agent
+         from conversation_messages m left join client_agents a on a.id = m.agent_id
         where (${CONTACT_OF('m.session_id')} = $2
                and (m.client_id = $1 or m.agent_id in (select id from client_agents where client_id = $1)))
            or ($3 and m.external_ref = 'wa-' || $2)
@@ -410,6 +437,10 @@ async function contactDetail(clientId, key) {
         order by responded_at desc limit 200`,
       [clientId, k]
     ),
+    // Since when this client's agents have sent their transcripts at all —
+    // so an older conversation without one reads as "before transcripts",
+    // not as something lost.
+    db.query(`select min(created_at) as first from conversation_messages where client_id = $1`, [clientId]),
   ]);
 
   // Transcript lines grouped under the conversation they belong to.
@@ -417,7 +448,10 @@ async function contactDetail(clientId, key) {
   for (const m of messages.rows.slice().reverse()) {
     const sid = m.session_id || `${k}-${new Date(m.created_at).toISOString().slice(0, 10)}`;
     if (!bySession.has(sid)) bySession.set(sid, []);
-    bySession.get(sid).push({ role: m.role, content: m.content, at: m.created_at });
+    const line = { role: m.role, content: m.content, at: m.created_at };
+    // Only a reply the channel refused says so; everything else was delivered.
+    if (m.delivered === false) { line.delivered = false; line.error = m.delivery_error || ''; }
+    bySession.get(sid).push(line);
   }
   const convs = sessions.rows.map((s, i) => ({
     session_id: s.session_id,
@@ -429,11 +463,21 @@ async function contactDetail(clientId, key) {
     handoff: s.handoff_reported ? !!s.handoff : null,
     visit: sessions.rows.length - i,
     transcript: bySession.get(s.session_id) || [],
+    undelivered: undelivered(bySession.get(s.session_id)),
   }));
   // Lines logged under a session usage never saw (a lead's chat before the agent metered it).
   const known = new Set(sessions.rows.map((s) => s.session_id));
   const orphan = [...bySession.entries()].filter(([sid]) => !known.has(sid))
-    .map(([sid, lines]) => ({ session_id: sid, started: lines[0].at, ended: lines[lines.length - 1].at, transcript: lines, channel: CHANNEL[messages.rows[0].channel] || '', messages: lines.length, visit: null }));
+    .map(([sid, lines]) => {
+      const first = messages.rows.find((m) => (m.session_id || '') === sid) || messages.rows[0];
+      return {
+        session_id: sid, started: lines[0].at, ended: lines[lines.length - 1].at,
+        minutes: Math.max(0, Math.round((new Date(lines[lines.length - 1].at) - new Date(lines[0].at)) / 60000)),
+        transcript: lines, channel: CHANNEL[first.channel] || first.channel || '', agent: first.agent || '',
+        messages: lines.filter((l) => l.role === 'customer').length || lines.length,
+        undelivered: undelivered(lines), visit: null,
+      };
+    });
 
   const { readableAnswers } = require('./surveys');
   const lastScoreRow = [...surveys.rows.map((r) => ({ at: r.submitted_at, score: r.score })), ...answers.rows.map((r) => ({ at: r.responded_at, score: r.score }))]
@@ -445,6 +489,8 @@ async function contactDetail(clientId, key) {
     avg_gap_days: convs.length >= 2 ? Math.round(((new Date(c.last_at) - new Date(c.first_at)) / DAY / (convs.length - 1)) * 10) / 10 : null,
     conversations_list: [...convs, ...orphan].sort((a, b) => new Date(b.started) - new Date(a.started)),
     has_transcripts: messages.rows.length > 0,
+    transcripts_from: since.rows[0] ? since.rows[0].first : null,
+    undelivered: [...convs, ...orphan].reduce((a, x) => a + x.undelivered, 0),
     survey_responses: surveys.rows.map((r) => ({
       id: r.id, survey_id: r.survey_id, survey: r.survey_title, submitted_at: r.submitted_at,
       score: r.score, nps: r.nps, ces: r.ces, resolved: r.resolved, comment: r.comment,

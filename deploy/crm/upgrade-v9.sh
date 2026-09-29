@@ -464,6 +464,16 @@ else
   CUSTOMERS=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
     -c "select count(*) from contacts" 2>/dev/null || echo '?')
   ok "customer profiles on file: $CUSTOMERS (they fill in as agents pass names and customers answer surveys)"
+  chk "v9.20.2 transcripts: message ids, delivery state, the alert throttle" 4 \
+    "select (select count(*) from information_schema.columns where table_name='conversation_messages' and column_name in ('external_id','delivered','delivery_error'))
+          + (select count(*) from information_schema.tables where table_name='delivery_alerts')"
+  # Counts only — transcripts are customers' words and this log is public.
+  TRANSCRIPTS=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At -F '|' \
+    -c "select count(*), count(*) filter (where created_at >= now() - interval '7 days'), count(*) filter (where not delivered),
+               coalesce(to_char(max(created_at) at time zone 'Asia/Karachi', 'DD Mon HH24:MI'), 'never')
+          from conversation_messages" 2>/dev/null || echo '?|?|?|?')
+  IFS='|' read -r T_ALL T_WEEK T_FAILED T_LAST <<< "$TRANSCRIPTS"
+  ok "transcript lines kept: $T_ALL ($T_WEEK in the last 7 days, latest $T_LAST Karachi time); agent replies not delivered: $T_FAILED"
   # Whether an unhappy answer is actually emailed to anyone. Reported, never
   # failed on — and this log is public, so it says yes or no, nothing more.
   MAIL_SET=$(docker exec "$APP_CONTAINER" node -e "require('dotenv').config();process.stdout.write(require('/app/src/utils/mailer').mailDiagnosis().configured?'yes':'no')" 2>/dev/null || echo '?')
@@ -594,5 +604,13 @@ cat <<'NEXT'
  11. Vantriq Echo pricing (v9.20.1): PKR 12,000 setup + 6,000/month for the
      first location, 2,000 + 1,500/month for each further one; more than 10
      priced on scope. Why, and the margins: deploy/crm/SURVEYS.md.
+
+ 12. Transcripts (v9.20.2). Customers → a customer → Conversations: every
+     line in the order it was said, at the time it was said. A reply the
+     channel refused (an expired WhatsApp token, a closed 24-hour window)
+     is kept and marked "not delivered" — the customer's own words are never
+     lost — and the team is emailed at once, at most once an hour per agent.
+     n8n sends each WhatsApp message's id, so a retry or a history backfill
+     never stores a line twice.
 NEXT
 printf '\n'

@@ -208,6 +208,39 @@ async function makeClient(tag) {
       'Pulse: where the people who wrote are', JSON.stringify({ c: pulse.cities, k: pulse.countries, p: pulse.profile_coverage }));
     const raw = JSON.stringify(pulse);
     ok(![P.ayesha, P.bilal].some((ph) => raw.includes(ph)), 'the Pulse dashboard itself still carries no numbers');
+
+    console.log('\n== v9.20.2: transcripts with real times, and replies that never arrived ==');
+    // Noor wrote while WhatsApp was refusing the agent's replies: no usage was
+    // metered, only the transcript — her words, and the reply she never got.
+    const noor = `92325${tail}`;
+    const said = Math.floor(Date.now() / 1000) - 600;
+    const nr = await post('/api/webhooks/conversation', { external_ref: AG, session_id: `${noor}-${day(new Date(said * 1000))}`, channel: 'whatsapp',
+      contact_name: 'Noor', delivered: false, error: 'Cannot call API for app 1775 on behalf of user 1221',
+      messages: [{ role: 'customer', content: 'Is anyone there?', at: said, id: `wamid.noor.${stamp}` },
+        { role: 'agent', content: 'Assalam o alaikum Noor! Yes — how can I help?', at: said + 5, id: `wamid.noor.${stamp}-reply` }] });
+    ok(nr.status === 201 && nr.body.stored === 2 && nr.body.undelivered === 1, 'a refused reply is stored, marked not delivered', JSON.stringify(nr.body));
+    const again = await post('/api/webhooks/conversation', { external_ref: AG, session_id: `${noor}-${day(new Date(said * 1000))}`,
+      messages: [{ role: 'customer', content: 'Is anyone there?', at: said, id: `wamid.noor.${stamp}` }] });
+    ok(again.status === 200 && again.body.stored === 0 && again.body.duplicates === 1, 'the same WhatsApp message sent again is stored once', JSON.stringify(again.body));
+    const NL = byKey((await call('GET', `/api/contacts?client_id=${c1.id}`)).body)[noor];
+    ok(NL && NL.conversations === 1 && NL.messages === 1 && NL.name === 'Noor' && NL.status === 'New' && !NL.segments.includes('survey_only') && NL.agent === 'one WhatsApp',
+      'known only from her transcript, she is in the directory with her conversation — not "from a survey"', JSON.stringify(NL));
+    const nd = (await call('GET', `/api/contacts/${c1.id}/${noor}`)).body;
+    const nc = nd.conversations_list[0] || {};
+    ok(nd.conversations_list.length === 1 && nc.transcript.length === 2 && nc.undelivered === 1 && nd.undelivered === 1 && nc.agent === 'one WhatsApp',
+      'her page shows the conversation, one reply not delivered', JSON.stringify(nd.conversations_list));
+    ok(nc.transcript[0].delivered === undefined && nc.transcript[1].delivered === false && /Cannot call API/.test(nc.transcript[1].error),
+      'the unsent reply says why; her own line carries no delivery flag', JSON.stringify(nc.transcript));
+    ok(new Date(nc.transcript[0].at).getTime() === said * 1000, 'lines keep the time they were said, not the time they reached the CRM', nc.transcript[0].at);
+    ok(nd.transcripts_from && new Date(nd.transcripts_from) <= new Date(said * 1000), 'the page knows since when transcripts are kept', nd.transcripts_from);
+    // An exchange that arrives late but happened earlier sorts where it happened.
+    await post('/api/webhooks/conversation', { external_ref: AG, session_id: `${noor}-${day(new Date(said * 1000))}`,
+      messages: [{ role: 'customer', content: 'Salam', at: said - 60, id: `wamid.noor0.${stamp}` }] });
+    const nd2 = (await call('GET', `/api/contacts/${c1.id}/${noor}`)).body;
+    ok(nd2.conversations_list[0].transcript.map((l) => l.content).join(' | ') === 'Salam | Is anyone there? | Assalam o alaikum Noor! Yes — how can I help?',
+      'a line backfilled later still reads in the order it was said', nd2.conversations_list[0].transcript.map((l) => l.content).join(' | '));
+    const bd = (await call('GET', `/api/contacts/${c1.id}/${P.bilal}`)).body;
+    ok(!bd.has_transcripts && bd.transcripts_from, 'Bilal has no transcript, but the page can say since when they are kept', JSON.stringify({ h: bd.has_transcripts, f: bd.transcripts_from }));
   } finally {
     for (const c of [c1, c2]) if (c && c.id) await call('DELETE', `/api/clients/${c.id}`);
     console.log('\n(cleanup: clients deleted)');

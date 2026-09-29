@@ -315,27 +315,7 @@ router.post('/lead', async (req, res) => {
 /** Emails whoever is on the notify list that a new lead just arrived. */
 async function notifyNewLead(client, channel) {
   if (!mailConfigured()) return;
-  let configured = '';
-  try {
-    const { rows } = await db.query(`select lead_notify_emails from settings limit 1`);
-    configured = (rows[0] && rows[0].lead_notify_emails) || '';
-  } catch (err) {
-    // Settings row or column missing on an un-migrated install — fall back.
-  }
-  // Semicolons as well as commas: mail clients separate addresses with a
-  // semicolon, so that is what people paste in. Accepting only commas turns
-  // the whole list into one malformed address and every send fails — and it
-  // fails quietly, which is the worst way for a lead alert to break.
-  // TEAM_NOTIFY_EMAIL is where the rest of the app sends internal alerts, so
-  // it belongs in this chain. MAIL_FROM stays at the end because installs
-  // predating its removal may still have it set, and losing a lead alert to
-  // a rename would be a silent regression.
-  const recipients = (configured
-    || process.env.LEAD_NOTIFY_EMAIL
-    || process.env.TEAM_NOTIFY_EMAIL
-    || process.env.MAIL_FROM
-    || '')
-    .split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+  const recipients = await teamRecipients();
   if (!recipients.length) return;
 
   const named = client.company && client.company !== '—' ? ` (${client.company})` : '';
@@ -356,6 +336,23 @@ async function notifyNewLead(client, channel) {
   ));
 }
 
+// Time and delivery values as n8n sends them — see POST /api/webhooks/conversation.
+const YEAR_MS = 366 * 86400000;
+const ALERT_FRESH_MS = 30 * 60000;
+
+function spokenAt(v) {
+  if (v === undefined || v === null || v === '') return null;
+  const numeric = typeof v === 'number' || /^\d+(\.\d+)?$/.test(String(v).trim());
+  // Seconds (WhatsApp, Unix) or milliseconds (JavaScript) — told apart by size.
+  const ms = numeric ? (Number(v) < 1e11 ? Number(v) * 1000 : Number(v)) : Date.parse(String(v));
+  if (!Number.isFinite(ms)) return null;
+  const now = Date.now();
+  return ms < now - YEAR_MS || ms > now + 10 * 60000 ? null : new Date(ms);
+}
+
+const isFalse = (v) => v === false || v === 'false';
+const isTrue = (v) => v === true || v === 'true';
+
 /**
  * POST /api/webhooks/conversation
  *
@@ -363,9 +360,20 @@ async function notifyNewLead(client, channel) {
  * buffer that a restart wipes, so without this the transcript behind a
  * lead is gone by the time anyone opens the CRM to read it.
  *
- * Body: { external_ref, session_id, channel, messages: [{ role, content }] }
+ * Body: { external_ref, session_id, channel, messages: [{ role, content, at, id, delivered, error }] }
  * role is "customer" or "agent". Unknown roles are dropped rather than
  * failing the batch — a lost turn is better than a lost conversation.
+ *
+ *   at         when it was said: ISO 8601, or Unix seconds / milliseconds
+ *              (WhatsApp's own timestamp). Defaults to now. A time more than
+ *              a year back or in the future is not trusted, and now is used.
+ *   id         the channel's id for the message (a WhatsApp wamid). A message
+ *              already stored under that id is skipped, so an n8n retry or a
+ *              history backfill run twice never doubles a transcript.
+ *   delivered  false, with error, for a reply the agent wrote but the channel
+ *              refused. Given at the top level it applies to the batch's
+ *              agent lines. The customer's words are kept either way; a fresh
+ *              failure emails the team, at most once an hour per agent.
  */
 router.post('/conversation', async (req, res) => {
   const body = req.body || {};
@@ -375,11 +383,28 @@ router.post('/conversation', async (req, res) => {
   const CHANNELS = ['whatsapp', 'website', 'instagram', 'voice', 'email'];
   const channel = CHANNELS.includes(body.channel) ? body.channel : 'whatsapp';
   const sessionId = String(body.session_id || '').trim().slice(0, 200);
+  const batchDelivered = !isFalse(body.delivered);
+  const batchError = String(body.error || '').trim();
 
   const incoming = Array.isArray(body.messages) ? body.messages : [];
+  const seen = new Set();
   const messages = incoming
-    .map((m) => ({ role: m && m.role, content: String((m && m.content) ?? '').trim() }))
+    .map((m) => {
+      const x = m || {};
+      const delivered = x.role !== 'agent' ? true : isFalse(x.delivered) ? false : isTrue(x.delivered) ? true : batchDelivered;
+      const id = x.id == null || String(x.id).trim() === '' ? null : String(x.id).trim().slice(0, 200);
+      return {
+        role: x.role,
+        content: String(x.content ?? '').trim(),
+        at: spokenAt(x.at),
+        id,
+        delivered,
+        error: delivered ? '' : (String(x.error || batchError).trim() || 'The channel did not accept the reply.').slice(0, 500),
+      };
+    })
     .filter((m) => (m.role === 'customer' || m.role === 'agent') && m.content !== '')
+    // The same id twice in one batch is one message.
+    .filter((m) => !m.id || (!seen.has(m.id) && seen.add(m.id)))
     .slice(0, 50);
   if (!messages.length) {
     return res.status(400).json({ error: 'messages must contain at least one customer or agent turn' });
@@ -395,18 +420,25 @@ router.post('/conversation', async (req, res) => {
     if (ag[0]) { agentId = ag[0].id; clientId = ag[0].client_id; }
   }
 
+  const COLS = ['client_id', 'external_ref', 'session_id', 'channel', 'role', 'content', 'agent_id', 'external_id', 'delivered', 'delivery_error', 'created_at'];
   const values = [];
   // A batch shares one "now"; a millisecond apart each keeps the turns in the
-  // order they were said when a transcript is read back.
+  // order they were said when a transcript is read back — also when two lines
+  // carry the same one-second WhatsApp timestamp.
   const placeholders = messages.map((m, i) => {
-    const base = i * 7;
-    values.push(clientId, externalRef, sessionId, channel, m.role, m.content.slice(0, 8000), agentId);
-    return `($${base + 1},$${base + 2},$${base + 3},$${base + 4},$${base + 5},$${base + 6},$${base + 7}, now() + interval '${i} milliseconds')`;
+    const base = i * COLS.length;
+    values.push(clientId, externalRef, sessionId, channel, m.role, m.content.slice(0, 8000), agentId,
+      m.id, m.delivered, m.error, m.at ? m.at.toISOString() : null);
+    const p = COLS.map((_, j) => `$${base + j + 1}`);
+    p[COLS.length - 1] = `coalesce(${p[COLS.length - 1]}::timestamptz, now()) + interval '${i} milliseconds'`;
+    return `(${p.join(',')})`;
   });
 
-  await db.query(
-    `insert into conversation_messages (client_id, external_ref, session_id, channel, role, content, agent_id, created_at)
-     values ${placeholders.join(',')}`,
+  const { rows: stored } = await db.query(
+    `insert into conversation_messages (${COLS.join(', ')})
+     values ${placeholders.join(',')}
+     on conflict (external_ref, external_id) where external_id is not null do nothing
+     returning role, content, delivered, delivery_error, created_at`,
     values
   );
   if (agentId && sessionId) {
@@ -414,8 +446,110 @@ router.post('/conversation', async (req, res) => {
       .catch((err) => console.error('[conversation] contact profile not updated:', err.message));
   }
 
-  res.status(201).json({ ok: true, stored: messages.length, client_id: clientId, agent_id: agentId });
+  // A reply that never reached the customer is somebody's problem right now:
+  // nobody who writes in is being answered. Only a fresh one alerts — a
+  // backfill of last week's failures is history, not news.
+  const failed = stored.find((r) => r.role === 'agent' && r.delivered === false
+    && Date.now() - new Date(r.created_at).getTime() < ALERT_FRESH_MS);
+  if (failed) {
+    const said = stored.filter((r) => r.role === 'customer').map((r) => r.content).join('\n');
+    notifyUndelivered({ ref: agentId || clientId || externalRef, clientId, agentId, externalRef, sessionId, channel, said, error: failed.delivery_error, at: failed.created_at })
+      .catch((err) => console.error('[conversation] undelivered-reply alert failed:', err.message));
+  }
+
+  res.status(stored.length ? 201 : 200).json({
+    ok: true, stored: stored.length, duplicates: messages.length - stored.length,
+    undelivered: stored.filter((r) => r.delivered === false).length, client_id: clientId, agent_id: agentId,
+  });
 });
+
+/** Everyone on the team's notify list: the CRM setting, then the environment. */
+async function teamRecipients() {
+  let configured = '';
+  try {
+    const { rows } = await db.query(`select lead_notify_emails from settings limit 1`);
+    configured = (rows[0] && rows[0].lead_notify_emails) || '';
+  } catch (err) {
+    // Settings row or column missing on an un-migrated install — fall back.
+  }
+  // Semicolons as well as commas: mail clients separate addresses with a
+  // semicolon, so that is what people paste in. Accepting only commas turns
+  // the whole list into one malformed address and every send fails — and it
+  // fails quietly, which is the worst way for an alert to break.
+  // TEAM_NOTIFY_EMAIL is where the rest of the app sends internal alerts, so
+  // it belongs in this chain. MAIL_FROM stays at the end because installs
+  // predating its removal may still have it set, and losing an alert to
+  // a rename would be a silent regression.
+  return (configured
+    || process.env.LEAD_NOTIFY_EMAIL
+    || process.env.TEAM_NOTIFY_EMAIL
+    || process.env.MAIL_FROM
+    || '')
+    .split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+}
+
+/**
+ * Tells the team an agent wrote a reply the channel would not deliver. One
+ * email an hour per agent while it lasts: the first says what broke, later
+ * ones how many more customers went unanswered in between.
+ */
+async function notifyUndelivered({ ref, clientId, agentId, sessionId, channel, said, error, at }) {
+  if (!mailConfigured()) return;
+  const { rows: due } = await db.query(
+    `update delivery_alerts d set last_sent_at = now(), failures_since = 0
+       from (select failures_since as missed from delivery_alerts where ref = $1) o
+      where d.ref = $1 and d.last_sent_at < now() - interval '1 hour'
+      returning o.missed`,
+    [String(ref)]
+  );
+  let missed = 0;
+  if (due[0]) {
+    missed = due[0].missed || 0;
+  } else {
+    const { rows: first } = await db.query(
+      `insert into delivery_alerts (ref) values ($1)
+       on conflict (ref) do update set failures_since = delivery_alerts.failures_since + 1
+       returning (xmax = 0) as fresh`,
+      [String(ref)]
+    );
+    if (!first[0] || !first[0].fresh) return; // already told within the hour
+  }
+  const to = await teamRecipients();
+  if (!to.length) return;
+
+  const { rows: who } = await db.query(
+    `select c.company, a.name as agent from clients c left join client_agents a on a.id = $2 where c.id = $1`,
+    [clientId, agentId]
+  );
+  const company = who[0] && who[0].company ? who[0].company : '';
+  const agent = (who[0] && who[0].agent) || `${channel} agent`;
+  const key = C.keyOf(sessionId);
+  const number = /^\d{8,15}$/.test(key) ? `+${key}` : key || 'unknown';
+  const when = new Date(at || Date.now()).toLocaleString('en-GB', { timeZone: 'Asia/Karachi', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const lines = [
+    `${company ? `${company}'s ` : ''}${agent} wrote a reply, but ${channel === 'whatsapp' ? 'WhatsApp' : 'the channel'} refused to deliver it.`,
+    '',
+    `Customer:   ${number}`,
+    `They said:  ${said ? `"${said.slice(0, 400)}"` : '(not recorded)'}`,
+    `When:       ${when} (Karachi)`,
+    '',
+    `${channel === 'whatsapp' ? 'WhatsApp' : 'The channel'} said: ${error}`,
+    '',
+    'Until this is fixed, customers who write in are not being answered.',
+    /^\d{8,15}$/.test(key) ? `Reply to this one yourself: https://wa.me/${key}` : '',
+    'The unsent reply and the whole conversation are in the CRM, under Customers.',
+    '',
+    /token|OAuth|access|permission|Cannot call API/i.test(error)
+      ? 'This usually means the WhatsApp access token in n8n has expired or lost its access. Create a new one in Meta Business Settings → System users (permissions whatsapp_business_messaging and whatsapp_business_management), and paste it into n8n → Credentials → "WhatsApp account".'
+      : '',
+    missed ? `${missed} more ${missed === 1 ? 'reply' : 'replies'} failed since the last email.` : '',
+    'You get at most one of these an hour while the problem lasts.',
+  ].filter((l, i, all) => l !== '' || (all[i - 1] !== '' && i > 0));
+
+  await Promise.all(to.map((addr) =>
+    sendMail({ to: addr, subject: `Agent reply not delivered: ${number}${company ? ` (${company})` : ''}`, text: lines.join('\n') })
+  ));
+}
 
 /**
  * POST /api/webhooks/csat
