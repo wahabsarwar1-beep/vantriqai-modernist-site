@@ -724,7 +724,7 @@
     // With no answers yet the whole dashboard still shows, at zero, so it is
     // clear what will fill in — with one line saying how to get there.
     const waiting = !w.responses ? `<div class="vqa-card" style="margin-bottom:14px;border-left:4px solid ${C.s1};"><h3>Waiting for the first answer</h3>
-      <div class="vqa-sub" style="margin:4px 0 0;">No survey answers in the ${esc(d.period.window_label.toLowerCase())} yet. Share a survey below — by QR code, link or WhatsApp — and every tile, chart and breakdown here fills in the moment answers arrive.</div></div>` : '';
+      <div class="vqa-sub" style="margin:4px 0 0;">No survey answers in the ${esc(d.period.window_label.toLowerCase())} yet. Share your survey — by QR code, link, WhatsApp, a kiosk tablet or your website — and every tile, chart and breakdown here fills in the moment answers arrive.</div></div>` : '';
     const npsTotal = w.promoters + w.passives + w.detractors;
     const seg = (v) => npsTotal ? (v / npsTotal) * 100 : 0;
     const f = d.followups;

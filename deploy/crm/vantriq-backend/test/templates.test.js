@@ -96,6 +96,10 @@ const boot = (html) => {
     ok(full.status === 'live' && full.languages.join() === 'en,ur' && full.display_name === A.company, 'live, in English and Urdu, in their name');
     ok(full.alert_emails === A.email, 'unhappy answers go to the client\'s email');
     ok((await page(`/s/${full.slug}`)).status === 200, 'its public page is up');
+    const listed = (await get(`/api/surveys?client_id=${A.id}`)).body.surveys[0];
+    const L = listed.links || {};
+    ok(L.url === listed.url && /\/poster$/.test(L.poster) && /^https:\/\/wa\.me\//.test(L.whatsapp) && /\?kiosk=1$/.test(L.kiosk) && /^<iframe /.test(L.embed),
+      'the survey list carries every way to share each survey: link, poster, WhatsApp, kiosk, website (v9.19.2)', JSON.stringify(L).slice(0, 200));
     await patch(`/api/clients/${A.id}/surveys`, { enabled: false });
     const again = await patch(`/api/clients/${A.id}/surveys`, { enabled: true, starter_survey: true });
     ok(again.status === 200 && again.body.starter_survey === null && again.body.surveys === 1, 'off and on again never makes a second');

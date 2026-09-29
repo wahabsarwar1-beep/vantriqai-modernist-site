@@ -157,6 +157,27 @@ const api = (method, p, b) => fetch(B + p, { method, headers: AH, body: b ? JSON
 
       await page.click('.vqs-link:has-text("All surveys")');
       await page.waitForSelector('.vqs-scard', { timeout: 10000 });
+
+      console.log('\n== sharing it, front and centre (v9.19.2) ==');
+      await page.waitForSelector('#vqs-share', { timeout: 10000 });
+      const share = await page.$eval('#vqs-share', (el) => ({
+        text: el.innerText,
+        qr: el.querySelector('img') ? el.querySelector('img').getAttribute('src') : '',
+        link: el.querySelector('.vqs-url code').textContent,
+        wa: (el.querySelector('a[href^="https://wa.me/"]') || {}).href || '',
+        posters: [...el.querySelectorAll('a')].map((a) => a.getAttribute('href')).filter((h) => /\/poster/.test(h)),
+        copies: [...el.querySelectorAll('[data-a="copy"]')].map((b) => b.dataset.text),
+      }));
+      ok(/Your survey is live — share it/.test(share.text), 'the Echo page leads with sharing the new survey', share.text.slice(0, 80));
+      ok(/\/qr\.svg/.test(share.qr) && share.link.endsWith('/s/' + made[0].slug), 'its QR code and its link', share.link);
+      ok(!!share.wa && share.posters.length >= 2, 'WhatsApp, the QR poster and table cards', JSON.stringify(share.posters));
+      ok(share.copies.some((t) => /\?kiosk=1$/.test(t)) && share.copies.some((t) => /^<iframe /.test(t)), 'the kiosk link and the website code, a tap to copy');
+      const card = await page.$eval('.vqs-scard', (c) => ({ tab: c.dataset.tab || '', acts: c.querySelectorAll('.vqs-scard-acts button').length }));
+      ok(card.tab === 'share' && card.acts === 2, 'each survey card has Copy link and Share, and one with no answers yet opens on Share', JSON.stringify(card));
+      await page.click('.vqs-scard .t');
+      await page.waitForSelector('.vqs-tabs button.on', { timeout: 8000 });
+      ok(/Share/.test(await page.innerText('.vqs-tabs button.on')) && !!(await page.$('img[src*="/qr.svg"]')), '…straight onto its QR code and links');
+      await page.click('.vqs-link:has-text("All surveys")');
       await page.waitForSelector('#vqs-lib', { timeout: 10000 });
       ok(/Recommended for you/.test(await page.innerText('#vqs-lib')), 'with surveys, the library stays under them: recommended for you…');
       await page.click('#vqs-lib button[data-a="lib-open"][data-cat="money"]');
@@ -241,6 +262,11 @@ const api = (method, p, b) => fetch(B + p, { method, headers: AH, body: b ? JSON
         JSON.stringify(theirs.map((s) => [s.title, s.status, s.industry])));
       ok(/is live and ready to share/.test(await page.innerText('body')), 'and says so');
       ok(!(await page.$(`#echo-starter-${cafe.id}`)), 'once on, the starter option is gone');
+      await page.waitForSelector('.echo-survey', { timeout: 8000 });
+      const es = await page.$eval('.echo-survey', (e) => ({ text: e.innerText, url: e.querySelector('[data-url]') ? e.querySelector('[data-url]').dataset.url : '',
+        links: [...e.querySelectorAll('a')].map((a) => a.getAttribute('href')) }));
+      ok(es.text.includes(theirs[0].title) && es.url.endsWith('/s/' + theirs[0].slug), 'their page lists the survey with its link (v9.19.2)', JSON.stringify(es));
+      ok(es.links.some((h) => /\/poster$/.test(h)) && es.links.some((h) => /^https:\/\/wa\.me\//.test(h)), 'its QR poster and WhatsApp a click away');
 
       await page.click(`a[onclick*="openEchoFor('${cafe.id}')"]`);
       await page.waitForSelector('.vqs-scard', { timeout: 10000 });
@@ -254,6 +280,13 @@ const api = (method, p, b) => fetch(B + p, { method, headers: AH, body: b ? JSON
       await page.waitForFunction((id) => state.clients.find((c) => c.id === id).industry === 'hotel', cafe.id, { timeout: 5000 }).catch(() => {});
       ok(await page.evaluate((id) => state.clients.find((c) => c.id === id).industry, cafe.id) === 'hotel', 'an industry set in the library is the client\'s, on their page too');
       ok((await cards(page, '.vqs-recs .vqs-tcard'))[0] === 'hotel', 'and the recommendations follow it');
+      await page.click('.nav-item:has-text("Clients")');
+      await page.click(`tr:has-text("${cafe.company}")`);
+      await page.waitForSelector('.echo-survey button:has-text("All sharing options")', { timeout: 8000 });
+      await page.click('.echo-survey button:has-text("All sharing options")');
+      await page.waitForSelector('.vqs-tabs button.on', { timeout: 10000 });
+      ok(/Share/.test(await page.innerText('.vqs-tabs button.on')) && /Restaurant/.test(await page.innerText('.vqs h2')),
+        '"All sharing options" on their page opens that survey\'s Share tab in Echo');
       await page.close();
     }
   } finally {
