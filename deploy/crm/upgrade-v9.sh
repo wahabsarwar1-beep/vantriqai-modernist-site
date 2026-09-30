@@ -233,6 +233,22 @@ BEFORE=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
   -c "select count(*) from information_schema.tables where table_schema='public'")
 ok "database '$DB_NAME' reachable — $BEFORE tables today"
 
+# Which API keys are in use, by scope: how many, and when each scope was last
+# used. Read-only and printed in dry runs too, so a change to how a key is
+# accepted can be checked against real traffic before it ships. Counts and
+# times only — never a key, its name or a hash.
+KEY_USE=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At -F '|' -c "
+  select scope,
+         count(*) filter (where not revoked),
+         coalesce(round(extract(epoch from now() - max(last_used_at) filter (where not revoked)) / 60)::text, 'never')
+    from api_keys group by scope order by scope" 2>/dev/null || true)
+if [ -n "$KEY_USE" ]; then
+  echo "$KEY_USE" | while IFS='|' read -r scope active mins; do
+    if [ "$mins" = "never" ]; then when="never used"; else when="last used $mins min ago"; fi
+    ok "API keys, $scope scope: $active active, $when"
+  done
+fi
+
 # ---------------------------------------------------------------- 2. backup
 bold "2. Backing up first"
 mkdir -p backups
