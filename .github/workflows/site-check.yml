@@ -37,6 +37,9 @@ jobs:
             grep -iE '^(HTTP/|server:|location:|x-powered-by:|cache-control:|platform:|x-hcdn)' headers.txt || true
             echo "title: $(grep -o '<title>[^<]*' body.html | head -1 | sed 's/<title>//')"
             echo "bytes: $(wc -c < body.html 2>/dev/null || echo 0)"
+            # Which WhatsApp numbers the page links to, so a number change can
+            # be confirmed from outside once the site has redeployed.
+            echo "whatsapp: $(grep -o 'wa\.me/[0-9]*' body.html 2>/dev/null | sort | uniq -c | tr -s ' ' | tr '\n' ';' || true)"
             head -c 300 body.html | tr '\n' ' '; echo
           done
       - name: Ports
