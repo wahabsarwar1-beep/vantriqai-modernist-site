@@ -6,6 +6,7 @@ const { sendMail, otpEmail, resetEmail, mailConfigured } = require('../utils/mai
 const { issueReset, redeemReset, RESET_MINUTES } = require('../utils/resets');
 const { randomSecret, verifyTotp, otpauthUri } = require('../utils/totp');
 const { alertOwner } = require('../utils/securityAlerts');
+const { isPricingOwner } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -172,7 +173,8 @@ router.get('/me', async (req, res) => {
     [token]
   );
   if (!rows[0]) return res.status(401).json({ error: 'Not signed in' });
-  res.json(rows[0]);
+  // Whether this account opens Pricing — the CEO's alone (middleware/auth.js).
+  res.json({ ...rows[0], pricing: isPricingOwner(rows[0]) });
 });
 
 // Changing your own password. Requires the current one, and ends every other

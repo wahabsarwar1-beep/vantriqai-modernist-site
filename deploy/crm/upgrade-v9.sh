@@ -440,16 +440,14 @@ else
   ADDONS=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
     -c "select count(*) from catalog_addons where active" 2>/dev/null || echo '?')
   ok "add-ons in the catalogue: $ADDONS (capabilities, solutions, Pulse, Echo, Human Support…)"
-  ECHO_PRICE=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At -F '|' \
-    -c "select coalesce(max(case when key='echo' then setup_fee::int||' + '||monthly_fee::int||'/mo' end),'missing'),
-               coalesce(max(case when key='echo-location' then setup_fee::int||' + '||monthly_fee::int||'/mo' end),'missing')
-          from catalog_addons" 2>/dev/null || echo '?|?')
-  ok "Vantriq Echo price: first location PKR ${ECHO_PRICE%|*}, each further location PKR ${ECHO_PRICE#*|}"
-  # The costing model, as the Products & Pricing page shows it: every package
-  # costed at today's model prices. Prints costs and margins — which are ours,
-  # not customers' data — so an unexpected figure is visible in the log.
-  if docker exec "$APP_CONTAINER" node -e "require('dotenv').config();require('/app/src/utils/costing').costingModel({withAddons:false}).then(m=>{console.log('    costed '+m.as_of+' at USD/PKR '+m.assumptions.fx_usd_pkr+', bulk '+m.assumptions.bulk_model+', premium '+m.assumptions.premium_model);for(const r of m.packages)console.log('    '+r.name.padEnd(12)+' '+r.msgs_per_session+' msgs/session  PKR '+r.cost_per_session.toFixed(2)+'/session  margin '+(r.margin_full*100).toFixed(1)+'% full, '+(r.margin_util*100).toFixed(1)+'% at '+Math.round(m.assumptions.utilization*100)+'%');console.log('    steady state: '+(m.steady_state.margin*100).toFixed(1)+'% contribution on PKR '+m.steady_state.revenue.toLocaleString('en-US'));for(const f of m.flags)console.log('    note: '+f.text);process.exit(m.packages.length&&m.packages.every(r=>r.cost_per_session>0)?0:1)}).catch(e=>{console.error('    '+e.message);process.exit(1)})"; then
-    ok "every package is costed at today's prices (Products & Pricing, and Financials' delivery cost)"
+  # Prices, costs and margins are the CEO's alone (v9.21) and this log is
+  # public, so only whether things are in place is printed — never a figure.
+  ECHO_PRICED=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
+    -c "select count(*) from catalog_addons where key in ('echo','echo-location') and setup_fee is not null and monthly_fee is not null" 2>/dev/null || echo '?')
+  ok "Vantriq Echo is priced in the catalogue ($ECHO_PRICED of 2 lines)"
+  # The costing model runs and every package comes out costed at current prices.
+  if docker exec "$APP_CONTAINER" node -e "require('dotenv').config();require('/app/src/utils/costing').costingModel({withAddons:false}).then(m=>{console.log('    '+m.packages.length+' packages costed at current prices');process.exit(m.packages.length&&m.packages.every(r=>r.cost_per_session>0)?0:1)}).catch(e=>{console.error('    '+e.message);process.exit(1)})"; then
+    ok "every package is costed at current prices (Products & Pricing and Financials — the CEO's)"
   else
     warn "the costing model did not run — lines above"; FAILED=1
   fi
@@ -518,6 +516,21 @@ else
   else
     warn "no protected owner account yet — run 'docker exec -it $APP_CONTAINER npm run seed-owner' by hand, over SSH, not through this pipeline"
   fi
+  # v9.21: Pricing, Financials and the business documents open for one
+  # account only — the protected owner, at PRICING_EMAIL (ceo@vantriqai.com
+  # unless crm_app says otherwise). Yes or no; nothing else is printed.
+  PRICING_TO=$(docker exec "$APP_CONTAINER" node -e "require('dotenv').config();process.stdout.write(String(process.env.PRICING_EMAIL||'ceo@vantriqai.com').trim().toLowerCase())" 2>/dev/null | tr -cd 'a-z0-9@._+-')
+  PRICING_TO=${PRICING_TO:-ceo@vantriqai.com}
+  CEO_READY=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
+    -c "select count(*) from internal_users where is_owner and active and lower(email) = '$PRICING_TO'" 2>/dev/null || echo '?')
+  if [ "$CEO_READY" = "1" ]; then
+    ok "Pricing, Financials and the business documents open only for $PRICING_TO, the protected owner account"
+  else
+    warn "Pricing opens only for $PRICING_TO as the protected owner account, and that account is not set up — nobody can open Pricing until it is"
+  fi
+  CEO_DOCS=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
+    -c "select count(*) from owner_documents" 2>/dev/null || echo '?')
+  ok "business documents on file for the CEO: $CEO_DOCS"
 
   AFTER=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
     -c "select count(*) from information_schema.tables where table_schema='public'")
@@ -615,9 +628,8 @@ cat <<'NEXT'
      exchange rate and re-costs everything, Financials included. Prices
      themselves stay locked to the business model.
 
- 11. Vantriq Echo pricing (v9.20.1): PKR 12,000 setup + 6,000/month for the
-     first location, 2,000 + 1,500/month for each further one; more than 10
-     priced on scope. Why, and the margins: deploy/crm/SURVEYS.md.
+ 11. Vantriq Echo pricing (v9.20.1): priced per location, first location and
+     each further one, in the add-ons catalogue — Products & Pricing.
 
  12. Transcripts (v9.20.2). Customers → a customer → Conversations: every
      line in the order it was said, at the time it was said. A customer who
@@ -634,5 +646,12 @@ cat <<'NEXT'
      and in that client's portal. Chats stored under no business before now
      were placed on this deploy (counted above). New client agents copy the
      transcript step from the wiring kit: vantriq-backend/n8n/README.md.
+
+ 14. Pricing is the CEO's (v9.21). Products & Pricing, Financials, every
+     cost and margin, and the new Business documents open only for
+     ceo@vantriqai.com signed in to its own account — not other admins, not
+     any API key. Upload the business model, pitch deck and portfolio there
+     once (drop them on the card): they live in the database, never in the
+     code. This log no longer prints prices, costs or margins.
 NEXT
 printf '\n'

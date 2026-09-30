@@ -13,7 +13,17 @@ const j=async r=>{ try{return await r.json()}catch{return null} };
   let r=await A(`/api/products/${starter.id}`,{method:'PUT',body:JSON.stringify({retainer:1})});
   ok(r.status===403,'edit standard package blocked (403)','got '+r.status);
   r=await A(`/api/products/${ep.id}`,{method:'PUT',body:JSON.stringify({retainer:250000})});
-  ok(r.status===200,'edit Enterprise+ allowed (200)','got '+r.status);
+  ok(r.status===403,'the admin key cannot change even Enterprise+: pricing is the CEO\'s (403)','got '+r.status);
+  {
+    // v9.21: the CEO's own session changes it — and puts it back after.
+    const { ceoSession, db } = require('./ceo-session');
+    const ceo=await ceoSession();
+    const C=(p,o={})=>fetch(B+p,{...o,headers:{...ceo.headers,...(o.headers||{})}});
+    r=await C(`/api/products/${ep.id}`,{method:'PUT',body:JSON.stringify({retainer:250000})});
+    ok(r.status===200,'the CEO edits Enterprise+ (200)','got '+r.status);
+    await C(`/api/products/${ep.id}`,{method:'PUT',body:JSON.stringify({retainer:ep.retainer})});
+    await ceo.end(); await db.pool.end();
+  }
   r=await A('/api/products',{method:'POST',body:JSON.stringify({name:'Bespoke'})});
   ok(r.status===403,'creating new package blocked (403)','got '+r.status);
   r=await A(`/api/products/${starter.id}`,{method:'DELETE'});

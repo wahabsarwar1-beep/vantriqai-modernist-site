@@ -3,6 +3,7 @@ const db = require('../db');
 const { internalAiCost, internalAiUnstamped } = require('../utils/accounting');
 const router = express.Router();
 
+/** Revenue, delivery cost and margin by package at a chosen utilisation. The CEO's alone (v9.21). */
 router.get('/', async (req, res) => {
   const [clientsQ, productsQ, vendorsQ, expensesQ, invoicesQ, settingsQ] = await Promise.all([
     db.query(`select * from clients`),

@@ -1893,8 +1893,8 @@ alter table settings add column if not exists costing jsonb not null default '{}
 --                scope     priced after scoping; setup/monthly are NULL
 --
 -- est_monthly_cost and est_build_hours are ours, not the client's: what
--- serving the add-on costs, so its margin can be shown to an admin. They
--- are never sent to staff, a customer or a document.
+-- serving the add-on costs, so its margin can be shown to the CEO (v9.21).
+-- They are never sent to anyone else, a customer or a document.
 create table if not exists catalog_addons (
   id uuid primary key default gen_random_uuid(),
   key text not null unique,
@@ -2020,9 +2020,9 @@ on conflict (key) do nothing;
 -- own — the cost is setup time and a short monthly review, and both grow with
 -- the number of locations. So it is now PKR 12,000 + 6,000 a month for the
 -- first location (unlimited surveys and responses) and PKR 2,000 + 1,500 a
--- month for each further one: about a 75% monthly and a 50% setup margin at
--- any size, and a single branch pays less than it did while a chain pays in
--- step with what it gets. More than ten locations is priced on scope.
+-- month for each further one, so a single branch pays less than it did while
+-- a chain pays in step with what it gets. More than ten locations is priced
+-- on scope.
 --
 -- Once, and only where Echo still carries the provisional figures: a price an
 -- admin has already set is theirs, and is never overwritten.
@@ -2066,3 +2066,27 @@ create table if not exists delivery_alerts (
   last_sent_at timestamptz not null default now(),
   failures_since integer not null default 0
 );
+
+-- v9.21 — the CEO's business documents: the business model, the client pitch
+-- deck, the product portfolio. Kept here, in the database, and never in the
+-- code repository (which anyone can read). Only the CEO's own signed-in
+-- account lists, opens, uploads or deletes them (routes/pricingDocs.js).
+-- Every upload is a new row: the newest file of each kind and format is the
+-- current one, the rest are its history.
+create table if not exists owner_documents (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null default 'other'
+    check (kind in ('business_model','pitch_deck','portfolio','other')),
+  title text not null default '',
+  filename text not null,
+  content_type text not null default 'application/octet-stream',
+  size_bytes integer not null,
+  sha256 text not null,
+  content bytea not null,
+  note text not null default '',
+  uploaded_by text not null default '',
+  uploaded_at timestamptz not null default now(),
+  opened_count integer not null default 0,
+  last_opened_at timestamptz
+);
+create index if not exists idx_owner_documents_kind on owner_documents(kind, uploaded_at desc);

@@ -40,7 +40,7 @@ function requireScope(minScope) {
       const bearer = header.toLowerCase().startsWith('bearer ') ? header.slice(7).trim() : '';
       if (bearer) {
         const { rows } = await db.query(
-          `select s.expires_at, u.id, u.email, u.name, u.role, u.active, u.must_change_password
+          `select s.expires_at, u.id, u.email, u.name, u.role, u.active, u.must_change_password, u.is_owner
              from staff_sessions s join internal_users u on u.id = s.user_id
             where s.token = $1`,
           [bearer]
@@ -59,7 +59,7 @@ function requireScope(minScope) {
           return res.status(403).json({ error: 'Your account does not have access to this area.' });
         }
         db.query(`update staff_sessions set last_seen_at = now() where token = $1`, [bearer]).catch(() => {});
-        req.user = { id: row.id, email: row.email, name: row.name, role: row.role };
+        req.user = { id: row.id, email: row.email, name: row.name, role: row.role, is_owner: !!row.is_owner };
         req.authKind = 'session';
         return next();
       }
@@ -130,6 +130,29 @@ function isAdminRequest(req) {
 }
 
 /**
+ * Pricing is the CEO's alone: the price book, what each package and add-on
+ * costs us to serve, every margin, and the business documents behind them.
+ * Not another admin, not the break-glass admin key, not an automation key —
+ * only the CEO, signed in as themselves (password and authenticator code)
+ * on the protected owner account (db/schema.sql v9.11), whose address is
+ * PRICING_EMAIL (ceo@vantriqai.com unless the server says otherwise).
+ */
+const PRICING_EMAIL = () => String(process.env.PRICING_EMAIL || 'ceo@vantriqai.com').trim().toLowerCase();
+
+function isPricingOwner(user) {
+  return !!(user && user.is_owner && String(user.email || '').toLowerCase() === PRICING_EMAIL());
+}
+
+function isCeoRequest(req) {
+  return req.authKind === 'session' && isPricingOwner(req.user);
+}
+
+function requireCeo(req, res, next) {
+  if (isCeoRequest(req)) return next();
+  return res.status(403).json({ error: 'Pricing is open to the CEO only.' });
+}
+
+/**
  * Route guard for the things an automation key must not do even on routes it
  * is otherwise allowed to reach: deleting records, and handing out portal
  * credentials. n8n creates and updates; a person deletes.
@@ -141,4 +164,4 @@ function blockAutomation(req, res, next) {
   next();
 }
 
-module.exports = { requireScope, hashKey, isAdminRequest, blockAutomation };
+module.exports = { requireScope, hashKey, isAdminRequest, blockAutomation, isCeoRequest, isPricingOwner, requireCeo, PRICING_EMAIL };

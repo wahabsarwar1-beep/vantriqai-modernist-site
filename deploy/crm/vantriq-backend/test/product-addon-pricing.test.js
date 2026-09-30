@@ -31,12 +31,16 @@ let pass = 0, fail = 0;
 const ok = (c, m, x = '') => { c ? pass++ : fail++; console.log((c ? '  PASS ' : '  FAIL ') + m + (c ? '' : '  <<< ' + x)); };
 const J = async (r) => { try { return await r.json(); } catch { return null; } };
 const get = (p) => fetch(B + p, { headers: H }).then(async (r) => ({ status: r.status, body: await J(r) }));
-const patch = (p, b) => fetch(B + p, { method: 'PATCH', headers: H, body: JSON.stringify(b || {}) })
+// A package's add-on pricing is the CEO's to set (v9.21): the CEO's own session.
+const { ceoSession, db } = require('./ceo-session');
+let CEO = null;
+const patch = (p, b, headers) => fetch(B + p, { method: 'PATCH', headers: headers || CEO.headers, body: JSON.stringify(b || {}) })
   .then(async (r) => ({ status: r.status, body: await J(r) }));
-const put = (p, b) => fetch(B + p, { method: 'PUT', headers: H, body: JSON.stringify(b || {}) })
+const put = (p, b) => fetch(B + p, { method: 'PUT', headers: CEO.headers, body: JSON.stringify(b || {}) })
   .then(async (r) => ({ status: r.status, body: await J(r) }));
 
 (async () => {
+  CEO = await ceoSession();
   const products = (await get('/api/products')).body;
   const starter = products.find((p) => p.name === 'Starter');
   const entPlus = products.find((p) => p.name === 'Enterprise+');
@@ -97,6 +101,8 @@ const put = (p, b) => fetch(B + p, { method: 'PUT', headers: H, body: JSON.strin
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ extra_agent_price: 1 }),
   });
   ok(noKey.status === 401, 'no credentials at all is refused', String(noKey.status));
+  const adminKey = await patch(`/api/products/${starter.id}/addon-pricing`, { extra_agent_price: 1 }, H);
+  ok(adminKey.status === 403, 'nor the break-glass admin key: pricing is the CEO\'s alone', String(adminKey.status));
 
   console.log('\n== a non-admin key cannot set it either ==');
   // Reuses the automation-scope check pattern from the rest of the suite:
@@ -126,6 +132,7 @@ const put = (p, b) => fetch(B + p, { method: 'PUT', headers: H, body: JSON.strin
   ok(restored.every((p) => Number(p.extra_agent_price) === 0),
     'cleaned up back to "not charged" for every package');
 
+  await CEO.end(); await db.pool.end();
   console.log(`\n==== ${pass} passed, ${fail} failed ====\n`);
   process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

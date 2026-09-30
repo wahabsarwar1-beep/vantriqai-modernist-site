@@ -55,7 +55,10 @@ for (const line of indexSrc.split('\n')) {
   const varName = (rest.match(/(\w+)\s*$/) || [])[1];
   const file = varToFile[varName];
   if (!file) continue;                       // express.json() and friends
-  const scope = (rest.match(/requireScope\('(\w+)'\)/) || [])[1]
+  // requireCeo narrows an admin mount to one person (v9.21), so it is named
+  // for what it is rather than shown as the admin scope it builds on.
+  const scope = (/requireCeo/.test(rest) ? 'ceo' : null)
+    || (rest.match(/requireScope\('(\w+)'\)/) || [])[1]
     || (/requireRep/.test(rest) ? 'rep-session' : null)
     || (/requireClientApiToken/.test(rest) ? 'client-token' : null);
   mounts.push({ mountPath, file, scope, varName });
@@ -144,7 +147,8 @@ const SCOPE_NOTE = {
   webhook: 'Webhook key. The narrowest scope — usage, lead and conversation ingestion only.',
   automation: 'Automation key or any staff session. Clients, invoices, packages, agents.',
   staff: 'Staff session, or an admin key. Day-to-day CRM work.',
-  admin: 'Admin only. Financials, settings, procurement, archive, exports.',
+  admin: 'Admin only. Settings, procurement, accounting, archive, exports.',
+  ceo: 'The CEO only: the owner account (ceo@vantriqai.com) signed in with its own session. No API key and no other admin reaches it. Costing, Financials, the business documents.',
   'rep-session': 'A sales rep\'s own session token. Scoped to that rep.',
   null: 'Open, or authenticated by the route itself (portal and staff sign-in).',
 };
@@ -157,7 +161,9 @@ for (const e of endpoints) {
   paths[converted][e.method] = {
     tags: [e.module],
     summary: e.summary || `${e.method.toUpperCase()} ${e.path}`,
-    description: e.scope
+    description: e.scope === 'ceo'
+      ? SCOPE_NOTE.ceo
+      : e.scope
       ? `Requires the **${e.scope}** scope or higher. ${SCOPE_NOTE[e.scope] || ''}`.trim()
       : SCOPE_NOTE[null],
     parameters: params.map((name) => ({
@@ -180,7 +186,7 @@ for (const e of endpoints) {
       403: { description: 'Authenticated, but not to this scope' },
       404: { description: 'Not found' },
     },
-    security: e.scope === null ? [] : [{ apiKey: [] }, { staffSession: [] }],
+    security: e.scope === null ? [] : e.scope === 'ceo' ? [{ staffSession: [] }] : [{ apiKey: [] }, { staffSession: [] }],
   };
 }
 
@@ -264,9 +270,9 @@ md.push('Least to most privileged: **`webhook`** < **`automation`** < **`staff`*
 md.push('');
 md.push('| Scope | What it is for |');
 md.push('| --- | --- |');
-for (const s of ['webhook', 'automation', 'staff', 'admin']) md.push(`| \`${s}\` | ${SCOPE_NOTE[s]} |`);
+for (const s of ['webhook', 'automation', 'staff', 'admin', 'ceo']) md.push(`| \`${s}\` | ${SCOPE_NOTE[s]} |`);
 md.push('');
-md.push('The **admin key opens everything** and exists as break-glass for when email delivery fails or the last admin loses their second factor. Set `ALLOW_API_KEY_LOGIN=false` once staff accounts exist.');
+md.push('The **admin key opens everything but `ceo`** and exists as break-glass for when email delivery fails or the last admin loses their second factor. Set `ALLOW_API_KEY_LOGIN=false` once staff accounts exist.');
 md.push('');
 md.push('> **Automation writes through this API, never to the database.** Tenancy, quota and the tax rules live in these routes. A direct Postgres write bypasses all three.');
 md.push('');
