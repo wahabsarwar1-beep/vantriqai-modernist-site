@@ -1,6 +1,6 @@
 const express = require('express');
 const db = require('../db');
-const { isAdminRequest } = require('../middleware/auth');
+const { isCeoRequest, requireCeo } = require('../middleware/auth');
 const router = express.Router();
 
 const FIELDS = [
@@ -19,11 +19,8 @@ const LOCKED_MESSAGE =
   'Standard packages are fixed by the business model and cannot be edited. ' +
   'Custom pricing and resources are only available on Enterprise+, set per client.';
 
-/** Reading the catalogue is open to staff; changing it is not. */
-function adminOnly(req, res, next) {
-  if (isAdminRequest(req)) return next();
-  return res.status(403).json({ error: 'Only an admin can change package pricing.' });
-}
+/** Reading the catalogue is open to staff; changing it is the CEO's alone. */
+const adminOnly = requireCeo;
 
 async function loadProduct(id) {
   const { rows } = await db.query(`select * from products where id = $1`, [id]);
@@ -34,12 +31,10 @@ router.get('/', async (req, res) => {
   const { rows } = await db.query(
     `select * from products where archived = false order by sort_order asc, created_at asc`
   );
-  // delivery_cost_full is what a package costs us to run — Financials data. It
-  // is withheld from everyone but an admin, which covers staff sessions and
-  // the automation key alike; neither has any use for our margin.
-  // The cost profile (v9.20) is the same kind of figure — what serving the
-  // package takes — and is withheld the same way.
-  if (!isAdminRequest(req)) {
+  // delivery_cost_full is what a package costs us to run, and the cost profile
+  // (v9.20) what serving it takes: the margin behind the price. Only the CEO
+  // receives them — not other admins, not staff, not any key (v9.21).
+  if (!isCeoRequest(req)) {
     return res.json(rows.map(({
       delivery_cost_full, context_tokens, premium_share, mgmt_hours, build_hours, founder_share,
       bulk_model, premium_model, ...rest

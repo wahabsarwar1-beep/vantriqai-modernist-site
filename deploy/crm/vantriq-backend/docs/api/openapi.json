@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "VantriqAI CRM API",
-    "version": "9.20.4",
+    "version": "9.21.0",
     "description": "The CRM behind VantriqAI: clients, invoices, payments, quotes and proposals,\ncontracts, statements, and the webhook surface the AI agents write through.\n\n## Authentication\n\nTwo ways in, and one of them is for people:\n\n- **Staff session** — `Authorization: Bearer <token>`, issued by `POST /api/auth/verify`\n  after a password and an emailed one-time code. A staff member's role decides reach.\n- **API key** — `x-api-key: <key>`, for machines. Keys are scoped.\n\n## Scopes\n\nLeast to most: `webhook` < `automation` < `staff` < `admin`. A scope opens everything\nbelow it. The admin key opens everything and is intended as break-glass only — set\n`ALLOW_API_KEY_LOGIN=false` once staff accounts exist.\n\n## Automation writes through this API, never to the database\n\nn8n and any other integration must use these endpoints rather than connecting to\nPostgres. Tenancy, quota and tax rules live here; a direct write bypasses all three."
   },
   "servers": [
@@ -96,6 +96,9 @@
       "name": "portal"
     },
     {
+      "name": "pricingDocs"
+    },
+    {
       "name": "procurement"
     },
     {
@@ -139,7 +142,7 @@
           "accounting"
         ],
         "summary": "GET /api/accounting/balance-sheet",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -179,7 +182,7 @@
           "accounting"
         ],
         "summary": "A period against the one immediately before it, same length. Two columns is what makes a statement readable — a single number tells you nothing about whether it is good.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -219,7 +222,7 @@
           "accounting"
         ],
         "summary": "GET /api/accounting/pnl",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -259,7 +262,7 @@
           "accounting"
         ],
         "summary": "GET /api/accounting/pnl/monthly?from=&to= One P&L per month from the first thing that ever happened (or `from`) to today (or `to`). This is the monthly report the business runs on: the trend matters more than any single month's number.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -299,7 +302,7 @@
           "accounting"
         ],
         "summary": "GET /api/accounting/remittances",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -337,7 +340,7 @@
           "accounting"
         ],
         "summary": "POST /api/accounting/remittances",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -388,7 +391,7 @@
           "accounting"
         ],
         "summary": "DELETE /api/accounting/remittances/:id",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -437,7 +440,7 @@
           "accounting"
         ],
         "summary": "The FBR position: GST we have collected and owe, AIT clients have withheld and we can recover, and what has already been settled either way.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -1176,7 +1179,7 @@
           "archive"
         ],
         "summary": "GET /api/archive — what is live, what has been archived, and past runs.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -1216,7 +1219,7 @@
           "archive"
         ],
         "summary": "GET /api/archive/download?months=12 The workbook, and the run that a purge will have to name. The hash is of the exact bytes sent, so the file on disk can be checked against it later.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -1256,7 +1259,7 @@
           "archive"
         ],
         "summary": "GET /api/archive/preview?months=12 — what a run would take, and nothing else.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -1296,7 +1299,7 @@
           "archive"
         ],
         "summary": "POST /api/archive/purge { sha256, confirm: 'PURGE' } Deletes exactly what the matching archive run covered, after writing its monthly totals into the books. One transaction: either the rows are gone and the totals are recorded, or neither happened.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -4410,8 +4413,8 @@
         "tags": [
           "costing"
         ],
-        "summary": "Products & Pricing, the cost side — admin only (mounted behind requireScope('admin') in src/index.js). Everything here is margin, which staff, automation keys and customers never see. GET /api/costing the whole model: rate card, assumptions, every package's economics, the steady state, the bulk-model what-if, flags PUT /api/costing change rates and/or assumptions { rates: {key: {input, output, ...}|null}, assumptions: {...}, utilization } utilization is the costing's own typical use (0.1–1), not Financials' projection PATCH /api/costing/packages/:id one package's cost profile POST /api/costing/reset back to the business model's defaults Package PRICES are not changed here — they stay locked to the business model (routes/products.js). Every change here re-costs every package and writes delivery_cost_full, so Financials moves with it.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "summary": "Products & Pricing, the cost side — the CEO's alone (mounted behind requireScope('admin') + requireCeo in src/index.js, v9.21). Everything here is margin, which other admins, staff, every API key and customers never see. GET /api/costing the whole model: rate card, assumptions, every package's economics, the steady state, the bulk-model what-if, flags PUT /api/costing change rates and/or assumptions { rates: {key: {input, output, ...}|null}, assumptions: {...}, utilization } utilization is the costing's own typical use (0.1–1), not Financials' projection PATCH /api/costing/packages/:id one package's cost profile POST /api/costing/reset back to the business model's defaults Package PRICES are not changed here — they stay locked to the business model (routes/products.js). Every change here re-costs every package and writes delivery_cost_full, so Financials moves with it.",
+        "description": "The CEO only: the owner account (ceo@vantriqai.com) signed in with its own session. No API key and no other admin reaches it. Costing, Financials, the business documents.",
         "parameters": [],
         "responses": {
           "200": {
@@ -4437,9 +4440,6 @@
         },
         "security": [
           {
-            "apiKey": []
-          },
-          {
             "staffSession": []
           }
         ]
@@ -4449,7 +4449,7 @@
           "costing"
         ],
         "summary": "PUT /api/costing",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "The CEO only: the owner account (ceo@vantriqai.com) signed in with its own session. No API key and no other admin reaches it. Costing, Financials, the business documents.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -4486,9 +4486,6 @@
         },
         "security": [
           {
-            "apiKey": []
-          },
-          {
             "staffSession": []
           }
         ]
@@ -4500,7 +4497,7 @@
           "costing"
         ],
         "summary": "PATCH /api/costing/packages/:id",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "The CEO only: the owner account (ceo@vantriqai.com) signed in with its own session. No API key and no other admin reaches it. Costing, Financials, the business documents.",
         "parameters": [
           {
             "name": "id",
@@ -4546,9 +4543,6 @@
         },
         "security": [
           {
-            "apiKey": []
-          },
-          {
             "staffSession": []
           }
         ]
@@ -4560,7 +4554,7 @@
           "costing"
         ],
         "summary": "POST /api/costing/reset",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "The CEO only: the owner account (ceo@vantriqai.com) signed in with its own session. No API key and no other admin reaches it. Costing, Financials, the business documents.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -4596,9 +4590,6 @@
           }
         },
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "staffSession": []
           }
@@ -4651,7 +4642,7 @@
           "expenses"
         ],
         "summary": "GET /api/expenses?include_derived=1&from=&to= The typed-in expenses \\u2014 rent, salaries, subscriptions \\u2014 and, when asked for, the one cost nobody types in: what VantriqAI's own agents cost to run. That figure is already an invoice on the internal account, so re-entering it by hand would double it. It is derived instead, and marked `derived` so the UI shows it as a cost without offering to edit something that is really an invoice. It is converted to PKR on the way out. The internal invoices behind it are raised in dollars, and this list is a list of rupees.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -4689,7 +4680,7 @@
           "expenses"
         ],
         "summary": "POST /api/expenses",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -4740,7 +4731,7 @@
           "expenses"
         ],
         "summary": "DELETE /api/expenses/:id",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -4787,7 +4778,7 @@
           "expenses"
         ],
         "summary": "Ending a recurring expense rather than deleting it. Deleting the row also deletes it from every past month's P&L, which is not what \"we cancelled that subscription in March\" means.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -4847,7 +4838,7 @@
           "exportBase"
         ],
         "summary": "GET /api/export/contracts.xlsx[?view=expiring] With no view it writes one sheet per filter on the Contracts tab plus an \"All contracts\" sheet, so the whole book and each section separately arrive together. With ?view= it writes that section alone.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -4887,7 +4878,7 @@
           "exportBase"
         ],
         "summary": "GET /api/export/crm.xlsx Optional ?from=&to= narrows the transactional sheets (invoices, payments, usage). The reference sheets — clients, packages, agents — are always complete, because a filtered invoice list that points at clients you cannot see is not much use to anyone.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -4927,7 +4918,7 @@
           "exportBase"
         ],
         "summary": "GET /api/export/pipeline.xlsx[?stage=lead] The pipeline as a spreadsheet. With no stage it writes one sheet per stage plus an \"All stages\" sheet holding every row — so the whole pipeline and each stage on its own arrive in a single file, which is what you want when the question is \"where is everything sitting\". With ?stage= it writes that one stage alone. The columns are the ones you work a lead from — who, how to reach them, where they came from, what it is worth, who owns it and how long it has sat there — rather than every column the table happens to have. Days in stage comes off updated_at, which is what the stage-change trigger touches.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -5402,8 +5393,8 @@
         "tags": [
           "financials"
         ],
-        "summary": "GET /api/financials",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "summary": "Revenue, delivery cost and margin by package at a chosen utilisation. The CEO's alone (v9.21).",
+        "description": "The CEO only: the owner account (ceo@vantriqai.com) signed in with its own session. No API key and no other admin reaches it. Costing, Financials, the business documents.",
         "parameters": [],
         "responses": {
           "200": {
@@ -5428,9 +5419,6 @@
           }
         },
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "staffSession": []
           }
@@ -8452,6 +8440,181 @@
         "security": []
       }
     },
+    "/api/pricing/documents": {
+      "get": {
+        "tags": [
+          "pricingDocs"
+        ],
+        "summary": "Every business document, newest first, without its bytes; `current` marks the newest of each kind and format.",
+        "description": "The CEO only: the owner account (ceo@vantriqai.com) signed in with its own session. No API key and no other admin reaches it. Costing, Financials, the business documents.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "pricingDocs"
+        ],
+        "summary": "Upload one: { filename, data (base64), content_type?, kind?, title?, note? }. Up to 25 MB; the same file twice is one version.",
+        "description": "The CEO only: the owner account (ceo@vantriqai.com) signed in with its own session. No API key and no other admin reaches it. Costing, Financials, the business documents.",
+        "parameters": [],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/pricing/documents/{id}": {
+      "delete": {
+        "tags": [
+          "pricingDocs"
+        ],
+        "summary": "Delete one version for good.",
+        "description": "The CEO only: the owner account (ceo@vantriqai.com) signed in with its own session. No API key and no other admin reaches it. Costing, Financials, the business documents.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/pricing/documents/{id}/file": {
+      "get": {
+        "tags": [
+          "pricingDocs"
+        ],
+        "summary": "The file itself, as an attachment that is never cached. Each opening is counted.",
+        "description": "The CEO only: the owner account (ceo@vantriqai.com) signed in with its own session. No API key and no other admin reaches it. Costing, Financials, the business documents.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
     "/api/products": {
       "get": {
         "tags": [
@@ -8869,7 +9032,7 @@
           "procurement"
         ],
         "summary": "GET /api/purchase-orders",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -8907,7 +9070,7 @@
           "procurement"
         ],
         "summary": "POST /api/purchase-orders",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -8958,7 +9121,7 @@
           "procurement"
         ],
         "summary": "DELETE /api/purchase-orders/:id",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -9005,7 +9168,7 @@
           "procurement"
         ],
         "summary": "PUT /api/purchase-orders/:id",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -10004,7 +10167,7 @@
           "reps"
         ],
         "summary": "List reps, with a live count of leads each one owns (admin visibility — this is exactly the cross-rep view individual reps never get).",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -10042,7 +10205,7 @@
           "reps"
         ],
         "summary": "Create a rep and issue their login key — shown once, same pattern as admin/webhook keys.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -10093,7 +10256,7 @@
           "reps"
         ],
         "summary": "DELETE /api/reps/:id",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -10140,7 +10303,7 @@
           "reps"
         ],
         "summary": "PUT /api/reps/:id",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -10200,7 +10363,7 @@
           "reps"
         ],
         "summary": "Issue a brand-new key for an existing rep (e.g. their old one leaked). Old key stops working immediately.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -10260,7 +10423,7 @@
           "settings"
         ],
         "summary": "GET /api/settings",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -10298,7 +10461,7 @@
           "settings"
         ],
         "summary": "PUT /api/settings",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -10349,7 +10512,7 @@
           "settings"
         ],
         "summary": "GET /api/settings/email — is email working, and if not, why? Every send path in the CRM fails soft: a chase that cannot send is logged as skipped and the invoice still stands. That is the right behaviour and it is also why a broken mail token is silent for weeks. This says it out loud, without sending anything.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -10389,7 +10552,7 @@
           "settings"
         ],
         "summary": "POST /api/settings/email/test { to } — send one real email, and report exactly what the mail API said. The alternative way to test this is to raise a real invoice for a real customer, which is a poor way to find out your token is wrong.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -10440,7 +10603,7 @@
           "settings"
         ],
         "summary": "GET /api/settings/internal-account",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -10478,7 +10641,7 @@
           "settings"
         ],
         "summary": "Idempotent: creates what is missing, leaves what exists alone.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -10529,7 +10692,7 @@
           "settings"
         ],
         "summary": "VantriqAI's own account — the site assistant and the WhatsApp agent metered and priced like any customer, with the billing landing as cost rather than revenue. See src/utils/internalClient.js. The tax authorities we bill under. Read-mostly: the rates change once a year at most, and each one is a statutory figure somebody has to stand behind. The endpoint therefore updates one authority at a time rather than accepting a bulk overwrite, so a malformed payload cannot quietly zero all five.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -10569,7 +10732,7 @@
           "settings"
         ],
         "summary": "PUT /api/settings/jurisdictions/:code",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "code",
@@ -11908,7 +12071,7 @@
           "team"
         ],
         "summary": "GET /api/team",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -11946,7 +12109,7 @@
           "team"
         ],
         "summary": "POST /api/team",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -11997,7 +12160,7 @@
           "team"
         ],
         "summary": "POST /api/team/:id/activate",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -12057,7 +12220,7 @@
           "team"
         ],
         "summary": "POST /api/team/:id/deactivate",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -12117,7 +12280,7 @@
           "team"
         ],
         "summary": "Set an employee's password: type one in `password`, or leave it out for a generated one. Either way every session they had open is closed.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -12177,7 +12340,7 @@
           "team"
         ],
         "summary": "POST /api/team/:id/role",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -12237,7 +12400,7 @@
           "procurement"
         ],
         "summary": "GET /api/vendors",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -12275,7 +12438,7 @@
           "procurement"
         ],
         "summary": "POST /api/vendors",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -12326,7 +12489,7 @@
           "procurement"
         ],
         "summary": "DELETE /api/vendors/:id",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -12373,7 +12536,7 @@
           "procurement"
         ],
         "summary": "PUT /api/vendors/:id",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",

@@ -1,6 +1,6 @@
 const express = require('express');
 const db = require('../db');
-const { isAdminRequest } = require('../middleware/auth');
+const { isCeoRequest } = require('../middleware/auth');
 const acc = require('../utils/accounting');
 const router = express.Router();
 
@@ -75,10 +75,10 @@ router.get('/', async (req, res) => {
     .sort((a, b) => new Date(a.issued_date) - new Date(b.issued_date))
     .slice(0, 8);
 
-  // Staff run the pipeline; delivery cost, platform cost and margin are
-  // Financials data their role deliberately excludes, so they never leave
-  // the server for a staff session.
-  const withholdCosts = !isAdminRequest(req);
+  // Delivery cost, platform cost and margin come from the price book's cost
+  // side, which is the CEO's alone (v9.21): for anyone else they never leave
+  // the server.
+  const withholdCosts = !isCeoRequest(req);
 
   const kpis = {
       active_clients: active.length,

@@ -5,8 +5,8 @@
  * model's own structure — its labour figures to the rupee, its steady-state
  * revenue, labour and infrastructure — so that the only thing that moved is
  * what the business model got wrong or what changed since: model prices and
- * the exchange rate. And the API must keep margins where they belong: an
- * admin sees them, staff never do.
+ * the exchange rate. And the API must keep margins where they belong: the
+ * CEO sees them (v9.21), nobody else does — not another admin, not any key.
  *
  * Needs Postgres (DATABASE_URL in .env) and the API on 8099 with an admin key
  * in /tmp/adminkey.
@@ -18,16 +18,18 @@ const fs = require('fs');
 const crypto = require('crypto');
 const V = require('../src/utils/costingEngine');
 const C = require('../src/utils/costing');
-const db = require('../src/db');
+const { ceoSession, adminSession, db } = require('./ceo-session');
 
 const B = 'http://127.0.0.1:8099';
 const KEY = fs.readFileSync('/tmp/adminkey', 'utf8').trim();
-const A = { 'Content-Type': 'application/json', 'x-api-key': KEY };
+const K = { 'Content-Type': 'application/json', 'x-api-key': KEY };
+let A = K; // the CEO's session, once signed in below
 
 let pass = 0, fail = 0;
 const ok = (c, m, x = '') => { c ? pass++ : fail++; console.log((c ? '  PASS ' : '  FAIL ') + m + (c ? '' : '  <<< ' + x)); };
-const call = (method, p, body, headers = A) => fetch(B + p, {
-  method, headers, body: body === undefined ? undefined : JSON.stringify(body),
+const call = (method, p, body, headers) => fetch(B + p, {
+  headers: headers || A,
+  method, body: body === undefined ? undefined : JSON.stringify(body),
 }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) }));
 
 // The ladder exactly as the business model sets it.
@@ -86,10 +88,28 @@ const LADDER = [
   ok(next.rates['gpt-4o-mini'].input === 0.2 && /^\d{4}-\d{2}-\d{2}$/.test(next.assumptions.as_of),
     'a rate change is stored and dates the model as re-checked', JSON.stringify(next));
 
-  console.log('\n== the API ==');
-  let r = await call('GET', '/api/costing');
+  console.log('\n== the API: the CEO\'s alone ==');
+  const ceo = await ceoSession();
+  const other = await adminSession();
+  A = ceo.headers;
+  let r = await call('GET', '/api/costing', undefined, K);
+  ok(r.status === 403, 'the break-glass admin key cannot open the costing model', r.status);
+  r = await call('GET', '/api/costing', undefined, other.headers);
+  ok(r.status === 403, 'nor can another admin', r.status);
+  r = await call('GET', '/api/products', undefined, other.headers);
+  ok(r.status === 200 && r.body.every((p) => p.delivery_cost_full === undefined), 'another admin sees packages without their cost', r.status);
+  r = await call('GET', '/api/financials', undefined, other.headers);
+  ok(r.status === 403, 'nor Financials', r.status);
+  r = await call('PUT', `/api/products/${(await call('GET', '/api/products')).body[0].id}`, { retainer: 1 }, other.headers);
+  ok(r.status === 403 && /CEO/.test(r.body.error), 'nor may they change a price', r.status);
+  r = await call('GET', '/api/auth/me', undefined, ceo.headers);
+  ok(r.status === 200 && r.body.pricing === true, 'the CEO\'s own session says it opens Pricing', JSON.stringify(r.body));
+  r = await call('GET', '/api/auth/me', undefined, other.headers);
+  ok(r.status === 200 && r.body.pricing === false, 'another admin\'s does not', JSON.stringify(r.body));
+  await other.end();
+  r = await call('GET', '/api/costing');
   ok(r.status === 200 && r.body.packages.length >= 6 && r.body.steady_state && r.body.addons.length >= 20,
-    'an admin gets the whole model, add-ons included', r.status);
+    'the CEO gets the whole model, add-ons included', r.status);
   const starter = r.body.packages.find((p) => p.name === 'Starter');
 
   // Vantriq Echo, priced on what it costs to run (v9.20.1).
@@ -151,7 +171,7 @@ const LADDER = [
   ok(r.status === 400, 'a priced add-on needs both fees', r.status);
   r = await call('POST', '/api/addons', { name: 'Costing test add-on', family: 'capability', price_basis: 'fixed',
     setup_fee: 10000, monthly_fee: 5000, est_monthly_cost: 1000 });
-  ok(r.status === 201 && r.body.key === 'costing-test-add-on', 'an admin can add to the catalogue', r.status);
+  ok(r.status === 201 && r.body.key === 'costing-test-add-on', 'the CEO can add to the catalogue', r.status);
   const addonId = r.body && r.body.id;
 
   console.log('\n== staff never see margins ==');
@@ -179,6 +199,7 @@ const LADDER = [
   } finally {
     await db.query(`delete from internal_users where id = $1`, [u[0].id]);
     if (addonId) await db.query(`delete from catalog_addons where id = $1`, [addonId]);
+    await ceo.end();
   }
 
   await db.pool.end();

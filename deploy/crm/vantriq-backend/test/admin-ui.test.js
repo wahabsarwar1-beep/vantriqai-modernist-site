@@ -22,14 +22,11 @@ const ok=(c,m,x='')=>{c?pass++:fail++;console.log((c?'  PASS ':'  FAIL ')+m+(c?'
   await page.click('button:has-text("Connect")'); await page.waitForTimeout(2500);
   ok(!(await page.locator('#conn_key').count()), 'connected to the CRM');
 
-  // ---- Products & Pricing: standard tiers locked
-  await page.getByText('Products & Pricing',{exact:true}).first().click(); await page.waitForTimeout(1200);
-  const prod = await page.locator('body').innerText();
-  ok(/Fixed by the business model/.test(prod), 'standard packages show as fixed', prod.slice(0,150));
-  ok(/The ladder is fixed/.test(prod), 'no "add a new package" tile');
-  const editBtns = await page.locator('button:has-text("Edit")').count();
-  ok(editBtns===1, 'exactly one package is editable (Enterprise+)', 'found '+editBtns);
-  ok(!(await page.locator('button:has-text("New package")').count()), 'no New package button in the topbar');
+  // ---- Products & Pricing and Financials are the CEO's (v9.21): the
+  // break-glass key opens everything else, not these. The CEO's own view is
+  // tested in test/pricing-ceo.test.js.
+  const nav = await page.locator('nav, .sidebar, aside').first().innerText().catch(()=> '');
+  ok(!/Products & Pricing/.test(nav) && !/Financials/.test(nav), 'no Products & Pricing or Financials for the admin key', nav.slice(0,200));
 
   // ---- Clients: required-field validation
   await page.getByText('Clients',{exact:true}).first().click(); await page.waitForTimeout(1000);

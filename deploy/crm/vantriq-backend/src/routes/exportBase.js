@@ -3,6 +3,7 @@ const ExcelJS = require('exceljs');
 const db = require('../db');
 const acc = require('../utils/accounting');
 const { settlementOf } = require('../utils/billing');
+const { isCeoRequest } = require('../middleware/auth');
 const router = express.Router();
 
 /**
@@ -523,7 +524,8 @@ router.get('/crm.xlsx', async (req, res) => {
     col('Setup fee', 'setup_fee', { money: true }), col('Retainer', 'retainer', { money: true }),
     col('Quota', 'quota'), col('Overage rate', 'overage_rate', { money: true }),
     col('Msgs / session', 'msgs_per_session'),
-    col('Delivery cost @100%', 'delivery_cost_full', { money: true }),
+    // What a package costs us to serve is the CEO's alone (v9.21).
+    ...(isCeoRequest(req) ? [col('Delivery cost @100%', 'delivery_cost_full', { money: true })] : []),
     col('AI model', 'ai_model', { width: 20 }), col('Channels', 'channels', { width: 22 }),
     col('Automation', 'automation', { width: 26 }), col('Data layer', 'data_layer', { width: 22 }),
     col('Standard', 'is_standard'), col('Archived', 'archived'),

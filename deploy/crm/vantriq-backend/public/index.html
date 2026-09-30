@@ -284,6 +284,20 @@ tr.row-click:hover td{background:#FBFAF7;}
 .kpi-mini .d{font-size:11px;color:var(--muted);margin-top:2px;}
 .pricing-flag{font-size:12px;padding:7px 10px;border-radius:8px;background:var(--amber-light);color:var(--amber-dark);}
 .pricing-flag.bad{background:var(--red-light);color:var(--red);}
+/* The CEO's business documents (v9.21) */
+.odoc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;border-radius:12px;transition:outline-color .15s;outline:2px dashed transparent;outline-offset:4px;}
+.odoc-grid.drag{outline-color:var(--teal);}
+.odoc{border:1px solid var(--border);border-radius:12px;padding:14px;background:var(--bg);min-width:0;}
+.odoc-t{font-weight:700;font-size:14px;}
+.odoc-s{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.45;}
+.odoc-f{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;font-size:12px;}
+.odoc-fmt{font-weight:700;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:var(--card);border:1px solid var(--border);}
+.odoc-meta{color:var(--muted);flex:1;min-width:110px;}
+.odoc-act{display:flex;gap:6px;}
+.odoc-empty{margin-top:10px;font-size:12px;color:var(--muted);font-style:italic;}
+.odoc-prev{margin-top:8px;font-size:12px;}
+.odoc-prev summary{cursor:pointer;color:var(--muted);}
+.odoc-frame{width:100%;height:min(75vh,900px);border:0;border-radius:8px;background:#fff;}
 
 .empty{
   text-align:center;padding:50px 20px;color:var(--muted);
@@ -960,6 +974,10 @@ function showToast(msg, kind){
 let currentView = 'dashboard';
 let authUser = null;   // {id,email,name,role} when signed in as an employee
 function isAdmin(){ return !authUser || authUser.role === 'admin'; }  // an API-key session is admin
+/* Pricing, what serving it costs, every margin and the business documents are
+   the CEO's alone (v9.21): the server says so on /api/auth/me. Never an
+   API-key session, never another admin. */
+function isCeo(){ return !!(authUser && authUser.pricing === true); }
 let sidebarOpen = false;
 let openPanel = null; // {type:'client'|'invoiceDetail', id}
 let openModal = null; // {type, id}
@@ -985,9 +1003,9 @@ const NAV = [
     {id:'reps', label:'Sales Reps', icon:iconUsers},
   ]},
   {group:'Operations', items:[
-    {id:'products', label:'Products & Pricing', icon:iconBox},
+    {id:'products', label:'Products & Pricing', icon:iconBox, ceoOnly:true},
     {id:'procurement', label:'Procurement', icon:iconTruck, adminOnly:true},
-    {id:'financials', label:'Financials', icon:iconChart, adminOnly:true},
+    {id:'financials', label:'Financials', icon:iconChart, adminOnly:true, ceoOnly:true},
     {id:'accounting', label:'Accounts & Statements', icon:iconLedger, adminOnly:true},
     {id:'ops', label:'Billing Automation', icon:iconBolt, adminOnly:true},
   ]},
@@ -1000,7 +1018,7 @@ const NAV = [
 /* Nav filtered to what this account may actually open. */
 function visibleNav(){
   return NAV
-    .map(g=>({ ...g, items: g.items.filter(it=> !it.adminOnly || isAdmin()) }))
+    .map(g=>({ ...g, items: g.items.filter(it=> (!it.adminOnly || isAdmin()) && (!it.ceoOnly || isCeo())) }))
     .filter(g=>g.items.length);
 }
 
@@ -1242,9 +1260,9 @@ function renderView(){
     case 'reps': return renderReps();
     case 'team': return renderTeam();
     case 'requests': return renderRequests();
-    case 'products': return renderProducts();
+    case 'products': return isCeo() ? renderProducts() : renderCeoOnly();
     case 'procurement': return renderProcurement();
-    case 'financials': return renderFinancials();
+    case 'financials': return isCeo() ? renderFinancials() : renderCeoOnly();
     case 'accounting': return renderAccounting();
     case 'quotes': return renderQuotes();
     case 'contracts': return renderContracts();
@@ -1293,7 +1311,7 @@ function renderDashboard(){
       <div class="value mono">${fmtMoney(pipeVal)}</div>
       <div class="delta">${pipelineClients().length} open deals</div>
     </div>
-    ${isAdmin() ? `<div class="card kpi">
+    ${isCeo() ? `<div class="card kpi">
       <div class="label">Est. net monthly result</div>
       <div class="value mono" style="color:${netMonthly>=0?'var(--teal-dark)':'var(--red)'}">${fmtMoney(netMonthly)}</div>
       <div class="delta ${marginPct>=35?'up':'down'}">${marginPct.toFixed(0)}% contribution margin</div>
@@ -1334,7 +1352,7 @@ function renderDashboard(){
   <div class="grid kpi-row">
     <div class="card kpi"><div class="label">Vendor / tooling cost</div><div class="value mono" style="font-size:19px;">${fmtMoney(totalPlatformCostMonthly())}</div></div>
     <div class="card kpi"><div class="label">Contract labour</div><div class="value mono" style="font-size:19px;">${fmtMoney(totalContractLabourMonthly())}</div></div>
-    <div class="card kpi"><div class="label">Est. AI + messaging delivery cost</div><div class="value mono" style="font-size:19px;">${fmtMoney(totalDelivery)}</div></div>
+    ${isCeo() ? `<div class="card kpi"><div class="label">Est. AI + messaging delivery cost</div><div class="value mono" style="font-size:19px;">${fmtMoney(totalDelivery)}</div></div>` : ''}
     <div class="card kpi"><div class="label">Assumed avg. quota utilization</div><div class="value" style="font-size:19px;">${Math.round(state.utilization*100)}%</div></div>
   </div>` : ''}
   `;
@@ -2157,12 +2175,14 @@ let costingData = null;   // null = not loaded yet
 let addonsData = null;
 async function loadPricing(){
   try{
-    const [costing, addons] = await Promise.all([
-      isAdmin() ? API.get('/api/costing') : Promise.resolve({}),
+    const [costing, addons, docs] = await Promise.all([
+      isCeo() ? API.get('/api/costing') : Promise.resolve({}),
       API.get('/api/addons'),
+      isCeo() ? API.get('/api/pricing/documents').catch(e=>({ error: e.message })) : Promise.resolve({ documents: [] }),
     ]);
     costingData = costing || {};
     addonsData = addons || [];
+    ownerDocs = docs || { documents: [] };
   }catch(e){
     costingData = { error: e.message || 'Could not load the costing' };
     addonsData = addonsData || [];
@@ -2204,7 +2224,7 @@ function productEconomicsHTML(p){
   </div>`;
 }
 function pricingBasisHTML(){
-  if(!isAdmin()) return '';
+  if(!isCeo()) return '';
   if(costingData===null) return `<div class="card" style="margin-bottom:16px;color:var(--muted);">Costing the packages at today's prices…</div>`;
   if(costingData.error) return `<div class="card" style="margin-bottom:16px;color:var(--red);">${esc(costingData.error)}</div>`;
   const a = costingData.assumptions || {};
@@ -2236,7 +2256,7 @@ function pricingBasisHTML(){
   </div>`;
 }
 function unitEconomicsHTML(){
-  if(!isAdmin() || !costingData || !Array.isArray(costingData.packages) || !costingData.packages.length) return '';
+  if(!isCeo() || !costingData || !Array.isArray(costingData.packages) || !costingData.packages.length) return '';
   const rows = costingData.packages;
   const util = Math.round(((costingData.assumptions||{}).utilization||0.7)*100);
   const a = costingData.assumptions || {};
@@ -2287,7 +2307,7 @@ function addonsHTML(){
   if(addonsData===null) return '';
   const list = addonsData.filter(a=>a.active!==false);
   if(!list.length) return '';
-  const admin = isAdmin();
+  const admin = isCeo();
   return `
   <div class="section-title"><div><h2>Add-ons catalogue</h2><div class="hint">Sold on top of a package and priced separately — the business model's capabilities and solutions, with Vantriq Pulse, Echo and Human Support</div></div></div>
   ${ADDON_FAMILIES.map(([fam,label,hint])=>{
@@ -2313,9 +2333,152 @@ function addonsHTML(){
   ${admin?`<p class="footnote">Our cost is an estimate per add-on (model, voice and telephony usage at a typical volume); setup margin assumes build hours split evenly between founder and contracted time. Vantriq Echo is priced on what it costs to run — it has no AI or messaging cost of its own, only setup time and a short monthly review — so it is a base for the first location and a smaller step for each further one: PKR 6,000 a month for one branch, 12,000 for five, 19,500 for ten, at a monthly margin of 75% or more at every size. Human Support is new since the August model and carries the September proposal. Change any add-on through the API (PUT /api/addons/:id).</p>`:''}`;
 }
 
+/* The CEO's business documents (v9.21): the business model, the client pitch
+   deck and the product portfolio. They live in the CRM's database — never in
+   the code repository, which is public — and only the CEO's own account can
+   list, open or replace them (routes/pricingDocs.js). */
+let ownerDocs = null;
+const DOC_KINDS = [
+  ['business_model','Business Model','Prices, unit economics, margins and the plan'],
+  ['pitch_deck','Client Pitch Deck','What to walk a prospect through'],
+  ['portfolio','Product Portfolio','Every product, capability and add-on, priced'],
+];
+function docFormat(d){
+  const ext = (String(d.filename).split('.').pop()||'').toLowerCase();
+  return {pdf:'PDF',docx:'Word',doc:'Word',pptx:'PowerPoint',ppt:'PowerPoint',xlsx:'Excel',xls:'Excel',png:'Image',jpg:'Image',jpeg:'Image',txt:'Text',md:'Text',csv:'CSV'}[ext] || ext.toUpperCase();
+}
+const isPdfDoc = d => /pdf/i.test(d.content_type||'') || /\.pdf$/i.test(d.filename||'');
+function fmtBytes(n){ n=+n||0; return n>=1048576 ? (n/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(n/1024))+' KB'; }
+function ownerDocRow(d, old){
+  return `<div class="odoc-f">
+    <span class="odoc-fmt">${esc(docFormat(d))}</span>
+    <span class="odoc-meta">${fmtDate(d.uploaded_at)} · ${fmtBytes(d.size_bytes)}</span>
+    <span class="odoc-act">
+      ${isPdfDoc(d)?`<button class="btn btn-ghost btn-sm" onclick="viewOwnerDoc('${d.id}')">View</button>`:''}
+      <button class="btn btn-ghost btn-sm" onclick="downloadOwnerDoc('${d.id}')">${iconDownload(13)} Download</button>
+      ${old?`<button class="btn btn-danger-ghost btn-icon" title="Delete this version" onclick="deleteOwnerDoc('${d.id}')">${iconTrash(13)}</button>`:''}
+    </span>
+  </div>`;
+}
+function ownerDocsHTML(){
+  if(!isCeo()) return '';
+  if(ownerDocs===null) return `<div class="card" style="margin-bottom:16px;color:var(--muted);">Opening your documents…</div>`;
+  if(ownerDocs.error) return `<div class="card" style="margin-bottom:16px;color:var(--red);">${esc(ownerDocs.error)}</div>`;
+  const all = ownerDocs.documents || [];
+  const slot = ([kind,title,hint]) => {
+    const now = all.filter(d=>d.kind===kind && d.current);
+    const prev = all.filter(d=>d.kind===kind && !d.current);
+    return `<div class="odoc">
+      <div class="odoc-t">${esc(title)}</div>
+      <div class="odoc-s">${esc(hint)}</div>
+      ${now.length ? now.map(d=>ownerDocRow(d,false)).join('') : `<div class="odoc-empty">Not uploaded yet</div>`}
+      ${prev.length?`<details class="odoc-prev"><summary>${prev.length} earlier version${prev.length===1?'':'s'}</summary>${prev.map(d=>ownerDocRow(d,true)).join('')}</details>`:''}
+    </div>`;
+  };
+  const others = all.filter(d=>d.kind==='other');
+  return `<div class="card" style="margin-bottom:16px;">
+    <div class="section-title" style="margin-top:0;">
+      <div><h2>Business documents</h2><div class="hint">Yours alone: no other account, admin or key can open Pricing or these files</div></div>
+      <label class="btn btn-primary btn-sm" style="cursor:pointer;">${iconPlus(14)} Upload
+        <input type="file" multiple accept=".pdf,.docx,.pptx,.xlsx,.doc,.ppt,.xls,.png,.jpg,.jpeg,.txt,.md,.csv" style="display:none" onchange="uploadOwnerDocs(this.files);this.value=''">
+      </label>
+    </div>
+    <div class="odoc-grid" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')"
+         ondrop="event.preventDefault();this.classList.remove('drag');uploadOwnerDocs(event.dataTransfer.files)">
+      ${DOC_KINDS.map(slot).join('')}
+      ${others.length?`<div class="odoc"><div class="odoc-t">Other documents</div><div class="odoc-s">Anything else you keep here</div>
+        ${others.map(d=>`<div style="margin-top:8px;font-size:12.5px;font-weight:600;overflow-wrap:anywhere;">${esc(d.title||d.filename)}</div>${ownerDocRow(d,true)}`).join('')}</div>`:''}
+    </div>
+    <p class="footnote" style="margin-bottom:0;">Drop new versions anywhere on this card — they are recognised by name and the old one is kept as history. The files are stored in the CRM's database, not in its code.</p>
+  </div>`;
+}
+function renderCeoOnly(){
+  return `<div class="card" style="max-width:560px;">
+    <h3 style="margin:0 0 6px;">The CEO's area</h3>
+    <p style="margin:0;color:var(--muted);font-size:13px;line-height:1.6;">Pricing, what it costs to serve each package, the margins and the business documents open only for the CEO, signed in to their own account.</p>
+  </div>`;
+}
+async function ownerDocBlob(id){
+  const headers = {};
+  if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
+  const res = await fetch(`${API.base}/api/pricing/documents/${encodeURIComponent(id)}/file`, { headers });
+  if(!res.ok){
+    const err = await res.json().catch(()=>null);
+    throw new Error((err&&err.error) || `Could not open the file (${res.status})`);
+  }
+  return res.blob();
+}
+const ownerDocById = id => ((ownerDocs&&ownerDocs.documents)||[]).find(d=>d.id===id);
+async function downloadOwnerDoc(id){
+  const d = ownerDocById(id); if(!d) return;
+  try{
+    const blob = await ownerDocBlob(id);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = d.filename; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  }catch(e){ showToast(e.message||'Could not download it','warn'); }
+}
+async function viewOwnerDoc(id){
+  const d = ownerDocById(id); if(!d) return;
+  try{
+    const blob = await ownerDocBlob(id);
+    const url = URL.createObjectURL(new Blob([blob], { type:'application/pdf' }));
+    openModal = { type:'ownerDoc', id, url, title: DOC_KINDS.concat([['other',d.title||d.filename]]).find(k=>k[0]===d.kind)[1] };
+    render();
+  }catch(e){ showToast(e.message||'Could not open it','warn'); }
+}
+function ownerDocModalHTML(){
+  const m = openModal;
+  return `<div class="modal" style="max-width:1100px;width:96vw;">
+    <div class="modal-head"><h3>${esc(m.title)}</h3><button class="close-x" onclick="closeOwnerDoc()">${iconX(18)}</button></div>
+    <div class="modal-body" style="padding:10px;"><iframe class="odoc-frame" src="${m.url}" title="${esc(m.title)}"></iframe></div>
+  </div>`;
+}
+function closeOwnerDoc(){
+  const url = openModal && openModal.url;
+  openModal = null; render();
+  if(url) URL.revokeObjectURL(url);
+}
+function fileToBase64(file){
+  return new Promise((resolve, reject)=>{
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1] || '');
+    r.onerror = () => reject(new Error('Could not read '+file.name));
+    r.readAsDataURL(file);
+  });
+}
+async function uploadOwnerDocs(files){
+  const list = Array.from(files||[]);
+  if(!list.length) return;
+  const tooBig = list.find(f=>f.size > 25*1024*1024);
+  if(tooBig){ showToast(`${tooBig.name} is over 25 MB`, 'warn'); return; }
+  let done = 0;
+  for(const f of list){
+    showToast(`Uploading ${f.name}…`);
+    try{
+      const data = await fileToBase64(f);
+      await API.post('/api/pricing/documents', { filename: f.name, content_type: f.type || '', data });
+      done++;
+    }catch(e){ showToast(`${f.name}: ${e.message||'not uploaded'}`, 'warn'); }
+  }
+  try{ ownerDocs = await API.get('/api/pricing/documents'); }catch(e){}
+  render();
+  if(done) showToast(done===1 ? 'Document saved' : `${done} documents saved`);
+}
+async function deleteOwnerDoc(id){
+  const d = ownerDocById(id); if(!d) return;
+  if(!confirm(`Delete this version of ${d.filename}? It cannot be recovered.`)) return;
+  try{
+    await API.del(`/api/pricing/documents/${encodeURIComponent(id)}`);
+    ownerDocs = await API.get('/api/pricing/documents');
+    render();
+  }catch(e){ showToast(e.message||'Could not delete it','warn'); }
+}
+
 function renderProducts(){
   const sorted = state.products.slice().sort((a,b)=>a.order-b.order);
   return `
+  ${ownerDocsHTML()}
   ${pricingBasisHTML()}
   <div class="prod-grid">
     ${sorted.map(p=>`
@@ -2331,7 +2494,7 @@ function renderProducts(){
         <div class="prod-stat-row"><span class="k">Channels</span><span class="v" style="font-family:var(--f-body);font-weight:600;">${esc(p.channels)}</span></div>
         <div class="prod-stat-row"><span class="k">Automation</span><span class="v" style="font-family:var(--f-body);font-weight:600;">${esc(p.automation)}</span></div>
         <div class="prod-stat-row"><span class="k">Data layer</span><span class="v" style="font-family:var(--f-body);font-weight:600;">${esc(p.dataLayer)}</span></div>
-        ${isAdmin()?'':`<div class="prod-stat-row"><span class="k">AI model</span><span class="v" style="font-family:var(--f-body);font-weight:600;">${esc(p.aiModel)}</span></div>`}
+        ${isCeo()?'':`<div class="prod-stat-row"><span class="k">AI model</span><span class="v" style="font-family:var(--f-body);font-weight:600;">${esc(p.aiModel)}</span></div>`}
         <div class="prod-stat-row">
           <span class="k">Extra number</span>
           <span class="v">${p.extraAgentPrice>0
@@ -5566,7 +5729,8 @@ function renderModal(){
   else if(openModal.type==='clientDoc') html = clientDocModalHTML();
   else if(openModal.type==='identity') html = identityModalHTML();
   else if(openModal.type==='totpSetup') html = totpSetupModalHTML();
-  root.innerHTML = `<div class="modal-overlay" onmousedown="if(event.target===this){openModal=null;render();}">${html}</div>`;
+  else if(openModal.type==='ownerDoc') html = ownerDocModalHTML();
+  root.innerHTML = `<div class="modal-overlay" onmousedown="if(event.target===this){${openModal.type==='ownerDoc'?'closeOwnerDoc()':'openModal=null;render();'}}">${html}</div>`;
   if(openModal.type==='invoice') requestAnimationFrame(prefillInvoiceAmount);
   if(openModal.type==='bundle') requestAnimationFrame(bundleProductChanged);
 }

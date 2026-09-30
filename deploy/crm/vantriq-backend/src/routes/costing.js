@@ -4,9 +4,9 @@ const C = require('../utils/costing');
 const router = express.Router();
 
 /**
- * Products & Pricing, the cost side — admin only (mounted behind
- * requireScope('admin') in src/index.js). Everything here is margin, which
- * staff, automation keys and customers never see.
+ * Products & Pricing, the cost side — the CEO's alone (mounted behind
+ * requireScope('admin') + requireCeo in src/index.js, v9.21). Everything here
+ * is margin, which other admins, staff, every API key and customers never see.
  *
  *   GET    /api/costing                 the whole model: rate card, assumptions,
  *                                       every package's economics, the steady

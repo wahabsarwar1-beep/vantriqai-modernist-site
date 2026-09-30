@@ -48,7 +48,7 @@ async function signIn(who){
   console.log('\n== session gives access ==');
   const A={Authorization:'Bearer '+adminSess};
   r=await get('/api/clients',A); ok(r.status===200,'admin session reads clients','got '+r.status);
-  r=await get('/api/financials',A); ok(r.status===200,'admin session reads financials','got '+r.status);
+  r=await get('/api/financials',A); ok(r.status===403,'an admin who is not the CEO does not read financials (v9.21)','got '+r.status);
   r=await get('/api/team',A); ok(r.status===200,'admin session reads the team','got '+r.status);
   r=await get('/api/clients'); ok(r.status===401,'no credentials rejected','got '+r.status);
   r=await get('/api/clients',{Authorization:'Bearer ss_bogus'}); ok(r.status===401,'bogus session rejected','got '+r.status);
@@ -76,10 +76,20 @@ async function signIn(who){
   ok(sDash.kpis.mrr!==undefined && sDash.kpis.active_clients!==undefined,'staff still gets the revenue KPIs they need');
   const sProds=await J(await get('/api/products',S));
   ok(sProds.every(p=>p.delivery_cost_full===undefined),'staff catalogue withholds delivery cost','leaked');
+  // v9.21: cost and margin are the CEO's alone — another admin is withheld
+  // them like staff are, and the CEO's own session has the full picture.
   const aDash=await J(await get('/api/dashboard',A));
-  ok(aDash.kpis.net_monthly_result!==undefined,'admin dashboard still has the full picture');
+  ok(aDash.kpis.net_monthly_result===undefined,'an admin who is not the CEO is withheld margin KPIs');
   const aProds=await J(await get('/api/products',A));
-  ok(aProds.every(p=>p.delivery_cost_full!==undefined),'admin catalogue still has delivery cost');
+  ok(aProds.every(p=>p.delivery_cost_full===undefined),'and delivery cost');
+  const { ceoSession, db } = require('./ceo-session');
+  const ceo=await ceoSession();
+  const cDash=await J(await get('/api/dashboard',ceo.headers));
+  ok(cDash.kpis.net_monthly_result!==undefined,'the CEO\'s dashboard has the full picture');
+  const cProds=await J(await get('/api/products',ceo.headers));
+  ok(cProds.every(p=>p.delivery_cost_full!==undefined),'and the CEO\'s catalogue the delivery cost');
+  r=await get('/api/financials',ceo.headers); ok(r.status===200,'the CEO reads financials','got '+r.status);
+  await ceo.end(); await db.pool.end();
 
   console.log('\n== team management ==');
   r=await post('/api/team',{email:'outsider@gmail.com',name:'X',role:'staff'},A);

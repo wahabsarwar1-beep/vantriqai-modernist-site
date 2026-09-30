@@ -1,6 +1,6 @@
 const express = require('express');
 const db = require('../db');
-const { isAdminRequest } = require('../middleware/auth');
+const { isCeoRequest, requireCeo } = require('../middleware/auth');
 const { costingModel, addonEconomics } = require('../utils/costing');
 const router = express.Router();
 
@@ -9,8 +9,8 @@ const router = express.Router();
  * modules (Pulse, Echo, Human Support…) and deployment options, each priced
  * separately from the package.
  *
- * Staff read it — the quote builder offers these as lines — but only an
- * admin changes it, and only an admin receives what an add-on costs us
+ * Staff read it — the quote builder offers these as lines — but only the
+ * CEO changes it, and only the CEO receives what an add-on costs us
  * (est_monthly_cost, est_build_hours and the margins worked out from them).
  */
 
@@ -22,10 +22,7 @@ class AddonError extends Error {
   constructor(status, message) { super(message); this.status = status; this.expose = true; }
 }
 
-function adminOnly(req, res, next) {
-  if (isAdminRequest(req)) return next();
-  return res.status(403).json({ error: 'Only an admin can change the add-ons catalogue.' });
-}
+const adminOnly = requireCeo;
 
 const strip = (row) => {
   const out = { ...row };
@@ -87,7 +84,7 @@ function keyFrom(name) {
 }
 
 router.get('/', async (req, res) => {
-  const admin = isAdminRequest(req);
+  const admin = isCeoRequest(req);
   const { rows } = await db.query(
     `select * from catalog_addons ${admin ? '' : 'where active = true'} order by sort_order, name`
   );
