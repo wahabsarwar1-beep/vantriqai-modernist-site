@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { waLink } from "@/lib/whatsapp";
 import "@/styles/n8n-chat.css";
 import "@/styles/chat-widget-theme.css";
 
@@ -241,7 +242,7 @@ function whenPageIsIdle(run: () => void): () => void {
 }
 
 const OFFLINE_REPLY =
-  "Sorry — I can't reach our assistant right now. Please message the team on WhatsApp at https://wa.me/923411120049 and they'll pick this up straight away.";
+  `Sorry — I can't reach our assistant right now. Please message the team on WhatsApp at ${waLink()} and they'll pick this up straight away.`;
 
 /**
  * If a message cannot reach n8n at all, answer with a human sentence and a
