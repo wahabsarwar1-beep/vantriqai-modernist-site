@@ -1,5 +1,6 @@
 const { chromium } = require('playwright-core');
 const fs = require('fs');
+const { signInAsAdmin, endUiSessions } = require('./ui-session');
 const KEY = fs.readFileSync('/tmp/adminkey','utf8').trim();
 const B='http://127.0.0.1:8099';
 const U = Date.now().toString().slice(-8);          // unique per run
@@ -13,20 +14,18 @@ const ok=(c,m,x='')=>{c?pass++:fail++;console.log((c?'  PASS ':'  FAIL ')+m+(c?'
   const errs=[]; page.on('pageerror',e=>errs.push(String(e)));
   const dialogs=[]; page.on('dialog',async d=>{ dialogs.push({type:d.type(),msg:d.message()}); await d.accept('Moving forward after a good call'); });
 
+  // Signed in as an admin (v9.22: the admin key alone no longer opens the
+  // page; emergency access has its own test, breakglass.test.js).
   await page.goto(B, {waitUntil:'networkidle'});
-  // Sign-in asks for an email and password first; the API-key form is the
-  // deliberate break-glass route behind a link, not the landing screen.
-  await page.click('text=Emergency access with an API key');
-  await page.waitForTimeout(400);
-  await page.fill('#conn_base', B); await page.fill('#conn_key', KEY);
-  await page.click('button:has-text("Connect")'); await page.waitForTimeout(2500);
-  ok(!(await page.locator('#conn_key').count()), 'connected to the CRM');
+  await signInAsAdmin(page);
+  await page.goto(B, {waitUntil:'networkidle'}); await page.waitForTimeout(1500);
+  ok(await page.locator('.sidebar').count()===1, 'signed in to the CRM');
 
-  // ---- Products & Pricing and Financials are the CEO's (v9.21): the
-  // break-glass key opens everything else, not these. The CEO's own view is
-  // tested in test/pricing-ceo.test.js.
+  // ---- Products & Pricing and Financials are the CEO's (v9.21): another
+  // admin opens everything else, not these. The CEO's own view is tested in
+  // test/pricing-ceo.test.js.
   const nav = await page.locator('nav, .sidebar, aside').first().innerText().catch(()=> '');
-  ok(!/Products & Pricing/.test(nav) && !/Financials/.test(nav), 'no Products & Pricing or Financials for the admin key', nav.slice(0,200));
+  ok(!/Products & Pricing/.test(nav) && !/Financials/.test(nav), 'no Products & Pricing or Financials for another admin', nav.slice(0,200));
 
   // ---- Clients: required-field validation
   await page.getByText('Clients',{exact:true}).first().click(); await page.waitForTimeout(1000);
@@ -89,5 +88,5 @@ const ok=(c,m,x='')=>{c?pass++:fail++;console.log((c?'  PASS ':'  FAIL ')+m+(c?'
 
   if(errs.length) console.log('  page errors:', errs.slice(0,4));
   console.log(`\n==== admin UI: ${pass} passed, ${fail} failed ====`);
-  await browser.close(); process.exit(fail?1:0);
+  await browser.close(); await endUiSessions(); process.exit(fail?1:0);
 })();

@@ -24,7 +24,7 @@ async function clientOf(id) {
   if (!rows[0]) throw new CT.ContactError(404, 'Client not found');
   return rows[0];
 }
-const actor = (req) => (req.user ? req.user.email : 'API key');
+const actor = (req) => (req.user ? req.user.email : req.authKind === 'breakglass' ? 'Emergency access' : 'API key');
 
 /** The directory: search, segments (new, returning, regulars, at risk, unhappy…), city filter, sort. */
 router.get('/', async (req, res) => {

@@ -665,35 +665,40 @@ td.amt,th.amt,td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
 
 const CURRENCY = 'PKR';
 const LS_BASE = 'vantriq_api_base';
+/* Until v9.22 an admin API key could be kept here and sent with every
+   request. On its own it opens nothing any more, so a browser still holding
+   one drops it on load and is shown sign-in, saying why. */
 const LS_KEY = 'vantriq_api_key';
+let bootNotice = '';
+try{
+  if(localStorage.getItem(LS_KEY)){
+    localStorage.removeItem(LS_KEY);
+    bootNotice = 'Signing in with the admin key alone has ended. Sign in with your account, or use Emergency access below: the key then sends a code to the CEO.';
+  }
+}catch(e){}
 
 /* ---------------------------- API client ---------------------------- */
 const LS_SESS = 'vantriq_staff_session';
 const API = {
   base: localStorage.getItem(LS_BASE) || window.location.origin,
-  key: localStorage.getItem(LS_KEY) || '',
   session: localStorage.getItem(LS_SESS) || '',
-  // Signed in either as an employee (session) or, for emergencies only, with
-  // an admin API key.
-  configured(){ return !!(this.base && (this.session || this.key)); },
+  // Signed in as an employee, or in an emergency session opened with the
+  // admin key and a code the CEO gave (v9.22). Either way, a session token.
+  configured(){ return !!(this.base && this.session); },
   setSession(base, token){
     this.base = (base||this.base||window.location.origin).replace(/\/$/,'');
     this.session = token;
     localStorage.setItem(LS_BASE, this.base); localStorage.setItem(LS_SESS, token);
   },
-  setConfig(base, key){
-    this.base = base.replace(/\/$/,''); this.key = key;
-    localStorage.setItem(LS_BASE, this.base); localStorage.setItem(LS_KEY, this.key);
-  },
   clearConfig(){
     localStorage.removeItem(LS_BASE); localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_SESS);
-    this.base=''; this.key=''; this.session='';
+    this.base=''; this.session='';
   },
   async req(method, path, body){
     let res;
     const headers = {'Content-Type':'application/json'};
-    if(this.session) headers['Authorization'] = 'Bearer ' + this.session;
-    else if(this.key) headers['x-api-key'] = this.key;
+    const sent = this.session;
+    if(sent) headers['Authorization'] = 'Bearer ' + sent;
     try{
       res = await fetch(this.base+path, {
         method, headers,
@@ -706,7 +711,12 @@ const API = {
     // Carry the whole body on the error, not just its message: some endpoints
     // answer a failure with a hint worth showing, and re-issuing the request
     // to go and read it would repeat whatever it just did.
-    if(!res.ok){ throw new ApiError((data&&data.error)||`Request failed (${res.status})`, res.status, data); }
+    if(!res.ok){
+      // The server ended this session — it expired, was signed out elsewhere,
+      // or (emergency access) the CEO ended it: back to sign-in, saying why.
+      if(res.status===401 && data && data.signed_out && sent && sent===this.session) signedOutByServer(data.error);
+      throw new ApiError((data&&data.error)||`Request failed (${res.status})`, res.status, data);
+    }
     return data;
   },
   get(path){ return this.req('GET', path); },
@@ -847,6 +857,8 @@ function fmtNum(n){ return Math.round(n).toLocaleString('en-US'); }
 function uid(prefix){ return prefix+'_'+Math.random().toString(36).slice(2,9); }
 function todayISO(){ return new Date().toISOString().slice(0,10); }
 function fmtDate(d){ if(!d) return '—'; const dt=new Date(d); return dt.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }
+function fmtClock(d){ if(!d) return '—'; return new Date(d).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); }
+function fmtDateTime(d){ if(!d) return '—'; return fmtDate(d)+' '+fmtClock(d); }
 function addMonths(dateStr,n){ const d=new Date(dateStr); d.setMonth(d.getMonth()+n); return d.toISOString().slice(0,10); }
 function esc(s){ return (s+'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -972,11 +984,12 @@ function showToast(msg, kind){
 
 /* ---------------------------- Router / view state ---------------------------- */
 let currentView = 'dashboard';
-let authUser = null;   // {id,email,name,role} when signed in as an employee
-function isAdmin(){ return !authUser || authUser.role === 'admin'; }  // an API-key session is admin
+let authUser = null;   // {id,email,name,role} signed in; {breakglass:true,role:'admin'} in emergency access
+function isAdmin(){ return !!(authUser && authUser.role === 'admin'); }
+function isEmergency(){ return !!(authUser && authUser.breakglass); }
 /* Pricing, what serving it costs, every margin and the business documents are
    the CEO's alone (v9.21): the server says so on /api/auth/me. Never an
-   API-key session, never another admin. */
+   emergency session, never another admin. */
 function isCeo(){ return !!(authUser && authUser.pricing === true); }
 let sidebarOpen = false;
 let openPanel = null; // {type:'client'|'invoiceDetail', id}
@@ -1167,14 +1180,15 @@ function renderSidebar(){
       `).join('')}
     </div>
     <div class="sidebar-foot">
-      ${authUser ? `
+      ${isEmergency() ? `
+        <div style="color:#C7A76B;font-weight:600;font-size:11.5px;">Emergency access</div>
+        <div style="margin-bottom:6px;">Opened with the admin key and the CEO's code · ends ${esc(fmtClock(authUser.expires_at))}</div>
+        <a href="#" onclick="event.preventDefault();signOut()" style="color:var(--teal-400);">Sign out</a>
+      ` : authUser ? `
         <div style="color:#B9C6CE;font-weight:600;font-size:11.5px;">${esc(authUser.name)}</div>
         <div style="margin-bottom:6px;">${esc(authUser.email)} · ${authUser.role==='admin'?'Admin':'Staff'}</div>
         <a href="#" onclick="event.preventDefault();signOut()" style="color:var(--teal-400);">Sign out</a>
-      ` : `
-        <div style="margin-bottom:6px;color:#C7A76B;">Signed in with an API key (emergency access)</div>
-        <a href="#" onclick="event.preventDefault();signOut()" style="color:var(--teal-400);">Sign out</a>
-      `}
+      ` : ''}
       <div style="margin-top:8px;">${esc(state.company.name)} · ${esc(state.company.city)}</div>
       ${serverVersion?`<div class="mono" style="margin-top:2px;font-size:10px;opacity:.6;">v${esc(serverVersion)}</div>`:''}
     </div>
@@ -1498,7 +1512,6 @@ async function downloadAnalyticsReport(){
   try{
     const headers = {};
     if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
-    else if(API.key) headers['x-api-key'] = API.key;
     const res = await fetch(API.base + path, { headers });
     if(!res.ok){
       const err = await res.json().catch(()=>null);
@@ -1941,8 +1954,10 @@ async function decideQuota(id, decision){
 
 /* ============================== TEAM ============================== */
 let teamUsers = null;
+let emergencyData = null;   // the CEO's list of emergency sessions (v9.22)
 
 async function loadTeam(){
+  emergencyData = null;
   try{ teamUsers = await API.get('/api/team'); render(); }
   catch(e){ showToast(e.message||'Could not load the team','warn'); }
 }
@@ -1950,6 +1965,7 @@ async function loadTeam(){
 function renderTeam(){
   if(teamUsers === null){ requestAnimationFrame(loadTeam); return `<div class="card"><div class="empty"><span class="loading-dot"></span> Loading the team…</div></div>`; }
   return `
+  ${isCeo() ? renderEmergencyCard() : ''}
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
       <div style="font-size:12.5px;color:var(--muted);max-width:520px;">
@@ -1991,6 +2007,82 @@ function renderTeam(){
       </tbody>
     </table>
   </div>`;
+}
+
+/* ---------- Emergency access (v9.22): the CEO's alone ----------
+   The admin API key opens nothing by itself. Typed into "Emergency access" on
+   the sign-in page it emails the CEO a code, and only that code opens the CRM,
+   for a couple of hours. This is where the CEO sees each one and ends it. */
+async function loadEmergency(){
+  try{ emergencyData = await API.get('/api/auth/breakglass/sessions'); }
+  catch(e){ emergencyData = { error: e.message || 'Could not load emergency access' }; }
+  if(currentView==='team') render();
+}
+
+function shortBrowser(ua){
+  ua = String(ua||'');
+  if(!ua) return 'unknown browser';
+  const b = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Firefox\//.test(ua) ? 'Firefox'
+    : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : ua.split(/[ /]/)[0];
+  const os = /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iPhone' : /Windows/.test(ua) ? 'Windows'
+    : /Mac OS X/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : '';
+  return os ? `${b} on ${os}` : b;
+}
+
+function renderEmergencyCard(){
+  if(emergencyData === null){ requestAnimationFrame(loadEmergency); emergencyData = { loading:true }; }
+  const d = emergencyData;
+  const sessions = (d && d.sessions) || [];
+  const live = sessions.filter(x=>x.live);
+  const rows = sessions.map(x=>`
+    <tr>
+      <td>${esc(fmtDateTime(x.created_at))}</td>
+      <td class="mono" style="font-size:12px;">${esc(x.ip||'—')}</td>
+      <td style="font-size:12px;">${esc(shortBrowser(x.user_agent))}</td>
+      <td>${x.live
+        ? `<span class="pill pill-pending"><span class="pill-dot"></span>Open until ${esc(fmtClock(x.expires_at))}</span>`
+        : `<span style="font-size:12px;color:var(--muted);">${x.ended_at ? esc('Ended '+fmtDateTime(x.ended_at)+(x.ended_by?' — '+x.ended_by:'')) : esc('Expired '+fmtDateTime(x.expires_at))}</span>`}</td>
+      <td style="text-align:right;">${x.live ? `<button class="btn btn-danger-ghost btn-sm" onclick="endEmergency('${esc(x.id)}')">End now</button>` : ''}</td>
+    </tr>`).join('');
+  return `
+  <div class="card" id="emergency-card" style="margin-bottom:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+      <div style="max-width:620px;">
+        <h3 style="margin:0 0 6px;font-size:14.5px;">Emergency access</h3>
+        <div style="font-size:12.5px;color:var(--muted);">
+          The admin API key opens nothing on its own. Typed into <em>Emergency access</em> on the sign-in page, it emails a
+          6-digit code to you${d && d.sent_to ? ` (<span class="mono">${esc(d.sent_to)}</span>)` : ''}. Only that code, if you give it,
+          opens the CRM: as an admin, without Pricing or Financials, for ${esc(String((d && d.session_hours) || 2))} hours.
+          You are emailed each time one opens. ${d && d.enabled === false ? '<strong>It is switched off on this server.</strong>' : ''}
+        </div>
+      </div>
+      ${live.length ? `<button class="btn btn-danger-ghost btn-sm" onclick="endAllEmergency()">End all (${live.length})</button>` : ''}
+    </div>
+    ${d && d.error ? `<div class="footnote" style="margin-top:10px;color:var(--danger,#8F3527);">${esc(d.error)}</div>`
+      : d && d.loading ? `<div class="empty" style="padding:14px 0 0;"><span class="loading-dot"></span> Loading…</div>`
+      : sessions.length ? `
+    <div class="table-wrap" style="margin-top:12px;">
+      <table>
+        <thead><tr><th>Opened</th><th>From</th><th>Browser</th><th>Status</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>` : `<div class="footnote" style="margin-top:10px;">Nobody has used emergency access yet.</div>`}
+    ${d && d.codes_waiting ? `<div class="footnote" style="margin-top:8px;">${d.codes_waiting} code${d.codes_waiting===1?'':'s'} sent to you in the last few minutes ${d.codes_waiting===1?'is':'are'} still unused. Ending all also cancels ${d.codes_waiting===1?'it':'them'}.</div>` : ''}
+  </div>`;
+}
+
+async function endEmergency(id){
+  if(!confirm('End this emergency session now?\n\nWhoever is using it is signed out within seconds.')) return;
+  try{ await API.post(`/api/auth/breakglass/sessions/${id}/end`, {}); showToast('Emergency session ended'); }
+  catch(e){ showToast(e.message||'Could not end it','warn'); }
+  emergencyData = null; render();
+}
+
+async function endAllEmergency(){
+  if(!confirm('End every emergency session now, and cancel any code still waiting?')) return;
+  try{ const r = await API.post('/api/auth/breakglass/end-all', {}); showToast(`${r.ended} emergency session${r.ended===1?'':'s'} ended`); }
+  catch(e){ showToast(e.message||'Could not end them','warn'); }
+  emergencyData = null; render();
 }
 
 function showCreds(title, email, password){
@@ -3464,7 +3556,6 @@ async function downloadContracts(view){
   try{
     const headers = {};
     if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
-    else if(API.key) headers['x-api-key'] = API.key;
     const res = await fetch(`${API.base}/api/export/contracts.xlsx${one?`?view=${encodeURIComponent(view)}`:''}`, { headers });
     if(!res.ok){
       const err = await res.json().catch(()=>null);
@@ -3494,7 +3585,6 @@ async function downloadPipeline(stage){
   try{
     const headers = {};
     if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
-    else if(API.key) headers['x-api-key'] = API.key;
     const res = await fetch(`${API.base}/api/export/pipeline.xlsx${one?`?stage=${encodeURIComponent(stage)}`:''}`, { headers });
     if(!res.ok){
       const err = await res.json().catch(()=>null);
@@ -3516,7 +3606,6 @@ async function downloadWorkbook(){
   try{
     const headers = {};
     if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
-    else if(API.key) headers['x-api-key'] = API.key;
     const res = await fetch(API.base + '/api/export/crm.xlsx', { headers });
     if(!res.ok){
       const err = await res.json().catch(()=>null);
@@ -3573,7 +3662,6 @@ async function downloadArchive(){
   try{
     const headers = {};
     if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
-    else if(API.key) headers['x-api-key'] = API.key;
     const res = await fetch(`${API.base}/api/archive/download?months=${archiveMonths}`, { headers });
     if(!res.ok){
       const err = await res.json().catch(()=>null);
@@ -3826,7 +3914,6 @@ async function downloadClientDoc(clientId, docId){
   try{
     const headers = {};
     if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
-    else if(API.key) headers['x-api-key'] = API.key;
     const res = await fetch(`${API.base}/api/clients/${clientId}/documents/${docId}/download`, { headers });
     if(!res.ok) throw new Error(`Could not fetch it (${res.status})`);
     const blob = await res.blob();
@@ -4370,7 +4457,6 @@ async function downloadProposal(id){
   try{
     const headers = {};
     if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
-    else if(API.key) headers['x-api-key'] = API.key;
     const res = await fetch(`${API.base}/api/quotes/${id}/proposal.pdf`, { headers });
     if(!res.ok){
       const err = await res.json().catch(()=>null);
@@ -5695,10 +5781,8 @@ function exportAllData(){
   a.click();
 }
 function disconnectApi(){
-  if(!confirm('Disconnect from the API? You will need your key again to reconnect.')) return;
-  clearInterval(usagePollTimer);
-  API.clearConfig();
-  boot();
+  if(!confirm('Disconnect from the API? You will need to sign in again.')) return;
+  signOut();
 }
 
 /* ============================== MODALS ============================== */
@@ -7096,7 +7180,6 @@ async function downloadInvoice(id){
   try{
     const headers = {};
     if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
-    else if(API.key) headers['x-api-key'] = API.key;
     const res = await fetch(`${API.base}/api/invoices/${id}/pdf`, { headers });
     if(!res.ok){
       const err = await res.json().catch(()=>null);
@@ -7625,9 +7708,10 @@ function attachPostRenderHooks(){
 
 /* ============================== Sign in ============================== */
 /* Employees sign in with their company email and password, then a one-time
-   code emailed to that address. The API-key route still exists but is a
-   deliberate break-glass path, not the everyday way in. */
-let loginStep = 'password';      // 'password' | 'otp' | 'apikey'
+   code emailed to that address. Emergency access is the break-glass path, not
+   the everyday way in: the admin API key, then a code that goes to the CEO
+   (v9.22) — the key alone opens nothing. */
+let loginStep = 'password';      // 'password' | 'otp' | 'emergency'
 let loginChallenge = null;
 let loginBusy = false;
 
@@ -7660,28 +7744,32 @@ function shell(inner){
 
 function renderConnectScreen(){
   const app = document.getElementById('app');
-  if(loginStep === 'apikey'){
+  if(loginStep === 'emergency'){
     app.innerHTML = shell(`
-      <div style="background:var(--amber-light);color:#63430B;padding:9px 11px;border-radius:8px;font-size:11.5px;margin-bottom:14px;">
-        Emergency access. Use your Vantriq Ops account unless sign-in by email is unavailable.
+      <h3 style="margin:0 0 4px;font-size:15px;">Emergency access</h3>
+      <div style="background:var(--amber-light);color:#63430B;padding:9px 11px;border-radius:8px;font-size:11.5px;margin:8px 0 14px;">
+        For when signing in with your own account is not possible. The admin key alone opens nothing:
+        it sends a 6-digit code to the CEO, and the CEO decides whether to give it to you.
+        The code lets you in for 2 hours, and the CEO can end it at any time.
       </div>
-      <div class="field"><label>API base URL</label><input id="conn_base" value="${esc(API.base||window.location.origin)}"></div>
-      <div class="field"><label>Admin API key</label><input id="conn_key" type="password" placeholder="vq_..."></div>
-      <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:6px;" onclick="attemptConnect()">Connect with key</button>
+      <div class="field"><label>Admin API key</label><input id="conn_key" type="password" autocomplete="off" placeholder="vq_..." onkeydown="if(event.key==='Enter')startEmergency()"></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:6px;" onclick="startEmergency()">Send a code to the CEO</button>
       <p class="footnote" style="text-align:center;"><a href="#" onclick="event.preventDefault();loginStep='password';connectError='';renderConnectScreen()">Back to normal sign-in</a></p>`);
+    const el = document.getElementById('conn_key'); if(el) el.focus();
     return;
   }
   if(loginStep === 'otp'){
     const isTotp = loginChallenge && loginChallenge.method === 'totp';
+    const isCeoCode = loginChallenge && loginChallenge.method === 'ceo';
     app.innerHTML = shell(`
-      <h3 style="margin:0 0 4px;font-size:15px;">${isTotp ? 'Your authenticator app' : 'Check your email'}</h3>
+      <h3 style="margin:0 0 4px;font-size:15px;">${isCeoCode ? 'Ask the CEO for the code' : isTotp ? 'Your authenticator app' : 'Check your email'}</h3>
       <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">${esc((loginChallenge&&loginChallenge.message)||'We sent you a 6-digit code.')}</p>
       <div class="field"><label>6-digit code</label>
         <input id="otp_code" inputmode="numeric" autocomplete="one-time-code" maxlength="6"
                style="letter-spacing:6px;font-size:19px;font-family:var(--f-mono);text-align:center;"
                onkeydown="if(event.key==='Enter')submitOtp()"></div>
-      <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitOtp()">Verify and sign in</button>
-      <p class="footnote" style="text-align:center;"><a href="#" onclick="event.preventDefault();loginStep='password';loginChallenge=null;connectError='';renderConnectScreen()">Start again</a></p>`);
+      <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitOtp()">${isCeoCode ? 'Verify and open emergency access' : 'Verify and sign in'}</button>
+      <p class="footnote" style="text-align:center;"><a href="#" onclick="event.preventDefault();loginStep=${isCeoCode ? "'emergency'" : "'password'"};loginChallenge=null;connectError='';renderConnectScreen()">Start again</a></p>`);
     const el = document.getElementById('otp_code'); if(el) el.focus();
     return;
   }
@@ -7691,7 +7779,7 @@ function renderConnectScreen(){
     <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:6px;" onclick="submitPassword()">Continue</button>
     <p class="footnote" style="text-align:center;margin-top:10px;"><a href="#" onclick="event.preventDefault();forgotPassword()">Forgot your password?</a></p>
     <p class="footnote">You'll get a one-time code by email to finish signing in. Accounts are created by an administrator in the CRM.</p>
-    <p class="footnote" style="text-align:center;margin-top:10px;"><a href="#" onclick="event.preventDefault();loginStep='apikey';connectError='';renderConnectScreen()" style="color:var(--muted);">Emergency access with an API key</a></p>`);
+    <p class="footnote" style="text-align:center;margin-top:10px;"><a href="#" onclick="event.preventDefault();loginStep='emergency';connectError='';renderConnectScreen()" style="color:var(--muted);">Emergency access with an API key</a></p>`);
   const el = document.getElementById('lg_email'); if(el) el.focus();
 }
 
@@ -7738,10 +7826,15 @@ async function submitPassword(){
 async function submitOtp(){
   if(loginBusy) return;
   const code = (document.getElementById('otp_code')||{}).value || '';
-  if(!code.trim()){ connectError = (loginChallenge&&loginChallenge.method==='totp') ? 'Enter the code from your authenticator app.' : 'Enter the code from your email.'; renderConnectScreen(); return; }
+  if(!code.trim()){
+    const m = loginChallenge && loginChallenge.method;
+    connectError = m==='totp' ? 'Enter the code from your authenticator app.' : m==='ceo' ? 'Enter the code the CEO gives you.' : 'Enter the code from your email.';
+    renderConnectScreen(); return;
+  }
   loginBusy = true;
   try{
-    const res = await fetch((API.base||window.location.origin)+'/api/auth/verify', {
+    const isCeoCode = loginChallenge && loginChallenge.method === 'ceo';
+    const res = await fetch((API.base||window.location.origin)+(isCeoCode ? '/api/auth/breakglass/verify' : '/api/auth/verify'), {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ challenge_id: loginChallenge.challenge_id, code: code.trim() }),
     });
@@ -7778,7 +7871,6 @@ function mountSurveys(){
       showToast('Building the spreadsheet…');
       const headers = {};
       if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
-      else if(API.key) headers['x-api-key'] = API.key;
       const res = await fetch(API.base + '/api/surveys' + path, { headers });
       if(!res.ok){ const err = await res.json().catch(()=>null); throw new Error((err&&err.error) || `Export failed (${res.status})`); }
       const blob = await res.blob();
@@ -7806,7 +7898,6 @@ function mountCustomers(){
       showToast('Building the customer workbook…');
       const headers = {};
       if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
-      else if(API.key) headers['x-api-key'] = API.key;
       const res = await fetch(API.base + '/api/contacts' + path, { headers });
       if(!res.ok){ const err = await res.json().catch(()=>null); throw new Error((err&&err.error) || `Export failed (${res.status})`); }
       const blob = await res.blob();
@@ -7819,31 +7910,65 @@ function mountCustomers(){
 }
 
 async function signOut(){
+  clearInterval(usagePollTimer);
   if(window.VQS) VQS.reset();
   if(window.VQC) VQC.reset();
   try{ if(API.session) await fetch(API.base+'/api/auth/logout',{method:'POST',headers:{'Authorization':'Bearer '+API.session}}); }catch(e){}
-  API.clearConfig(); authUser=null; apiConnected=false;
+  API.clearConfig(); authUser=null; apiConnected=false; emergencyData=null;
   API.base = window.location.origin;
   loginStep='password'; connectError='';
   renderConnectScreen();
 }
 
-async function attemptConnect(){
-  const base = document.getElementById('conn_base').value.trim();
-  const key = document.getElementById('conn_key').value.trim();
-  if(!base||!key){ connectError='Both fields are required.'; renderConnectScreen(); return; }
-  API.setConfig(base, key);
-  await boot();
+/** The server says this session is over: back to sign-in, with its reason. */
+function signedOutByServer(msg){
+  clearInterval(usagePollTimer);
+  if(window.VQS) VQS.reset();
+  if(window.VQC) VQC.reset();
+  API.clearConfig(); authUser=null; apiConnected=false; emergencyData=null;
+  API.base = window.location.origin;
+  openModal=null; openPanel=null;
+  loginStep='password'; loginChallenge=null;
+  connectError = msg || 'You have been signed out. Sign in again.';
+  renderConnectScreen();
+}
+
+/** Emergency access, step 1: the admin key sends a code to the CEO. */
+async function startEmergency(){
+  if(loginBusy) return;
+  const key = ((document.getElementById('conn_key')||{}).value || '').trim();
+  if(!key){ connectError='Paste the admin API key.'; renderConnectScreen(); return; }
+  loginBusy = true;
+  try{
+    const res = await fetch((API.base||window.location.origin)+'/api/auth/breakglass/start', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key }),
+    });
+    const json = await res.json().catch(()=>({}));
+    loginBusy = false;
+    if(!res.ok){ connectError = json.error || 'Could not start emergency access.'; renderConnectScreen(); return; }
+    loginChallenge = json; loginStep = 'otp'; connectError = '';
+    renderConnectScreen();
+  }catch(e){
+    loginBusy = false; connectError = 'Could not reach the server.'; renderConnectScreen();
+  }
 }
 
 /* ============================== Boot ============================== */
 async function boot(){
-  if(!API.configured()){ renderConnectScreen(); return; }
+  if(!API.configured()){
+    if(bootNotice){ connectError = bootNotice; bootNotice = ''; }
+    renderConnectScreen(); return;
+  }
   document.getElementById('app').innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;gap:10px;color:#6C7885;font-family:Inter;"><span class="loading-dot"></span> Connecting to Vantriq API…</div>`;
   try{
     if(API.session){
       const me = await fetch(API.base+'/api/auth/me',{headers:{'Authorization':'Bearer '+API.session}});
-      if(!me.ok){ API.clearConfig(); API.base = window.location.origin; renderConnectScreen(); return; }
+      if(!me.ok){
+        const why = await me.json().catch(()=>({}));
+        API.clearConfig(); API.base = window.location.origin;
+        connectError = (why && why.signed_out && why.error) || '';
+        renderConnectScreen(); return;
+      }
       authUser = await me.json();
     } else { authUser = null; }
     await loadState();
@@ -7852,7 +7977,7 @@ async function boot(){
     startUsagePolling();
   }catch(e){
     apiConnected = false;
-    connectError = e instanceof ApiError ? e.message : 'Could not connect. Check the API URL and key.';
+    connectError = e instanceof ApiError ? e.message : 'Could not connect to the server. Try again.';
     if(e && e.status===401) { API.clearConfig(); }
     renderConnectScreen();
   }

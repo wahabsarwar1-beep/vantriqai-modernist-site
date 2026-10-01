@@ -64,7 +64,8 @@ router.post('/:id/decision', async (req, res) => {
   if (!event) return res.status(404).json({ error: 'Quota flag not found' });
   if (event.decision) return res.status(409).json({ error: `This month was already decided: ${event.decision}.` });
 
-  const decidedBy = (req.user && req.user.email) || (req.authKind === 'apikey' ? `api-key (${req.apiKeyScope})` : 'unknown');
+  const decidedBy = (req.user && req.user.email)
+    || (req.authKind === 'breakglass' ? 'emergency access' : req.authKind === 'apikey' ? `api-key (${req.apiKeyScope})` : 'unknown');
 
   let invoice = null;
   if (decision === 'bill_overage') {

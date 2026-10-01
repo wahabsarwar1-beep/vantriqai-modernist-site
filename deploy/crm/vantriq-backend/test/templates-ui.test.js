@@ -12,6 +12,7 @@
  */
 const { chromium } = require('playwright-core');
 const fs = require('fs');
+const { signInAsAdmin, endUiSessions } = require('./ui-session');
 const B = 'http://127.0.0.1:8099';
 const ADMIN_KEY = fs.readFileSync('/tmp/adminkey', 'utf8').trim();
 const AH = { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY };
@@ -243,7 +244,7 @@ const api = (method, p, b) => fetch(B + p, { method, headers: AH, body: b ? JSON
       page.on('pageerror', (e) => errors.push(`crm: ${e.message}`));
       page.on('dialog', (d) => d.accept());
       await page.goto(B + '/');
-      await page.evaluate((k) => localStorage.setItem('vantriq_api_key', k), ADMIN_KEY);
+      await signInAsAdmin(page);
       await page.goto(B + '/');
       await page.click('.nav-item:has-text("Clients")');
       await page.waitForSelector(`text=${cafe.company}`, { timeout: 10000 });
@@ -295,5 +296,6 @@ const api = (method, p, b) => fetch(B + p, { method, headers: AH, body: b ? JSON
   }
   ok(errors.length === 0, 'no script errors on any page', errors.join(' | '));
   console.log(`\n==== ${pass} passed, ${fail} failed ====\n`);
+  await endUiSessions();
   process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

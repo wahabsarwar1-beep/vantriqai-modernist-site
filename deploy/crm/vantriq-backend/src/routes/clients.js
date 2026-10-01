@@ -490,7 +490,7 @@ router.patch('/:id/api-access', async (req, res) => {
 router.patch('/:id/surveys', async (req, res) => {
   if (!isAdminRequest(req)) return res.status(403).json({ error: 'Only an admin can switch Vantriq Echo on or off for a client.' });
   const body = req.body || {};
-  const by = req.user ? (req.user.name || req.user.email) : 'admin key';
+  const by = req.user ? (req.user.name || req.user.email) : req.authKind === 'breakglass' ? 'emergency access' : 'admin key';
   // v9.19: the industry can be set in the same call, and switching on can
   // make a live starter survey from it (only when they have none yet).
   if ('industry' in body && !(await setClientIndustry(req.params.id, body.industry))) return res.status(404).json({ error: 'Client not found' });

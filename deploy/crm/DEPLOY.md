@@ -112,8 +112,11 @@ docker exec crm_app npm run create-key -- "n8n usage webhook" webhook
 ```
 
 Each prints a `vq_...` key **once**. Store them in a password manager, not a
-chat window. The admin key goes into the CRM's Connect screen; the webhook key
-goes into n8n and nowhere else.
+chat window. The webhook key goes into n8n and nowhere else. The admin key is
+break-glass only (v9.22): from a browser it opens nothing on its own — typed
+into the CRM's *Emergency access* it emails a one-time code to the CEO, and
+only that code opens the CRM, for two hours. On the server itself it still
+works as an API key.
 
 ## 8. Point Nginx Proxy Manager at it
 
@@ -161,8 +164,10 @@ That should return the six seeded packages. A 500 here with a green container
 means the app is up but `DATABASE_URL` / `DATABASE_SSL` are wrong — check
 `docker logs crm_app` for the Postgres error.
 
-Then open `https://crm.vantriqai.com`, paste the admin key into the Connect
-screen, and confirm the six packages load with zero clients. All three surfaces
+Then create the CEO's account over SSH (`docker exec -it crm_app npm run
+seed-owner`), open `https://crm.vantriqai.com`, sign in with it — email,
+password, then the code emailed to it — and confirm the six packages load with
+zero clients. All three surfaces
 are served by this one container — `/` (admin CRM), `/portal.html` (customer
 portal) and `/rep.html` (sales rep pipeline), each returning 200 in prep testing.
 

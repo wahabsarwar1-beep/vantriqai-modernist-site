@@ -9,6 +9,7 @@
  */
 const { chromium } = require('playwright-core');
 const fs = require('fs');
+const { signInAsAdmin, endUiSessions } = require('./ui-session');
 const B = 'http://127.0.0.1:8099';
 const ADMIN_KEY = fs.readFileSync('/tmp/adminkey', 'utf8').trim();
 const AH = { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY };
@@ -70,7 +71,7 @@ const post = (p, b) => fetch(B + p, { method: 'POST', headers: AH, body: JSON.st
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   page.on('pageerror', (e) => errors.push(`crm: ${e.message}`));
   await page.goto(B + '/');
-  await page.evaluate((k) => localStorage.setItem('vantriq_api_key', k), ADMIN_KEY);
+  await signInAsAdmin(page);
   await page.goto(B + '/');
   await page.click('.nav-item:has-text("Vantriq Pulse")');
   await page.waitForSelector('#vqaLeads', { timeout: 10000 }).catch(() => {});
@@ -92,5 +93,6 @@ const post = (p, b) => fetch(B + p, { method: 'POST', headers: AH, body: JSON.st
 
   await fetch(`${B}/api/clients/${client.id}`, { method: 'DELETE', headers: AH });
   console.log(`\n==== ${pass} passed, ${fail} failed ====\n`);
+  await endUiSessions();
   process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

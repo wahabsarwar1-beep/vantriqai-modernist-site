@@ -233,11 +233,11 @@ curl -sS https://crm.vantriqai.com/api/health
 
 **You should see:** `{"ok":true,"time":"..."}`
 
-Now open <https://crm.vantriqai.com> in your browser. You'll get a **Connect**
-screen. Enter:
-
-- **API base URL:** `https://crm.vantriqai.com`
-- **Admin API key:** your `vq_...` admin key from Step 11
+Now create your own account on the server (`docker exec -it crm_app npm run
+seed-owner` makes the CEO's), open <https://crm.vantriqai.com> and sign in with
+it: email, password, then the 6-digit code emailed to you. The admin key from
+Step 11 does not sign you in on its own (v9.22) — it is break-glass, behind
+*Emergency access*, and needs a code the CEO is emailed.
 
 You should land on the dashboard with six packages and no clients. **That's it —
 you're live.**
@@ -246,10 +246,11 @@ you're live.**
 > database is connected — that check doesn't look at the database at all. The
 > real proof is the dashboard loading your six packages in the browser.
 
-To prove the database from the terminal, swap in your admin key:
+To prove the database from the terminal, on the server itself (the admin key
+alone is refused from anywhere else):
 
 ```bash
-curl -sS -H "x-api-key: vq_YOUR_ADMIN_KEY" https://crm.vantriqai.com/api/products
+docker exec crm_app wget -qO- --header "x-api-key: vq_YOUR_ADMIN_KEY" http://127.0.0.1:8080/api/products
 ```
 
 **You should see:** a long line of data starting `[{"id":"...","name":"Starter"`.
