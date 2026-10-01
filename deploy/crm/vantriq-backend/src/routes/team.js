@@ -8,6 +8,47 @@ const COMPANY_DOMAIN = (process.env.COMPANY_EMAIL_DOMAIN || 'vantriqai.com').toL
 
 /** Admin-only management of internal employee logins. */
 
+/**
+ * Whatever an emergency session (v9.22) changes here is emailed to the CEO as
+ * it happens. Emergency access is two hours of admin, and an account added or
+ * a password set in those two hours would outlast them — so the CEO hears of
+ * each one, not just that a session opened.
+ */
+const EMERGENCY_ACTIONS = {
+  'reset-password': 'set a new password for',
+  deactivate: 'deactivated',
+  activate: 'reactivated',
+  role: 'changed the role of',
+};
+router.use((req, res, next) => {
+  if (req.authKind !== 'breakglass' || req.method === 'GET') return next();
+  res.on('finish', () => {
+    if (res.statusCode >= 400) return;
+    (async () => {
+      const body = req.body || {};
+      const m = /^\/([0-9a-f-]{36})\/([a-z-]+)$/i.exec(req.path);
+      let what;
+      if (req.path === '/') {
+        what = `added an employee: ${body.email} (${body.role || 'staff'})`;
+      } else if (m) {
+        const { rows } = await db.query(`select email, role from internal_users where id = $1`, [m[1]]);
+        const who = rows[0] ? `${rows[0].email} (now ${rows[0].role})` : m[1];
+        what = `${EMERGENCY_ACTIONS[m[2]] || m[2]} ${who}`;
+      } else {
+        what = `${req.method} /api/team${req.path}`;
+      }
+      alertOwner('Emergency access just changed the team', [
+        `It ${what}.`,
+        `Key: ${req.breakglass.key_name}`,
+        `Time: ${new Date().toISOString()}`,
+        '',
+        'If you did not expect this, end emergency access (CRM → Team → Emergency access) and undo it.',
+      ]);
+    })().catch((err) => console.error('Team change alert failed', err));
+  });
+  next();
+});
+
 const PUBLIC_COLS = `id, email, name, role, active, must_change_password, is_owner, totp_enabled, must_setup_totp, created_at, last_login_at, password_set_by`;
 
 const MIN_PASSWORD = 10;

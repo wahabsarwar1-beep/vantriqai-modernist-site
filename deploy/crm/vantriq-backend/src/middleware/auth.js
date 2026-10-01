@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const db = require('../db');
 const { alertOwner } = require('../utils/securityAlerts');
+const { clientIp } = require('../utils/clientIp');
 
 function hashKey(plaintextKey) {
   return crypto.createHash('sha256').update(plaintextKey).digest('hex');
@@ -17,10 +18,14 @@ function hashKey(plaintextKey) {
  *     how people sign in. Their role decides what they can reach.
  *
  *  2. An API key in `x-api-key`. The webhook-scoped key is how n8n posts usage
- *     and must keep working. The admin key still opens everything and is kept
- *     deliberately as a break-glass route for when email delivery fails or the
- *     last admin loses their second factor. Set ALLOW_API_KEY_LOGIN=false to
- *     switch that off.
+ *     and must keep working. The admin key is break-glass only, and since
+ *     v9.22 it no longer opens anything on its own: on the CRM's sign-in page
+ *     ("Emergency access") it asks for a one-time code that is emailed to the
+ *     CEO, and the code — read out by the CEO, if they agree — opens a
+ *     two-hour emergency session (Bearer bg_…, below). Sent bare from anywhere
+ *     but the server itself, the admin key is refused with signed_out, which
+ *     is what signs out a browser still holding it. Set
+ *     ALLOW_API_KEY_LOGIN=false to switch emergency access off altogether.
  *
  *  3. An 'automation' scoped API key. n8n needs to onboard a client and raise
  *     an invoice, which the webhook scope cannot do and which is no reason to
@@ -32,6 +37,85 @@ function hashKey(plaintextKey) {
  */
 const ROLE_RANK = { webhook: 0, automation: 1, staff: 2, admin: 3 };
 
+/** Emergency sessions (v9.22) are told apart from staff sessions by this. */
+const BREAKGLASS_PREFIX = 'bg_';
+
+const apiKeyLoginAllowed = () =>
+  String(process.env.ALLOW_API_KEY_LOGIN || 'true').toLowerCase() !== 'false';
+
+/**
+ * True for a request made on the server itself — from inside the container,
+ * not through Nginx Proxy Manager. The proxy connects from its own address on
+ * the Docker network and always adds X-Real-IP and X-Forwarded-For, so a
+ * loopback peer with neither is somebody with a shell on the box, who holds
+ * the database anyway. Only there does the admin key still work on its own.
+ */
+const LOOPBACK = /^(127\.|::1$|::ffff:127\.)/;
+function isOnServer(req) {
+  const peer = String((req.socket && req.socket.remoteAddress) || '');
+  if (!LOOPBACK.test(peer)) return false;
+  const h = req.headers || {};
+  return !(h['x-forwarded-for'] || h['x-real-ip'] || h['forwarded']);
+}
+
+const ADMIN_KEY_ALONE = 'The admin key no longer opens the CRM on its own. Use it under "Emergency access" on the sign-in page: a one-time code goes to the CEO.';
+
+/**
+ * Somebody presented the admin key on its own from outside — a browser still
+ * signed in the old way, or someone who has the key. Either way the CEO hears
+ * about it, once an hour per key, with where it came from.
+ */
+const refusedAlertAt = new Map();
+function alertRefusedKey(key, req) {
+  const last = refusedAlertAt.get(key.id) || 0;
+  if (Date.now() - last < 60 * 60 * 1000) return;
+  refusedAlertAt.set(key.id, Date.now());
+  alertOwner('The admin API key was used on its own and refused', [
+    `Key: ${key.name}`,
+    `Path: ${req.method} ${req.originalUrl}`,
+    `From: ${clientIp(req)}`,
+    `Browser: ${String(req.header('user-agent') || 'unknown').slice(0, 160)}`,
+    `Time: ${new Date().toISOString()}`,
+    '',
+    'Nothing was opened. A browser still signed in with the key alone has been signed out; to get back in, it must ask you for a code.',
+    'If nobody you know should have this key, rotate it.',
+  ]);
+}
+
+/**
+ * An emergency session: opened with the admin key AND a code emailed to the
+ * CEO (routes/auth.js, /breakglass/*). Admin everywhere an admin goes, except
+ * the CEO's own areas, and it ends after a couple of hours, when signed out,
+ * when the CEO ends it, or when its key is revoked.
+ */
+async function breakglassSession(token, minScope, req, res, next) {
+  const { rows } = await db.query(
+    `select s.id, s.expires_at, s.ended_at, s.key_id, k.name as key_name, k.scope, k.revoked
+       from breakglass_sessions s join api_keys k on k.id = s.key_id
+      where s.token_hash = $1`,
+    [hashKey(token)]
+  );
+  const s = rows[0];
+  const out = (error) => res.status(401).json({ error, signed_out: true });
+  if (!s || s.ended_at) return out('Emergency access has ended. Sign in again.');
+  if (new Date(s.expires_at) < new Date()) return out('Emergency access has expired. Sign in again.');
+  if (s.revoked || s.scope !== 'admin' || !apiKeyLoginAllowed()) {
+    await db.query(
+      `update breakglass_sessions set ended_at = now(), ended_by = $2 where id = $1 and ended_at is null`,
+      [s.id, s.revoked ? 'key revoked' : 'emergency access switched off']
+    );
+    return out('Emergency access has ended: its key no longer works.');
+  }
+  if (minScope === 'webhook') {
+    return res.status(403).json({ error: 'Usage ingestion uses a webhook key, not a staff session.' });
+  }
+  db.query(`update breakglass_sessions set last_seen_at = now() where id = $1`, [s.id]).catch(() => {});
+  req.breakglass = { id: s.id, key_id: s.key_id, key_name: s.key_name, expires_at: s.expires_at };
+  req.apiKeyScope = 'admin';
+  req.authKind = 'breakglass';
+  return next();
+}
+
 function requireScope(minScope) {
   return async function (req, res, next) {
     try {
@@ -39,6 +123,7 @@ function requireScope(minScope) {
       const header = req.header('authorization') || '';
       const bearer = header.toLowerCase().startsWith('bearer ') ? header.slice(7).trim() : '';
       if (bearer) {
+        if (bearer.startsWith(BREAKGLASS_PREFIX)) return await breakglassSession(bearer, minScope, req, res, next);
         const { rows } = await db.query(
           `select s.expires_at, u.id, u.email, u.name, u.role, u.active, u.must_change_password, u.is_owner
              from staff_sessions s join internal_users u on u.id = s.user_id
@@ -46,11 +131,11 @@ function requireScope(minScope) {
           [bearer]
         );
         const row = rows[0];
-        if (!row) return res.status(401).json({ error: 'Your session has ended. Please sign in again.' });
+        if (!row) return res.status(401).json({ error: 'Your session has ended. Please sign in again.', signed_out: true });
         if (!row.active) return res.status(403).json({ error: 'This account has been deactivated.' });
         if (new Date(row.expires_at) < new Date()) {
           await db.query(`delete from staff_sessions where token = $1`, [bearer]);
-          return res.status(401).json({ error: 'Your session has expired. Please sign in again.' });
+          return res.status(401).json({ error: 'Your session has expired. Please sign in again.', signed_out: true });
         }
         if (minScope === 'webhook') {
           return res.status(403).json({ error: 'Usage ingestion uses a webhook key, not a staff session.' });
@@ -78,16 +163,21 @@ function requireScope(minScope) {
 
       // The admin key is break-glass only; the webhook key is machine traffic
       // and is unaffected by that switch.
-      if (key.scope === 'admin' && String(process.env.ALLOW_API_KEY_LOGIN || 'true').toLowerCase() === 'false') {
+      if (key.scope === 'admin' && !apiKeyLoginAllowed()) {
         return res.status(403).json({ error: 'API key sign-in is disabled. Use your Vantriq Ops account.' });
+      }
+      // And on its own it opens nothing from outside the server (v9.22): it is
+      // the first half of emergency access, the CEO's code the second.
+      if (key.scope === 'admin' && !isOnServer(req)) {
+        alertRefusedKey(key, req);
+        return res.status(401).json({ error: ADMIN_KEY_ALONE, signed_out: true, breakglass: true });
       }
       if (ROLE_RANK[key.scope] < ROLE_RANK[minScope]) {
         return res.status(403).json({ error: `This endpoint requires ${minScope} access` });
       }
 
-      // The admin key opens everything with no attribution — whoever holds
-      // it IS an admin. That's exactly what "break-glass" means, and exactly
-      // why every use of it gets emailed to the owner immediately: a
+      // On the server itself the admin key still opens everything with no
+      // attribution, and every use of it is still emailed to the owner: a
       // legitimate emergency and a leaked key both need to be seen the
       // moment they happen, not discovered later in last_used_at. Throttled
       // to once an hour per key so a burst of automated calls through it
@@ -120,11 +210,13 @@ function requireScope(minScope) {
 }
 
 /**
- * True only for a real administrator — an admin's own session, or the
- * break-glass admin key. Used to gate cost and margin figures, which staff,
- * automation keys and webhooks must never receive.
+ * True only for a real administrator — an admin's own session, an emergency
+ * session, or the admin key on the server itself. Used to gate cost and
+ * margin figures, which staff, automation keys and webhooks must never
+ * receive.
  */
 function isAdminRequest(req) {
+  if (req.authKind === 'breakglass') return true;
   if (req.authKind === 'apikey' && req.apiKeyScope === 'admin') return true;
   return !!(req.user && req.user.role === 'admin');
 }
@@ -132,10 +224,11 @@ function isAdminRequest(req) {
 /**
  * Pricing is the CEO's alone: the price book, what each package and add-on
  * costs us to serve, every margin, and the business documents behind them.
- * Not another admin, not the break-glass admin key, not an automation key —
- * only the CEO, signed in as themselves (password and authenticator code)
- * on the protected owner account (db/schema.sql v9.11), whose address is
- * PRICING_EMAIL (ceo@vantriqai.com unless the server says otherwise).
+ * Not another admin, not the admin key, not an emergency session, not an
+ * automation key — only the CEO, signed in as themselves (password and
+ * authenticator code) on the protected owner account (db/schema.sql v9.11),
+ * whose address is PRICING_EMAIL (ceo@vantriqai.com unless the server says
+ * otherwise).
  */
 const PRICING_EMAIL = () => String(process.env.PRICING_EMAIL || 'ceo@vantriqai.com').trim().toLowerCase();
 
@@ -164,4 +257,7 @@ function blockAutomation(req, res, next) {
   next();
 }
 
-module.exports = { requireScope, hashKey, isAdminRequest, blockAutomation, isCeoRequest, isPricingOwner, requireCeo, PRICING_EMAIL };
+module.exports = {
+  requireScope, hashKey, isAdminRequest, blockAutomation, isCeoRequest, isPricingOwner, requireCeo, PRICING_EMAIL,
+  BREAKGLASS_PREFIX, apiKeyLoginAllowed, isOnServer,
+};

@@ -233,6 +233,22 @@ BEFORE=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
   -c "select count(*) from information_schema.tables where table_schema='public'")
 ok "database '$DB_NAME' reachable — $BEFORE tables today"
 
+# Which API keys are in use, by scope: how many, and when each scope was last
+# used. Read-only and printed in dry runs too, so a change to how a key is
+# accepted can be checked against real traffic before it ships. Counts and
+# times only — never a key, its name or a hash.
+KEY_USE=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At -F '|' -c "
+  select scope,
+         count(*) filter (where not revoked),
+         coalesce(round(extract(epoch from now() - max(last_used_at) filter (where not revoked)) / 60)::text, 'never')
+    from api_keys group by scope order by scope" 2>/dev/null || true)
+if [ -n "$KEY_USE" ]; then
+  echo "$KEY_USE" | while IFS='|' read -r scope active mins; do
+    if [ "$mins" = "never" ]; then when="never used"; else when="last used $mins min ago"; fi
+    ok "API keys, $scope scope: $active active, $when"
+  done
+fi
+
 # ---------------------------------------------------------------- 2. backup
 bold "2. Backing up first"
 mkdir -p backups
@@ -531,6 +547,25 @@ else
   CEO_DOCS=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
     -c "select count(*) from owner_documents" 2>/dev/null || echo '?')
   ok "business documents on file for the CEO: $CEO_DOCS"
+  # v9.22: the admin key opens nothing on its own from outside the server.
+  # Emergency access is the key plus a code emailed to the CEO. Checked
+  # without a real key and without sending anything: a made-up key is turned
+  # away by the emergency route, and a made-up emergency session is told it
+  # is signed out. Counts only.
+  BG_TABLES=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
+    -c "select count(*) from information_schema.tables where table_schema='public' and table_name in ('breakglass_challenges','breakglass_sessions')" 2>/dev/null || echo '?')
+  if [ "$BG_TABLES" = "2" ] && docker exec "$APP_CONTAINER" node -e "
+    const B='http://127.0.0.1:8080/api/auth';
+    Promise.all([
+      fetch(B+'/breakglass/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:'vq_deploy_check_not_a_key'})}).then(r=>r.status===401||r.status===403),
+      fetch(B+'/me',{headers:{Authorization:'Bearer bg_deploy_check_not_a_session'}}).then(r=>r.json().then(j=>r.status===401&&j.signed_out===true)),
+    ]).then(a=>process.exit(a.every(Boolean)?0:1)).catch(()=>process.exit(1))" 2>/dev/null; then
+    BG_OPEN=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
+      -c "select count(*) from breakglass_sessions where ended_at is null and expires_at > now()" 2>/dev/null || echo '?')
+    ok "the admin key alone opens nothing; emergency access needs a code emailed to $PRICING_TO (open now: $BG_OPEN)"
+  else
+    warn "emergency access is not answering as expected"; FAILED=1
+  fi
 
   AFTER=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
     -c "select count(*) from information_schema.tables where table_schema='public'")
@@ -653,5 +688,16 @@ cat <<'NEXT'
      any API key. Upload the business model, pitch deck and portfolio there
      once (drop them on the card): they live in the database, never in the
      code. This log no longer prints prices, costs or margins.
+
+ 15. Emergency access (v9.22). The admin API key no longer opens the CRM
+     on its own: anyone still signed in with it is shut out by this deploy —
+     everything it asks for is refused, and on reload the page drops the key
+     and shows sign-in. "Emergency access with an API key" on the
+     sign-in page now emails a 6-digit code to ceo@vantriqai.com, saying
+     where the request came from; only that code, if the CEO gives it out,
+     opens the CRM — as an admin, without Pricing — for two hours. The CEO
+     sees each one and ends it under Team → Emergency access. If email is
+     down, the way in is the server itself (SSH). If you are not sure who
+     has had the admin key, rotate it.
 NEXT
 printf '\n'

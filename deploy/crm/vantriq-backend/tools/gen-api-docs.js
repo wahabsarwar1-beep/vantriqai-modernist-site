@@ -103,10 +103,13 @@ for (const mount of mounts) {
   for (const m of src.matchAll(/^router\.(get|post|put|patch|delete)\(\s*'([^']*)'/gm)) {
     const method = m[1];
     const sub = m[2] === '/' ? '' : m[2];
+    // A route can narrow its own mount: the CEO's guards on a route inside
+    // an otherwise open module (auth.js's emergency-access list, v9.22).
+    const line = src.slice(m.index, src.indexOf('\n', m.index));
     endpoints.push({
       method,
       path: (mount.mountPath + sub) || '/',
-      scope: mount.scope,
+      scope: /\bceoOnly\b|\brequireCeo\b/.test(line) ? 'ceo' : mount.scope,
       module: mount.file,
       summary: commentAbove(src, m.index),
     });
@@ -146,9 +149,9 @@ endpoints.sort((a, b) => a.path.localeCompare(b.path) || a.method.localeCompare(
 const SCOPE_NOTE = {
   webhook: 'Webhook key. The narrowest scope — usage, lead and conversation ingestion only.',
   automation: 'Automation key or any staff session. Clients, invoices, packages, agents.',
-  staff: 'Staff session, or an admin key. Day-to-day CRM work.',
-  admin: 'Admin only. Settings, procurement, accounting, archive, exports.',
-  ceo: 'The CEO only: the owner account (ceo@vantriqai.com) signed in with its own session. No API key and no other admin reaches it. Costing, Financials, the business documents.',
+  staff: 'Staff session or an emergency session. Day-to-day CRM work.',
+  admin: 'Admin only: an admin\'s session or an emergency session. Settings, procurement, accounting, archive, exports.',
+  ceo: 'The CEO only: the owner account (ceo@vantriqai.com) signed in with its own session. No API key, no emergency session and no other admin reaches it. Costing, Financials, the business documents, the list of emergency sessions.',
   'rep-session': 'A sales rep\'s own session token. Scoped to that rep.',
   null: 'Open, or authenticated by the route itself (portal and staff sign-in).',
 };
@@ -206,12 +209,15 @@ const spec = {
       '- **Staff session** — `Authorization: Bearer <token>`, issued by `POST /api/auth/verify`',
       '  after a password and an emailed one-time code. A staff member\'s role decides reach.',
       '- **API key** — `x-api-key: <key>`, for machines. Keys are scoped.',
+      '- **Emergency session** — `Authorization: Bearer bg_…`, issued by',
+      '  `POST /api/auth/breakglass/verify` for the admin key plus a code emailed to the CEO.',
       '',
       '## Scopes',
       '',
       'Least to most: `webhook` < `automation` < `staff` < `admin`. A scope opens everything',
-      'below it. The admin key opens everything and is intended as break-glass only — set',
-      '`ALLOW_API_KEY_LOGIN=false` once staff accounts exist.',
+      'below it. The admin key is break-glass, and on its own it opens nothing from outside the',
+      'server (v9.22): it starts emergency access, which needs the CEO\'s code and lasts two',
+      'hours. Set `ALLOW_API_KEY_LOGIN=false` to switch emergency access off.',
       '',
       '## Automation writes through this API, never to the database',
       '',
@@ -262,7 +268,8 @@ md.push('');
 md.push('| Method | Header | Who uses it |');
 md.push('| --- | --- | --- |');
 md.push('| Staff session | `Authorization: Bearer <token>` | People. Issued by `POST /api/auth/verify` after a password **and** an emailed one-time code. |');
-md.push('| API key | `x-api-key: <key>` | Machines. Scoped per key. |');
+md.push('| API key | `x-api-key: <key>` | Machines. Scoped per key. The admin key is not one of them — see below. |');
+md.push('| Emergency session | `Authorization: Bearer bg_…` | Break-glass. Issued by `POST /api/auth/breakglass/verify` for the admin key **and** a code emailed to the CEO. Admin for two hours, never `ceo`. |');
 md.push('');
 md.push('### Scopes');
 md.push('');
@@ -272,7 +279,7 @@ md.push('| Scope | What it is for |');
 md.push('| --- | --- |');
 for (const s of ['webhook', 'automation', 'staff', 'admin', 'ceo']) md.push(`| \`${s}\` | ${SCOPE_NOTE[s]} |`);
 md.push('');
-md.push('The **admin key opens everything but `ceo`** and exists as break-glass for when email delivery fails or the last admin loses their second factor. Set `ALLOW_API_KEY_LOGIN=false` once staff accounts exist.');
+md.push('The **admin key is break-glass**, for when nobody can sign in with their own account. Since v9.22 it opens nothing on its own from outside the server: `POST /api/auth/breakglass/start` with the key emails a 6-digit code to the CEO, and `POST /api/auth/breakglass/verify` with that code returns an emergency session — admin everywhere except `ceo`, for two hours, listed for the CEO and ended by them. Sent bare, the key is answered 401 with `signed_out: true`. Set `ALLOW_API_KEY_LOGIN=false` to switch emergency access off.');
 md.push('');
 md.push('> **Automation writes through this API, never to the database.** Tenancy, quota and the tax rules live in these routes. A direct Postgres write bypasses all three.');
 md.push('');

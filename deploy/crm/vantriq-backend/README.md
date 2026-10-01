@@ -83,10 +83,12 @@ nowhere else.
 npm start
 ```
 
-Open `http://localhost:8080` in a browser. You'll see a **Connect**
-screen — paste in:
-- **API base URL:** `http://localhost:8080`
-- **Admin API key:** the admin key from Step 4
+Open `http://localhost:8080` in a browser and sign in with an account
+(`npm run seed-owner` or `npm run create-user`); the code it emails needs
+`HOSTINGER_MAIL_TOKEN` set. The admin key from Step 4 does not sign a browser
+in on its own (v9.22): it is break-glass, behind *Emergency access*, and needs
+a code emailed to the CEO. From this machine it still works as an API key:
+`curl -H "x-api-key: <admin key>" http://localhost:8080/api/products`.
 
 You should land on a dashboard with the six packages and zero clients.
 Add a test client, move it through the pipeline to Active, and confirm
@@ -104,9 +106,8 @@ Any Node hosting works. **Railway** is the fastest path:
    service: `DATABASE_URL`, `DATABASE_SSL=true`, `CORS_ORIGIN=*`
    (or your actual domain once you have one).
 4. Railway gives you a public URL like `https://vantriq-ops-production.up.railway.app`.
-5. Open that URL — you'll hit the Connect screen again. Use the same
-   admin key from Step 4 (it's stored in the database, not tied to
-   your laptop).
+5. Open that URL and sign in with the same account (it's stored in the
+   database, not tied to your laptop).
 
 Render and Fly.io work the same way — set `DATABASE_URL` as an
 environment variable and deploy.

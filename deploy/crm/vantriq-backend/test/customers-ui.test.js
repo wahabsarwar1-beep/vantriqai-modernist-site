@@ -13,6 +13,7 @@
 const { chromium } = require('playwright-core');
 const ExcelJS = require('exceljs');
 const fs = require('fs');
+const { signInAsAdmin, endUiSessions } = require('./ui-session');
 const B = 'http://127.0.0.1:8099';
 const os = require('os');
 const path = require('path');
@@ -103,7 +104,7 @@ const at = (d, m = 0) => new Date(Date.now() - d * 86400000 - m * 60000);
     await phone.close();
     const crm = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     crm.on('pageerror', (e) => errors.push('crm: ' + e.message));
-    await crm.goto(B + '/'); await crm.evaluate((k) => localStorage.setItem('vantriq_api_key', k), ADMIN_KEY); await crm.goto(B + '/');
+    await crm.goto(B + '/'); await signInAsAdmin(crm); await crm.goto(B + '/');
     await crm.click('.nav-item:has-text("Customers")'); await crm.waitForSelector('.vqc-table', { timeout: 15000 });
     await crm.selectOption('select[data-c="client"]', c.id); await crm.waitForTimeout(1200);
     ok(await crm.locator('.vqc-table tr.r').count() === 8, 'CRM → Customers, picking the client: the same eight');
@@ -112,6 +113,7 @@ const at = (d, m = 0) => new Date(Date.now() - d * 86400000 - m * 60000);
     await fetch(`${B}/api/clients/${c.id}`, { method: 'DELETE', headers: AH });
     ok(errors.length === 0, 'no script errors on any page', errors.join(' | '));
     console.log(`\n==== ${pass} passed, ${fail} failed ====`);
+    await endUiSessions();
     process.exit(fail ? 1 : 0);
   }
 })().catch((e) => { console.error(e); process.exit(1); });

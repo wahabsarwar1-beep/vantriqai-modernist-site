@@ -2090,3 +2090,43 @@ create table if not exists owner_documents (
   last_opened_at timestamptz
 );
 create index if not exists idx_owner_documents_kind on owner_documents(kind, uploaded_at desc);
+
+-- v9.22 — the admin API key is no longer a way in on its own.
+--
+-- Typed into the CRM's "Emergency access" screen, the key only asks for a
+-- one-time code, and the code goes to the CEO (PRICING_EMAIL), never to
+-- whoever typed the key: the CEO decides whether to read it out. A correct
+-- code opens an emergency session of two hours, listed for the CEO under
+-- Team → Emergency access and ended from there. The key sent on its own,
+-- from anywhere but the server itself, is refused — which signs out every
+-- browser that was still holding it.
+--
+-- Codes and session tokens are stored hashed: nothing in either table opens
+-- the CRM if read.
+create table if not exists breakglass_challenges (
+  id uuid primary key default gen_random_uuid(),
+  key_id uuid not null references api_keys(id) on delete cascade,
+  code_hash text not null,
+  sent_to text not null default '',
+  expires_at timestamptz not null,
+  attempts integer not null default 0,
+  consumed boolean not null default false,
+  ip text not null default '',
+  user_agent text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_breakglass_challenges_key on breakglass_challenges(key_id, created_at desc);
+
+create table if not exists breakglass_sessions (
+  id uuid primary key default gen_random_uuid(),
+  token_hash text not null unique,
+  key_id uuid not null references api_keys(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null,
+  last_seen_at timestamptz not null default now(),
+  ip text not null default '',
+  user_agent text not null default '',
+  ended_at timestamptz,
+  ended_by text not null default ''
+);
+create index if not exists idx_breakglass_sessions_recent on breakglass_sessions(created_at desc);

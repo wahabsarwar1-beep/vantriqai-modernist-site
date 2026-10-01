@@ -128,6 +128,42 @@ function otpEmail(code, name) {
   return { subject, text, html };
 }
 
+/**
+ * The emergency-access code (v9.22). It goes to the CEO, not to whoever typed
+ * the admin key, so the email says who is asking and from where: the CEO is
+ * deciding whether to let them in, not signing in themselves. The code is not
+ * in the subject, so it never shows on a locked phone's notification.
+ */
+function breakglassEmail(code, { keyName, ip, browser, minutes, hours }) {
+  const subject = 'Someone is asking for emergency access to the CRM';
+  const text = [
+    `Someone has typed the admin API key ("${keyName}") into the CRM's emergency-access screen and is waiting for a code.`,
+    ``,
+    `From: ${ip || 'unknown'}`,
+    `Browser: ${browser || 'unknown'}`,
+    `Time: ${new Date().toISOString()}`,
+    ``,
+    `If you know who this is and why they need in, give them this code: ${code}`,
+    ``,
+    `It expires in ${minutes} minutes and opens the CRM, as an admin and without Pricing, for ${hours} hours. You can end it at any time: CRM → Team → Emergency access.`,
+    `If you do not know who this is, do not share the code. Ignore this email and rotate the admin key.`,
+  ].join('\n');
+  const html = `
+    <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;">
+      <p>Someone has typed the admin API key (<strong>${escapeHtml(keyName)}</strong>) into the CRM's emergency-access screen and is waiting for a code.</p>
+      <table style="font-size:13px;color:#333;border-collapse:collapse;margin:10px 0 16px;">
+        <tr><td style="padding:2px 12px 2px 0;color:#777;">From</td><td>${escapeHtml(ip || 'unknown')}</td></tr>
+        <tr><td style="padding:2px 12px 2px 0;color:#777;">Browser</td><td>${escapeHtml(browser || 'unknown')}</td></tr>
+        <tr><td style="padding:2px 12px 2px 0;color:#777;">Time</td><td>${escapeHtml(new Date().toISOString())}</td></tr>
+      </table>
+      <p>If you know who this is and why they need in, give them this code:</p>
+      <p style="font-size:30px;font-weight:700;letter-spacing:5px;font-family:ui-monospace,Menlo,monospace;margin:18px 0;">${escapeHtml(code)}</p>
+      <p style="color:#555;font-size:13px;">It expires in ${escapeHtml(String(minutes))} minutes and opens the CRM, as an admin and without Pricing, for ${escapeHtml(String(hours))} hours. You can end it at any time: CRM → Team → Emergency access.</p>
+      <p style="color:#8F3527;font-size:13px;">If you do not know who this is, do not share the code. Ignore this email and rotate the admin key.</p>
+    </div>`;
+  return { subject, text, html };
+}
+
 function resetEmail(url, name, minutes) {
   const subject = 'Reset your Vantriq password';
   const text = [
@@ -262,4 +298,4 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
 
-module.exports = { sendMail, otpEmail, resetEmail, invoiceEmail, mailConfigured, mailDiagnosis };
+module.exports = { sendMail, otpEmail, resetEmail, breakglassEmail, invoiceEmail, mailConfigured, mailDiagnosis };

@@ -154,13 +154,12 @@ const stamp = Date.now().toString(36);
       await page.screenshot({ path: `${process.env.SHOTS || '/tmp'}/pricing-ceo.png`, fullPage: false });
       ok(errs.length === 0, 'no page errors', errs.join(' | '));
 
+      // Another admin; emergency access is the same (test/breakglass.test.js).
       const page2 = await browser.newPage();
-      await page2.goto(B, { waitUntil: 'networkidle' });
-      await page2.click('text=Emergency access with an API key'); await page2.waitForTimeout(300);
-      await page2.fill('#conn_base', B); await page2.fill('#conn_key', KEY);
-      await page2.click('button:has-text("Connect")'); await page2.waitForTimeout(2500);
+      await page2.addInitScript(([b, t]) => { localStorage.setItem('vantriq_api_base', b); localStorage.setItem('vantriq_staff_session', t); }, [B, other.headers.Authorization.slice(7)]);
+      await page2.goto(B, { waitUntil: 'networkidle' }); await page2.waitForTimeout(1500);
       const nav2 = await page2.locator('.sidebar').innerText();
-      ok(!/Products & Pricing/.test(nav2) && !/Financials/.test(nav2), 'the break-glass key sees neither', nav2.slice(0, 300));
+      ok(!/Products & Pricing/.test(nav2) && !/Financials/.test(nav2), 'another admin sees neither', nav2.slice(0, 300));
     } finally { await browser.close(); }
   } finally {
     if (made.length) await db.query(`delete from owner_documents where id = any($1::uuid[])`, [made]);

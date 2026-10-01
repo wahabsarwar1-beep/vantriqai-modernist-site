@@ -225,9 +225,11 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST \
 
 - **Rotate the mail token.** It has been shared in a chat. hPanel → Emails →
   API tokens → new token → replace line 1 of `.env` → `docker compose up -d --build`.
-- **Close the emergency door.** Once every employee has an account and you have
-  seen codes arrive reliably, set `ALLOW_API_KEY_LOGIN=false` in `.env` and
-  rebuild. The admin API key then stops opening the CRM.
+- **The emergency door has a second lock (v9.22).** The admin API key no
+  longer opens the CRM on its own: *Emergency access* on the sign-in page
+  emails a code to the CEO, and only that code opens it, for two hours — the
+  CEO sees and ends each one under Team → Emergency access. To shut the door
+  altogether, set `ALLOW_API_KEY_LOGIN=false` in `.env` and rebuild.
 - **Rotate the WhatsApp token.** Still sitting in plaintext in three n8n nodes.
 - **Reboot when convenient.** Ubuntu has been asking since day one. Containers
   restart by themselves.

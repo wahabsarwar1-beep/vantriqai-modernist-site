@@ -68,7 +68,7 @@ function normaliseProductIds(v) {
  * than printing nothing, so anything that is not plainly a person's
  * identity yields an empty string and the block simply omits the line.
  */
-const AUTH_SENTINELS = new Set(['apikey', 'session', 'webhook', 'automation', 'admin', 'staff', '']);
+const AUTH_SENTINELS = new Set(['apikey', 'breakglass', 'session', 'webhook', 'automation', 'admin', 'staff', '']);
 function preparerName(createdBy) {
   const v = String(createdBy || '').trim();
   return AUTH_SENTINELS.has(v.toLowerCase()) ? '' : v;
