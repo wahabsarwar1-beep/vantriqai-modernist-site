@@ -16,6 +16,7 @@ function shapeLead(row) {
     productId: row.product_id, productName: row.product_name || null,
     estValue: +row.est_value || 0, source: row.source, notes: row.notes,
     salesStage: row.sales_stage, closeOutcome: row.close_outcome,
+    assignedAt: row.assigned_at, assignedBy: row.assigned_by,
     createdAt: row.created_at, updatedAt: row.updated_at,
   };
 }
@@ -23,6 +24,14 @@ function shapeLead(row) {
 // Everything below is implicitly scoped to req.rep.id — a rep can never
 // pass another rep's client id and see/change it, because every query
 // filters on owner_rep_id = req.rep.id in the WHERE clause itself.
+
+// A rep's calendar follows current lead ownership; reassignment revokes access immediately.
+router.get('/calendar',async(req,res)=>res.json(await require('../utils/calendar').listEvents(req.query,req.rep.id)));
+router.get('/calendar/export',async(req,res)=>{
+  const cal=require('../utils/calendar');
+  res.type('text/calendar').set('Content-Disposition','attachment; filename="my-calendar.ics"')
+    .send(cal.ics(await cal.listEvents(req.query,req.rep.id)));
+});
 
 router.get('/leads', async (req, res) => {
   const { rows } = await db.query(

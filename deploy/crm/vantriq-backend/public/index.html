@@ -25,6 +25,7 @@
 <script src="/analytics-view.js"></script>
 <script src="/survey-studio.js"></script>
 <script src="/contacts-view.js"></script>
+<script src="/calendar-view.js"></script>
 <script src="/invoice-print.js"></script>
 <style>
 /* The console is set in VantriqAI's own palette — the cream ground, ink
@@ -647,6 +648,8 @@ td.amt,th.amt,td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
   .topbar{padding:13px 16px;}
   .detail-panel{width:100%;}
 }
+
+.calendar-scroll{overflow-x:auto;}.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(120px,1fr));min-width:840px;border:1px solid var(--border);border-radius:10px;overflow:hidden;}.calendar-weekday{padding:10px;background:var(--border-2);font-weight:600;text-align:center;}.calendar-day{min-height:140px;padding:6px;border-top:1px solid var(--border);border-right:1px solid var(--border);background:var(--surface,#fff);}.calendar-empty{background:var(--border-2);}.calendar-today{box-shadow:inset 0 0 0 2px var(--teal-400);}.calendar-booking{display:block;width:100%;text-align:left;border:0;border-radius:6px;background:var(--teal-light);color:var(--teal-dark);padding:8px;margin:5px 0;cursor:pointer;font:inherit;font-size:11px;overflow-wrap:anywhere;}.calendar-cancelled{opacity:.55;text-decoration:line-through;}
 </style>
 </head>
 <body>
@@ -736,7 +739,7 @@ function productFromApi(p){ return { id:p.id, name:p.name, isStandard:p.is_stand
   extraAgentPrice:(p.extra_agent_price===undefined||p.extra_agent_price===null)?0:+p.extra_agent_price }; }
 function productToApi(p){ return { name:p.name, target_tier:p.targetTier, setup_fee:p.setupFee, retainer:p.retainer, msgs_per_session:p.msgsPerSession, quota:p.quota, overage_rate:p.overageRate, delivery_cost_full:p.deliveryCostFull, automation:p.automation, data_layer:p.dataLayer, ai_model:p.aiModel, channels:p.channels }; }
 
-function clientFromApi(c){ return { id:c.id, name:c.name, company:c.company, email:c.email, phone:c.phone, externalRef:c.external_ref||'', productId:c.product_id, stage:c.stage, estValue:+c.est_value||0, source:c.source, notes:c.notes, joinDate:c.join_date, sessionsUsedThisMonth:0, ownerRepId:c.owner_rep_id||null, salesStage:c.sales_stage||null, closeOutcome:c.close_outcome||null,
+function clientFromApi(c){ return { assignedAt:c.assigned_at||null, assignedBy:c.assigned_by||null, id:c.id, name:c.name, company:c.company, email:c.email, phone:c.phone, externalRef:c.external_ref||'', productId:c.product_id, stage:c.stage, estValue:+c.est_value||0, source:c.source, notes:c.notes, joinDate:c.join_date, sessionsUsedThisMonth:0, ownerRepId:c.owner_rep_id||null, salesStage:c.sales_stage||null, closeOutcome:c.close_outcome||null,
   portalEnabled:!!c.portal_enabled, portalUsername:c.portal_username||'',
   portalPasswordSetBy:c.portal_password_set_by||'', portalPasswordSetAt:c.portal_password_set_at||null,
   parentClientId:c.parent_client_id||null,
@@ -1005,6 +1008,7 @@ const NAV = [
   ]},
   {group:'Revenue', items:[
     {id:'pipeline', label:'Pipeline', icon:iconFunnel},
+    {id:'calendar', label:'Calendar', icon:iconGrid},
     {id:'clients', label:'Clients', icon:iconUsers},
     {id:'agents', label:'Agents & Automations', icon:iconBot},
     {id:'billing', label:'Billing & Invoices', icon:iconReceipt},
@@ -1213,6 +1217,7 @@ const VIEW_TITLES = {
   analytics:['Vantriq Pulse','Analytics — leads, conversations and customer satisfaction, by day, week, month, quarter or year'],
   surveys:['Vantriq Echo','Customer-satisfaction surveys for every client — results, follow-ups and sharing'],
   customers:['Customers','Every client\'s customers — who they are, every conversation and what was said, their survey answers'],
+  calendar:['Calendar','Bookings and follow-ups from your website and WhatsApp agents'],
   pipeline:['Pipeline','Move deals from lead to active client'],
   clients:['Clients','Every active and past account'],
   billing:['Billing & Invoices','Setup fees, retainers, and overage'],
@@ -1247,6 +1252,7 @@ function renderTopbar(){
   </div>`;
 }
 function topbarAction(){
+  if(currentView==='calendar') return `<button class="btn btn-primary" onclick="VQCAL.openEvent()">New appointment</button>`;
   if(currentView==='pipeline') return `<button class="btn btn-primary" onclick="openModal={type:'client'};render()">${iconPlus(15)} New lead</button>`;
   if(currentView==='clients') return `<button class="btn btn-primary" onclick="openModal={type:'client'};render()">${iconPlus(15)} Add client</button>`;
   if(currentView==='procurement') return `<button class="btn btn-primary" onclick="openModal={type:'vendor'};render()">${iconPlus(15)} Add vendor</button>`;
@@ -1267,6 +1273,7 @@ function renderView(){
     case 'analytics': return renderAnalytics();
     case 'surveys': return window.VQS ? '<div id="vqs-root"></div>' : '<div class="card"><div class="empty">The Vantriq Echo page could not load in this browser.</div></div>';
     case 'customers': return window.VQC ? '<div id="vqc-root"></div>' : '<div class="card"><div class="empty">The Customers page could not load in this browser.</div></div>';
+    case 'calendar': return VQCAL.renderCalendar();
     case 'pipeline': return renderPipeline();
     case 'clients': return renderClients();
     case 'billing': return renderBilling();
@@ -1605,7 +1612,7 @@ function pipelineStageTable(tab){
           <td><span class="pill ${stagePillClass(c.stage)}"><span class="pill-dot"></span>${stageLabel(c.stage)}</span></td>
           <td class="mono">${fmtMoney(c.estValue)}</td>
           <td>${esc(c.source||'—')}</td>
-          <td>${esc(repNameOf(c)||'House')}</td>
+          <td>${esc(repNameOf(c)||(c.ownerRepId?'Assigned rep':'Unassigned'))}</td>
           <td style="white-space:nowrap;">
             ${next.map(ns=>`<button class="btn btn-ghost btn-sm" style="margin-left:4px;"
                onclick="event.stopPropagation();advanceStage('${c.id}','${ns}')">${esc(stageLabel(ns))}</button>`).join('')}
@@ -1641,7 +1648,7 @@ function renderPipeline(){
           const p = productOf(c);
           return `<div class="kcard" draggable="true" ondragstart="kanbanDragId='${c.id}';event.dataTransfer.effectAllowed='move'" onclick="openPanel={type:'client',id:'${c.id}'};render()">
             <div class="name">${esc(c.name)}</div>
-            <div class="co">${esc(c.company)}</div>
+            <div class="co">${esc(c.company)}</div>${VQCAL.badge(c)}
             <div class="meta">
               <span class="tag">${p?esc(p.name):'—'}</span>
       ${c.serviceStatus==='suspended'?`<span class="pill pill-overdue"><span class="pill-dot"></span>Service paused</span>`:''}
@@ -1655,7 +1662,7 @@ function renderPipeline(){
       <div class="kanban-col-head"><span class="t" style="color:#8F3527;">Lost / churned</span><span class="n">${state.clients.filter(c=>c.stage==='lost'||c.stage==='churned').length}</span></div>
       ${state.clients.filter(c=>c.stage==='lost'||c.stage==='churned').map(c=>`
         <div class="kcard" onclick="openPanel={type:'client',id:'${c.id}'};render()">
-          <div class="name">${esc(c.name)}</div><div class="co">${esc(c.company)}</div>
+          <div class="name">${esc(c.name)}</div><div class="co">${esc(c.company)}</div>${VQCAL.badge(c)}
           <div class="meta"><span class="pill ${stagePillClass(c.stage)}"><span class="pill-dot"></span>${stageLabel(c.stage)}</span></div>
         </div>`).join('')}
     </div>
@@ -1774,7 +1781,7 @@ function renderReps(){
       </tbody>
     </table>
   </div>
-  <p class="footnote">Each rep logs in separately at <span class="mono">/rep.html</span> with their own key. They can only see and edit leads they created, move them through Qualification → Needs Assessment → Proposal Submission → Negotiation → Closure, and export their own pipeline to Excel — nothing else in the CRM is visible to them.</p>
+  <p class="footnote">Each rep logs in separately at <span class="mono">/rep.html</span> with their own key. They can only see and edit leads they own, including leads assigned by an admin, move them through Qualification → Needs Assessment → Proposal Submission → Negotiation → Closure, and export their own pipeline to Excel — nothing else in the CRM is visible to them.</p>
   `;
 }
 async function resetRepKey(id){
@@ -5790,7 +5797,9 @@ function renderModal(){
   const root = document.getElementById('modal-root');
   if(!openModal){ root.innerHTML=''; return; }
   let html='';
-  if(openModal.type==='client') html = clientModalHTML(openModal.id);
+  if(openModal.type==='calendar') html = VQCAL.eventModal();
+  else if(openModal.type==='assignment') html = VQCAL.assignmentModal();
+  else if(openModal.type==='client') html = clientModalHTML(openModal.id);
   else if(openModal.type==='teamUser') html = teamUserModalHTML();
   else if(openModal.type==='product') html = productModalHTML(openModal.id);
   else if(openModal.type==='productAddon') html = productAddonModalHTML(openModal.id);
@@ -6612,7 +6621,7 @@ function repModalHTML(){
     <div class="modal-body">
       <div class="field"><label>Name</label><input id="r_name" placeholder="e.g. Ahmed Raza"></div>
       <div class="field"><label>Email (optional)</label><input id="r_email" placeholder="ahmed@vantriq.ai"></div>
-      <p class="footnote" style="margin-top:0;">A login key is generated on save. The rep uses it to log in at <span class="mono">/rep.html</span> — they'll only ever see leads they create there.</p>
+      <p class="footnote" style="margin-top:0;">A login key is generated on save. The rep uses it to log in at <span class="mono">/rep.html</span> — they'll see leads they create or an admin assigns to them.</p>
     </div>
     <div class="modal-foot">
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
@@ -6850,6 +6859,12 @@ function clientPanelHTML(id){
     </div>
   </div>
   <div class="detail-body">
+    <div class="detail-row"><span class="k">Assigned to</span><span class="v">${esc(repNameOf(c)||(c.ownerRepId?'Assigned rep':'Unassigned'))}</span></div>
+    ${c.assignedAt?`<p class="footnote">Assigned ${esc(fmtDate(c.assignedAt))} by ${esc(c.assignedBy||'—')}</p>`:''}
+    <div style="display:flex;gap:8px;margin:12px 0;">
+      ${isAdmin()?`<button class="btn btn-ghost btn-sm" onclick="VQCAL.assign('${c.id}')">Assign / history</button>`:''}
+      <button class="btn btn-ghost btn-sm" onclick="VQCAL.openEvent(null,'${c.id}')">Book appointment</button>
+    </div>
     ${c.ownerRepId?`<div class="detail-row"><span class="k">Sales stage (rep pipeline)</span><span class="v">${SALES_STAGE_LABEL[c.salesStage]||'—'}${c.closeOutcome?` · <span style="color:${c.closeOutcome==='won'?'var(--teal-dark)':'var(--red)'}">${c.closeOutcome}</span>`:''}</span></div>`:''}
     <div class="detail-row"><span class="k">Phone</span><span class="v">${esc(c.phone||'—')}</span></div>
     <div class="detail-row"><span class="k">Source</span><span class="v">${esc(c.source||'—')}</span></div>
@@ -7913,6 +7928,7 @@ async function signOut(){
   clearInterval(usagePollTimer);
   if(window.VQS) VQS.reset();
   if(window.VQC) VQC.reset();
+  if(window.VQCAL) VQCAL.reset();
   try{ if(API.session) await fetch(API.base+'/api/auth/logout',{method:'POST',headers:{'Authorization':'Bearer '+API.session}}); }catch(e){}
   API.clearConfig(); authUser=null; apiConnected=false; emergencyData=null;
   API.base = window.location.origin;
@@ -7925,6 +7941,7 @@ function signedOutByServer(msg){
   clearInterval(usagePollTimer);
   if(window.VQS) VQS.reset();
   if(window.VQC) VQC.reset();
+  if(window.VQCAL) VQCAL.reset();
   API.clearConfig(); authUser=null; apiConnected=false; emergencyData=null;
   API.base = window.location.origin;
   openModal=null; openPanel=null;

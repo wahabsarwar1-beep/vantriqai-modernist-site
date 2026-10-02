@@ -2130,3 +2130,37 @@ create table if not exists breakglass_sessions (
   ended_by text not null default ''
 );
 create index if not exists idx_breakglass_sessions_recent on breakglass_sessions(created_at desc);
+
+-- CRM calendar and explicit sales ownership. Additive; existing records retain ownership.
+alter table clients add column if not exists assigned_at timestamptz;
+alter table clients add column if not exists assigned_by text;
+create table if not exists lead_assignment_history (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  from_rep_id uuid references sales_reps(id),
+  to_rep_id uuid references sales_reps(id),
+  assigned_by text not null,
+  reason text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_lead_assignment_history on lead_assignment_history(client_id, created_at);
+create table if not exists calendar_events (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  title text not null,
+  starts_at timestamptz not null,
+  ends_at timestamptz not null,
+  channel text not null check (channel in ('manual','website','whatsapp')),
+  kind text not null default 'meeting' check (kind in ('meeting','demo','call','follow_up')),
+  status text not null default 'scheduled' check (status in ('scheduled','completed','cancelled','no_show')),
+  location text not null default '',
+  notes text not null default '',
+  external_id text,
+  created_by text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (ends_at > starts_at),
+  unique(channel, external_id)
+);
+create index if not exists idx_calendar_events_time on calendar_events(starts_at, ends_at);
+create index if not exists idx_calendar_events_client on calendar_events(client_id);
