@@ -224,6 +224,13 @@ router.get('/service-status', async (req, res) => {
  * blanks only. Whatever a human has typed into the CRM outranks whatever
  * the agent inferred on the next message.
  */
+// Agent booking is separate from lead capture: a failed booking never loses a lead.
+router.post('/appointment', async(req,res)=>{
+  const {createEvent}=require('../utils/calendar');
+  const saved=await createEvent(req.body||{},'AI agent webhook',true);
+  res.status(saved.created?201:200).json({ok:true,created:saved.created,event_id:saved.event.id,client_id:saved.event.client_id});
+});
+
 router.post('/lead', async (req, res) => {
   const body = req.body || {};
   const externalRef = String(body.external_ref || '').trim();

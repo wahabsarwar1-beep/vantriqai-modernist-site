@@ -290,6 +290,25 @@ router.delete('/:id', blockAutomation, async (req, res) => {
   res.status(204).end();
 });
 
+
+// Ownership changes are a separate admin operation, including for incomplete agent leads.
+router.patch('/:id/assignment', async (req,res)=>{
+  if (!isAdminRequest(req)) return res.status(403).json({error:'Only an admin can assign leads.'});
+  const {assignLead}=require('../utils/calendar');
+  const by=req.user ? req.user.email : req.authKind==='breakglass' ? `Emergency session ${req.breakglass.id}` : 'Admin key';
+  const body=req.body||{};
+  if (!Object.prototype.hasOwnProperty.call(body,'rep_id')) return res.status(400).json({error:'rep_id is required (null to unassign).'});
+  res.json(await assignLead(req.params.id,body.rep_id,by,body.reason));
+});
+router.get('/:id/assignment-history', async (req,res)=>{
+  if (!isAdminRequest(req)) return res.status(403).json({error:'Only an admin can read assignment history.'});
+  const {id}=require('../utils/calendar');id(req.params.id);
+  const {rows}=await db.query(`select h.*,a.name as from_rep_name,b.name as to_rep_name
+    from lead_assignment_history h left join sales_reps a on a.id=h.from_rep_id
+    left join sales_reps b on b.id=h.to_rep_id where h.client_id=$1 order by h.created_at desc,h.id`,[req.params.id]);
+  res.json(rows);
+});
+
 /* ---------------------------- Stage history ---------------------------- */
 router.get('/:id/stage-history', async (req, res) => {
   const { rows } = await db.query(

@@ -1,0 +1,87 @@
+{
+  "name": "Vantriq \u2014 confirmed calendar booking",
+  "active": false,
+  "nodes": [
+    {
+      "id": "325905b5-0d8f-406f-9ede-1f6f3e8d3356",
+      "name": "Confirmed booking inputs",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "b9110fae-5794-4b4d-b47a-8d11df84972d",
+      "name": "Save CRM appointment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://crm_app:8080/api/webhooks/appointment",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ external_ref: $json.external_ref, client_id: $json.client_id, external_id: $json.external_id, channel: $json.channel, title: $json.title, starts_at: $json.starts_at, ends_at: $json.ends_at, kind: $json.kind || 'meeting', location: $json.location || '', notes: $json.notes || '' }) }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "daf69a82-5887-4304-91ec-85721b3578d0",
+      "name": "Return booking result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "jsCode": "return $input.all().map(item => ({ json: { ...item.json.body, status: item.json.statusCode, ok: item.json.statusCode >= 200 && item.json.statusCode < 300 && item.json.body?.ok === true } }));"
+      }
+    }
+  ],
+  "connections": {
+    "Confirmed booking inputs": {
+      "main": [
+        [
+          {
+            "node": "Save CRM appointment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save CRM appointment": {
+      "main": [
+        [
+          {
+            "node": "Return booking result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

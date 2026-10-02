@@ -127,6 +127,7 @@ app.use('/api/quotes', requireScope('staff'), quotesRoutes);
 // Contracts carry the counterparty's legal identity, so they sit behind the
 // same gate as quotes: staff who work accounts, not automation keys.
 app.use('/api/contracts', requireScope('staff'), contractsRoutes);
+app.use('/api/calendar', requireScope('staff'), require('./routes/calendar'));
 app.use('/api/reps', requireScope('admin'), repsRoutes);
 app.use('/api/package-requests', requireScope('staff'), packageRequestsRoutes);
 app.use('/api/expenses', requireScope('admin'), expensesRoutes);
