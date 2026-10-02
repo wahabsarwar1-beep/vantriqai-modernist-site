@@ -6059,6 +6059,7 @@ async function saveClient(id){
     }
     // Going active bills the setup fee and first retainer, server-side.
     state.invoices.push(...raised.map(invoiceFromApi));
+    if(window.VQCAL) VQCAL.invalidate();
     closeModal(); render();
     showToast(raised.length ? `Client saved — ${raised.length} invoice${raised.length===1?'':'s'} raised` : 'Client saved');
   }catch(e){ showToast(e.message||'Could not save client','warn'); }
@@ -6069,6 +6070,7 @@ async function deleteClient(id){
     await API.del(`/api/clients/${id}`);
     state.clients = state.clients.filter(c=>c.id!==id);
     state.invoices = state.invoices.filter(i=>i.clientId!==id);
+    if(window.VQCAL) VQCAL.invalidate();
     closeModal(); openPanel=null; render(); showToast('Client deleted');
   }catch(e){ showToast(e.message||'Could not delete client','warn'); }
 }

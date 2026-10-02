@@ -44,6 +44,7 @@ window.VQCAL=(()=>{
       <p class="footnote">Times are Pakistan time (UTC+05:00). The lead's sales rep owns the appointment.</p>
       <div class="field"><label for="ce_lead">Lead</label><select id="ce_lead" ${e?'disabled':''} onchange="VQCAL.updateOwner(this.value)"><option value="">Choose a lead</option>${state.clients.map(c=>`<option value="${c.id}" ${selected===c.id?'selected':''}>${esc(c.name)} · ${esc(c.company)}</option>`).join('')}</select></div>
       <div id="ce_owner" class="calendar-assignment-summary">Assigned to: ${esc(owner(state.clients.find(c=>c.id===selected)||{}))}</div>
+      ${selected&&isAdmin()?`<div class="field-row" aria-label="Manage calendar lead"><button type="button" class="btn btn-ghost btn-sm" onclick="VQCAL.editLead('${selected}')">Edit lead</button><button type="button" class="btn btn-ghost btn-sm" onclick="VQCAL.assign('${selected}')">Assign / history</button><button type="button" class="btn btn-danger-ghost btn-sm" onclick="deleteClient('${selected}')">Delete lead</button></div><p class="footnote">Deleting the lead also removes its appointments and invoices. You will be asked to confirm.</p>`:''}
       <div class="field"><label for="ce_title">Title</label><input id="ce_title" maxlength="200" value="${esc(e?e.title:'')}" placeholder="Discovery call, demo or follow-up"></div>
       <div class="field-row"><div class="field"><label for="ce_start">Start (PKT)</label><input id="ce_start" type="datetime-local" value="${e?local(e.starts_at):(openModal.date||today())+'T10:00'}"></div><div class="field"><label for="ce_end">End (PKT)</label><input id="ce_end" type="datetime-local" value="${e?local(e.ends_at):(openModal.date||today())+'T10:30'}"></div></div>
       <div class="field-row"><div class="field"><label for="ce_kind">Type</label><select id="ce_kind">${['meeting','demo','call','follow_up'].map(k=>`<option value="${k}" ${e&&e.kind===k?'selected':''}>${k.replace('_',' ')}</option>`).join('')}</select></div><div class="field"><label for="ce_status">Status</label><select id="ce_status">${['scheduled','completed','cancelled','no_show'].map(k=>`<option value="${k}" ${e&&e.status===k?'selected':''}>${k.replace('_',' ')}</option>`).join('')}</select></div></div>
@@ -53,6 +54,8 @@ window.VQCAL=(()=>{
       <p id="ce_error" role="alert" style="color:var(--red);"></p></div><div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button id="ce_save" class="btn btn-primary" onclick="VQCAL.saveEvent()">Save appointment</button></div></div>`;
   }
   function updateOwner(id){document.getElementById('ce_owner').textContent='Assigned to: '+owner(state.clients.find(c=>c.id===id)||{});}
+  function editLead(id){if(!isAdmin())return;openModal={type:'client',id};render();}
+  function invalidate(){loaded='';}
   async function saveEvent(){const get=id=>document.getElementById(id).value;const b={title:get('ce_title'),starts_at:get('ce_start')+'+05:00',ends_at:get('ce_end')+'+05:00',kind:get('ce_kind'),status:get('ce_status'),location:get('ce_location'),notes:get('ce_notes')};const button=document.getElementById('ce_save');button.disabled=true;try{if(openModal.id)await API.patch('/api/calendar/'+openModal.id,b);else await API.post('/api/calendar',{...b,client_id:get('ce_lead'),channel:'manual'});closeModal();loaded='';showToast('Appointment saved');render();}catch(e){document.getElementById('ce_error').textContent=e.message;button.disabled=false;}}
   async function assign(id){try{history=await API.get('/api/clients/'+id+'/assignment-history');openPanel=null;openModal={type:'assignment',id};render();}catch(e){showToast(e.message,'warn');}}
   function assignmentModal(){const c=state.clients.find(c=>c.id===openModal.id);return `<div class="modal"><div class="modal-head"><h3>Assign lead: ${esc(c.name)}</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div><div class="modal-body">
@@ -72,5 +75,5 @@ window.VQCAL=(()=>{
     const url=URL.createObjectURL(new Blob([folded],{type:'text/calendar;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='vantriq-calendar-'+month+'.ics';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }catch(e){showToast(e.message,'warn');}}
   function reset(){generation++;events=[];history=[];loaded='';error='';rep='';channel='';month=today().slice(0,7);}
-  return {reset,renderCalendar,filter,move,refresh,openEvent,eventModal,updateOwner,saveEvent,assign,assignmentModal,saveAssignment,badge,exportCalendar};
+  return {reset,renderCalendar,filter,move,refresh,invalidate,openEvent,eventModal,editLead,updateOwner,saveEvent,assign,assignmentModal,saveAssignment,badge,exportCalendar};
 })();
