@@ -108,7 +108,7 @@ export function regionFromPathname(pathname: string): Region {
 /** The same page in the other region, for the switcher. */
 export function pathInRegion(pathname: string, region: Region): string {
   // Shared privacy notices apply to both regions and have one canonical URL.
-  if (pathname === "/privacy" || pathname === "/cookies") return pathname;
+  if (pathname === "/privacy" || pathname === "/cookies" || pathname === "/terms") return pathname;
   const current = regionFromPathname(pathname);
   const bare = current.base ? pathname.slice(current.base.length) || "/" : pathname;
   return hrefIn(region, bare);

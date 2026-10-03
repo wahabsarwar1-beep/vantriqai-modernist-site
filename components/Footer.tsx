@@ -75,7 +75,7 @@ function columns(region: Region): { title: string; links: FooterLink[] }[] {
         { href: navHref(region, { href: "/contact" }), label: "Send a brief" },
         { href: waLink(), label: "WhatsApp us", external: true },
         ...SOCIAL_PROFILES.map((url) => ({ href: url, label: socialLabel(url), external: true })),
-        { href: `${hrefIn(region, "/pricing")}#terms`, label: "Terms & conditions" },
+        { href: "/terms", label: "Terms & service information" },
         { href: "/privacy", label: "Privacy policy" },
         { href: "/cookies", label: "Cookies & storage" },
       ],
