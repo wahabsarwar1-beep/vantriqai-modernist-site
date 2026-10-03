@@ -4,7 +4,11 @@ const sections = ["home", "products", "pricing", "industries", "contact", "how-i
 const buckets = new Map<string, { count: number; until: number }>();
 export async function POST(request: Request) {
   const origin = request.headers.get("origin");
-  if (!origin || origin !== new URL(request.url).origin) return Response.json({ error: "Same-origin requests only" }, { status: 403 });
+  // The hosting proxy uses an internal HTTP origin in request.url. Trust only
+  // our explicit public HTTPS origins, or an exact local development origin.
+  const url = new URL(request.url);
+  const allowed = origin === "https://www.vantriqai.com" || origin === "https://vantriqai.com" || (["localhost", "127.0.0.1"].includes(url.hostname) && origin === url.origin);
+  if (!allowed) return Response.json({ error: "Same-origin requests only" }, { status: 403 });
   if (!request.headers.get("content-type")?.startsWith("application/json")) return Response.json({ error: "JSON required" }, { status: 415 });
   const raw = await request.text();
   if (raw.length > 512) return Response.json({ error: "Payload too large" }, { status: 413 });
