@@ -540,7 +540,9 @@
     var o = st.overview || {};
     var firstAnswers = surveys.every(function(s){ return Number(s.responses || 0) === 0; });
     return head
-      + (firstAnswers ? firstResponsesPanel(surveys) + sharePanel(surveys, true) : dashboard() + sharePanel(surveys))
+      + (firstAnswers ? '<details class="vqs-card" style="margin-bottom:14px;"><summary style="cursor:pointer;font-weight:600;">Get your first responses · sharing guide</summary>' + firstResponsesPanel(surveys) + sharePanel(surveys, true) + '</details>' : '')
+      + dashboard()
+      + (!firstAnswers ? sharePanel(surveys) : '')
       + (o.followup_queue && o.followup_queue.length ? followupQueue(o.followup_queue) : '')
       + '<div class="vqs-spread" style="margin:18px 0 0;"><h3 style="margin:0;">Your surveys</h3><span class="sub" style="margin:0;">' + n(o.live) + ' live · ' + n(o.surveys) + ' in total</span></div>'
       + '<div class="vqs-grid vqs-g3" style="margin-top:10px;">' + surveys.map(surveyCard).join('') + '</div>'
@@ -557,7 +559,7 @@
   function firstResponsesPanel(surveys){
     var live = surveys.filter(function(s){ return s.status === 'live' && !s.closed && s.client_surveys_enabled !== false && s.links; });
     return '<section class="vqs-card vqs-start" aria-label="Get your first responses">'
-      + '<div class="vqs-spread"><div><h3>Get your first responses</h3><div class="sub">Your dashboard will lead with results once an answer arrives.</div></div><span class="vqs-tag">' + live.length + ' ready to share</span></div>'
+      + '<div class="vqs-spread"><div><h3>Get your first responses</h3><div class="sub">Your full dashboard stays visible below. Charts fill in as responses arrive.</div></div><span class="vqs-tag">' + live.length + ' ready to share</span></div>'
       + '<ol class="vqs-start-steps"><li><span class="vqs-step-number">1</span><div><b>' + (live.length ? 'Choose a live survey' : 'Publish a survey') + '</b><p>' + (live.length ? 'Pick the survey below. Each link and QR code belongs to that survey.' : 'Open a draft and set it live before collecting answers.') + '</p></div></li>'
       + '<li><span class="vqs-step-number">2</span><div><b>Share with your customers</b><p>Copy a link, print a QR poster, or open the WhatsApp sharing option.</p></div></li>'
       + '<li><span class="vqs-step-number">3</span><div><b>Watch the first answer arrive</b><p>Satisfaction, trends and follow-ups appear as real responses come in.</p></div></li></ol>'
