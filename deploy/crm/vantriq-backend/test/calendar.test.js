@@ -13,7 +13,9 @@ require.cache[require.resolve('../src/db')]={exports:db};
 const {errorHandler}=require('../src/utils/asyncErrors');
 const cal=require('../src/utils/calendar');
 const repA=randomUUID(),repB=randomUUID(),leadA=randomUUID(),leadB=randomUUID(),leadC=randomUUID();
-const slot={title:'Discovery demo',starts_at:'2026-10-03T10:00:00+05:00',ends_at:'2026-10-03T10:30:00+05:00',channel:'website',external_id:'web-session-demo-1'};
+// Conflict tests need future meetings: completed time slots do not block reassignment.
+const start=new Date(Date.now()+2*86400000);start.setUTCHours(5,0,0,0);
+const slot={title:'Discovery demo',starts_at:start.toISOString(),ends_at:new Date(+start+30*60000).toISOString(),channel:'website',external_id:'web-session-demo-1'};
 const rejected=async(fn,status)=>assert.rejects(fn,e=>e.status===status);
 (async()=>{
  await pg.exec(`create table sales_reps(id uuid primary key,name text,email text,active boolean);
@@ -39,7 +41,7 @@ const rejected=async(fn,status)=>assert.rejects(fn,e=>e.status===status);
  await cal.assignLead(leadB,repB,'admin','Route to Rep B');
  await cal.createEvent({...slot,external_ref:'wa-b',channel:'whatsapp',external_id:'wa-1'},'agent',true);
  await rejected(()=>cal.assignLead(leadA,repB,'admin','Reassign'),409);
- const query={from:'2026-10-01T00:00:00+05:00',to:'2026-11-01T00:00:00+05:00'};
+ const query={from:new Date(+start-86400000).toISOString(),to:new Date(+start+86400000).toISOString()};
  assert.equal((await cal.listEvents(query,repA)).length,1);
  assert.equal((await cal.listEvents({...query,rep_id:repB},repA))[0].client_id,leadA); // rep cannot override identity
  const app=express();app.use(express.json());app.use((req,res,next)=>{req.user={email:'admin@example.test',role:req.header('x-test-role')||'admin'};next();});
@@ -57,7 +59,7 @@ const rejected=async(fn,status)=>assert.rejects(fn,e=>e.status===status);
  await rejected(()=>cal.assignLead(leadC,repA,'admin','Route'),400);
  await cal.assignLead(leadA,null,'admin','Return to queue');
  assert.equal((await cal.listEvents({...query,rep_id:'unassigned'})).length,1);
- const exportText=await (await fetch(base+'/api/calendar/export?'+new URLSearchParams(query))).text();assert.match(exportText,/BEGIN:VCALENDAR/);assert.match(exportText,/DTSTART:20261003T050000Z/);assert.match(exportText,/STATUS:CANCELLED/);
+ const exportText=await (await fetch(base+'/api/calendar/export?'+new URLSearchParams(query))).text();assert.match(exportText,/BEGIN:VCALENDAR/);assert.ok(exportText.includes('DTSTART:'+slot.starts_at.replace(/[-:]/g,'').replace(/\.\d{3}/,'')));assert.match(exportText,/STATUS:CANCELLED/);
  const escaped=cal.ics([{...created.event,title:'Demo\nATTENDEE:evil@example.test',notes:'é'.repeat(100),updated_at:new Date()}]);
  assert.ok(!escaped.split('\r\n').some(l=>l.startsWith('ATTENDEE:')));assert.ok(escaped.split('\r\n').every(l=>Buffer.byteLength(l)<=75));
  await new Promise(r=>server.close(r));await pg.close();console.log('Calendar integration checks passed: migration, input validation, retries, overlaps, reassignment, rep isolation, admin-only assignment and ICS export.');

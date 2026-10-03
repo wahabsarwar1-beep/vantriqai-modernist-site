@@ -3,7 +3,7 @@ const vm=require('node:vm');
 const fs=require('node:fs');
 const path=require('node:path');
 const nodes={};let calls=[];
-const ctx=vm.createContext({window:{VQC:{customers:true}},Intl,Date,URLSearchParams,TextEncoder,console,setTimeout,
+const ctx=vm.createContext({window:{VQC:{customers:true},matchMedia:()=>({matches:process.env.MOBILE_UI_TEST==='1'})},Intl,Date,URLSearchParams,TextEncoder,console,setTimeout,
  currentView:'calendar',openModal:null,openPanel:null,
  state:{clients:[{id:'lead-a',name:'Ayesha <script>',company:'Acme',ownerRepId:'rep-a'}],reps:[{id:'rep-a',name:'Ali',active:true}]},
  esc:s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
@@ -16,6 +16,10 @@ const ui=ctx.window.VQCAL;
 (async()=>{
  assert.equal(ctx.window.VQC.customers,true,'calendar does not overwrite the existing Customers UI');
  ui.filter('month','2026-10');ui.renderCalendar();await new Promise(r=>setImmediate(r));
+ const initial=ui.renderCalendar();
+ if(process.env.MOBILE_UI_TEST==='1'){assert.match(initial,/<option value="agenda" selected>/);assert.match(initial,/calendar-agenda-card/);assert.match(initial,/VQCAL.openEvent\('event-a'\)/);}
+ else assert.match(initial,/<option value="month" selected>/);
+ ui.filter('mode','month');
  const html=ui.renderCalendar();assert.match(html,/Demo &lt;script&gt;/);assert.match(html,/Ali · website/);assert.match(html,/Pakistan/);
  ui.filter('mode','agenda');assert.match(ui.renderCalendar(),/10:00–10:30/,'UTC timestamps display in Pakistan time');
  ui.openEvent('event-a');assert.match(ui.eventModal(),/Edit lead/);assert.match(ui.eventModal(),/Assign \/ history/);assert.match(ui.eventModal(),/Delete lead/);

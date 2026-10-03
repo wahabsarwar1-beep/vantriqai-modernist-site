@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Vantriq Ops — CRM &amp; Revenue Console</title>
 <link rel="icon" href="/brand/mark.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -652,6 +652,7 @@ td.amt,th.amt,td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
 
 </style>
 <link rel="stylesheet" href="/calendar.css">
+<link rel="stylesheet" href="/mobile.css?v=9.23.3">
 </head>
 <body>
 <div id="app"></div>
@@ -1155,22 +1156,53 @@ function render(){
       ${renderTopbar()}
       <div class="content">${renderView()}</div>
     </div>
-    ${sidebarOpen?'<div class="scrim" onclick="sidebarOpen=false;render()"></div>':''}
+    ${renderMobileNav()}
+    ${sidebarOpen?'<div class="scrim nav-scrim" onclick="sidebarOpen=false;render()"></div>':''}
   `;
   renderModal();
   renderPanel();
+  labelMobileTables();
   attachPostRenderHooks();
 }
 
+function labelMobileTables(){
+  document.querySelectorAll('.main .table-wrap table').forEach(table=>{
+    if(table.closest('.calendar-agenda-table')||table.classList.contains('stmt'))return;
+    const head=table.tHead;
+    if(!head||head.rows.length!==1)return;
+    const headers=Array.from(head.rows[0].cells);
+    if(headers.length<2||headers.some(cell=>cell.colSpan!==1))return;
+    const rows=Array.from(table.tBodies).flatMap(body=>Array.from(body.rows));
+    if(rows.some(row=>row.cells.length!==headers.length&&!(row.cells.length===1&&row.cells[0].colSpan===headers.length)))return;
+    table.classList.add('mobile-table');
+    rows.forEach(row=>Array.from(row.cells).forEach((cell,i)=>{
+      if(cell.colSpan===1)cell.dataset.label=headers[i].textContent.trim()||'Actions';
+      else cell.classList.add('mobile-table-empty');
+    }));
+  });
+}
+function renderMobileNav(){
+  const items=visibleNav().flatMap(group=>group.items);
+  const shortcuts=['dashboard','pipeline','calendar','clients'].map(id=>items.find(item=>item.id===id)).filter(Boolean);
+  return `<nav class="mobile-nav" aria-label="Quick navigation">
+    ${shortcuts.map(item=>`<button class="mobile-nav-item ${currentView===item.id?'active':''}" ${currentView===item.id?'aria-current="page"':''} onclick="navigate('${item.id}')">${item.icon()}<span>${item.id==='dashboard'?'Home':esc(item.label)}</span></button>`).join('')}
+    <button class="mobile-nav-item ${sidebarOpen?'active':''}" aria-label="Open all navigation" aria-controls="crm-navigation" aria-expanded="${sidebarOpen}" onclick="sidebarOpen=true;render()">${icon('<path d="M3 6h18M3 12h18M3 18h18"/>',20)}<span>More</span></button>
+  </nav>`;
+}
+document.addEventListener('keydown',event=>{
+  if(event.key==='Escape'&&sidebarOpen){sidebarOpen=false;render();document.querySelector('.hamburger')?.focus();}
+});
+
 function renderSidebar(){
   return `
-  <div class="sidebar ${sidebarOpen?'open':''}">
+  <div id="crm-navigation" class="sidebar ${sidebarOpen?'open':''}" aria-label="Main navigation">
     <div class="brand">
       <div class="brand-mark">${sidebarPulseSVG()}</div>
       <div>
         <div class="brand-name">Vantriq<em>AI</em></div>
         <div class="brand-sub">Revenue Console</div>
       </div>
+      <button class="mobile-menu-close" aria-label="Close navigation" onclick="sidebarOpen=false;render()">${iconX(20)}</button>
     </div>
     <div class="nav">
       ${visibleNav().map(g=>`
@@ -1240,14 +1272,14 @@ function renderTopbar(){
   const [title,sub] = VIEW_TITLES[currentView]||['',''];
   return `
   <div class="topbar">
-    <div style="display:flex;align-items:center;gap:10px;">
-      <button class="hamburger" onclick="sidebarOpen=true;render()">${icon('<path d="M3 6h18M3 12h18M3 18h18"/>',20)}</button>
+    <div class="topbar-heading" style="display:flex;align-items:center;gap:10px;">
+      <button class="hamburger" aria-label="Open navigation" aria-controls="crm-navigation" aria-expanded="${sidebarOpen}" onclick="sidebarOpen=true;render()">${icon('<path d="M3 6h18M3 12h18M3 18h18"/>',20)}</button>
       <div>
         <h1>${title}</h1>
         <div class="topbar-sub">${sub}</div>
       </div>
     </div>
-    <div style="display:flex;gap:8px;">
+    <div class="topbar-actions" style="display:flex;gap:8px;">
       ${topbarAction()}
     </div>
   </div>`;
