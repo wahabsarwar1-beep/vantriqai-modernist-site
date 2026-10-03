@@ -148,6 +148,14 @@
 .vqe-words{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;}.vqe-words span{border:1px solid;border-radius:999px;padding:3px 11px;font-weight:600;background:#fff;}
 .vqe-words small{opacity:.65;font-weight:500;font-size:11px;}
 .vqa-section{font-family:var(--f-head,inherit);font-size:15px;font-weight:600;margin:22px 0 10px;color:var(--text,#16151a);}
+.vqe-graph{display:block;width:100%;height:auto;margin:12px 0;color:var(--text,#16151a);font-family:inherit;}
+.vqe-three{grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));}
+.vqe-disclosure{margin:18px 0 14px;border:1px solid var(--border,#e7e2da);border-radius:var(--radius,14px);background:var(--card,#fff);box-shadow:var(--shadow-sm,none);}
+.vqa .vqe-disclosure>summary{padding:16px 18px;font-size:14px;color:var(--text,#16151a);}
+.vqe-disclosure>summary:hover{color:var(--teal,#2f56d9);}
+.vqe-disclosure[open]>summary{border-bottom:1px solid var(--border,#e7e2da);}
+.vqe-disclosure-body{padding:14px;}
+.vqe-disclosure-body>.vqa-card:last-child{margin-bottom:0!important;}
 @media (max-width:520px){.vqa-kpi .v{font-size:22px;}.vqa-bar{grid-template-columns:1fr auto;row-gap:5px;}.vqa-bar .tr{grid-column:1/-1;order:3;}}
 `;
     const el = document.createElement('style');
@@ -712,13 +720,32 @@
     return `<div class="vqe-words">${list.map(w => `<span style="font-size:${12 + Math.round((w.n / max) * 8)}px;border-color:${color};color:${color}">${esc(w.word)} <small>${w.n}</small></span>`).join('')}</div>`;
   }
 
+  /** Response counts on one labelled axis, with shares visible without hovering. */
+  function responseGraph(list, label){
+    const rows=(list||[]).slice().sort((a,b)=>b.responses-a.responses);
+    const total=rows.reduce((sum,x)=>sum+Number(x.responses||0),0);
+    if(!total) return `<svg class="vqe-graph" viewBox="0 0 480 160" role="img" aria-label="${esc(label)}: no responses yet"><path d="M24 20V132H456" fill="none" stroke="${C.axis}"/><path d="M24 48H456M24 76H456M24 104H456" stroke="${C.grid}"/><text x="240" y="78" text-anchor="middle" fill="${C.muted}" font-size="14">No responses yet</text><text x="240" y="153" text-anchor="middle" fill="${C.muted}" font-size="12">Answers</text></svg>`;
+    const shown=rows.slice(0,9);
+    if(rows.length>9) shown.push({name:'Other categories',responses:rows.slice(9).reduce((sum,x)=>sum+Number(x.responses||0),0)});
+    const max=Math.max(...shown.map(x=>x.responses),1), height=shown.length*48+38;
+    return `<svg class="vqe-graph" viewBox="0 0 480 ${height}" role="img" aria-label="${esc(label)} · ${n(total)} answers"><title>${esc(label)}: ${shown.map(x=>`${esc(x.name)} ${n(x.responses)} (${Math.round(x.responses/total*100)}%)`).join('; ')}</title>
+      ${[0,.5,1].map(t=>`<path d="M${18+330*t} 20V${height-28}" stroke="${C.grid}"/>`).join('')}
+      ${shown.map((x,i)=>`<g><text x="18" y="${i*48+15}" fill="currentColor" font-size="12">${esc(x.name)}</text><rect x="18" y="${i*48+22}" width="${330*x.responses/max}" height="12" rx="4" fill="${x.known===false?C.axis:C.s1}"/><text x="465" y="${i*48+33}" text-anchor="end" fill="currentColor" font-size="12">${n(x.responses)} · ${Math.round(x.responses/total*100)}%</text></g>`).join('')}
+      <text x="18" y="${height-10}" fill="${C.muted}" font-size="11">0</text><text x="348" y="${height-10}" text-anchor="end" fill="${C.muted}" font-size="11">${n(max)} answers</text></svg>`;
+  }
+
+  function responseGraphCard(title,list,dimension,subtitle){
+    return `<div class="vqa-card"><h3>${esc(title)}</h3><div class="vqa-sub">${esc(subtitle)} · answer count and share</div>${responseGraph(list,title)}${list&&list.length?`<details><summary>View satisfaction and scores</summary>${breakdown(list,dimension)}</details>`:''}</div>`;
+  }
+
   function echoAdvancedHTML(d){
     const a=d.advanced;
     if(!a) return '';
     const service=a.service;
     const hours=v=>v==null?'—':v<1?Math.round(v*60)+' min':v+' h';
-    return `<section aria-label="Advanced Echo insights">
-      <div class="vqa-section">Advanced insights</div>
+    return `<details class="vqe-disclosure" aria-label="Advanced Echo insights">
+      <summary>Advanced insights · complaint trends, branches &amp; service</summary>
+      <div class="vqe-disclosure-body">
       ${d.sampled?'<div class="vqa-card"><b>Response limit reached.</b><div class="vqa-sub">These insights use the latest 50,000 responses in the window and may omit earlier responses.</div></div>':''}
       <div class="vqa-card" style="margin-bottom:14px;"><h3>Complaint topic trends</h3>
         <div class="vqa-sub">${esc(d.period.window_label)} · ${n(a.topics.comment_count)} comments from low scores or unresolved answers. English, Urdu and Roman Urdu keyword matching; topics can overlap. This is not AI sentiment analysis.</div>
@@ -746,7 +773,8 @@
         </div>
         <div class="vqa-sub">First-contact and first-resolution timestamps are captured on new status transitions. Historical timings are not reconstructed from note edits.${service.missing_reply_timestamps?` ${n(service.missing_reply_timestamps)} contacted/resolved follow-ups have unknown first-contact time.`:''}${!service.measured_replies&&!service.measured_resolutions?' Not enough timing data yet.':''}</div>
       </div>
-    </section>`;
+      </div>
+    </details>`;
   }
 
   function echoHTML(d, opts){
@@ -770,7 +798,7 @@
       { name: 'Answered', value: d.funnel.answered, share: d.funnel.sent ? Math.round(d.funnel.answered / d.funnel.sent * 100) : null },
     ];
     const demo = d.demographics;
-    const demoCards = [['By gender', demo.gender, 'Gender'], ['By age group', demo.age, 'Age group'], ['By city', demo.city, 'City']].filter(x => x[1].length);
+    const demoCards = [['By gender', demo.gender, 'Gender'], ['By age group', demo.age, 'Age group'], ['By city', demo.city, 'City']];
     return `<div class="vqa vqe">
       ${filters(g, opts.onGrain, note, opts)}
       ${waiting}
@@ -813,12 +841,16 @@
       </div>
 
       <div class="vqa-grid vqa-two">
-        <div class="vqa-card"><h3>By channel</h3><div class="vqa-sub">How the survey was answered</div>${breakdown(d.channels, 'Channel')}</div>
-        <div class="vqa-card"><h3>${d.locations.length ? 'By location' : 'By language'}</h3><div class="vqa-sub">${d.locations.length ? 'Branch or site, from the QR code or link' : 'English or Urdu'}</div>${breakdown(d.locations.length ? d.locations : d.languages, d.locations.length ? 'Location' : 'Language')}</div>
+        ${responseGraphCard('By channel',d.channels,'Channel','How the survey was answered')}
+        ${responseGraphCard('By language',d.languages,'Language','English, Urdu or another recorded language')}
       </div>
+      ${d.locations.length?`<div style="margin-bottom:14px;">${responseGraphCard('By location',d.locations,'Location','Branch or site, from the QR code or link')}</div>`:''}
 
-      ${demoCards.length ? [demoCards.slice(0, 2), demoCards.slice(2)].filter(p => p.length).map(p => `<div class="vqa-grid ${p.length === 2 ? 'vqa-two' : ''}">${p.map(x => `<div class="vqa-card"><h3>${x[0]}</h3><div class="vqa-sub">From the survey's "about you" questions</div>${breakdown(x[1], x[2])}</div>`).join('')}</div>`).join('')
-        : `<div class="vqa-card" style="margin-bottom:14px;"><h3>Who answers</h3><div class="vqa-empty" style="padding:12px;">Add the <b>Gender</b>, <b>Age group</b> or <b>City</b> question to a survey (open it → Questions → Add a question → About you) to see how satisfaction differs between groups here.</div></div>`}
+      <section aria-label="Who answers"><h3 class="vqa-section">Who answers</h3>
+        <div class="vqa-sub">From the survey's “about you” questions. Unspecified answers stay labelled; shares are within each breakdown.</div>
+        ${!demoCards.some(x=>x[1].some(r=>r.responses))?'<div class="vqa-empty" style="margin-bottom:12px;">Add Gender, Age group or City in Survey → Questions → Add a question → About you to collect respondent details.</div>':''}
+        <div class="vqa-grid vqe-three">${demoCards.map(x=>responseGraphCard(x[0],x[1],x[2],'Respondent profile')).join('')}</div>
+      </section>
 
       <div class="vqa-grid vqa-two">
         <div class="vqa-card"><h3>What unhappy customers write about</h3><div class="vqa-sub">Words used most in comments scoring 1–2, NPS 0–6 or not resolved</div>${words(d.themes.unhappy, SCORE[0])}</div>
