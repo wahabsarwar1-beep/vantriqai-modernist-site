@@ -653,8 +653,9 @@ td.amt,th.amt,td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
 </style>
 <link rel="stylesheet" href="/calendar.css">
 <link rel="stylesheet" href="/mobile.css?v=9.23.3">
+<link rel="stylesheet" href="/workspace-theme.css?v=9.24.0">
 </head>
-<body>
+<body class="crm-shell">
 <div id="app"></div>
 <div id="modal-root"></div>
 <div id="panel-root"></div>
@@ -1275,6 +1276,7 @@ function renderTopbar(){
     <div class="topbar-heading" style="display:flex;align-items:center;gap:10px;">
       <button class="hamburger" aria-label="Open navigation" aria-controls="crm-navigation" aria-expanded="${sidebarOpen}" onclick="sidebarOpen=true;render()">${icon('<path d="M3 6h18M3 12h18M3 18h18"/>',20)}</button>
       <div>
+        <div class="workspace-eyebrow">${esc(NAV.find(group=>group.items.some(item=>item.id===currentView))?.group||'Workspace')}</div>
         <h1>${title}</h1>
         <div class="topbar-sub">${sub}</div>
       </div>
@@ -1344,6 +1346,10 @@ function renderDashboard(){
   const marginPct = mrrVal>0 ? ((mrrVal-totalDelivery)/mrrVal*100) : 0;
 
   return `
+  <section class="workspace-intro" aria-label="Business overview">
+    <div><div class="workspace-eyebrow">VantriqAI workspace</div><h2>Your business, at a glance.</h2><p>Track your leads, manage your accounts, and keep the next conversation moving.</p></div>
+    <div class="workspace-intro-actions"><button class="btn btn-primary" onclick="navigate('pipeline')">View pipeline ${iconArrowRight(16)}</button><button class="btn btn-ghost" onclick="navigate('calendar')">Open calendar</button></div>
+  </section>
   <div class="grid kpi-row">
     <div class="card kpi">
       <div class="label">Active clients</div>
@@ -7777,7 +7783,9 @@ function loginMarkSVG(){
 function shell(inner){
   return `
   <div class="auth-screen">
-    <div class="auth-card">
+    <div class="auth-layout">
+      <aside class="auth-story"><div class="workspace-eyebrow">VantriqAI · Revenue console</div><h1>Every lead.<br>Every conversation.<br><em>One workspace.</em></h1><p>A clear view of your sales, customer accounts, and the work ahead.</p><div class="auth-capabilities"><span>Pipeline &amp; calendar</span><span>Agents &amp; customers</span><span>Billing &amp; insights</span></div><div class="auth-story-note"><span class="auth-story-mark">${loginMarkSVG()}</span><div><strong>Built around your business.</strong><p>Your team, your customers, your next opportunity.</p></div></div></aside>
+      <div class="auth-form-wrap"><div class="auth-card">
       <div class="auth-brand">
         ${loginMarkSVG()}
         <div>
@@ -7785,10 +7793,12 @@ function shell(inner){
           <div class="auth-kicker">Revenue Console</div>
         </div>
       </div>
+      ${loginStep==='password'?'<h2 class="auth-title">Welcome back.</h2><p class="auth-description">Sign in to your VantriqAI workspace.</p>':''}
       ${connectError?`<div class="auth-error">${esc(connectError)}</div>`:''}
       ${inner}
     </div>
-    <p class="auth-foot">Signed-in sessions are tied to your company email.</p>
+    <p class="auth-foot">Signed-in sessions are tied to your company email.</p></div>
+    </div>
   </div>`;
 }
 
