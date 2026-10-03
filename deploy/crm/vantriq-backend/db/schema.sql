@@ -145,6 +145,7 @@ create table if not exists usage_events (
 create index if not exists idx_usage_client_time on usage_events(client_id, occurred_at);
 create index if not exists idx_usage_session on usage_events(session_id);
 
+
 -- Rolled-up monthly usage per client, derived from usage_events.
 -- Used by the dashboard/billing to show "sessions used this month"
 -- and to compute overage without re-scanning raw events each time.
@@ -2169,3 +2170,17 @@ create table if not exists calendar_events (
 );
 create index if not exists idx_calendar_events_time on calendar_events(starts_at, ends_at);
 create index if not exists idx_calendar_events_client on calendar_events(client_id);
+
+-- Pulse measurements are separate from usage/billing. Stable event ids make retries idempotent.
+create table if not exists pulse_events (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  agent_id uuid references client_agents(id) on delete set null,
+  session_id text not null check (length(session_id) between 1 and 200),
+  event_id text not null check (length(event_id) between 1 and 128),
+  occurred_at timestamptz not null default now(),
+  data jsonb not null,
+  created_at timestamptz not null default now(),
+  unique(client_id,event_id)
+);
+create index if not exists idx_pulse_client_time on pulse_events(client_id,occurred_at);

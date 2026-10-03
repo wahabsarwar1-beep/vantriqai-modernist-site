@@ -719,7 +719,7 @@ async function pulseReport(client, { grain, quota = null } = {}) {
     m('Messages handled', k.messages),
     { label: 'Messages per conversation', cur: k.messages_per_conversation.current, prev: k.messages_per_conversation.previous, chg: k.messages_per_conversation.delta_pct, fmt: 'dec', good: null },
   ];
-  if (k.containment) pulseItems.push({ label: 'Handled fully by AI (%)', cur: k.containment.current, prev: k.containment.previous, chg: k.containment.delta_pct, fmt: 'pct', chgFmt: 'signed' });
+  if (k.containment) pulseItems.push({ label: 'No human handoff (%)', cur: k.containment.current, prev: k.containment.previous, chg: k.containment.delta_pct, fmt: 'pct', chgFmt: 'signed' });
   r = kpiTable(sum, r, d, pulseItems);
 
   r = sectionTitle(sum, r, `${g.window} in total`);
@@ -958,10 +958,37 @@ async function pulseReport(client, { grain, quota = null } = {}) {
   })));
 
   heatSheet(wb, d, who, window);
+  appendPulseAdvancedReport(wb, d.advanced, who, d.period.current_label);
   definitions(wb, grain, 'pulse');
 
   const buffer = Buffer.from(await wb.xlsx.writeBuffer());
   return { buffer, filename: `vantriq-pulse-${all ? 'all-customers' : safeName(client.company)}-${grain}-${new Date().toISOString().slice(0, 10)}.xlsx` };
+}
+
+function appendPulseAdvancedReport(wb,a,who,period){
+  if(!a)return;
+  const note=`${period} conversation cohort. ${a.tracked}/${a.conversations} tracked. Explicit outcomes only; stages may be skipped. Missing measurements are unknown.${a.sampled?' Data limit reached; partial results.':''}`;
+  const outcomes=addSheet(wb,'Pulse outcomes');
+  table(outcomes,titleBlock(outcomes,`Reported outcomes — ${who}`,note,6),[
+    {header:'Channel',key:'name',width:24,fmt:'text'},...['conversations','tracked','qualified','meetings','won'].map(key=>({header:cap(key),key,width:16,fmt:'int'}))
+  ],a.outcomes.channels);
+  const agents=addSheet(wb,'Pulse performance',{landscape:true});
+  table(agents,titleBlock(agents,`Agent performance — ${who}`,note+' First recorded agent; handoff is not resolution. Reply duration is reported, not inferred.',10),[
+    {header:'Agent',key:'name',width:26,fmt:'text'},{header:'Customer',key:'company',width:26,fmt:'text'},
+    ...['conversations','tracked','reported_handoffs','handoffs','resolution_reported','resolved','qualification_reported','qualified','meetings','won'].map(key=>({header:key.replace(/_/g,' '),key,width:18,fmt:'int'})),
+    {header:'Median reply (sec)',key:'median_seconds',width:20,fmt:'dec'}
+  ],a.agents);
+  const service=addSheet(wb,'Pulse service');
+  table(service,titleBlock(service,`Response speed — ${who}`,note+' Unknown timings are not counted as unanswered. 60 seconds is a reference threshold.',2),[
+    {header:'Metric',key:'name',width:40,fmt:'text'},{header:'Value',key:'value',width:20,fmt:'dec'}
+  ],Object.entries(a.response).map(([name,value])=>({name:name.replace(/_/g,' '),value})));
+  const topics=addSheet(wb,'Pulse intents');
+  let r=titleBlock(topics,`Intents and handoffs — ${who}`,note+' Agent-reported categories and reasons; can overlap. Not AI sentiment analysis.',2);
+  for(const [label,rows] of [['Intents',a.intents],['Handoff reasons',a.handoff_reasons]]){r=sectionTitle(topics,r,label,2);r=table(topics,r,[{header:'Category',key:'name',width:45,fmt:'text'},{header:'Conversations',key:'value',width:20,fmt:'int'}],rows);}
+  if(a.health&&a.value){
+    const ops=addSheet(wb,'Pulse operations');
+    table(ops,titleBlock(ops,`Operations — ${who}`,`${period} reported events, including events outside the conversation cohort. Not uptime. PKR amounts are incremental reported attribution, not verified collections; time saved is workflow-supplied estimate.`,2),[{header:'Metric',key:'name',width:45,fmt:'text'},{header:'Value',key:'value',width:20,fmt:'dec'}], [...Object.entries(a.health),...Object.entries(a.value)].map(([name,value])=>({name,value})));
+  }
 }
 
 function heatSheet(wb, d, who, window) {
@@ -1490,12 +1517,12 @@ function definitions(wb, grain, kind = 'pulse') {
   const pulse = [
     { f: 'Conversation', m: 'One customer\'s conversation with an agent. On WhatsApp it is that customer\'s 24-hour window, however many messages it holds.' },
     { f: 'Contact / person', m: 'Someone who messaged — on WhatsApp, the number they wrote from. The same number on another day is the same person.' },
-    { f: 'New contact', m: 'Their very first conversation ever falls in the period. The dashboard\'s "New contacts (leads)".' },
+    { f: 'New contact', m: 'Their very first conversation ever falls in the period. The dashboard\'s "New contacts".' },
     { f: 'Returning contact', m: 'On the dashboard and the Trend tab: active in a period, first seen before it. In the Contacts tabs, "Returning" is someone first seen before the whole window, and "New, came back" someone first seen in it who has since had another conversation; the Returning contacts tab lists both — everyone who came back.' },
     { f: 'Messages handled', m: 'Messages the agent answered, as each agent reports them.' },
     period,
     { f: 'On pace for', m: 'Where the period under way ends at its current pace — shown once a tenth of it has passed.' },
-    { f: 'Handled fully by AI', m: 'Conversations the agent finished without passing to a person, for agents that report hand-offs.' },
+    { f: 'No human handoff', m: 'Conversations the agent finished without passing to a person, for agents that report hand-offs.' },
     { f: 'Name, email, city, gender, age group', m: 'What the customer told the agent or a survey, their WhatsApp profile name, or what someone typed on their profile in the CRM or the portal. Automatic sources only fill a blank; a person\'s edit always wins.' },
     { f: 'Country', m: 'From the dialling code of the number they wrote from. Web visitors have none.' },
   ];
@@ -1670,4 +1697,4 @@ function sendReport(res, { buffer, filename }) {
   res.send(buffer);
 }
 
-module.exports = { appendEchoAdvancedReport, pulseReport, echoReport, contactsWorkbook, salesReport, sendReport, periodLabel, contactLabel };
+module.exports = { appendPulseAdvancedReport, appendEchoAdvancedReport, pulseReport, echoReport, contactsWorkbook, salesReport, sendReport, periodLabel, contactLabel };

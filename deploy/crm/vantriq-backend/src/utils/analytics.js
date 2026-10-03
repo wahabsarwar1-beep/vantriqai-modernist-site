@@ -1,5 +1,6 @@
 const db = require('../db');
 const { countryOf } = require('./contacts');
+const { pulseAdvanced } = require('./pulseAdvanced');
 
 /**
  * Conversation, contact and satisfaction analytics.
@@ -567,10 +568,11 @@ async function quotaPace(clientId, quota) {
 async function clientAnalytics(clientId, { grain, quota = null } = {}) {
   grain = normaliseGrain(grain);
   const b = await periodBounds(grain);
-  const [conv, sat, q] = await Promise.all([
+  const [conv, sat, q, advanced] = await Promise.all([
     conversationAnalytics(clientId, grain, b),
     satisfactionAnalytics(clientId, grain, b),
     quotaPace(clientId, quota),
+    pulseAdvanced(clientId, b),
   ]);
   return {
     grain,
@@ -586,6 +588,7 @@ async function clientAnalytics(clientId, { grain, quota = null } = {}) {
       elapsed_pct: Math.round(b.elapsed_frac * 100),
     },
     ...conv,
+    advanced,
     satisfaction: sat,
     quota: q,
     insights: buildInsights(grain, conv, sat, { quota: q }),
@@ -786,9 +789,10 @@ async function salesAnalytics({ grain } = {}) {
 async function platformAnalytics({ grain } = {}) {
   grain = normaliseGrain(grain);
   const b = await periodBounds(grain);
-  const [conv, sat] = await Promise.all([
+  const [conv, sat, advanced] = await Promise.all([
     conversationAnalytics(null, grain, b),
     satisfactionAnalytics(null, grain, b, { withCompany: true }),
+    pulseAdvanced(null, b),
   ]);
   return {
     grain,
@@ -799,6 +803,7 @@ async function platformAnalytics({ grain } = {}) {
       current_start: b.cur_start, compared_to: b.prev_point, elapsed_pct: Math.round(b.elapsed_frac * 100),
     },
     ...conv,
+    advanced,
     satisfaction: sat,
     insights: buildInsights(grain, conv, sat),
   };

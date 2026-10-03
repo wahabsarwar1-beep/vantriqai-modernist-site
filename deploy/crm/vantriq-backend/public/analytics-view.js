@@ -501,6 +501,30 @@
   /* ------------------------------------------------------------------ */
   /* Conversations view — one customer, or every customer               */
   /* ------------------------------------------------------------------ */
+
+  function pulseAdvancedHTML(d, audience){
+    const a=d.advanced;if(!a)return '';
+    const time=v=>v==null?'—':v<60?v+' sec':Math.round(v/60*10)/10+' min';
+    const percent=v=>v==null?'—':v+'%';
+    const trackedNote=`${n(a.tracked)} of ${n(a.conversations)} conversations have outcome or service measurements. Missing measurements are unknown, not failures.`;
+    return `<details class="vqe-disclosure" aria-label="Advanced Pulse insights"><summary>Advanced insights · conversions, response speed &amp; agents</summary><div class="vqe-disclosure-body">
+      <div class="vqa-card" style="margin-bottom:14px;"><h3>Tracking coverage</h3><div class="vqa-sub">${esc(d.period.current_label)} · conversations first recorded in this period. ${trackedNote}</div>
+        ${a.sampled?'<div class="vqa-empty">Data limit reached: latest 50,000 conversations / 100,000 events only. Results may be incomplete.</div>':''}
+        ${a.unlinked_events?`<div class="vqa-empty">${n(a.unlinked_events)} events do not match a conversation that started this period; excluded from conversion and agent figures.</div>`:''}
+        ${!a.tracked?'<div class="vqa-empty">Outcome and timing measurements are not reporting yet. These insights will populate when your agent starts reporting them.</div>':''}</div>
+      <div class="vqa-grid vqa-two"><div class="vqa-card"><h3>Conversation-to-sale outcomes</h3><div class="vqa-sub">Distinct conversations with explicitly reported outcomes. Stages can be skipped; these are not a sequential drop-off funnel. Sales refer to your automation’s recorded outcomes.</div>
+        ${barList([{name:'Conversations',value:a.conversations},{name:'Qualified leads',value:a.outcomes.qualified},{name:'Meetings booked',value:a.outcomes.meetings},{name:'Deals won',value:a.outcomes.won}])}
+        <details style="margin-top:14px;"><summary>Compare channels</summary>${table(['Channel','Conversations','Tracked','Qualified','Meetings','Won'],a.outcomes.channels.map(x=>[CHANNELS[x.name]||x.name,x.conversations,x.tracked,x.qualified,x.meetings,x.won]))}</details></div>
+      <div class="vqa-card"><h3>Response speed</h3><div class="vqa-sub">First reply duration explicitly reported by the automation, one measurement per conversation. A missing timestamp does not prove the customer was left unanswered.</div>
+        <div class="vqa-grid vqa-two">${kpi({label:'Median first reply',value:time(a.response.median_seconds)})}${kpi({label:'95th percentile',value:time(a.response.p95_seconds)})}${kpi({label:'First replies over 60 sec',value:n(a.response.over_60_seconds),foot:'Reference threshold, not a contractual SLA'})}${kpi({label:'Unmeasured conversations',value:n(a.response.unmeasured),foot:`${n(a.response.measured)} recorded timings`})}</div></div></div>
+      <div class="vqa-card" style="margin-bottom:14px;"><h3>Agent performance matrix</h3><div class="vqa-sub">Assigned to the first recorded agent in the conversation. Handoffs use only reported handoff status; confirmed resolution is independently reported. Small samples are descriptive.</div>
+        <div class="vqa-tablewrap">${table(['Agent','Conversations','Tracked','Handoff %','Confirmed resolved','Median reply','Qualification %','Qualified / booked / won'],a.agents.map(x=>[x.name+(audience==='platform'?' — '+x.company:''),x.conversations,x.tracked,percent(x.handoff_pct),x.resolved+' / '+x.resolution_reported,time(x.median_seconds),percent(x.qualification_pct)+' ('+n(x.qualification_reported)+' reported)',x.qualified+' / '+x.meetings+' / '+x.won]))}</div></div>
+      <div class="vqa-grid vqa-two"><div class="vqa-card"><h3>Customer intents</h3><div class="vqa-sub">Agent-reported categories, counted once per conversation per category. Categories can overlap; no sentiment or inferred intent is claimed.</div>${a.intents.length?barList(a.intents):'<div class="vqa-empty">No intent measurements yet.</div>'}</div>
+      <div class="vqa-card"><h3>Why customers need a person</h3><div class="vqa-sub">Reported reasons for conversations with a confirmed human handoff. Reasons can overlap.</div>${a.handoff_reasons.length?barList(a.handoff_reasons):'<div class="vqa-empty">No handoff reasons reported yet.</div>'}</div></div>
+      ${audience==='platform'?`<div class="vqa-grid vqa-two"><div class="vqa-card"><h3>Automation health</h3><div class="vqa-sub">Explicit success/failure events this period, including events outside the conversation cohort. Coverage depends on workflow reporting; this is not an uptime measure.</div>${barList([{name:'Reported successes',value:a.health.success},{name:'Reported failures',value:a.health.failure}])}</div>
+      <div class="vqa-card"><h3>Reported business value</h3><div class="vqa-sub">Incremental amounts sent by your automation; partial coverage, PKR only. Revenue is reported attribution, not verified collections. Time saved is an estimate supplied by the workflow.</div><div class="vqa-grid vqa-two">${kpi({label:'Recorded cost',value:a.value.cost_events?money(a.value.cost):'—',foot:n(a.value.cost_events)+' cost measurements'})}${kpi({label:'Attributed revenue',value:a.value.revenue_events?money(a.value.revenue):'—',foot:n(a.value.revenue_events)+' revenue measurements'})}${kpi({label:'Estimated minutes saved',value:a.value.saved_events?n(a.value.saved):'—',foot:n(a.value.saved_events)+' estimates'})}</div></div></div>`:''}
+    </div></details>`;
+  }
   function conversationsHTML(d, opts){
     opts = opts || {};
     const audience = opts.audience || 'portal';
@@ -527,7 +551,7 @@
       <div class="vqa-grid vqa-kpis">
         ${kpi({ label: 'Conversations', value: n(k.conversations.current), delta: k.conversations.delta_pct, prevLabel: prev,
                 projected: k.conversations.projected, sparkValues: series.map(s => s.conversations) })}
-        ${kpi({ label: 'New contacts (leads)', value: n(k.new_contacts.current), delta: k.new_contacts.delta_pct, prevLabel: prev,
+        ${kpi({ label: 'New contacts', value: n(k.new_contacts.current), delta: k.new_contacts.delta_pct, prevLabel: prev,
                 projected: k.new_contacts.projected, sparkValues: series.map(s => s.new_contacts) })}
         ${kpi({ label: 'Returning contacts', value: n(k.returning_contacts.current), delta: k.returning_contacts.delta_pct, prevLabel: prev,
                 sparkValues: series.map(s => s.returning_contacts) })}
@@ -536,9 +560,9 @@
         ${kpi({ label: 'Messages per conversation', value: k.messages_per_conversation.current == null ? '—' : k.messages_per_conversation.current,
                 delta: k.messages_per_conversation.current == null ? undefined : k.messages_per_conversation.delta_pct, goodWhenUp: null, prevLabel: prev,
                 sparkValues: series.map(s => s.conversations ? s.messages / s.conversations : null) })}
-        ${k.containment ? kpi({ label: 'Handled fully by AI', value: k.containment.current == null ? '—' : k.containment.current, unit: k.containment.current == null ? '' : '%',
+        ${k.containment ? kpi({ label: 'No human handoff', value: k.containment.current == null ? '—' : k.containment.current, unit: k.containment.current == null ? '' : '%',
                 delta: k.containment.current == null ? undefined : k.containment.delta_pct, deltaUnit: 'pts', prevLabel: prev,
-                foot: `${n(k.containment.handed_off)} of ${n(k.containment.reported_conversations)} passed to a person` }) : ''}
+                foot: `${n(k.containment.handed_off)} of ${n(k.containment.reported_conversations)} passed to a person · not confirmed resolution` }) : ''}
       </div>
 
       ${q ? `<div class="vqa-card" style="margin-bottom:14px;">
@@ -595,6 +619,7 @@
       </div>`}
 
       ${satisfactionHTML(d, { audience, surveysEnabled: opts.surveysEnabled })}
+      ${pulseAdvancedHTML(d, audience)}
 
       <div class="vqa-card" style="margin-top:14px;">
         <details>

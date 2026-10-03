@@ -6,6 +6,44 @@ const { sendMail, mailConfigured } = require('../utils/mailer');
 const S = require('../utils/surveys');
 const C = require('../utils/contacts');
 const router = express.Router();
+const { validatePulse } = require('../utils/pulseAdvanced');
+
+/** Non-billable, idempotent outcome/timing telemetry; protected by the existing webhook scope. */
+router.post('/pulse-event', async (req,res) => {
+  const body=req.body||{},uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  let data;
+  try {
+    data=validatePulse(body.data);
+    for(const key of ['client_id','agent_id']) if(body[key]&&!uuid.test(body[key]))throw new Error(key+' must be a UUID');
+    for(const [key,max] of [['session_id',200],['event_id',128]])if(typeof body[key]!=='string'||!body[key].trim()||body[key].length>max)throw new Error(key+' is required (maximum '+max+' characters)');
+    if(body.occurred_at && (!Number.isFinite(Date.parse(body.occurred_at))||Date.parse(body.occurred_at)>Date.now()+300000))throw new Error('occurred_at must be a valid timestamp, no more than five minutes ahead');
+  } catch(err){return res.status(400).json({error:err.message});}
+  try {
+    let clientId=body.client_id||null,agentId=null;
+    if(body.agent_id||body.agent_ref){
+      const {rows}=await db.query('select id,client_id from client_agents where '+(body.agent_id?'id=$1':'external_ref=$1'),[body.agent_id||body.agent_ref]);
+      if(!rows[0])return res.status(404).json({error:'Agent not found'});
+      if(clientId&&clientId!==rows[0].client_id)return res.status(400).json({error:'Agent does not belong to this client'});
+      clientId=rows[0].client_id;agentId=rows[0].id;
+    }
+    if(!clientId&&body.external_ref){
+      const {rows}=await db.query('select id from clients where external_ref=$1',[body.external_ref]);
+      if(rows[0])clientId=rows[0].id;
+      else {const {rows:agents}=await db.query('select id,client_id from client_agents where external_ref=$1',[body.external_ref]);if(agents[0]){clientId=agents[0].client_id;agentId=agents[0].id;}}
+    }
+    if(!clientId)return res.status(400).json({error:'A valid client_id, external_ref, agent_id or agent_ref is required'});
+    const {rows:clients}=await db.query('select id from clients where id=$1',[clientId]);if(!clients[0])return res.status(404).json({error:'Client not found'});
+    const session=body.session_id.trim(),event=body.event_id.trim();
+    const {rows}=await db.query(`insert into pulse_events(client_id,agent_id,session_id,event_id,occurred_at,data)
+      values($1,$2,$3,$4,coalesce($5::timestamptz,now()),$6::jsonb) on conflict(client_id,event_id) do nothing returning id`,[clientId,agentId,session,event,body.occurred_at||null,JSON.stringify(data)]);
+    if(!rows.length){
+      const {rows:existing}=await db.query(`select id,(session_id=$2 and data=$3::jsonb and agent_id is not distinct from $4::uuid) matches from pulse_events where client_id=$1 and event_id=$5`,[clientId,session,JSON.stringify(data),agentId,event]);
+      if(!existing[0]?.matches)return res.status(409).json({error:'event_id already exists with different measurements'});
+      return res.json({event_id:event,duplicate:true});
+    }
+    res.status(201).json({event_id:event,duplicate:false});
+  }catch(err){console.error('[pulse-event]',err.message);res.status(500).json({error:'Could not record Pulse measurements'});}
+});
 
 /**
  * What a caller says about the customer, in whichever shape it sends it:
