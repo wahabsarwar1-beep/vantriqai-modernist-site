@@ -1703,6 +1703,11 @@ create unique index if not exists idx_survey_responses_submission
 create index if not exists idx_survey_responses_followup
   on survey_responses(client_id, followup_status) where followup_status in ('open','contacted');
 
+-- Echo service timing: historical updates do not identify first contact.
+-- Keep historical timestamps unknown; capture only new status transitions.
+alter table survey_responses add column if not exists first_contacted_at timestamptz;
+alter table survey_responses add column if not exists first_resolved_at timestamptz;
+
 create table if not exists survey_invites (
   id uuid primary key default gen_random_uuid(),
   survey_id uuid not null references surveys(id) on delete cascade,

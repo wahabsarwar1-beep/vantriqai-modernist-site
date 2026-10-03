@@ -1500,7 +1500,11 @@ async function setFollowUp(survey, responseId, { status, note }, actor) {
     `update survey_responses
         set followup_status = coalesce($3, followup_status),
             followup_note = coalesce($4, followup_note),
-            followup_by = $5, followup_at = now()
+            followup_by = $5, followup_at = now(),
+            first_contacted_at = case when $3 in ('contacted','resolved') and followup_status in ('none','open')
+              then coalesce(first_contacted_at, now()) else first_contacted_at end,
+            first_resolved_at = case when $3 = 'resolved' and followup_status <> 'resolved'
+              then coalesce(first_resolved_at, now()) else first_resolved_at end
       where id = $1 and survey_id = $2 returning *`,
     [responseId, survey.id, status === undefined ? null : status, note === undefined ? null : cleanStr(note, 2000), cleanStr(actor, 200)]
   );

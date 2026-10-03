@@ -1020,6 +1020,40 @@ function echoFindings(demo, sw) {
   return out;
 }
 
+function appendEchoAdvancedReport(wb, advancedDashboard, who, grain) {
+  const g = GRAINS[grain];
+  const adv = advancedDashboard.advanced;
+  const topicSheet = addSheet(wb, 'Complaint topics', { landscape: true });
+  let topicRow = titleBlock(topicSheet, `Complaint topics — ${who}`, `${g.window} · keyword matching (English, Urdu, Roman Urdu); topics overlap; not AI sentiment. ${advancedDashboard.sampled ? 'Latest 50,000 responses only.' : ''}`, 4);
+  table(topicSheet, topicRow, [
+    { header: 'Topic', key: 'label', width: 28, fmt: 'text' },
+    { header: 'Matching comments', key: 'count', width: 20, fmt: 'int' },
+    { header: 'Share of unhappy comments, %', key: 'share', width: 24, fmt: 'pct' },
+  ], adv.topics.rows, { emptyText: 'No unhappy comments available for classification.' });
+  const topicTrendSheet = addSheet(wb, 'Topic trends', { landscape: true });
+  table(topicTrendSheet, titleBlock(topicTrendSheet, `Topic trends — ${who}`, `${g.window} · matching comments by calendar period`, 3), [
+    { header: 'Topic', key: 'topic', width: 28, fmt: 'text' }, { header: 'Period', key: 'bucket', width: 16, fmt: 'text' },
+    { header: 'Matching comments', key: 'count', width: 20, fmt: 'int' },
+  ], adv.topics.rows.flatMap(t => t.series.map(x => ({ topic: t.label, ...x }))), { emptyText: 'No topic trends yet.' });
+  const branchSheet = addSheet(wb, 'Branch matrix', { landscape: true });
+  table(branchSheet, titleBlock(branchSheet, `Branch matrix — ${who}`, `${g.current} · change against ${g.previous} to the same point; at least five scored answers in both periods required. Descriptive changes, not significance tests.`, 8), [
+    { header: 'Branch', key: 'name', width: 24, fmt: 'text' }, { header: 'Customer', key: 'company', width: 24, fmt: 'text' },
+    { header: 'Answers', key: 'responses', width: 12, fmt: 'int' }, { header: 'Satisfied, %', key: 'csat', width: 15, fmt: 'pct' },
+    { header: 'NPS', key: 'nps', width: 12, fmt: 'int' }, { header: 'Open / contacted', key: 'open', width: 18, fmt: 'int' },
+    { header: 'Change, points', key: 'delta_pts', width: 17, fmt: 'signed' }, { header: 'Sample', key: 'sample', width: 22, fmt: 'text' },
+  ], adv.branches.map(b => ({ ...b, sample: b.low_sample ? 'Fewer than 5 scored' : `${b.scored} scored` })), { emptyText: 'No branch-tagged answers in the current period.' });
+  const serviceSheet = addSheet(wb, 'Service performance', { landscape: true });
+  const servicePerf = adv.service;
+  table(serviceSheet, titleBlock(serviceSheet, `Service performance — ${who}`, `${g.current} submission cohort; status now. Historical first-contact times remain unknown; resolution is team-marked, not customer-confirmed.`, 2), [
+    { header: 'Measure', key: 'measure', width: 45, fmt: 'text' }, { header: 'Value', key: 'value', width: 24, fmt: 'dec' },
+  ], [
+    ['Follow-ups in cohort', servicePerf.followups], ['Waiting over 48 hours', servicePerf.overdue], ['Median first response, hours', servicePerf.median_first_reply_hours],
+    ['Median first resolution, hours', servicePerf.median_resolution_hours], ['Recorded first contacts', servicePerf.measured_replies], ['Recorded first resolutions', servicePerf.measured_resolutions],
+    ['Recorded first contacts within 48 hours, %', servicePerf.replied_within_48_pct], ['Unknown first contact times', servicePerf.missing_reply_timestamps],
+  ].map(([measure,value]) => ({ measure,value })));
+
+}
+
 async function echoReport(client, { grain } = {}) {
   grain = normaliseGrain(grain);
   const all = !client;
@@ -1275,6 +1309,10 @@ async function echoReport(client, { grain } = {}) {
     { header: 'Latest satisfaction', key: 'score', width: 11, fmt: 'int' },
     { header: 'Latest NPS', key: 'nps', width: 9, fmt: 'int' },
   ], echo.respondents, { filter: true, emptyText: `Nobody left their details in the ${window}.` });
+
+  // Exactly the dashboard's scoped calculations, available in either audience's workbook.
+  const advancedDashboard = await require('./echoDashboard').echoDashboard({ clientId: client ? client.id : null, grain });
+  appendEchoAdvancedReport(wb, advancedDashboard, who, grain);
 
   definitions(wb, grain, 'echo');
   const buffer = Buffer.from(await wb.xlsx.writeBuffer());
@@ -1632,4 +1670,4 @@ function sendReport(res, { buffer, filename }) {
   res.send(buffer);
 }
 
-module.exports = { pulseReport, echoReport, contactsWorkbook, salesReport, sendReport, periodLabel, contactLabel };
+module.exports = { appendEchoAdvancedReport, pulseReport, echoReport, contactsWorkbook, salesReport, sendReport, periodLabel, contactLabel };

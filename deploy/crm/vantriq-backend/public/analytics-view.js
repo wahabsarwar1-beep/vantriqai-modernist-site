@@ -712,6 +712,43 @@
     return `<div class="vqe-words">${list.map(w => `<span style="font-size:${12 + Math.round((w.n / max) * 8)}px;border-color:${color};color:${color}">${esc(w.word)} <small>${w.n}</small></span>`).join('')}</div>`;
   }
 
+  function echoAdvancedHTML(d){
+    const a=d.advanced;
+    if(!a) return '';
+    const service=a.service;
+    const hours=v=>v==null?'—':v<1?Math.round(v*60)+' min':v+' h';
+    return `<section aria-label="Advanced Echo insights">
+      <div class="vqa-section">Advanced insights</div>
+      ${d.sampled?'<div class="vqa-card"><b>Response limit reached.</b><div class="vqa-sub">These insights use the latest 50,000 responses in the window and may omit earlier responses.</div></div>':''}
+      <div class="vqa-card" style="margin-bottom:14px;"><h3>Complaint topic trends</h3>
+        <div class="vqa-sub">${esc(d.period.window_label)} · ${n(a.topics.comment_count)} comments from low scores or unresolved answers. English, Urdu and Roman Urdu keyword matching; topics can overlap. This is not AI sentiment analysis.</div>
+        ${a.topics.rows.length?a.topics.rows.map(t=>`<details style="padding:12px 0;border-bottom:1px solid var(--border,#e7e2da);"><summary style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;"><b>${esc(t.label)}</b><span>${n(t.count)} comments · ${t.share}%</span></summary>
+          <div style="max-width:240px;margin-top:8px;">${spark(t.series.map(x=>x.count))}</div>
+          <div class="vqa-sub">Open the period table and supporting comments to inspect this classification.</div>
+          ${table(['Period','Matching comments'],t.series.map(x=>[bucketLabel(x.bucket,d.grain,true),x.count]))}
+          ${t.samples.map(x=>`<div class="vqa-fb"><div>“${esc(x.comment)}”</div><div class="m">${esc(x.survey)}${x.location?' · '+esc(x.location):''} · ${esc(new Date(x.submitted_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',timeZone:d.time_zone}))}</div></div>`).join('')}
+        </details>`).join(''):'<div class="vqa-empty">Not enough data yet. Topics appear when an unhappy or unresolved response includes a comment.</div>'}
+      </div>
+      <div class="vqa-card" style="margin-bottom:14px;"><h3>Branch performance matrix</h3>
+        <div class="vqa-sub">${esc(d.period.current_label)} · open complaints first. Change compares satisfaction with ${esc(d.period.previous_label)} up to the same point. Fewer than five scored answers is labelled low sample; changes require five in both periods and are descriptive, not significance tests.</div>
+        ${a.branches.length?`<div style="overflow-x:auto;"><table class="vqa-table"><thead><tr><th>Branch / customer</th><th>Answers</th><th>Satisfied</th><th>NPS</th><th>Open / contacted</th><th>Change</th></tr></thead><tbody>
+          ${a.branches.map(b=>`<tr><td><b>${esc(b.name)}</b><div class="vqa-sub">${esc(b.company)}</div></td><td>${n(b.responses)}${b.low_sample?'<div class="vqa-sub">Low sample</div>':''}</td><td><span class="vqe-pill" style="background:${b.low_sample?'#bdb7ad':satColor(b.csat)}">${b.csat==null?'—':b.csat+'%'}</span><div class="vqa-sub">${n(b.scored)} scored</div></td><td>${sign(b.nps)}</td><td>${n(b.open)}</td><td>${b.delta_pts==null?'—':sign(b.delta_pts)+' pts'}${b.delta_pts==null?'<div class="vqa-sub">Insufficient comparison data</div>':''}</td></tr>`).join('')}
+        </tbody></table></div>`:'<div class="vqa-empty">Not enough data yet. Responses tagged to a branch will appear here.</div>'}
+        ${a.unlocated_current?`<div class="vqa-sub">${n(a.unlocated_current)} current-period answers have no branch tag and are excluded.</div>`:''}
+      </div>
+      <div class="vqa-card" style="margin-bottom:14px;"><h3>Service response performance</h3>
+        <div class="vqa-sub">Follow-ups for answers submitted in ${esc(d.period.current_label.toLowerCase())}; status as of now. The 48-hour first-response target is a reference threshold. Resolution means your team marked it resolved, not customer confirmation.</div>
+        <div class="vqa-grid vqa-two" style="margin-top:14px;">
+          ${kpi({label:'First response',value:hours(service.median_first_reply_hours),foot:`Median · ${n(service.measured_replies)} recorded first contacts`})}
+          ${kpi({label:'Time to resolve',value:hours(service.median_resolution_hours),foot:`Median · ${n(service.measured_resolutions)} recorded first resolutions`})}
+          ${kpi({label:'Replied within 48 hours',value:service.replied_within_48_pct==null?'—':service.replied_within_48_pct,unit:service.replied_within_48_pct==null?'':'%',foot:'Of recorded first contacts; excludes unknown timings'})}
+          ${kpi({label:'Waiting over 48 hours',value:n(service.overdue),foot:`${n(service.waiting)} open · ${n(service.followups)} follow-ups in this cohort`})}
+        </div>
+        <div class="vqa-sub">First-contact and first-resolution timestamps are captured on new status transitions. Historical timings are not reconstructed from note edits.${service.missing_reply_timestamps?` ${n(service.missing_reply_timestamps)} contacted/resolved follow-ups have unknown first-contact time.`:''}${!service.measured_replies&&!service.measured_resolutions?' Not enough timing data yet.':''}</div>
+      </div>
+    </section>`;
+  }
+
   function echoHTML(d, opts){
     opts = opts || {};
     const k = d.kpis, w = d.window, prev = d.period.previous_label, g = d.grain;
@@ -789,9 +826,9 @@
       </div>
 
       <div class="vqa-grid vqa-two">
-        <div class="vqa-card"><h3>Closing the loop</h3><div class="vqa-sub">Every unhappy answer opens a follow-up</div>
+        <div class="vqa-card"><h3>Closing the loop</h3><div class="vqa-sub">All-time follow-up backlog · every unhappy answer opens a follow-up</div>
           ${barList([{ name: 'Waiting for a reply', value: f.open }, { name: 'Contacted', value: f.contacted }, { name: 'Resolved', value: f.resolved }], { colors: [SCORE[0], '#d9a441', '#2f7d5f'] })}
-          <div class="vqa-sub" style="margin:12px 0 0;">${f.median_hours_to_reply != null ? `Typical time to get back to them: <b>${f.median_hours_to_reply < 1 ? 'under an hour' : f.median_hours_to_reply < 48 ? f.median_hours_to_reply + ' hours' : Math.round(f.median_hours_to_reply / 24) + ' days'}</b>` : 'No follow-ups handled yet'}${f.overdue ? ` · <b style="color:${SCORE[0]}">${n(f.overdue)} waiting over 48 hours</b>` : ''}</div></div>
+          <div class="vqa-sub" style="margin:12px 0 0;">${f.median_hours_to_reply != null ? `Typical time to get back to them: <b>${f.median_hours_to_reply < 1 ? 'under an hour' : f.median_hours_to_reply < 48 ? f.median_hours_to_reply + ' hours' : Math.round(f.median_hours_to_reply / 24) + ' days'}</b>` : 'No first-contact timings recorded yet'}${f.overdue ? ` · <b style="color:${SCORE[0]}">${n(f.overdue)} waiting over 48 hours</b>` : ''}</div></div>
         <div class="vqa-card"><h3>When people answer</h3><div class="vqa-sub">By day and hour (${esc(d.time_zone.replace('Asia/', ''))} time) · ${esc(d.period.window_label)}</div>${heatmap(d.heatmap, d.period.window_label)}</div>
       </div>
 
@@ -799,6 +836,7 @@
         ${d.recent_comments.map(c => `<div class="vqa-fb"><div>“${esc(c.comment)}”</div><div class="m">${c.score != null ? `${'★'.repeat(c.score)}${'☆'.repeat(5 - c.score)} · ` : ''}${c.nps != null ? `NPS ${c.nps} · ` : ''}${c.resolved != null ? (c.resolved ? 'Resolved · ' : 'Not resolved · ') : ''}${esc(c.channel)} · ${esc(c.survey)} · ${esc(new Date(c.submitted_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }))}</div></div>`).join('')}
       </div></div>` : ''}
 
+      ${echoAdvancedHTML(d)}
       <div class="vqa-card"><details><summary>See every figure as a table</summary>${table(lastSeries.headers, lastSeries.rows)}</details></div>
     </div>`;
   }

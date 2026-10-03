@@ -70,8 +70,8 @@ async function echoDashboard({ clientId = null, grain } = {}) {
   const b = await periodBounds(grain);
   const [rowsR, bucketsR, invR, viewsR, surveysR, fuR] = await Promise.all([
     db.query(
-      `select r.id, r.survey_id, r.score, r.nps, r.ces, r.resolved, r.comment, r.channel, r.location_name, r.language,
-              r.gender, r.city, r.age_band, r.followup_status, r.followup_at, r.submitted_at, r.duration_sec,
+      `select r.id, r.survey_id, r.client_id, r.score, r.nps, r.ces, r.resolved, r.comment, r.channel, r.location_name, r.language,
+              r.gender, r.city, r.age_band, r.followup_status, r.followup_at, r.first_contacted_at, r.first_resolved_at, r.submitted_at, r.duration_sec,
               to_char(date_trunc($3, r.submitted_at at time zone $4), 'YYYY-MM-DD') as bucket,
               extract(isodow from r.submitted_at at time zone $4)::int as dow,
               extract(hour from r.submitted_at at time zone $4)::int as hour
@@ -102,11 +102,11 @@ async function echoDashboard({ clientId = null, grain } = {}) {
     ),
     db.query(
       `select followup_status as st, count(*)::int as n,
-              percentile_cont(0.5) within group (order by extract(epoch from (followup_at - submitted_at)) / 3600)
-                filter (where followup_at is not null and followup_status in ('contacted','resolved')) as median_hours,
+              percentile_cont(0.5) within group (order by extract(epoch from (first_contacted_at - submitted_at)) / 3600)
+                filter (where first_contacted_at is not null) as median_hours,
               count(*) filter (where followup_status = 'open' and submitted_at < now() - interval '48 hours')::int as overdue
          from survey_responses where ($1::uuid is null or client_id = $1) and followup_status <> 'none'
-        group by 1`,
+        group by rollup(followup_status)`,
       [clientId]
     ),
   ]);
@@ -149,7 +149,7 @@ async function echoDashboard({ clientId = null, grain } = {}) {
   for (const s of surveysR.rows) if (!surveys.some((x) => x.id === s.id)) surveys.push({ id: s.id, key: s.id, name: s.title, company: s.company, status: s.status, slug: s.slug, responses: 0, known: true });
 
   const fu = { open: 0, contacted: 0, resolved: 0, overdue: 0, median_hours_to_reply: null };
-  for (const f of fuR.rows) { fu[f.st] = f.n; fu.overdue += f.overdue || 0; if (f.median_hours != null && f.st !== 'open') fu.median_hours_to_reply = fu.median_hours_to_reply == null ? r1(Number(f.median_hours)) : fu.median_hours_to_reply; }
+  for (const f of fuR.rows) { if (f.st == null) { fu.median_hours_to_reply = f.median_hours == null ? null : r1(Number(f.median_hours)); continue; } fu[f.st] = f.n; fu.overdue += f.overdue || 0; }
 
   // Words that set a group apart: used by a bigger share of its comments than
   // of the other group's, so "great" in "great taste, but cold" is not a complaint.
@@ -199,6 +199,7 @@ async function echoDashboard({ clientId = null, grain } = {}) {
   };
   for (const k of ['gender', 'age', 'city']) if (!d.demographics[k].some((x) => x.known)) d.demographics[k] = [];
   if (!d.locations.some((x) => x.known)) d.locations = [];
+  d.advanced = require('./echoAdvanced').echoAdvanced(rows, { bounds: b, buckets: bucketsR.rows.map(x => x.bucket), surveyNames: surveyName });
   d.insights = insights(d);
   return d;
 }
