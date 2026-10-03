@@ -403,6 +403,12 @@
       '.vqs-hero ul{margin:10px 0 0;padding:0 0 0 18px;font-size:13px;line-height:1.8;}',
       '.vqs-danger{border-color:#f0c7bf;}',
       /* share, on the home page */
+      '.vqs-start{margin-bottom:14px;border-color:var(--teal-300,#a9bbf7);}',
+      '.vqs-start-steps{list-style:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;padding:0;margin:20px 0;}',
+      '.vqs-start-steps li{display:flex;gap:10px;min-width:0;}.vqs-step-number{display:flex;align-items:center;justify-content:center;flex:0 0 28px;height:28px;border-radius:50%;background:var(--teal-light,#e8ecfd);color:var(--teal,#2f56d9);font-weight:700;}',
+      '.vqs-start-steps b{font-size:13px;}.vqs-start-steps p{font-size:12px;line-height:1.6;color:var(--muted,#6b645b);margin:5px 0 0;}',
+      '.vqs-start-foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;border-top:1px solid var(--border,#e7e2da);padding-top:14px;font-size:11px;color:var(--muted,#6b645b);}',
+      '@media(max-width:760px){.vqs-start-steps{grid-template-columns:minmax(0,1fr);gap:14px;}.vqs-start-foot .vqs-btn{min-height:44px;}}',
       '.vqs-share{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;border-color:var(--teal-300,#a9bbf7);background:linear-gradient(135deg,var(--teal-light,#e8ecfd),var(--card,#fff) 55%);margin:0 0 14px;}',
       '.vqs-share-qr{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;text-decoration:none;}',
       '@media (max-width:560px){.vqs-share-qr{width:100%;}}',
@@ -532,9 +538,9 @@
     var surveys = st.list.surveys || [];
     if (!surveys.length) return head + emptyHome();
     var o = st.overview || {};
+    var firstAnswers = surveys.every(function(s){ return Number(s.responses || 0) === 0; });
     return head
-      + sharePanel(surveys)
-      + dashboard()
+      + (firstAnswers ? firstResponsesPanel(surveys) + sharePanel(surveys, true) : dashboard() + sharePanel(surveys))
       + (o.followup_queue && o.followup_queue.length ? followupQueue(o.followup_queue) : '')
       + '<div class="vqs-spread" style="margin:18px 0 0;"><h3 style="margin:0;">Your surveys</h3><span class="sub" style="margin:0;">' + n(o.live) + ' live · ' + n(o.surveys) + ' in total</span></div>'
       + '<div class="vqs-grid vqs-g3" style="margin-top:10px;">' + surveys.map(surveyCard).join('') + '</div>'
@@ -548,8 +554,18 @@
    * for the survey chosen here (the newest still waiting for its first answer
    * unless someone picks another). Staff see it for the client they picked.
    */
-  function sharePanel(surveys){
-    if (!isPortal() && !st.clientFilter) return '';
+  function firstResponsesPanel(surveys){
+    var live = surveys.filter(function(s){ return s.status === 'live' && !s.closed && s.client_surveys_enabled !== false && s.links; });
+    return '<section class="vqs-card vqs-start" aria-label="Get your first responses">'
+      + '<div class="vqs-spread"><div><h3>Get your first responses</h3><div class="sub">Your dashboard will lead with results once an answer arrives.</div></div><span class="vqs-tag">' + live.length + ' ready to share</span></div>'
+      + '<ol class="vqs-start-steps"><li><span class="vqs-step-number">1</span><div><b>' + (live.length ? 'Choose a live survey' : 'Publish a survey') + '</b><p>' + (live.length ? 'Pick the survey below. Each link and QR code belongs to that survey.' : 'Open a draft and set it live before collecting answers.') + '</p></div></li>'
+      + '<li><span class="vqs-step-number">2</span><div><b>Share with your customers</b><p>Copy a link, print a QR poster, or open the WhatsApp sharing option.</p></div></li>'
+      + '<li><span class="vqs-step-number">3</span><div><b>Watch the first answer arrive</b><p>Satisfaction, trends and follow-ups appear as real responses come in.</p></div></li></ol>'
+      + '<div class="vqs-start-foot"><span>No responses yet. Sharing progress is not tracked by this checklist.</span><button class="vqs-btn sm" onclick="VQS.echoReport()">Download Echo report (Excel)</button></div></section>';
+  }
+
+  function sharePanel(surveys, allowAllClients){
+    if (!isPortal() && !st.clientFilter && !allowAllClients) return '';
     var live = surveys.filter(function(x){ return x.status === 'live' && !x.closed && x.client_surveys_enabled !== false && x.links; });
     if (!live.length) {
       var draft = surveys.find(function(x){ return x.status === 'draft'; });
@@ -566,7 +582,7 @@
       + '<div class="sub" style="margin:2px 0 10px;">Customers answer on their own phone: they scan the QR code, tap the link on WhatsApp, use a tablet at your counter, or find it on your website.</div></div>'
       + (live.length > 1
         ? '<select data-a-change="share-pick" aria-label="Which survey to share">' + live.map(function(x){
-          return '<option value="' + esc(x.id) + '"' + (x.id === sv.id ? ' selected' : '') + '>' + esc(x.title) + '</option>';
+          return '<option value="' + esc(x.id) + '"' + (x.id === sv.id ? ' selected' : '') + '>' + esc((!isPortal() && !st.clientFilter && x.company ? x.company + ' · ' : '') + x.title) + '</option>';
         }).join('') + '</select>'
         : '<span class="vqs-tag" style="font-size:11.5px;padding:3px 9px;">' + esc(sv.title) + '</span>')
       + '</div>'
