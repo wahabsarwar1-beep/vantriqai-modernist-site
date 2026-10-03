@@ -76,6 +76,8 @@ function columns(region: Region): { title: string; links: FooterLink[] }[] {
         { href: waLink(), label: "WhatsApp us", external: true },
         ...SOCIAL_PROFILES.map((url) => ({ href: url, label: socialLabel(url), external: true })),
         { href: `${hrefIn(region, "/pricing")}#terms`, label: "Terms & conditions" },
+        { href: "/privacy", label: "Privacy policy" },
+        { href: "/cookies", label: "Cookies & storage" },
       ],
     },
   ];
@@ -171,6 +173,7 @@ export default function Footer() {
                 </a>
               );
             })}
+            <button className="ft-privacy" onClick={() => window.dispatchEvent(new Event("vantriq:manage-privacy"))}>Privacy preferences</button>
             <span className="ft-region">
               <RegionSwitch />
             </span>

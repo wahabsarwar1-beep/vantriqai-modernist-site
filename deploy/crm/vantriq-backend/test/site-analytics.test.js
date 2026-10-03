@@ -1,0 +1,22 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const {PGlite}=require('@electric-sql/pglite');
+(async()=>{
+ const pg=new PGlite();require.cache[require.resolve('../src/db')]={exports:{query:(q,p)=>pg.query(q,p)}};
+ const {validateSiteEvent,recordSiteEvent,siteAnalytics}=require('../src/utils/siteAnalytics');
+ for(const bad of [null,[],{}, {event:'page_view',section:'home',region:'pk',email:'private'}, {event:'page_view',section:'phone-number',region:'pk'}, {event:'invented',section:'home',region:'pk'}]) assert.throws(()=>validateSiteEvent(bad));
+ const sql='-- Opt-in public website activity:'+fs.readFileSync(require.resolve('../db/schema.sql'),'utf8').split('-- Opt-in public website activity:')[1];await pg.exec(sql);await pg.exec(sql);
+ const express=require('express'),app=express();app.use(express.json());app.use(require('../src/routes/usage'));const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.on('listening',r));
+ const post=body=>fetch('http://127.0.0.1:'+server.address().port+'/site-event',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+ assert.equal((await post({event:'page_view',region:'pk',section:'products',email:'private'})).status,400);
+ assert.equal((await post({event:'page_view',region:'pk',section:'products'})).status,200);
+ await Promise.all(Array.from({length:12},()=>recordSiteEvent({event:'page_view',region:'pk',section:'products'})));
+ await recordSiteEvent({event:'whatsapp_click',region:'global',section:'contact'});
+ await pg.exec("insert into website_activity values(current_date-200,'pk','home','page_view',99)");
+ await recordSiteEvent({event:'chat_open',region:'pk',section:'home'});
+ const a=await siteAnalytics('2020-01-01T00:00:00Z');assert.equal(a.totals.page_view,13);assert.equal(a.totals.whatsapp_click,1);assert.equal(a.regions.pk.page_view,13);assert.equal(a.sections.products.page_view,13);assert.equal((await pg.query('select count(*) n from website_activity where day<current_date-180')).rows[0].n,0);
+ const ctx=vm.createContext({window:{},console});vm.runInContext(fs.readFileSync(require.resolve('../public/analytics-view.js'),'utf8'),ctx);
+ const metric={current:0,previous:0,delta_pct:null};const d={website:a,grain:'month',time_zone:'Asia/Karachi',period:{current_label:'This month',previous_label:'Last month',window_label:'Last 12 months',elapsed_pct:10},series:[],window_totals:{conversations:0},kpis:{conversations:metric,new_contacts:metric,returning_contacts:metric,messages:metric,messages_per_conversation:metric},channels:[],agents:[],insights:[]};
+ assert.match(ctx.window.VQA.conversationsHTML(d,{audience:'platform'}),/Website insights|Successful briefs/);assert.doesNotMatch(ctx.window.VQA.conversationsHTML(d,{audience:'portal'}),/Website insights|Successful briefs/);
+ const ExcelJS=require('exceljs'),wb=new ExcelJS.Workbook();require('../src/utils/analyticsReport').appendWebsiteReport(wb,a,'This month');const check=new ExcelJS.Workbook();await check.xlsx.load(await wb.xlsx.writeBuffer());assert.ok(check.getWorksheet('Website activity'));
+ await new Promise(r=>server.close(r));await pg.close();console.log('PASS: website whitelist, concurrent aggregate counts, retention, authenticated route implementation and platform-only renderer.');
+})().catch(e=>{console.error(e);process.exit(1)});

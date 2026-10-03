@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { trackSiteEvent } from "@/lib/site-analytics";
 import { useState } from "react";
 import Magnetic from "@/components/Magnetic";
 import { waLink } from "@/lib/whatsapp";
@@ -45,6 +47,7 @@ export default function ContactForm({ region }: { region: Region }) {
         return;
       }
 
+      if (!data.get("company_website")) trackSiteEvent("brief_sent");
       form.reset();
       setStatus("sent");
     } catch {
@@ -107,6 +110,7 @@ export default function ContactForm({ region }: { region: Region }) {
         </button>
       </Magnetic>
 
+      <p style={{ fontSize: 13, lineHeight: "21px", margin: 0 }}>We use your details to respond to this enquiry. <Link href="/privacy" style={{ textDecoration: "underline" }}>Read our privacy policy</Link>. This does not sign you up for marketing.</p>
       <p aria-live="polite" style={{ fontSize: 14.5, lineHeight: "24px", margin: 0, minHeight: status === "idle" ? 0 : 24, color: status === "error" ? "var(--color-text)" : "var(--color-accent-700)" }}>
         {status === "sent" && "Thanks — your brief is with the team. We'll reply within one business day."}
         {status === "error" && (

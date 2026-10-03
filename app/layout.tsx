@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Sora, Manrope } from "next/font/google";
 import Nav from "@/components/Nav";
+import PrivacyControls from "@/components/PrivacyControls";
 import Footer from "@/components/Footer";
 import CustomCursor from "@/components/CustomCursor";
 import BackToTop from "@/components/BackToTop";
@@ -69,6 +70,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {children}
         <ShopAIChat />
         <Footer />
+        <PrivacyControls />
       </body>
     </html>
   );

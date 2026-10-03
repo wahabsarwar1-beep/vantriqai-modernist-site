@@ -2184,3 +2184,13 @@ create table if not exists pulse_events (
   unique(client_id,event_id)
 );
 create index if not exists idx_pulse_client_time on pulse_events(client_id,occurred_at);
+
+-- Opt-in public website activity: aggregate counters only, no visitor/contact identifiers.
+create table if not exists website_activity (
+  day date not null,
+  region text not null check (region in ('pk','global')),
+  section text not null check (section in ('home','products','pricing','industries','contact','how-it-works','resources','privacy','cookies','other')),
+  event text not null check (event in ('page_view','chat_open','whatsapp_click','brief_sent')),
+  total bigint not null default 0 check (total >= 0),
+  primary key (day,region,section,event)
+);

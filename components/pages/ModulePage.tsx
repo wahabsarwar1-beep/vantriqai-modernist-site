@@ -1,3 +1,4 @@
+import ProductDisclosures from "@/components/ProductDisclosures";
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import JsonLd from "@/components/JsonLd";
@@ -305,6 +306,8 @@ export default function ModulePage({ region, module: m }: { region: Region; modu
           ))}
         </ul>
       </section>
+
+      <ProductDisclosures />
 
       <PosterCTA
         headline={`Switch on the ${m.name}.`}

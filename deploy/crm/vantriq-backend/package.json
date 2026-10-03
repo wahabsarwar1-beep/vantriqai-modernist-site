@@ -1,6 +1,6 @@
 {
   "name": "vantriq-crm-backend",
-  "version": "9.26.0",
+  "version": "9.26.1",
   "description": "Vantriq AI \u2014 CRM, billing, procurement, and usage-ingestion API backed by Postgres/Supabase",
   "main": "src/index.js",
   "type": "commonjs",
@@ -20,6 +20,7 @@
     "test:report": "node test/report.test.js",
     "test:customers": "node test/contacts.test.js && node test/customers-ui.test.js",
     "test:echo": "node test/echo-dashboard.test.js",
+    "test:site-analytics": "node test/site-analytics.test.js",
     "test:pulse-advanced": "node test/pulse-advanced.test.js",
     "test:echo-advanced": "node test/echo-advanced.test.js",
     "test:templates": "node test/templates.test.js && node test/templates-ui.test.js",

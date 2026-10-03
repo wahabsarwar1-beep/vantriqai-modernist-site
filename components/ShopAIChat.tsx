@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { trackSiteEvent } from "@/lib/site-analytics";
 import { waLink } from "@/lib/whatsapp";
 import "@/styles/n8n-chat.css";
 import "@/styles/chat-widget-theme.css";
@@ -182,6 +183,7 @@ function syncChatWindowOpenClass() {
     return;
   }
   if (win.classList.contains("chat-window-open") || win.dataset.opening) return;
+  trackSiteEvent("chat_open");
   // Opening: n8n clears its inline display:none in the same tick this runs,
   // so adding the class immediately would collapse "become visible" and
   // "become open" into a single frame with nothing painted in between —
@@ -337,7 +339,7 @@ export default function ShopAIChat() {
               subtitle: "We're here to help.",
               inputPlaceholder: "Type your message...",
               getStarted: "New Conversation",
-              footer: "",
+              footer: '<a href="/privacy">Privacy policy</a> · Please avoid sharing sensitive information.',
               closeButtonTooltip: "Close chat",
             },
           },

@@ -1,3 +1,4 @@
+const { siteAnalytics } = require('./siteAnalytics');
 const db = require('../db');
 const { countryOf } = require('./contacts');
 const { pulseAdvanced } = require('./pulseAdvanced');
@@ -789,10 +790,11 @@ async function salesAnalytics({ grain } = {}) {
 async function platformAnalytics({ grain } = {}) {
   grain = normaliseGrain(grain);
   const b = await periodBounds(grain);
-  const [conv, sat, advanced] = await Promise.all([
+  const [conv, sat, advanced, website] = await Promise.all([
     conversationAnalytics(null, grain, b),
     satisfactionAnalytics(null, grain, b, { withCompany: true }),
     pulseAdvanced(null, b),
+    siteAnalytics(b.cur_start),
   ]);
   return {
     grain,
@@ -804,6 +806,7 @@ async function platformAnalytics({ grain } = {}) {
     },
     ...conv,
     advanced,
+    website,
     satisfaction: sat,
     insights: buildInsights(grain, conv, sat),
   };

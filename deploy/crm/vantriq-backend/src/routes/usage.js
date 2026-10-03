@@ -7,6 +7,12 @@ const S = require('../utils/surveys');
 const C = require('../utils/contacts');
 const router = express.Router();
 const { validatePulse } = require('../utils/pulseAdvanced');
+const { validateSiteEvent, recordSiteEvent } = require('../utils/siteAnalytics');
+
+router.post('/site-event', async (req,res) => {
+  try { validateSiteEvent(req.body); } catch(err){return res.status(400).json({error:err.message});}
+  try { await recordSiteEvent(req.body);res.json({ok:true}); } catch(err){ console.error('[site-event]',err.message);res.status(500).json({error:'Could not record website activity'}); }
+});
 
 /** Non-billable, idempotent outcome/timing telemetry; protected by the existing webhook scope. */
 router.post('/pulse-event', async (req,res) => {

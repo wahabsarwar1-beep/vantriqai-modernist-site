@@ -26,7 +26,7 @@ import { PACKAGE_SLUGS } from "@/lib/packages";
  * changes. Leave it alone for a schema tweak, a dependency bump or a CRM
  * deploy. The guides never use it — each carries its own date.
  */
-const PAGES_UPDATED = new Date("2026-09-26T00:00:00.000Z");
+const PAGES_UPDATED = new Date("2026-10-03T00:00:00.000Z");
 
 export default function sitemap(): MetadataRoute.Sitemap {
   // The index is a list of the guides, so it genuinely changes whenever one
@@ -71,5 +71,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     })),
   );
 
-  return [...regions, ...resources];
+  return [...regions, ...resources, ...["/privacy", "/cookies"].map(path => ({ url: SITE_URL + path, lastModified: PAGES_UPDATED, priority: 0.3 }))];
 }

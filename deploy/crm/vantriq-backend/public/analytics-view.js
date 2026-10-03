@@ -525,6 +525,17 @@
       <div class="vqa-card"><h3>Reported business value</h3><div class="vqa-sub">Incremental amounts sent by your automation; partial coverage, PKR only. Revenue is reported attribution, not verified collections. Time saved is an estimate supplied by the workflow.</div><div class="vqa-grid vqa-two">${kpi({label:'Recorded cost',value:a.value.cost_events?money(a.value.cost):'—',foot:n(a.value.cost_events)+' cost measurements'})}${kpi({label:'Attributed revenue',value:a.value.revenue_events?money(a.value.revenue):'—',foot:n(a.value.revenue_events)+' revenue measurements'})}${kpi({label:'Estimated minutes saved',value:a.value.saved_events?n(a.value.saved):'—',foot:n(a.value.saved_events)+' estimates'})}</div></div></div>`:''}
     </div></details>`;
   }
+  function websiteHTML(d, audience){
+    const a=d.website;if(audience!=='platform'||!a)return '';
+    const labels={page_view:'Page views',chat_open:'Chat opens',whatsapp_click:'WhatsApp clicks',brief_sent:'Successful briefs'};
+    return `<details class="vqa-advanced" style="margin:14px 0;"><summary>Website insights · opt-in activity</summary><div style="padding:18px;">
+      <div class="vqa-sub">vantriqai.com · selected calendar period · Asia/Karachi. Counts cover visitors who accepted analytics. Page views are not unique visitors; actions are independent and cannot be joined into a conversion funnel. No visitor identifiers are stored. Retention: 180 calendar days.</div>
+      <div class="vqa-grid vqa-four">${Object.keys(labels).map(k=>kpi({label:labels[k],value:n(a.totals[k]||0)})).join('')}</div>
+      <div class="vqa-grid vqa-two"><div class="vqa-card"><h3>Activity by section</h3>${Object.keys(a.sections).length?table(['Section',...Object.values(labels)],Object.entries(a.sections).map(([k,v])=>[k,...Object.keys(labels).map(e=>v[e]||0)])):'<div class="vqa-empty">No opted-in website activity recorded yet.</div>'}</div>
+      <div class="vqa-card"><h3>Page views by site region</h3>${barList(Object.entries(a.regions).map(([k,v])=>({name:k==='pk'?'Pakistan':'Global',value:v.page_view||0})))}</div></div>
+      <div class="vqa-card"><h3>Daily activity</h3><div class="vqa-tablewrap">${table(['Date',...Object.values(labels)],Object.entries(a.days).map(([k,v])=>[k,...Object.keys(labels).map(e=>v[e]||0)]))}</div></div>
+    </div></details>`;
+  }
   function conversationsHTML(d, opts){
     opts = opts || {};
     const audience = opts.audience || 'portal';
@@ -620,6 +631,7 @@
 
       ${satisfactionHTML(d, { audience, surveysEnabled: opts.surveysEnabled })}
       ${pulseAdvancedHTML(d, audience)}
+      ${websiteHTML(d, audience)}
 
       <div class="vqa-card" style="margin-top:14px;">
         <details>

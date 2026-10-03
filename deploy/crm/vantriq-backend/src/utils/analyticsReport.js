@@ -959,10 +959,20 @@ async function pulseReport(client, { grain, quota = null } = {}) {
 
   heatSheet(wb, d, who, window);
   appendPulseAdvancedReport(wb, d.advanced, who, d.period.current_label);
+  if(all) appendWebsiteReport(wb,d.website,d.period.current_label);
   definitions(wb, grain, 'pulse');
 
   const buffer = Buffer.from(await wb.xlsx.writeBuffer());
   return { buffer, filename: `vantriq-pulse-${all ? 'all-customers' : safeName(client.company)}-${grain}-${new Date().toISOString().slice(0, 10)}.xlsx` };
+}
+
+function appendWebsiteReport(wb,a,period){
+  if(!a)return;
+  const sh=addSheet(wb,'Website activity');
+  const rows=Object.entries(a.days).map(([day,v])=>({day,...v}));
+  table(sh,titleBlock(sh,'vantriqai.com — opted-in website activity',period+' · Asia/Karachi · page views, not unique visitors. Independent actions, not a linked conversion funnel. No visitor IDs. 180-calendar-day retention.',5),[
+    {header:'Day',key:'day',width:20,fmt:'text'},...['page_view','chat_open','whatsapp_click','brief_sent'].map(key=>({header:key.replace(/_/g,' '),key,width:20,fmt:'int'}))
+  ],rows);
 }
 
 function appendPulseAdvancedReport(wb,a,who,period){
@@ -1697,4 +1707,4 @@ function sendReport(res, { buffer, filename }) {
   res.send(buffer);
 }
 
-module.exports = { appendPulseAdvancedReport, appendEchoAdvancedReport, pulseReport, echoReport, contactsWorkbook, salesReport, sendReport, periodLabel, contactLabel };
+module.exports = { appendWebsiteReport, appendPulseAdvancedReport, appendEchoAdvancedReport, pulseReport, echoReport, contactsWorkbook, salesReport, sendReport, periodLabel, contactLabel };

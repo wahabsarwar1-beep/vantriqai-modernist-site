@@ -225,6 +225,11 @@ app.get('*', (req, res, next) => {
 // value the caller got wrong answers 4xx with a reason; anything else is 500.
 app.use(errorHandler);
 
+// Retention also runs while there are no new website events. No personal records are touched.
+const purgeWebsiteActivity = () => require('./utils/siteAnalytics').purgeSiteAnalytics().catch(err => console.error('[website retention]', err.message));
+purgeWebsiteActivity();
+setInterval(purgeWebsiteActivity, 60 * 60 * 1000).unref();
+
 const port = process.env.PORT || 8080;
 app.listen(port, () => {
   console.log(`Vantriq CRM API listening on port ${port}`);
