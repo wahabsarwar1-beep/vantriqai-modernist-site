@@ -2698,3 +2698,21 @@ span[data-chev] { display: inline-block; transition: transform .2s ease; }
 .legal-table th { background: var(--color-accent-100); font-family: var(--font-heading); font-weight: 600; }
 .legal-table tbody tr:last-child td { border-bottom: 0; }
 @media(max-width:640px){.privacy-banner{left:12px;bottom:12px;width:calc(100% - 24px);padding:18px;grid-template-columns:1fr;gap:14px;max-height:75dvh;overflow:auto}.privacy-banner .privacy-actions{flex-direction:row;display:grid;grid-template-columns:1fr 1fr}.privacy-banner .privacy-actions button:last-child{grid-column:1/-1}.privacy-banner h2{font-size:21px}.privacy-dialog{padding:20px}.legal-content nav{gap:8px}.legal-content nav .btn{font-size:13px;padding:12px 16px}.legal-hero-card{width:100%}.product-disclosures{margin:24px 16px 40px;padding:24px 18px}.privacy-option{gap:12px}.ft-bottom-right{flex-wrap:wrap}}
+
+/* Contact uses the same aurora stage and cream cards on both regional sites. */
+.contact-hero-card { width: min(100%,420px); padding: clamp(24px,3vw,36px); border-radius: var(--radius-lg); border: 1px solid var(--color-divider); background: linear-gradient(180deg,var(--color-surface),var(--color-bg)); box-shadow: var(--shadow-lg); }
+.contact-hero-card h2 { margin: 22px 0 16px; font-size: clamp(28px,3vw,36px); line-height: 1.12; letter-spacing: -.035em; }
+.contact-hero-card h2 span,.contact-team h2 span { color: var(--color-accent); }
+.contact-hero-card p { font-size: 15px; line-height: 1.7; color: var(--color-neutral-700); margin-bottom: 24px; }
+.contact-hero-card .btn { min-height: 48px; line-height: 1.3; white-space: normal; }
+.contact-brief-link { display: block; width: fit-content; margin-top: 18px; font-size: 14px; text-decoration: underline; text-underline-offset: 4px; }
+.contact-content { max-width: 1280px; margin: auto; padding: clamp(40px,6vw,80px) clamp(20px,5vw,64px) clamp(56px,7vw,88px); display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: clamp(32px,6vw,80px); align-items: start; }
+.contact-team h2 { font-size: clamp(30px,3.8vw,48px); line-height: 1.08; letter-spacing: -.04em; margin: 24px 0 20px; }
+.contact-team-intro { max-width: 46ch; font-size: 16px; line-height: 1.8; color: var(--color-neutral-700); }
+.contact-info { margin-top: 32px; display: grid; gap: 12px; }
+.contact-info-row { padding: 22px 24px; border: 1px solid var(--color-divider); border-radius: var(--radius-md); background: var(--color-surface); box-shadow: var(--shadow-sm); }
+.contact-info-row > p:last-child { font-size: 15px; line-height: 1.75; }
+.contact-form { position: relative; min-width: 0; padding: clamp(24px,3vw,36px); display: grid; gap: 20px; border: 1px solid var(--color-divider); border-radius: var(--radius-lg); background: linear-gradient(180deg,var(--color-surface),var(--color-bg)); box-shadow: var(--shadow-md); }
+.contact-form-heading h2 { font-size: clamp(26px,3vw,34px); margin: 20px 0 10px; letter-spacing: -.035em; }
+.contact-form-heading p { font-size: 14px; line-height: 1.7; color: var(--color-neutral-700); }
+@media(max-width:760px) { .contact-content { grid-template-columns: 1fr; gap: 32px; }.contact-hero-card { width: 100%; }.contact-hero-card .btn { width: 100%; padding-inline: 18px; }.contact-info-row { padding: 20px; } }

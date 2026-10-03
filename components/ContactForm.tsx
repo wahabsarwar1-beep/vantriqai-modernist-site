@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { trackSiteEvent } from "@/lib/site-analytics";
-import { useState } from "react";
+import { useId, useState } from "react";
 import Magnetic from "@/components/Magnetic";
 import { waLink } from "@/lib/whatsapp";
 import type { Region } from "@/lib/region";
@@ -10,6 +10,7 @@ import type { Region } from "@/lib/region";
 type Status = "idle" | "sending" | "sent" | "error";
 
 export default function ContactForm({ region }: { region: Region }) {
+  const formId = useId();
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
 
@@ -59,33 +60,30 @@ export default function ContactForm({ region }: { region: Region }) {
   return (
     <form
       onSubmit={onSubmit}
-      data-anim=""
-      style={{
-        border: "1px solid var(--color-divider)",
-        padding: "clamp(24px,3vw,36px)",
-        display: "grid",
-        gap: 18,
-        background: "var(--color-bg)",
-      }}
+      id="send-a-brief"
+      className="contact-form anchor-target"
+      aria-labelledby={`${formId}-title`}
     >
-      <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)", margin: 0 }}>
-        Send a brief
-      </p>
-      <div className="field">
-        <label>Name</label>
-        <input className="input" name="name" required placeholder="Your name" style={{ minHeight: 44 }} />
+      <div className="contact-form-heading">
+        <span className="tag tag-accent">Tell us what you need</span>
+        <h2 id={`${formId}-title`}>Send a brief.</h2>
+        <p>A few details help us prepare for the conversation.</p>
       </div>
       <div className="field">
-        <label>Business</label>
-        <input className="input" name="business" placeholder="Company name" style={{ minHeight: 44 }} />
+        <label htmlFor={`${formId}-name`}> Name</label>
+        <input className="input" id={`${formId}-name`} name="name" autoComplete="name" required placeholder="Your name" style={{ minHeight: 44 }} />
       </div>
       <div className="field">
-        <label>WhatsApp number</label>
-        <input className="input" name="whatsapp" required placeholder={region.phonePlaceholder} style={{ minHeight: 44 }} />
+        <label htmlFor={`${formId}-business`}> Business</label>
+        <input className="input" id={`${formId}-business`} name="business" autoComplete="organization" placeholder="Company name" style={{ minHeight: 44 }} />
       </div>
       <div className="field">
-        <label>What should the agent handle?</label>
-        <textarea className="input" name="notes" placeholder="Bookings, catalogue questions, lead qualification…" style={{ minHeight: 110 }} />
+        <label htmlFor={`${formId}-whatsapp`}> WhatsApp number</label>
+        <input className="input" id={`${formId}-whatsapp`} name="whatsapp" type="tel" autoComplete="tel" required placeholder={region.phonePlaceholder} style={{ minHeight: 44 }} />
+      </div>
+      <div className="field">
+        <label htmlFor={`${formId}-notes`}> What should the agent handle?</label>
+        <textarea className="input" id={`${formId}-notes`} name="notes" placeholder="Bookings, catalogue questions, lead qualification…" style={{ minHeight: 110 }} />
       </div>
 
       {/* Honeypot: hidden from people, irresistible to bots. Anything typed
