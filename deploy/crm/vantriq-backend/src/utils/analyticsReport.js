@@ -966,6 +966,12 @@ async function pulseReport(client, { grain, quota = null } = {}) {
   return { buffer, filename: `vantriq-pulse-${all ? 'all-customers' : safeName(client.company)}-${grain}-${new Date().toISOString().slice(0, 10)}.xlsx` };
 }
 
+async function websiteReport({range='30d'}={}){
+  const d=await require('./siteAnalytics').websiteAnalytics({range});
+  const wb=new ExcelJS.Workbook();wb.creator='VantriqAI';appendWebsiteReport(wb,d.website,d.period.current_label);
+  return {buffer:Buffer.from(await wb.xlsx.writeBuffer()),filename:`vantriq-website-${d.range}-${new Date().toISOString().slice(0,10)}.xlsx`};
+}
+
 function appendWebsiteReport(wb,a,period){
   if(!a)return;
   const sh=addSheet(wb,'Website activity');
@@ -973,6 +979,12 @@ function appendWebsiteReport(wb,a,period){
   table(sh,titleBlock(sh,'vantriqai.com — opted-in website activity',period+' · Asia/Karachi · page views, not unique visitors. Independent actions, not a linked conversion funnel. No visitor IDs. 180-calendar-day retention.',5),[
     {header:'Day',key:'day',width:20,fmt:'text'},...['page_view','chat_open','whatsapp_click','brief_sent'].map(key=>({header:key.replace(/_/g,' '),key,width:20,fmt:'int'}))
   ],rows);
+  const loc=addSheet(wb,'Website locations');
+  const countryName=code=>{try{return code?new Intl.DisplayNames(['en'],{type:'region'}).of(code):'Unknown location';}catch{return code;}};
+  table(loc,titleBlock(loc,'Approximate visitor locations',period+' · Network locations, not exact addresses. Unknown includes older activity and unresolved IPs. No visitor IPs retained. GeoLite data by MaxMind (maxmind.com).',7),[
+    {header:'Country',key:'country_name',width:25},{header:'Region / state',key:'subdivision',width:20},{header:'City',key:'city',width:25},
+    ...['page_view','chat_open','whatsapp_click','brief_sent'].map(key=>({header:key.replace(/_/g,' '),key,width:20,fmt:'int'}))
+  ],(a.locations||[]).map(r=>({...r,country_name:countryName(r.country),city:r.city||'Unknown'})));
 }
 
 function appendPulseAdvancedReport(wb,a,who,period){
@@ -1707,4 +1719,4 @@ function sendReport(res, { buffer, filename }) {
   res.send(buffer);
 }
 
-module.exports = { appendWebsiteReport, appendPulseAdvancedReport, appendEchoAdvancedReport, pulseReport, echoReport, contactsWorkbook, salesReport, sendReport, periodLabel, contactLabel };
+module.exports = { websiteReport, appendWebsiteReport, appendPulseAdvancedReport, appendEchoAdvancedReport, pulseReport, echoReport, contactsWorkbook, salesReport, sendReport, periodLabel, contactLabel };

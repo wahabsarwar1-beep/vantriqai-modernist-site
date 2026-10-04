@@ -1,15 +1,16 @@
 export const CONSENT_KEY = "vantriq.preferences.v1";
 export const CONSENT_LIFETIME = 180 * 24 * 60 * 60 * 1000;
-export type Preferences = { version: 1; analytics: boolean; savedAt: number };
+// Re-request consent when adding approximate location measurement.
+export type Preferences = { version: 2; analytics: boolean; savedAt: number };
 let volatileChoice: Preferences | null = null;
 export function readPreferences(): Preferences | null {
   if (typeof window === "undefined") return null;
   let choice = volatileChoice;
   try { const raw = localStorage.getItem(CONSENT_KEY); if (raw) choice = JSON.parse(raw); } catch { /* Storage can be disabled. */ }
-  return choice?.version === 1 && typeof choice.analytics === "boolean" && Number.isFinite(choice.savedAt) && choice.savedAt <= Date.now() && Date.now() - choice.savedAt < CONSENT_LIFETIME ? choice : null;
+  return choice?.version === 2 && typeof choice.analytics === "boolean" && Number.isFinite(choice.savedAt) && choice.savedAt <= Date.now() && Date.now() - choice.savedAt < CONSENT_LIFETIME ? choice : null;
 }
 export function savePreferences(analytics: boolean) {
-  volatileChoice = { version: 1, analytics, savedAt: Date.now() };
+  volatileChoice = { version: 2, analytics, savedAt: Date.now() };
   try { localStorage.setItem(CONSENT_KEY, JSON.stringify(volatileChoice)); volatileChoice = null; } catch { /* Keep the choice for this page. */ }
   window.dispatchEvent(new Event("vantriq:preferences"));
 }

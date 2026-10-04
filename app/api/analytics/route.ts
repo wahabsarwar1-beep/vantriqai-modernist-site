@@ -1,4 +1,7 @@
-// Same-origin browser endpoint; only fixed aggregate dimensions reach the CRM.
+import { isIP } from "node:net";
+
+// Browser payloads contain fixed dimensions only. The server adds the proxy IP
+// for a local CRM lookup; the CRM stores country/city counters, never the IP.
 const events = ["page_view", "chat_open", "whatsapp_click", "brief_sent"];
 const sections = ["home", "products", "pricing", "industries", "contact", "how-it-works", "resources", "privacy", "cookies", "other"];
 const buckets = new Map<string, { count: number; until: number }>();
@@ -15,7 +18,8 @@ export async function POST(request: Request) {
   let b;
   try { b = JSON.parse(raw); } catch { return Response.json({ error: "Invalid JSON" }, { status: 400 }); }
   if (!b || Array.isArray(b) || b.consent !== true || !events.includes(b.event) || !sections.includes(b.section) || !["pk", "global"].includes(b.region) || Object.keys(b).some(k => !["consent", "event", "section", "region"].includes(k))) return Response.json({ error: "Invalid event" }, { status: 400 });
-  // Best-effort per-process abuse guard. IP is transient, never sent to analytics.
+  // Hosting must overwrite X-Forwarded-For with its trusted client address.
+  // IP is transient: rate limiting here, then a local lookup inside our CRM.
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown";
   const now = Date.now();
   for (const [key, value] of buckets) if (value.until < now) buckets.delete(key);
@@ -25,7 +29,7 @@ export async function POST(request: Request) {
   const endpoint = process.env.CRM_WEBHOOK_URL, key = process.env.CRM_WEBHOOK_KEY;
   if (!endpoint || !key) return Response.json({ error: "Analytics unavailable" }, { status: 503 });
   try {
-    const res = await fetch(`${endpoint.replace(/\/$/, "")}/api/webhooks/site-event`, { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": key }, body: JSON.stringify({ event: b.event, section: b.section, region: b.region }), signal: AbortSignal.timeout(5000) });
+    const res = await fetch(`${endpoint.replace(/\/$/, "")}/api/webhooks/site-event`, { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": key }, body: JSON.stringify({ event: b.event, section: b.section, region: b.region, ...(isIP(ip) ? { client_ip: ip } : {}) }), signal: AbortSignal.timeout(5000) });
     if (!res.ok) return Response.json({ error: "Analytics unavailable" }, { status: 502 });
     return Response.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
   } catch { return Response.json({ error: "Analytics unavailable" }, { status: 502 }); }

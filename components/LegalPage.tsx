@@ -8,7 +8,7 @@ export default function LegalPage({ title, intro, children }: { title: string; i
           <span className="tag tag-accent">Your choices matter</span>
           <h2>Clear information.<br /><span>Control in your hands.</span></h2>
           <p>Optional analytics start only with your permission. Change your choice at any time using the footer.</p>
-          <span className="legal-updated">Updated 3 October 2026</span>
+          <span className="legal-updated">Updated 4 October 2026</span>
         </aside>
       } />
       <div className="legal-content">

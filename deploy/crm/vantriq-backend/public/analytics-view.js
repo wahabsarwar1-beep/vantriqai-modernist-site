@@ -525,16 +525,36 @@
       <div class="vqa-card"><h3>Reported business value</h3><div class="vqa-sub">Incremental amounts sent by your automation; partial coverage, PKR only. Revenue is reported attribution, not verified collections. Time saved is an estimate supplied by the workflow.</div><div class="vqa-grid vqa-two">${kpi({label:'Recorded cost',value:a.value.cost_events?money(a.value.cost):'—',foot:n(a.value.cost_events)+' cost measurements'})}${kpi({label:'Attributed revenue',value:a.value.revenue_events?money(a.value.revenue):'—',foot:n(a.value.revenue_events)+' revenue measurements'})}${kpi({label:'Estimated minutes saved',value:a.value.saved_events?n(a.value.saved):'—',foot:n(a.value.saved_events)+' estimates'})}</div></div></div>`:''}
     </div></details>`;
   }
+  function websiteCountry(code){
+    if(!code)return 'Unknown location';
+    try{return new Intl.DisplayNames(['en'],{type:'region'}).of(code)||code;}catch{return code;}
+  }
   function websiteHTML(d, audience){
     const a=d.website;if(audience!=='platform'||!a)return '';
     const labels={page_view:'Page views',chat_open:'Chat opens',whatsapp_click:'WhatsApp clicks',brief_sent:'Successful briefs'};
-    return `<details class="vqa-advanced" style="margin:14px 0;"><summary>Website insights · opt-in activity</summary><div style="padding:18px;">
-      <div class="vqa-sub">vantriqai.com · selected calendar period · Asia/Karachi. Counts cover visitors who accepted analytics. Page views are not unique visitors; actions are independent and cannot be joined into a conversion funnel. No visitor identifiers are stored. Retention: 180 calendar days.</div>
+    const locations=a.locations||[],countries=a.countries||[];
+    const known=countries.filter(r=>r.country).reduce((sum,r)=>sum+r.page_view,0);
+    const cities=locations.filter(r=>r.city).slice(0,12).map(r=>({name:`${r.city}, ${websiteCountry(r.country)}`,value:r.page_view}));
+    return `<section aria-label="Website insights" style="margin:14px 0;">
+      <div class="vqa-card"><h3>Website insights · opt-in activity</h3><div class="vqa-sub">vantriqai.com · ${esc(d.period.current_label)} · Asia/Karachi. Page views are not unique visitors. Independent actions cannot be joined into a conversion funnel. Retention: 180 calendar days.</div></div>
       <div class="vqa-grid vqa-four">${Object.keys(labels).map(k=>kpi({label:labels[k],value:n(a.totals[k]||0)})).join('')}</div>
+      <div class="vqa-grid vqa-two"><div class="vqa-card"><h3>Countries · page views</h3>${barList(countries.slice(0,12).map(r=>({name:websiteCountry(r.country),value:r.page_view})))}</div>
+        <div class="vqa-card"><h3>Cities · page views</h3>${cities.length?barList(cities):'<div class="vqa-empty">No city resolved in this period yet.</div>'}</div></div>
+      <div class="vqa-card"><h3>Approximate visitor location</h3><div class="vqa-sub">Country known for ${n(known)} of ${n(a.totals.page_view||0)} page views. IP-based network location can differ from the visitor’s actual city, especially with mobile networks and VPNs. Unknown includes unresolved addresses and activity recorded before location collection. Lookups run inside VantriqAI; analytics store no IP addresses, coordinates or visitor IDs. GeoLite location data by MaxMind (maxmind.com), September 2026.</div>
+        ${locations.length?table(['Country','Region / state','City',...Object.values(labels)],locations.slice(0,100).map(r=>[websiteCountry(r.country),r.subdivision||'—',r.city||'Unknown',...Object.keys(labels).map(e=>r[e]||0)])):'<div class="vqa-empty">No opted-in website activity recorded yet. Location reporting starts with new accepted visits.</div>'}
+        ${locations.length>100?'<div class="vqa-sub">Top 100 locations shown. Download the report for every location.</div>':''}</div>
       <div class="vqa-grid vqa-two"><div class="vqa-card"><h3>Activity by section</h3>${Object.keys(a.sections).length?table(['Section',...Object.values(labels)],Object.entries(a.sections).map(([k,v])=>[k,...Object.keys(labels).map(e=>v[e]||0)])):'<div class="vqa-empty">No opted-in website activity recorded yet.</div>'}</div>
-      <div class="vqa-card"><h3>Page views by site region</h3>${barList(Object.entries(a.regions).map(([k,v])=>({name:k==='pk'?'Pakistan':'Global',value:v.page_view||0})))}</div></div>
-      <div class="vqa-card"><h3>Daily activity</h3><div class="vqa-tablewrap">${table(['Date',...Object.values(labels)],Object.entries(a.days).map(([k,v])=>[k,...Object.keys(labels).map(e=>v[e]||0)]))}</div></div>
-    </div></details>`;
+      <div class="vqa-card"><h3>Page views by website version</h3><div class="vqa-sub">Pakistan / Global describes the version opened, not visitor location.</div>${barList(Object.entries(a.regions).map(([k,v])=>({name:k==='pk'?'Pakistan site':'Global site',value:v.page_view||0})))}</div></div>
+      <div class="vqa-card"><h3>Daily page views</h3>${barList(Object.entries(a.days).map(([name,v])=>({name,value:v.page_view||0})))}</div>
+      <div class="vqa-card"><h3>Daily activity</h3>${table(['Date',...Object.values(labels)],Object.entries(a.days).map(([k,v])=>[k,...Object.keys(labels).map(e=>v[e]||0)]))}</div>
+    </section>`;
+  }
+  function websiteTrafficHTML(d, opts={}){
+    const ranges=[['today','Today'],['7d','Last 7 days'],['30d','Last 30 days'],['90d','Last 90 days'],['180d','Last 180 days']];
+    return `<div class="vqa"><div class="vqa-top"><div><h2>Website traffic</h2><div class="vqa-sub">Where vantriqai.com is accessed and what consenting visitors do.</div></div></div>
+      <div class="vqa-seg" style="flex-wrap:wrap;">${ranges.map(([id,label])=>`<button class="${d.range===id?'on':''}" aria-pressed="${d.range===id}" onclick="${opts.onRange}('${id}')">${label}</button>`).join('')}</div>
+      <button class="btn btn-ghost btn-sm" style="margin:12px 0;" onclick="${opts.onReport}()">Download website report (Excel)</button>
+      ${websiteHTML(d,'platform')}</div>`;
   }
   function conversationsHTML(d, opts){
     opts = opts || {};
@@ -930,7 +950,7 @@
 
   window.VQA = {
     injectStyles,
-    conversationsHTML, drawConversations,
+    conversationsHTML, drawConversations, websiteTrafficHTML,
     salesHTML, drawSales,
     echoHTML, drawEcho,
     destroyCharts,
