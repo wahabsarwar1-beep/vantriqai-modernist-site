@@ -32,8 +32,8 @@ const config = node({
       assignments: {
         assignments: [
           { id: 'cfg-base', name: 'contentBaseUrl', value: 'https://raw.githubusercontent.com/wahabsarwar1-beep/vantriqai-modernist-site/claude/zealous-thompson-g0lxu7/marketing/social-ads/', type: 'string' },
-          { id: 'cfg-page', name: 'facebookPageId', value: '61594465987920', type: 'string' },
-          { id: 'cfg-ig', name: 'instagramAccountId', value: '', type: 'string' },
+          { id: 'cfg-page', name: 'facebookPageId', value: '1291897617346380', type: 'string' },
+          { id: 'cfg-ig', name: 'instagramAccountId', value: '17841414904483393', type: 'string' },
           { id: 'cfg-graph', name: 'graphApiVersion', value: 'v23.0', type: 'string' },
           { id: 'cfg-approval', name: 'requireApproval', value: true, type: 'boolean' },
           { id: 'cfg-to', name: 'approvalEmail', value: 'server@vantriqai.com', type: 'string' },
@@ -521,7 +521,7 @@ const publishIgCarousel = node({
 
 const setupNote = sticky(
   '## VantriqAI daily FB + IG post\n' +
-  'Posts to facebook.com/profile.php?id=61594465987920 and instagram.com/vantriq_ai.\n\n' +
+  'Posts to the Facebook Page (ID 1291897617346380) and Instagram @vantriq_ai (ID 17841414904483393).\n\n' +
   '**Before activating:**\n' +
   '1. Instagram @vantriq_ai must be a Business account linked to the Page. Its ID is looked up from the Page, so `instagramAccountId` can stay blank.\n' +
   '2. Credential **VantriqAI Page Access Token** (Facebook Graph API) on every Facebook/Instagram node: a long-lived Page token with `pages_manage_posts`, `pages_read_engagement`, `instagram_basic`, `instagram_content_publish`.\n' +

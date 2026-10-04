@@ -60,7 +60,7 @@ Every day at 10:00 PKT it:
    post in rotation;
 3. emails the draft to server@vantriqai.com with **Publish now** and **Skip
    today** buttons (skipped if nobody answers in 6 hours);
-4. posts it to the Facebook Page (61594465987920) and to Instagram @vantriq_ai,
+4. posts it to the Facebook Page (ID 1291897617346380) and to Instagram @vantriq_ai,
    as a single photo or as a multi-photo/carousel post.
 
 Before it can run, three things need doing in n8n and Meta (see the sticky note
