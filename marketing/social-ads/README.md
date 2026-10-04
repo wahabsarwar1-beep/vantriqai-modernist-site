@@ -10,12 +10,13 @@ the site's Symphony palette (ink, cream, cobalt) with Sora / Manrope.
 | `ads.html` | Source for every card and carousel slide. Open it in a browser to see them all. |
 | `vantriqai-ad-NN.png` | Single-image posts 01–12 |
 | `vantriqai-carousel-NN-K.png` | Carousel slides (C01 = slides 1–7) |
+| `vantriqai-video-*.mp4` | Video posts (V01 Reel 9:16, V02 Feed 4:5) |
 | `captions.md` | Ad headline, Facebook caption and Instagram caption for each post. **This is the file people edit.** |
 | `captions.json` | The same copy in the form the n8n workflow reads. Built from `captions.md`; don't edit it by hand. |
 | `briefs.md` | Ideas for upcoming posts. The weekly content routine works through them. |
 | `render.js` | Renders `ads.html` to the PNGs |
 | `captions_to_json.py` | Rebuilds `captions.json` from `captions.md` |
-| `n8n/daily-post.workflow.ts` | Source of the n8n posting workflow |
+| `n8n/daily-post.workflow.ts` | Original source of the n8n posting workflow (the live copy in n8n has since gained the video branch) |
 
 | Post | Angle |
 | --- | --- |
@@ -32,6 +33,8 @@ the site's Symphony palette (ink, cream, cobalt) with Sora / Manrope.
 | 11 | Roman Urdu replies |
 | 12 | Monday Insights Digest |
 | C01 | Carousel: 5 signs your inbox is costing you sales (7 slides) |
+| V01 | Video, Reel 9:16: One platform, built to act (posts 5 Oct) |
+| V02 | Video, Feed 4:5: Agents, Pulse and Echo (posts 8 Oct) |
 
 ## Making or changing a post
 
@@ -47,6 +50,11 @@ python3 marketing/social-ads/captions_to_json.py
 - A **carousel** is a set of `<section class="card k …" id="ckN">` slides plus a
   `## C01 · …` section. Its slides are every `vantriqai-carousel-01-*.png`, in
   order (2–10 slides).
+- A **video** is a `## V01 · …` section with a `**Video:**` line. Use a
+  jsDelivr URL pinned to the commit that added the file
+  (`https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@<sha>/marketing/social-ads/<file>.mp4`),
+  because GitHub raw serves .mp4 as `application/octet-stream`. Keep files under 20 MB (jsDelivr's limit).
+  Instagram gets a Reel shared to the feed, and Facebook gets a Page video.
 - Add `**Post on:** 2026-10-12` under a heading to post it on that day.
 
 ## How posting works (n8n)
@@ -61,7 +69,7 @@ Every day at 10:00 PKT it:
 3. emails the draft to server@vantriqai.com with **Publish now** and **Skip
    today** buttons (skipped if nobody answers in 6 hours);
 4. posts it to the Facebook Page (ID 1291897617346380) and to Instagram @vantriq_ai,
-   as a single photo or as a multi-photo/carousel post.
+   as a single photo, a multi-photo/carousel post, or a video (Instagram Reel).
 
 Before it can run, three things need doing in n8n and Meta (see the sticky note
 on the workflow):

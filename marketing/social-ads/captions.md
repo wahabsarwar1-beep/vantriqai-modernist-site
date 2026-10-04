@@ -348,3 +348,64 @@ Every figure is one the site already publishes. The 78% card credits its source,
 > One VantriqAI agent fixes all five. Book a free 15-min call, link in bio.
 >
 > #SmallBusinessTips #CustomerService #SalesGrowth #WhatsAppBusiness #VantriqAI
+
+---
+
+## V01 · Video (Reel, 9:16): One platform. Built to act.
+
+**Post on:** 2026-10-05
+**Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@159ea47e65e56d6d12f7dd8366298342e6884cd8/marketing/social-ads/vantriqai-video-platform-reels.mp4
+
+**Headline (ad field):** One platform. More possibilities.
+**Primary text / Facebook:**
+
+> Every conversation is a new possibility, if someone answers it.
+>
+> 💬 AI Agents answer, qualify and book on WhatsApp, Instagram, your website and the phone line
+> 📊 Vantriq Pulse shows every conversation live: leads, conversions and your busiest hours
+> 😊 Vantriq Echo asks customers how it went, in English or Urdu, and feeds the answers into Pulse
+>
+> One platform, built to act.
+>
+> Book a free demo → https://www.vantriqai.com/contact
+
+**Instagram:**
+
+> One platform. Built to act. ⚡
+>
+> AI Agents that answer and book, Pulse to see every conversation live, and Echo to hear every customer, all in one place.
+>
+> Book a free demo, link in bio.
+>
+> #AIagents #WhatsAppBusiness #CustomerExperience #BusinessAutomation #VantriqAI
+
+---
+
+## V02 · Video (Feed, 4:5): Every conversation. A new possibility.
+
+**Post on:** 2026-10-08
+**Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@159ea47e65e56d6d12f7dd8366298342e6884cd8/marketing/social-ads/vantriqai-video-platform-feed.mp4
+
+**Headline (ad field):** Agents, Pulse and Echo in one platform
+**Primary text / Facebook:**
+
+> 20 seconds on how VantriqAI works:
+>
+> 1. A customer asks "Is the black leather sofa in stock?" and your AI agent answers and books the showroom visit
+> 2. The calendar syncs and the lead is saved to your CRM
+> 3. Vantriq Pulse shows leads, conversions and busy hours live
+> 4. Vantriq Echo collects customer feedback in English and Urdu
+>
+> Agents, Pulse and Echo: one platform, more possibilities.
+>
+> Book a free demo → https://www.vantriqai.com/contact
+
+**Instagram:**
+
+> Every conversation. A new possibility. 🎬
+>
+> Answer and book with AI Agents. See it all live in Pulse. Hear every customer with Echo.
+>
+> One platform. Book a free demo, link in bio.
+>
+> #AIforBusiness #CustomerFeedback #SalesAutomation #WhatsAppBusiness #VantriqAI

@@ -3,6 +3,10 @@
 A section whose heading starts with C (e.g. "## C01 · ...") is a carousel; its
 slides are every vantriqai-carousel-<nn>-<k>.png in this folder, in order.
 
+A section whose heading starts with V (e.g. "## V01 · ...") is a video; its
+"**Video:**" line holds the file name or a full URL. Instagram gets it as a
+Reel (also shown in the feed), Facebook as a Page video.
+
 An optional "**Post on:** YYYY-MM-DD" line schedules a post for that day. Posts
 without one (and dated posts once their day has passed) rotate as evergreen.
 """
@@ -25,7 +29,15 @@ for sec in re.split(r"\n## ", md)[1:]:
     date = re.search(r"\*\*Post on:\*\* (\d{4}-\d{2}-\d{2})", sec)
     if date:
         post["date"] = date.group(1)
-    if pid.startswith("C"):
+    if pid.startswith("V"):
+        video = re.search(r"\*\*Video:\*\* (\S+)", sec)
+        if not video:
+            raise SystemExit(f"{pid}: video posts need a **Video:** line")
+        name = video.group(1).rsplit("/", 1)[-1]
+        if not (here / name).exists():
+            raise SystemExit(f"{pid}: {name} is missing")
+        post.update(type="video", video=video.group(1))
+    elif pid.startswith("C"):
         n = pid[1:]
         slides = sorted(here.glob(f"vantriqai-carousel-{n}-*.png"), key=lambda p: int(p.stem.rsplit("-", 1)[1]))
         if not 2 <= len(slides) <= 10:
@@ -43,4 +55,5 @@ if len(dates) != len(set(dates)):
     raise SystemExit("Two posts share a Post on date; one would never be posted.")
 
 (here / "captions.json").write_text(json.dumps(posts, ensure_ascii=False, indent=2) + "\n")
-print(f"captions.json: {len(posts)} posts ({sum(p['type'] == 'carousel' for p in posts)} carousel)")
+kinds = {k: sum(p["type"] == k for p in posts) for k in ("image", "carousel", "video")}
+print(f"captions.json: {len(posts)} posts {kinds}")
