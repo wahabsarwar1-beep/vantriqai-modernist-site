@@ -21,8 +21,8 @@ const rejected=async(fn,status)=>assert.rejects(fn,e=>e.status===status);
  await pg.exec(`create table sales_reps(id uuid primary key,name text,email text,active boolean);
  create table clients(id uuid primary key,name text,company text,email text,phone text,source text,external_ref text unique,owner_rep_id uuid references sales_reps(id),sales_stage text,updated_at timestamptz default now());`);
  const schema=fs.readFileSync(path.join(__dirname,'../db/schema.sql'),'utf8');
- await pg.exec(schema.slice(schema.indexOf('-- CRM calendar and explicit sales ownership.')));
- await pg.exec(schema.slice(schema.indexOf('-- CRM calendar and explicit sales ownership.'))); // migration is repeatable
+ await pg.exec(schema.slice(schema.indexOf('-- CRM calendar and explicit sales ownership.'),schema.indexOf('-- Pulse measurements are separate')));
+ await pg.exec(schema.slice(schema.indexOf('-- CRM calendar and explicit sales ownership.'),schema.indexOf('-- Pulse measurements are separate'))); // migration is repeatable
  await pg.query('insert into sales_reps values ($1,$2,$3,true),($4,$5,$6,true)',[repA,'Rep A','a@example.test',repB,'Rep B','b@example.test']);
  for(const [id,ref] of [[leadA,'web-a'],[leadB,'wa-b'],[leadC,'web-c']])await pg.query('insert into clients (id,name,company,source,external_ref) values ($1,$2,$3,$4,$5)',[id,ref,'Test company','AI agent',ref]);
  await rejected(()=>cal.createEvent({...slot,external_ref:'missing'},'agent',true),404);
