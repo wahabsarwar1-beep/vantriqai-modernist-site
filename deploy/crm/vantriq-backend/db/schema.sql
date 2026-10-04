@@ -2194,3 +2194,17 @@ create table if not exists website_activity (
   total bigint not null default 0 check (total >= 0),
   primary key (day,region,section,event)
 );
+
+-- Approximate network locations, independent of contacts and chat sessions.
+-- No IP, coordinates, visitor identifiers, or individual event records.
+create table if not exists website_location_activity (
+  day date not null,
+  region text not null check (region in ('pk','global')),
+  section text not null,
+  event text not null check (event in ('page_view','chat_open','whatsapp_click','brief_sent')),
+  country text not null default '' check (country = '' or country ~ '^[A-Z]{2}$'),
+  subdivision text not null default '' check (length(subdivision) <= 16),
+  city text not null default '' check (length(city) <= 120),
+  total bigint not null default 0 check (total >= 0),
+  primary key (day,region,section,event,country,subdivision,city)
+);

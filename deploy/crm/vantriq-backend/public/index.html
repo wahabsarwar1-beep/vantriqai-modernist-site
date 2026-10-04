@@ -22,7 +22,7 @@
      internet for a CDN neither they nor we control. Serving the file
      ourselves removes the dependency outright. -->
 <script src="/vendor/chart/chart.umd.js"></script>
-<script src="/analytics-view.js?v=9.26.1"></script>
+<script src="/analytics-view.js?v=9.27.0"></script>
 <script src="/survey-studio.js?v=9.24.2"></script>
 <script src="/contacts-view.js"></script>
 <script src="/calendar-view.js"></script>
@@ -1465,12 +1465,14 @@ function drawDashboardCharts(){
    exactly the page that customer sees for themselves. */
 let analyticsTab = 'sales';          // 'sales' | 'platform' | 'client'
 let analyticsGrain = 'month';
+let analyticsWebsiteRange = '30d';
 let analyticsClientId = null;
 let analyticsData = null;            // { key, data } | { key, error }
 let analyticsLoadingKey = null;
 
 const ANALYTICS_TABS = [
   {id:'sales', label:'Sales & leads'},
+  {id:'website', label:'Website traffic'},
   {id:'platform', label:'All customer conversations'},
   {id:'client', label:'One customer'},
 ];
@@ -1480,9 +1482,10 @@ function analyticsClients(){
     .sort((a,b)=> (b.isInternal?1:0)-(a.isInternal?1:0) || a.company.localeCompare(b.company));
 }
 function analyticsKey(){
-  return `${analyticsTab}|${analyticsGrain}|${analyticsTab==='client' ? analyticsClientId : ''}`;
+  return `${analyticsTab}|${analyticsTab==='website'?analyticsWebsiteRange:analyticsGrain}|${analyticsTab==='client' ? analyticsClientId : ''}`;
 }
 function setAnalyticsTab(t){ analyticsTab = t; render(); }
+function setWebsiteRange(r){ analyticsWebsiteRange=r; render(); }
 function setAnalyticsGrain(g){ analyticsGrain = g; render(); }
 function setAnalyticsClient(id){ analyticsClientId = id || null; render(); }
 
@@ -1490,7 +1493,8 @@ async function loadAnalytics(){
   const key = analyticsKey();
   if(analyticsLoadingKey === key) return;
   analyticsLoadingKey = key;
-  const path = analyticsTab==='sales' ? `/api/analytics/sales?grain=${analyticsGrain}`
+  const path = analyticsTab==='website' ? `/api/analytics/website?range=${encodeURIComponent(analyticsWebsiteRange)}`
+    : analyticsTab==='sales' ? `/api/analytics/sales?grain=${analyticsGrain}`
     : analyticsTab==='platform' ? `/api/analytics/platform?grain=${analyticsGrain}`
     : `/api/analytics/clients/${encodeURIComponent(analyticsClientId)}?grain=${analyticsGrain}`;
   try{
@@ -1532,6 +1536,7 @@ function renderAnalytics(){
   if(cur.error) return tabs + picker + `<div class="card" style="color:var(--red);">${esc(cur.error)}
     <button class="btn btn-ghost btn-sm" style="margin-left:8px;" onclick="analyticsData=null;render()">Try again</button></div>`;
   const opts = { onGrain:'setAnalyticsGrain', onReport:'downloadAnalyticsReport', reportLabel:'Download Pulse report (Excel)' };
+  if(analyticsTab==='website') return tabs + VQA.websiteTrafficHTML(cur.data,{onRange:'setWebsiteRange',onReport:'downloadAnalyticsReport'});
   if(analyticsTab==='sales') return tabs + VQA.salesHTML(cur.data, { ...opts,
     reportHint:'Every lead, the funnel, sources and each prospect conversation — a tab for each' });
   if(analyticsTab==='platform') return tabs + VQA.conversationsHTML(cur.data, { ...opts, audience:'platform',
@@ -1548,11 +1553,12 @@ function renderAnalytics(){
  */
 async function downloadAnalyticsReport(){
   const g = encodeURIComponent(analyticsGrain);
-  const path = analyticsTab==='sales' ? `/api/analytics/sales/report.xlsx?grain=${g}`
+  const path = analyticsTab==='website' ? `/api/analytics/website/report.xlsx?range=${encodeURIComponent(analyticsWebsiteRange)}`
+    : analyticsTab==='sales' ? `/api/analytics/sales/report.xlsx?grain=${g}`
     : analyticsTab==='platform' ? `/api/analytics/platform/report.xlsx?grain=${g}`
     : `/api/analytics/clients/${encodeURIComponent(analyticsClientId)}/report.xlsx?grain=${g}`;
   const shown = state.clients.find(c=>c.id===analyticsClientId);
-  const who = analyticsTab==='sales' ? 'sales' : analyticsTab==='platform' ? 'all-customers'
+  const who = analyticsTab==='website' ? 'website' : analyticsTab==='sales' ? 'sales' : analyticsTab==='platform' ? 'all-customers'
     : (String((shown && shown.company) || 'customer').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40) || 'customer');
   showToast('Building the report…');
   try{
@@ -1566,7 +1572,7 @@ async function downloadAnalyticsReport(){
     const blob = await res.blob();
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `vantriq-pulse-${who}-${analyticsGrain}-${todayISO()}.xlsx`;
+    a.download = `vantriq-${who}-${analyticsTab==='website'?analyticsWebsiteRange:analyticsGrain}-${todayISO()}.xlsx`;
     a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
     showToast('Report downloaded');
@@ -1577,6 +1583,7 @@ function drawAnalytics(){
   const cur = analyticsData && analyticsData.key===analyticsKey() ? analyticsData : null;
   if(!cur){ loadAnalytics(); return; }
   if(cur.error || !window.VQA) return;
+  if(analyticsTab==='website') return;
   if(analyticsTab==='sales') VQA.drawSales(cur.data); else VQA.drawConversations(cur.data);
 }
 

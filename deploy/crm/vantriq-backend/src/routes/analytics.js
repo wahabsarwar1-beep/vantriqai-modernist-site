@@ -3,6 +3,8 @@ const db = require('../db');
 const { effectivePackage } = require('../utils/pkg');
 const { clientAnalytics, salesAnalytics, platformAnalytics } = require('../utils/analytics');
 const { pulseReport, salesReport, sendReport } = require('../utils/analyticsReport');
+const { websiteAnalytics } = require('../utils/siteAnalytics');
+const { websiteReport } = require('../utils/analyticsReport');
 
 const router = express.Router();
 
@@ -23,6 +25,14 @@ const router = express.Router();
  * Staff and admins alike: none of this is cost or margin data.
  */
 const grainOf = (req) => String(req.query.grain || 'month');
+
+// These routes inherit the CRM's authenticated staff/admin access, never portal access.
+router.get('/website', async (req, res, next) => {
+  try { res.json(await websiteAnalytics({range:String(req.query.range || '30d')})); } catch(err) { next(err); }
+});
+router.get('/website/report.xlsx', async (req, res, next) => {
+  try { sendReport(res, await websiteReport({range:String(req.query.range || '30d')})); } catch(err) { next(err); }
+});
 
 /** The package allowance the customer's Pulse measures this month against, or null. */
 async function quotaOf(client) {
