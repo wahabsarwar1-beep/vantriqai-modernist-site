@@ -138,6 +138,137 @@
   .step .tag{font-family:'Sora';font-weight:600;font-size:22px;color:var(--ink-2);background:#efeae1;padding:10px 18px;border-radius:999px;white-space:nowrap}
   .step .tag.live{background:var(--cobalt);color:#fff}
   .c6 .cta{margin-top:48px}
+
+  .blob{position:absolute!important;border-radius:50%;filter:blur(100px);z-index:0!important}
+  .dark .src2{color:rgba(255,255,255,.45)} .light .src2{color:var(--muted)}
+  .src2{font-size:20px;letter-spacing:.03em;margin-top:22px}
+
+  /* ============ 7 · 21× RACE ============ */
+  .c7{background:radial-gradient(900px 700px at 15% 0%, #2a1a14 0%, #121016 55%, #0c0b10 100%)}
+  .c7 .fig{font-family:'Sora';font-weight:600;font-size:340px;line-height:.86;letter-spacing:-.07em;color:#fff;margin-top:58px}
+  .c7 .fig span{color:var(--peach)}
+  .c7 h1{font-size:62px;margin-top:26px;max-width:900px}
+  .race{width:900px;margin-top:54px;display:flex;flex-direction:column;gap:20px}
+  .race .row{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:22px}
+  .race .lbl{font-family:'Sora';font-weight:600;font-size:30px;color:#fff;text-align:right}
+  .race .row.slow .lbl{color:rgba(255,255,255,.5)}
+  .race .track{height:70px;border-radius:999px;background:rgba(255,255,255,.06);position:relative;display:flex;align-items:center}
+  .race .fill{height:100%;border-radius:999px;display:flex;align-items:center;padding:0 28px;font-family:'Sora';font-weight:600;font-size:25px;color:#fff;white-space:nowrap}
+  .race .fast .fill{width:100%;background:linear-gradient(90deg,#c06b3a,#e0854f 55%,#f3c9a6)}
+  .race .slow .fill{width:70px;background:rgba(255,255,255,.22);padding:0}
+  .race .slow .after{font-size:24px;color:rgba(255,255,255,.5);margin-left:22px;font-weight:600}
+  .c7 .cta{margin-top:50px}
+
+  /* ============ 8 · CLINIC ============ */
+  .c8{background:var(--cream)}
+  .c8 h1{font-size:84px;margin-top:52px}
+  .c8 h1 em{font-style:normal;color:var(--cobalt)}
+  .c8 .chat{margin-top:40px;width:820px}
+  .booked{display:flex;gap:16px;padding:22px 28px 28px;background:#f7f4ee;flex-wrap:wrap}
+  .booked span{font-family:'Sora';font-weight:600;font-size:22px;padding:12px 20px;border-radius:999px;background:#fff;border:1px solid var(--divider);color:var(--ink-2)}
+  .booked span.ok{background:#e6f5ec;border-color:#bfe6cd;color:#1f7a47}
+  .c8 .note{margin-top:30px;font-size:26px;color:#6b645b}
+  .c8 .note b{color:var(--ink-2)}
+  .c8 .cta{margin-top:34px}
+
+  /* ============ 9 · REAL ESTATE ============ */
+  .c9{background:radial-gradient(1000px 800px at 85% 15%, #23408f 0%, #142456 45%, #0b1030 100%)}
+  .c9 h1{font-size:98px;margin-top:56px}
+  .lead{margin-top:56px;width:880px;border-radius:40px;background:linear-gradient(160deg,rgba(255,255,255,.14),rgba(255,255,255,.04));border:1px solid rgba(255,255,255,.16);padding:36px 40px 40px;box-shadow:0 50px 100px -50px rgba(0,0,0,.7)}
+  .lead-top{display:flex;justify-content:space-between;align-items:center}
+  .lead-top b{font-family:'Sora';font-weight:600;font-size:30px;color:#fff;letter-spacing:-.01em}
+  .lead-top i{font-style:normal;font-size:22px;color:rgba(255,255,255,.55);font-weight:600}
+  .hot{font-family:'Sora';font-weight:600;font-size:20px;letter-spacing:.14em;text-transform:uppercase;color:#0b1030;background:#9fe3c4;padding:8px 16px;border-radius:999px}
+  .fields{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:30px}
+  .field{border-radius:22px;background:rgba(255,255,255,.06);padding:20px 24px}
+  .field small{display:block;font-size:19px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5);font-weight:700}
+  .field p{font-family:'Sora';font-weight:600;font-size:27px;color:#fff;margin-top:6px;display:flex;align-items:center;gap:10px}
+  .field p::before{content:"✓";color:#9fe3c4;font-size:24px}
+  .lead-foot{display:flex;gap:14px;margin-top:26px}
+  .lead-foot span{flex:1;text-align:center;font-family:'Sora';font-weight:600;font-size:23px;padding:18px;border-radius:20px;background:#fff;color:var(--ink-2)}
+  .lead-foot span.alt{background:rgba(255,255,255,.1);color:#fff}
+  .c9 .cta{margin-top:52px}
+
+  /* ============ 10 · RESTAURANT ============ */
+  .c10{background:radial-gradient(900px 800px at 50% 100%, #5a2a14 0%, #2a1610 45%, #120c0b 100%)}
+  .c10 h1{font-size:108px;margin-top:70px}
+  .c10 h1 em{font-style:normal;color:var(--peach)}
+  .c10 .pair{width:860px;margin-top:70px;display:flex;flex-direction:column;gap:16px}
+  .c10 .b{font-size:29px;max-width:620px}
+  .c10 .b.in{background:rgba(255,255,255,.1);color:#fff;box-shadow:none}
+  .c10 .b.in small{color:rgba(255,255,255,.5)}
+  .c10 .b.out{background:var(--peach);color:#1a0f0a}
+  .c10 .b.out small{color:rgba(26,15,10,.6)}
+  .ticket{margin-top:50px;width:860px;background:#fbf5ec;border-radius:30px;padding:30px 40px;display:grid;grid-template-columns:repeat(3,1fr);position:relative;box-shadow:0 40px 80px -40px rgba(0,0,0,.8)}
+  .ticket::before,.ticket::after{content:"";position:absolute;top:50%;width:40px;height:40px;border-radius:50%;background:#1d120e;transform:translateY(-50%)}
+  .ticket::before{left:-20px} .ticket::after{right:-20px}
+  .ticket div{text-align:center;border-right:1px dashed #e0d5c5}
+  .ticket div:last-child{border-right:0}
+  .ticket small{display:block;font-size:19px;letter-spacing:.16em;text-transform:uppercase;color:#94512b;font-weight:700}
+  .ticket b{display:block;font-family:'Sora';font-weight:600;font-size:40px;color:#1a0f0a;margin-top:6px;letter-spacing:-.02em}
+  .c10 .cta{margin-top:70px}
+
+  /* ============ 11 · LANGUAGE ============ */
+  .c11{background:var(--cream)}
+  .c11 h1{font-size:76px;margin-top:52px;max-width:1000px}
+  .c11 h1 em{font-style:normal;color:var(--cobalt)}
+  .c11 .chat{margin-top:46px;width:820px}
+  .langs{display:flex;gap:14px;margin-top:30px}
+  .langs span{font-family:'Sora';font-weight:600;font-size:26px;padding:16px 28px;border-radius:999px;border:1.5px solid var(--ink-2);color:var(--ink-2);background:rgba(255,255,255,.6)}
+  .langs span.on{background:var(--ink-2);color:#fff}
+  .c11 .cta{margin-top:34px}
+
+  /* ============ 12 · MONDAY DIGEST ============ */
+  .c12{background:linear-gradient(180deg,#0f0e14 0%,#1a1830 100%)}
+  .c12 h1{font-size:88px;margin-top:56px;max-width:940px}
+  .digest{margin-top:50px;width:860px;background:#fff;border-radius:36px;overflow:hidden;box-shadow:0 60px 120px -50px rgba(47,86,217,.6)}
+  .digest-head{background:var(--cobalt);color:#fff;padding:28px 38px;display:flex;justify-content:space-between;align-items:center}
+  .digest-head b{font-family:'Sora';font-weight:600;font-size:30px;letter-spacing:-.01em}
+  .digest-head i{font-style:normal;font-size:21px;opacity:.8;font-weight:600}
+  .dsec{padding:24px 38px;border-bottom:1px solid #efeae1}
+  .dsec:last-child{border-bottom:0}
+  .dsec small{display:block;font-size:19px;letter-spacing:.16em;text-transform:uppercase;color:var(--cobalt);font-weight:800}
+  .dsec p{font-size:27px;line-height:1.4;color:var(--ink-2);margin-top:8px}
+  .dsec p b{font-family:'Sora';font-weight:600}
+  .c12 .eg{margin-top:16px;font-size:20px;color:rgba(255,255,255,.45)}
+  .c12 .cta{margin-top:40px}
+
+  /* ============ CAROUSEL ============ */
+  .k{background:var(--cream)}
+  .k.dark{background:radial-gradient(900px 800px at 50% 0%, #1d2a66 0%, #111020 50%, #0c0b10 100%)}
+  .k .topbar{position:absolute!important;top:62px;left:64px;right:64px;display:flex;justify-content:space-between;align-items:center}
+  .k .topbar .lockup{margin:0;font-size:34px;gap:14px}
+  .k .topbar .lockup svg{width:36px;height:36px}
+  .k .count{font-family:'Sora';font-weight:600;font-size:24px;letter-spacing:.06em}
+  .k.light .count{color:var(--muted)} .k.dark .count{color:rgba(255,255,255,.5)}
+  .k .rail{position:absolute!important;left:0;right:0;bottom:120px;height:4px;background:rgba(22,21,26,.08)}
+  .k.dark .rail{background:rgba(255,255,255,.1)}
+  .k .rail i{position:absolute;left:0;top:0;bottom:0;background:var(--cobalt)}
+  .k.dark .rail i{background:var(--cobalt-hi)}
+  .k .foot{bottom:52px}
+  .k .num{font-family:'Sora';font-weight:600;font-size:230px;line-height:1;letter-spacing:-.06em;color:transparent;-webkit-text-stroke:3px var(--cobalt);margin-top:190px;align-self:flex-start;margin-left:96px}
+  .k h2{font-family:'Sora';font-weight:600;font-size:92px;line-height:1.04;letter-spacing:-.045em;color:var(--ink-2);align-self:flex-start;margin:26px 96px 0;max-width:880px;text-wrap:balance}
+  .k .body{font-size:37px;line-height:1.42;color:#4a453f;align-self:flex-start;margin:30px 96px 0;max-width:860px}
+  .k .body .srcline{display:block;font-size:20px;color:var(--muted);margin-top:14px;letter-spacing:.02em}
+  .fix{position:absolute!important;left:96px;right:96px;bottom:190px;background:var(--ink-2);border-radius:34px;padding:30px 36px;display:flex;align-items:center;gap:26px}
+  .fix .tag{font-family:'Sora';font-weight:600;font-size:19px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2);background:#9fe3c4;padding:10px 16px;border-radius:999px;white-space:nowrap}
+  .fix p{font-size:27px;line-height:1.35;color:rgba(255,255,255,.8)}
+  .fix p b{font-family:'Sora';font-weight:600;color:#fff}
+  .k .swipe{position:absolute!important;bottom:190px;right:96px;display:flex;align-items:center;gap:14px;font-family:'Sora';font-weight:600;font-size:30px;color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);padding:20px 32px;border-radius:999px}
+  .k .swipe svg{width:30px;height:30px}
+  .cover h1{font-size:104px;line-height:1.0;text-align:left;align-self:flex-start;margin:210px 96px 0;max-width:900px}
+  .cover h1 em{font-style:normal;color:var(--cobalt-hi)}
+  .stack{position:absolute!important;left:96px;bottom:300px;display:flex;flex-direction:column;gap:14px}
+  .stack div{display:flex;align-items:center;gap:16px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:24px;padding:18px 26px;font-size:24px;color:rgba(255,255,255,.75);width:560px}
+  .stack div:nth-child(2){margin-left:40px;opacity:.75} .stack div:nth-child(3){margin-left:80px;opacity:.5}
+  .stack div b{font-family:'Sora';font-weight:600;color:#fff}
+  .stack div i{margin-left:auto;font-style:normal;font-size:19px;letter-spacing:.12em;text-transform:uppercase;color:#f0997a;font-weight:700}
+  .final h1{font-size:110px;margin-top:270px}
+  .recap{display:flex;flex-wrap:wrap;justify-content:center;gap:14px;width:900px;margin-top:56px}
+  .recap span{font-family:'Sora';font-weight:600;font-size:25px;color:#fff;padding:16px 26px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14)}
+  .recap span::before{content:"✓  ";color:#9fe3c4}
+  .final .sub{margin-top:34px}
+  .final .cta{margin-top:64px}
 </style>
 </head>
 <body>
@@ -293,6 +424,200 @@
   </div>
   <a class="cta cobalt">Book a 15‑min call <svg><use href="#arrow"/></svg></a>
   <div class="foot"><span>vantriqai.com</span><span>For businesses of any size</span></div>
+</section>
+
+
+<!-- ================= 7 · 21× ================= -->
+<section class="card c7 dark" id="c7">
+  <svg class="contours" style="color:rgba(255,255,255,.04)"><use href="#contour"/></svg>
+  <div class="grain"></div>
+  <div class="lockup"><svg><use href="#mark-light"/></svg><span>Vantriq<span class="ai">AI</span></span></div>
+  <div class="fig">21<span>×</span></div>
+  <h1>more likely to qualify a lead when you reply in 5 minutes, not 30.</h1>
+  <div class="race">
+    <div class="row fast"><span class="lbl">5 min</span><div class="track"><div class="fill">21× more likely to qualify</div></div></div>
+    <div class="row slow"><span class="lbl">30 min</span><div class="track"><div class="fill"></div><span class="after">the baseline</span></div></div>
+  </div>
+  <p class="src2">Source: MIT / InsideSales.com · Lead Response Management Study</p>
+  <a class="cta white">Reply in seconds, not minutes <svg><use href="#arrow"/></svg></a>
+  <div class="foot"><span>vantriqai.com</span><span><i class="dot"></i>First reply in ~1.2s</span></div>
+</section>
+
+<!-- ================= 8 · CLINIC ================= -->
+<section class="card c8 light" id="c8">
+  <div class="blob" style="width:620px;height:620px;background:var(--mint);left:-240px;top:300px;opacity:.9"></div>
+  <div class="blob" style="width:560px;height:560px;background:var(--lilac);right:-220px;top:60px;opacity:.85"></div>
+  <div class="lockup"><svg><use href="#mark-dark"/></svg><span>Vantriq<span class="ai">AI</span></span></div>
+  <h1>Appointments booked.<br><em>Front desk freed.</em></h1>
+  <div class="chat">
+    <div class="chat-head">
+      <div class="chat-av"><svg><use href="#mark-light"/></svg></div>
+      <div><div class="chat-name">Your Clinic · AI Receptionist</div><div class="chat-status">● online · WhatsApp</div></div>
+    </div>
+    <div class="chat-body">
+      <div class="b in">Can I see Dr. Sana this week? Morning if possible.<small>08:12</small></div>
+      <div class="b out">Thursday 10:30 is free with Dr. Sana. Shall I book it?<small>08:12 ✓✓</small></div>
+    </div>
+    <div class="booked"><span class="ok">✓ Booked · Thu 10:30</span><span>Reminder set for Wednesday</span></div>
+  </div>
+  <p class="note">Anything clinical goes <b>straight to your staff</b>, with the whole chat attached.</p>
+  <a class="cta ink">See it for clinics <svg><use href="#arrow"/></svg></a>
+  <div class="foot"><span>vantriqai.com</span><span>Booking · Reminders · Reschedules</span></div>
+</section>
+
+<!-- ================= 9 · REAL ESTATE ================= -->
+<section class="card c9 dark" id="c9">
+  <svg class="contours" style="color:rgba(255,255,255,.05)"><use href="#contour"/></svg>
+  <div class="grain"></div>
+  <div class="lockup"><svg><use href="#mark-light"/></svg><span>Vantriq<span class="ai">AI</span></span></div>
+  <h1>Every enquiry,<br>qualified by morning.</h1>
+  <div class="lead">
+    <div class="lead-top"><div><b>New lead · Listing enquiry</b><br><i>Arrived 23:12 · answered in one reply</i></div><span class="hot">Qualified</span></div>
+    <div class="fields">
+      <div class="field"><small>Budget</small><p>Captured</p></div>
+      <div class="field"><small>Area</small><p>Captured</p></div>
+      <div class="field"><small>Timeline</small><p>Captured</p></div>
+      <div class="field"><small>In your CRM</small><p>With transcript</p></div>
+    </div>
+    <div class="lead-foot"><span>Matching listings sent</span><span class="alt">Viewing booked · Sat 17:00</span></div>
+  </div>
+  <a class="cta white">Qualify every lead <svg><use href="#arrow"/></svg></a>
+  <div class="foot"><span>vantriqai.com</span><span>For real estate teams</span></div>
+</section>
+
+<!-- ================= 10 · RESTAURANT ================= -->
+<section class="card c10 dark" id="c10">
+  <div class="grain"></div>
+  <div class="lockup"><svg><use href="#mark-light"/></svg><span>Vantriq<span class="ai" style="color:var(--peach-soft)">AI</span></span></div>
+  <h1>Take the order<br><em>through the rush.</em></h1>
+  <div class="pair">
+    <div class="b in">Table for four tonight at 9?<small>19:48</small></div>
+    <div class="b out">9:15 is our first free table for four. Shall I hold it under your name?<small>19:48 ✓✓</small></div>
+  </div>
+  <div class="ticket">
+    <div><small>Guests</small><b>4</b></div>
+    <div><small>Time</small><b>21:15</b></div>
+    <div><small>Status</small><b>Held ✓</b></div>
+  </div>
+  <a class="cta white">Never miss the rush <svg><use href="#arrow"/></svg></a>
+  <div class="foot"><span>vantriqai.com</span><span>Orders · Reservations · Menus</span></div>
+</section>
+
+<!-- ================= 11 · LANGUAGE ================= -->
+<section class="card c11 light" id="c11">
+  <div class="blob" style="width:640px;height:640px;background:var(--peach-soft);right:-260px;top:280px"></div>
+  <div class="blob" style="width:520px;height:520px;background:var(--mint);left:-220px;bottom:-140px;opacity:.85"></div>
+  <div class="lockup"><svg><use href="#mark-dark"/></svg><span>Vantriq<span class="ai">AI</span></span></div>
+  <h1>They write in Roman Urdu.<br><em>So does your agent.</em></h1>
+  <div class="chat">
+    <div class="chat-head">
+      <div class="chat-av"><svg><use href="#mark-light"/></svg></div>
+      <div><div class="chat-name">Your Store · AI Agent</div><div class="chat-status">● online · WhatsApp</div></div>
+    </div>
+    <div class="chat-body">
+      <div class="b in">Salam, ye sofa black mein available hai?<small>22:05</small></div>
+      <div class="b out">Ji bilkul! Black mein 2 pieces hain. Kal showroom visit book kar doon?<small>22:05 ✓✓</small></div>
+      <div class="b in">Haan, shaam 6 baje.<small>22:06</small></div>
+    </div>
+  </div>
+  <div class="langs"><span class="on">English</span><span class="on">Roman Urdu</span><span>Mix of both</span></div>
+  <a class="cta ink">Speak your customers’ language <svg><use href="#arrow"/></svg></a>
+  <div class="foot"><span>vantriqai.com</span><span>Replies in the customer’s language</span></div>
+</section>
+
+<!-- ================= 12 · MONDAY DIGEST ================= -->
+<section class="card c12 dark" id="c12">
+  <svg class="contours" style="color:rgba(255,255,255,.04)"><use href="#contour"/></svg>
+  <div class="grain"></div>
+  <div class="lockup"><svg><use href="#mark-light"/></svg><span>Vantriq<span class="ai">AI</span></span></div>
+  <h1>Every Monday, one page on what customers asked.</h1>
+  <div class="digest">
+    <div class="digest-head"><b>Insights Digest</b><i>Monday · 08:00</i></div>
+    <div class="dsec"><small>Most asked this week</small><p><b>Delivery times</b>, then sizes in stock, then opening hours.</p></div>
+    <div class="dsec"><small>Left unfinished</small><p>Carts abandoned right after a <b>delivery question</b>.</p></div>
+    <div class="dsec"><small>Hours that cost you</small><p><b>21:00–23:00</b> is your busiest window, with nobody online.</p></div>
+  </div>
+  <p class="eg">Example digest. Yours is written from your own conversations.</p>
+  <a class="cta white">Get your Monday digest <svg><use href="#arrow"/></svg></a>
+  <div class="foot"><span>vantriqai.com</span><span>Plain language, not a chart wall</span></div>
+</section>
+
+<!-- ================= CAROUSEL · 5 signs ================= -->
+<section class="card k cover dark" id="ck1">
+  <svg class="contours" style="color:rgba(255,255,255,.045)"><use href="#contour"/></svg>
+  <div class="grain"></div>
+  <div class="topbar"><div class="lockup"><svg><use href="#mark-light"/></svg><span>Vantriq<span class="ai">AI</span></span></div><span class="count">1 / 7</span></div>
+  <h1>5 signs your inbox is quietly <em>costing you sales.</em></h1>
+  <div class="stack">
+    <div><b>New message</b> · 21:40<i>Unread</i></div>
+    <div><b>New message</b> · 22:15<i>Unread</i></div>
+    <div><b>New message</b> · 23:02<i>Unread</i></div>
+  </div>
+  <div class="swipe">Swipe <svg><use href="#arrow"/></svg></div>
+  <div class="rail"><i style="width:14.3%"></i></div>
+  <div class="foot"><span>vantriqai.com</span><span>A 30-second inbox check</span></div>
+</section>
+
+<section class="card k light" id="ck2">
+  <div class="topbar"><div class="lockup"><svg><use href="#mark-dark"/></svg><span>Vantriq<span class="ai">AI</span></span></div><span class="count">2 / 7</span></div>
+  <div class="num">01</div>
+  <h2>Replies wait until morning.</h2>
+  <p class="body">The average first reply to a web enquiry took 42 hours, and 23% of firms never replied at all.<span class="srcline">Source: Harvard Business Review, 2011 · 2,241 firms audited</span></p>
+  <div class="fix"><span class="tag">The fix</span><p><b>Reception Agent</b> sends the first reply in about 1.2 seconds, at any hour.</p></div>
+  <div class="rail"><i style="width:28.6%"></i></div>
+  <div class="foot"><span>vantriqai.com</span><span>Sign 1 of 5</span></div>
+</section>
+
+<section class="card k light" id="ck3">
+  <div class="topbar"><div class="lockup"><svg><use href="#mark-dark"/></svg><span>Vantriq<span class="ai">AI</span></span></div><span class="count">3 / 7</span></div>
+  <div class="num">02</div>
+  <h2>Your team types the same answers all day.</h2>
+  <p class="body">Price, stock, sizes, delivery, timings. Every repeated answer is time not spent closing a sale.</p>
+  <div class="fix"><span class="tag">The fix</span><p><b>Catalogue Agent</b> answers from your live stock, so it never promises a size you’ve sold.</p></div>
+  <div class="rail"><i style="width:42.9%"></i></div>
+  <div class="foot"><span>vantriqai.com</span><span>Sign 2 of 5</span></div>
+</section>
+
+<section class="card k light" id="ck4">
+  <div class="topbar"><div class="lockup"><svg><use href="#mark-dark"/></svg><span>Vantriq<span class="ai">AI</span></span></div><span class="count">4 / 7</span></div>
+  <div class="num">03</div>
+  <h2>Leads arrive with no context.</h2>
+  <p class="body">A name and “interested” isn’t a lead. Someone still has to ask about budget, area and timing, usually a day later.</p>
+  <div class="fix"><span class="tag">The fix</span><p><b>Lead Qualifier</b> asks what your sales team would, scores the lead and writes it to your CRM.</p></div>
+  <div class="rail"><i style="width:57.1%"></i></div>
+  <div class="foot"><span>vantriqai.com</span><span>Sign 3 of 5</span></div>
+</section>
+
+<section class="card k light" id="ck5">
+  <div class="topbar"><div class="lockup"><svg><use href="#mark-dark"/></svg><span>Vantriq<span class="ai">AI</span></span></div><span class="count">5 / 7</span></div>
+  <div class="num">04</div>
+  <h2>Nobody follows up.</h2>
+  <p class="body">Abandoned carts, unanswered quotes, half-finished bookings. They don’t come back on their own.</p>
+  <div class="fix"><span class="tag">The fix</span><p><b>Follow-up Agent</b> reopens each quiet thread once, politely, at the hour people actually reply.</p></div>
+  <div class="rail"><i style="width:71.4%"></i></div>
+  <div class="foot"><span>vantriqai.com</span><span>Sign 4 of 5</span></div>
+</section>
+
+<section class="card k light" id="ck6">
+  <div class="topbar"><div class="lockup"><svg><use href="#mark-dark"/></svg><span>Vantriq<span class="ai">AI</span></span></div><span class="count">6 / 7</span></div>
+  <div class="num">05</div>
+  <h2>Your busiest hours are after closing.</h2>
+  <p class="body">Customers browse in the evenings and at weekends, which is exactly when nobody is watching the inbox.</p>
+  <div class="fix"><span class="tag">The fix</span><p><b>WhatsApp, Social &amp; Website Agents</b> answer 24/7, wherever the customer writes.</p></div>
+  <div class="rail"><i style="width:85.7%"></i></div>
+  <div class="foot"><span>vantriqai.com</span><span>Sign 5 of 5</span></div>
+</section>
+
+<section class="card k final dark" id="ck7">
+  <svg class="contours" style="color:rgba(255,255,255,.05)"><use href="#contour"/></svg>
+  <div class="grain"></div>
+  <div class="topbar"><div class="lockup"><svg><use href="#mark-light"/></svg><span>Vantriq<span class="ai">AI</span></span></div><span class="count">7 / 7</span></div>
+  <h1>Fix all five<br>with one agent.</h1>
+  <p class="sub">Built and tested on your real messages. Planned at 2–4 weeks from sign-off.</p>
+  <div class="recap"><span>Replies in ~1.2s</span><span>Answers from live stock</span><span>Leads scored</span><span>Follow-ups sent</span><span>Open 24/7</span></div>
+  <a class="cta white">Book a free 15‑min call <svg><use href="#arrow"/></svg></a>
+  <div class="rail"><i style="width:100%"></i></div>
+  <div class="foot"><span>vantriqai.com</span><span>WhatsApp · Instagram · Web</span></div>
 </section>
 
 <script>

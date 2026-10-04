@@ -168,3 +168,183 @@ Every figure is one the site already publishes. The 78% card credits its source,
 > Book a 15-min call, link in bio.
 >
 > #AIforSmallBusiness #Automation #StartupTools #CustomerSupport #VantriqAI
+
+---
+
+## 07 · 21× more likely to qualify
+
+**Headline (ad field):** Reply in 5 minutes, not 30
+**Primary text / Facebook:**
+
+> Leads are 21× more likely to qualify when you reply within 5 minutes instead of 30.*
+>
+> Most businesses aren't slow because they don't care. They're slow because the message lands while everyone is busy, on a break, or asleep.
+>
+> VantriqAI agents send the first reply in about 1.2 seconds on WhatsApp, Instagram and your website, at any hour.
+>
+> Reply in seconds → https://www.vantriqai.com
+>
+> *Source: MIT / InsideSales.com Lead Response Management Study.
+
+**Instagram:**
+
+> 5 minutes vs 30 minutes = 21× more likely to qualify the lead.* ⏱️
+>
+> VantriqAI agents reply in about 1.2 seconds on WhatsApp, Instagram and your website, day or night.
+>
+> Link in bio.
+>
+> *MIT / InsideSales.com Lead Response Management Study
+>
+> #LeadResponse #SalesTips #AIagents #WhatsAppBusiness #VantriqAI
+
+---
+
+## 08 · Appointments booked. Front desk freed.
+
+**Headline (ad field):** An AI receptionist for your clinic
+**Primary text / Facebook:**
+
+> "Can I see Dr. Sana this week? Morning if possible."
+> "Thursday 10:30 is free with Dr. Sana. Shall I book it?"
+>
+> That's a VantriqAI agent on your clinic's WhatsApp. It books from your live calendar, sends the reminder and handles the reschedule. Anything clinical goes straight to your staff with the whole chat attached.
+>
+> Your front desk gets its morning back.
+>
+> See it for clinics → https://www.vantriqai.com/industries/healthcare
+
+**Instagram:**
+
+> Appointments booked. Front desk freed. 🩺
+>
+> Booking, reminders and reschedules handled on WhatsApp by an AI receptionist. Anything clinical goes straight to your team.
+>
+> Link in bio.
+>
+> #HealthcarePakistan #ClinicManagement #WhatsAppBusiness #AIreceptionist #VantriqAI
+
+---
+
+## 09 · Every enquiry, qualified by morning
+
+**Headline (ad field):** Every property enquiry, qualified by morning
+**Primary text / Facebook:**
+
+> A listing enquiry at 23:12 usually gets a call back the next afternoon. By then the buyer has spoken to three other agents.
+>
+> A VantriqAI agent answers it in one reply. It captures budget, area and timeline, sends the matching listings, books the viewing and writes it all to your CRM with the transcript.
+>
+> Your team starts the day with qualified leads, not a list of names to chase.
+>
+> Qualify every lead → https://www.vantriqai.com/industries/real-estate
+
+**Instagram:**
+
+> Every enquiry, qualified by morning. 🏡
+>
+> Budget, area and timeline are captured, matching listings sent and the viewing booked, all before your team's first coffee.
+>
+> AI agents for real estate. Link in bio.
+>
+> #RealEstatePakistan #PropertyLeads #RealEstateMarketing #AIagents #VantriqAI
+
+---
+
+## 10 · Take the order through the rush
+
+**Headline (ad field):** Take reservations through the dinner rush
+**Primary text / Facebook:**
+
+> 19:48: "Table for four tonight at 9?"
+> 19:48: "9:15 is our first free table for four. Shall I hold it under your name?"
+>
+> During the dinner rush nobody on the floor has a free hand for the phone. A VantriqAI agent takes the orders, reservations and menu questions on WhatsApp, so every guest still gets an answer.
+>
+> Never miss the rush → https://www.vantriqai.com/industries/hospitality
+
+**Instagram:**
+
+> Take the order through the rush. 🍽️
+>
+> Reservations, orders and menu questions answered on WhatsApp while your team is busy serving.
+>
+> Link in bio.
+>
+> #RestaurantMarketing #HospitalityPakistan #FoodBusiness #WhatsAppBusiness #VantriqAI
+
+---
+
+## 11 · They write in Roman Urdu. So does your agent.
+
+**Headline (ad field):** An AI agent that speaks Roman Urdu
+**Primary text / Facebook:**
+
+> "Salam, ye sofa black mein available hai?"
+> "Ji bilkul! Black mein 2 pieces hain. Kal showroom visit book kar doon?"
+>
+> Your customers don't write like a chatbot script. VantriqAI agents reply in English, Roman Urdu or whatever mix the customer uses, and they still check stock and book the visit.
+>
+> Speak your customers' language → https://www.vantriqai.com
+
+**Instagram:**
+
+> They write in Roman Urdu. So does your agent. 💬
+>
+> English, Roman Urdu or a mix of both. Your VantriqAI agent replies in the customer's language and still gets the sale booked.
+>
+> Link in bio.
+>
+> #RomanUrdu #PakistaniBusiness #WhatsAppBusiness #AIagents #VantriqAI
+
+---
+
+## 12 · Every Monday, one page on what customers asked
+
+**Headline (ad field):** One Monday digest on what customers asked
+**Primary text / Facebook:**
+
+> What did your customers ask most last week? What did they abandon? Which hours cost you sales?
+>
+> Every VantriqAI plan includes an Insights Digest. It's one page every Monday, in plain language, written from your own conversations: no dashboards to dig through, no chart wall.
+>
+> Get your Monday digest → https://www.vantriqai.com/products
+
+**Instagram:**
+
+> Every Monday, one page on what your customers asked. 📊
+>
+> What they asked most, what they abandoned and which hours cost you sales, written in plain language from your own chats.
+>
+> Link in bio.
+>
+> #BusinessInsights #CustomerExperience #SmallBusinessTips #AIagents #VantriqAI
+
+---
+
+## C01 · Carousel: 5 signs your inbox is costing you sales (7 slides)
+
+**Headline (ad field):** 5 signs your inbox is costing you sales
+**Primary text / Facebook:**
+
+> 5 signs your inbox is quietly costing you sales 👇
+>
+> 1. Replies wait until morning
+> 2. Your team types the same answers all day
+> 3. Leads arrive with no context
+> 4. Nobody follows up
+> 5. Your busiest hours are after closing
+>
+> Recognise two or more? One VantriqAI agent fixes all five on WhatsApp, Instagram and your website.
+>
+> Book a free 15-min call → https://www.vantriqai.com/contact
+
+**Instagram:**
+
+> 5 signs your inbox is quietly costing you sales. Swipe → 
+>
+> How many did you tick? Two or more means customers are buying somewhere else while your inbox waits.
+>
+> One VantriqAI agent fixes all five. Book a free 15-min call, link in bio.
+>
+> #SmallBusinessTips #CustomerService #SalesGrowth #WhatsAppBusiness #VantriqAI

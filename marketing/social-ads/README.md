@@ -1,59 +1,90 @@
-# VantriqAI social ad cards
+# VantriqAI social posts
 
-Six 1080×1350 (4:5) cards for Facebook and Instagram feed, built in the site's
-Symphony palette (ink, cream, cobalt) with Sora / Manrope.
+Facebook and Instagram feed posts for vantriqai.com: 1080×1350 (4:5), built in
+the site's Symphony palette (ink, cream, cobalt) with Sora / Manrope.
 
-| File | Angle | CTA |
-| --- | --- | --- |
-| `vantriqai-ad-01.png` | Answer every customer in 1.2s (orb gauge) | Book a free demo |
-| `vantriqai-ad-02.png` | 21:40 WhatsApp conversation | Get your agent |
-| `vantriqai-ad-03.png` | 78% buy from whoever answers first | Be first — every time |
-| `vantriqai-ad-04.png` | Same message, two endings | See it on your business |
-| `vantriqai-ad-05.png` | One agent, every channel | Start building |
-| `vantriqai-ad-06.png` | Live in weeks, not quarters | Book a 15‑min call |
+## What's here
 
-Edit copy in `ads.html` (open it in a browser to see all six), then re-render:
+| File | What it is |
+| --- | --- |
+| `ads.html` | Source for every card and carousel slide. Open it in a browser to see them all. |
+| `vantriqai-ad-NN.png` | Single-image posts 01–12 |
+| `vantriqai-carousel-NN-K.png` | Carousel slides (C01 = slides 1–7) |
+| `captions.md` | Ad headline, Facebook caption and Instagram caption for each post. **This is the file people edit.** |
+| `captions.json` | The same copy in the form the n8n workflow reads. Built from `captions.md`; don't edit it by hand. |
+| `briefs.md` | Ideas for upcoming posts. The weekly content routine works through them. |
+| `render.js` | Renders `ads.html` to the PNGs |
+| `captions_to_json.py` | Rebuilds `captions.json` from `captions.md` |
+| `n8n/daily-post.workflow.ts` | Source of the n8n posting workflow |
+
+| Post | Angle |
+| --- | --- |
+| 01 | Answer every customer in 1.2s |
+| 02 | 21:40 WhatsApp conversation |
+| 03 | 78% buy from whoever answers first |
+| 04 | Same message, two endings |
+| 05 | One agent, every channel |
+| 06 | Live in weeks, not quarters |
+| 07 | 21× more likely to qualify at 5 minutes |
+| 08 | Clinics: appointments booked, front desk freed |
+| 09 | Real estate: every enquiry qualified by morning |
+| 10 | Restaurants: take the order through the rush |
+| 11 | Roman Urdu replies |
+| 12 | Monday Insights Digest |
+| C01 | Carousel: 5 signs your inbox is costing you sales (7 slides) |
+
+## Making or changing a post
 
 ```sh
 npm i --no-save playwright-core
-node marketing/social-ads/render.js        # all cards
-node marketing/social-ads/render.js 2 5    # just cards 2 and 5
+node marketing/social-ads/render.js          # everything
+node marketing/social-ads/render.js 8 k3     # card 08 and carousel slide 3
+python3 marketing/social-ads/captions_to_json.py
 ```
 
-`render.js` expects a Chromium at `/opt/pw-browsers/...`; point `executablePath`
-at your local Chrome if you render elsewhere.
+- A **single post** is a `<section class="card cN">` in `ads.html` plus a
+  `## NN · …` section in `captions.md`.
+- A **carousel** is a set of `<section class="card k …" id="ckN">` slides plus a
+  `## C01 · …` section. Its slides are every `vantriqai-carousel-01-*.png`, in
+  order (2–10 slides).
+- Add `**Post on:** 2026-10-12` under a heading to post it on that day.
 
-## Captions
+## How posting works (n8n)
 
-`captions.md` holds the write-up for each card: an ad headline, a Facebook caption
-and an Instagram caption. `captions.json` holds the same text for the posting
-workflow. Change both together, or change the `.md` and regenerate the `.json`.
+Workflow **VantriqAI · Daily Facebook + Instagram Post** on n8n.vantriqai.com.
 
-## Daily posting (n8n)
+Every day at 10:00 PKT it:
 
-Workflow **VantriqAI · Daily Facebook + Instagram Post** on n8n.vantriqai.com
-(source: `n8n/daily-post.workflow.ts`, written in n8n Workflow SDK code).
+1. reads `captions.json` from this folder on GitHub;
+2. picks the post dated today, or, if none is dated today, the next evergreen
+   post in rotation;
+3. emails the draft to server@vantriqai.com with **Publish now** and **Skip
+   today** buttons (skipped if nobody answers in 6 hours);
+4. posts it to the Facebook Page (61594465987920) and to Instagram @vantriq_ai,
+   as a single photo or as a multi-photo/carousel post.
 
-Daily 10:00 PKT → fetch `captions.json` → pick the next card in rotation →
-email the draft for approval (Publish now / Skip today; skipped if nobody
-answers within 6 hours) → post the photo to the Facebook Page, and create and
-publish the Instagram post.
+Before it can run, three things need doing in n8n and Meta (see the sticky note
+on the workflow):
 
-Before you activate it:
+1. Make @vantriq_ai a Business account linked to the Facebook Page.
+2. Add a **VantriqAI Page Access Token** credential (Facebook Graph API,
+   long-lived Page token with `pages_manage_posts`, `pages_read_engagement`,
+   `instagram_basic`, `instagram_content_publish`) to every Facebook/Instagram
+   node.
+3. Add a **VantriqAI SMTP** credential (smtp.hostinger.com:465,
+   server@vantriqai.com) to the approval email node.
 
-1. **Accounts**: it posts to facebook.com/profile.php?id=61594465987920 (the
-   Page ID is already in Config) and instagram.com/vantriq_ai. @vantriq_ai must
-   be a Business account linked to that Page. The workflow looks up its ID from
-   the Page, so `instagramAccountId` can stay blank.
-2. **VantriqAI Page Access Token** credential (Facebook Graph API): a long-lived
-   Page token with `pages_manage_posts`, `pages_read_engagement`,
-   `instagram_basic` and `instagram_content_publish`.
-3. **VantriqAI SMTP** credential: for example Hostinger `smtp.hostinger.com:465`
-   for server@vantriqai.com.
-4. `contentBaseUrl` points at this branch on raw.githubusercontent.com. Once the
-   branch is merged, point it at `main`.
+To test, set `forceCardId` in Config (e.g. `C01`) and click **Test Run**.
 
-To test, set `forceCardId` (for example `03`) and click **Test Run**. To post
-with no approval step, set `requireApproval` to `false`. To add a card, render a
-new PNG here and add its entry to `captions.json`. The rotation picks it up
-automatically.
+`contentBaseUrl` points at this branch on raw.githubusercontent.com. Once the
+branch is merged, point it at `main`.
+
+## Handing posts over
+
+- **Ideas:** add them to `briefs.md`, or send them to Claude in chat.
+- **Weekly:** a Claude routine runs each Saturday. It turns the briefs (or
+  topics from the site, if there are none) into the next week's dated posts,
+  renders them, updates the captions and pushes. The n8n workflow posts them
+  day by day.
+- **Control:** nothing goes live without the approval email, unless
+  `requireApproval` is switched off.
