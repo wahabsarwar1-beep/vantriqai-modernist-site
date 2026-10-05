@@ -395,10 +395,16 @@ is resold as a product, it needs the same three nodes and a client whose
 
 ## The assistant on vantriqai.com
 
-The marketing site already ships the widget: `components/ShopAIChat.tsx` mounts
-`@n8n/chat` in window mode from a vendored bundle in `public/vendor/n8n-chat/`,
-and reads one variable, `NEXT_PUBLIC_N8N_CHAT_WEBHOOK_URL`. Nothing on the site
-needed building — it needed pointing somewhere.
+The marketing site ships its own chat panel, `components/VantriqChat.tsx`
+(it replaced a vendored `@n8n/chat` bundle). It POSTs
+`{action: "sendMessage", sessionId, chatInput}` to the chat trigger and reads
+`output` back, defaulting to the production webhook; one variable,
+`NEXT_PUBLIC_N8N_CHAT_WEBHOOK_URL`, overrides it at build time.
+
+Replies are Markdown plus optional fenced ```` ```vq ```` JSON blocks —
+comparison tables, module cards, a lead form, a booking picker, suggested
+replies and action buttons. The protocol and its validation live in
+`lib/chat-blocks.ts`; the agent's system prompt documents what to emit.
 
 It was pointed at **n8n Cloud** (`wahabsarwar.app.n8n.cloud`). The workflow was
 imported to the VPS keeping its chat trigger's `webhookId`, so both instances

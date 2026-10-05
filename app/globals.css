@@ -2122,7 +2122,7 @@ span[data-chev] { display: inline-block; transition: transform .2s ease; }
   }
   .mm[data-open] { visibility: visible; clip-path: inset(0 0 0 0 round 0); transition: clip-path .6s cubic-bezier(.76,0,.24,1); }
   html.mm-lock { overflow: hidden; }
-  html.mm-lock #n8n-chat, html.mm-lock [aria-label="Back to top"] { display: none !important; }
+  html.mm-lock #vq-chat, html.mm-lock [aria-label="Back to top"] { display: none !important; }
   /* The capsule stays put over the sheet, solid so the sheet does not show through. */
   .bn[data-menu] .bn-capsule { background: var(--color-bg); box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-text) 8%, transparent); }
   .bn[data-menu] .bn-progress { opacity: 0; }
