@@ -3,6 +3,8 @@ import { breadcrumbSchema } from "@/lib/schema";
 import LineReveal from "@/components/LineReveal";
 import Magnetic from "@/components/Magnetic";
 import ContactForm from "@/components/ContactForm";
+import SocialIcon, { socialKey } from "@/components/SocialIcon";
+import { SOCIAL_PROFILES, socialHandle, socialLabel } from "@/lib/social";
 import { waLink } from "@/lib/whatsapp";
 import type { Region } from "@/lib/region";
 
@@ -27,6 +29,24 @@ const INFO_ROWS = [
     ),
   },
   { label: "What happens next", body: "A fifteen-minute discovery call, then a fixed setup fee and monthly plan in writing." },
+  {
+    label: "Follow along",
+    body: (
+      <span style={{ display: "flex", flexWrap: "wrap", gap: "10px 22px" }}>
+        {SOCIAL_PROFILES.map((url) => {
+          const key = socialKey(url);
+          const handle = socialHandle(url);
+          return (
+            <a key={url} href={url} target="_blank" rel="noopener me" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontWeight: 600 }}>
+              {key && <SocialIcon name={key} size={16} />}
+              {socialLabel(url)}
+              {handle && <span style={{ color: "color-mix(in srgb, var(--color-text) 62%, transparent)" }}>{handle}</span>}
+            </a>
+          );
+        })}
+      </span>
+    ),
+  },
 ];
 
 export default function ContactPage({ region }: { region: Region }) {

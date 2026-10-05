@@ -11,23 +11,8 @@ import { menuPanels } from "@/lib/menu";
 import { productSlug } from "@/lib/products";
 import { hrefIn, navHref, regionFromPathname, type Region } from "@/lib/region";
 import { RESOURCES } from "@/lib/resources";
-import { SOCIAL_PROFILES } from "@/lib/social";
+import { SOCIAL_PROFILES, socialLabel } from "@/lib/social";
 import { waLink, WHATSAPP_DISPLAY } from "@/lib/whatsapp";
-
-const SOCIAL_LABELS: Record<string, string> = {
-  "facebook.com": "Facebook",
-  "instagram.com": "Instagram",
-  "linkedin.com": "LinkedIn",
-  "x.com": "X",
-  "twitter.com": "X",
-  "youtube.com": "YouTube",
-  "tiktok.com": "TikTok",
-};
-
-const socialLabel = (url: string) => {
-  const host = new URL(url).hostname.replace(/^www\./, "");
-  return SOCIAL_LABELS[host] ?? host;
-};
 
 type FooterLink = { href: string; label: string; external?: boolean; isNew?: boolean };
 
