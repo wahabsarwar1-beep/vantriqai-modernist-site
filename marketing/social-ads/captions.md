@@ -398,3 +398,176 @@ Every figure is one the site already publishes. The 78% card credits its source,
 > Answer and book with AI Agents. See it all live in Pulse. Hear every customer with Echo.
 >
 > One platform. Book a free demo, link in bio.
+
+---
+
+## 13 · Different channels. One connected agent.
+
+**Post on:** 2026-10-06
+**Headline (ad field):** Different channels. One connected agent.
+**Hashtags:** #VantriqAI #VantriqAgents #Omnichannel #ConversationalAI #AIinPakistan
+**Primary text / Facebook:**
+
+> Your customers message you on WhatsApp, DM you on Instagram, use the chat on your website and call your business line.
+>
+> One VantriqAI agent covers all four. It replies, qualifies and books in each one, with the same knowledge of your business, around the clock.
+>
+> 💬 WhatsApp · 📸 Instagram · 🌐 Website · 📞 Voice
+>
+> Meet your AI agent → https://www.vantriqai.com/products
+
+**Instagram:**
+
+> Different channels. One connected agent. 🔗
+>
+> WhatsApp, Instagram, your website and your phone line, all answered by one VantriqAI agent that replies, qualifies and books, 24/7.
+>
+> Meet your AI agent, link in bio.
+
+---
+
+## 14 · From a message to a booking.
+
+**Post on:** 2026-10-07
+**Headline (ad field):** From a message to a booking
+**Hashtags:** #VantriqAI #VantriqAgents #AppointmentBooking #WhatsAppBusiness #SmallBusinessPakistan
+**Primary text / Facebook:**
+
+> "Tomorrow at 6:30 works."
+>
+> That's all your customer has to type. The VantriqAI Booking Agent checks your real availability, writes the appointment into your calendar, sends the reminder and handles the reschedule when it comes.
+>
+> Real availability. Confirmed appointments. Reminders handled.
+>
+> Fill your calendar → https://www.vantriqai.com/products/booking-agent
+
+**Instagram:**
+
+> From a message to a booking. 📅
+>
+> The Booking Agent checks real availability, confirms the slot in your calendar and sends the reminder, all inside the chat.
+>
+> Fill your calendar, link in bio.
+
+---
+
+## 15 · Your catalogue. Ready to answer.
+
+**Post on:** 2026-10-09
+**Headline (ad field):** Your catalogue, ready to answer
+**Hashtags:** #VantriqAI #VantriqAgents #EcommercePakistan #ConversationalCommerce #WhatsAppBusiness
+**Primary text / Facebook:**
+
+> "Does it come in black?"
+>
+> Your customer shouldn't have to wait until tomorrow to find out. The VantriqAI Catalogue Agent answers price, size, variant and stock questions from your actual inventory, shares the right product and holds the item while the customer decides.
+>
+> It never promises a size you sold an hour ago.
+>
+> Make your catalogue conversational → https://www.vantriqai.com/products/catalogue-agent
+
+**Instagram:**
+
+> Your catalogue. Ready to answer. 🛋️
+>
+> Prices, variants and availability straight from your real inventory, answered in the chat, at any hour.
+>
+> Make your catalogue conversational, link in bio.
+
+---
+
+## 16 · The conversation isn't over.
+
+**Post on:** 2026-10-10
+**Headline (ad field):** The conversation isn't over
+**Hashtags:** #VantriqAI #VantriqAgents #AbandonedCart #SalesFollowUp #CustomerRetention
+**Primary text / Facebook:**
+
+> The quote went out. The customer went quiet. Most businesses stop there.
+>
+> The VantriqAI Follow-up Agent reopens quiet enquiries, unanswered quotes and abandoned carts once, politely, at the hour people actually reply. And it stops the moment they say no.
+>
+> Keep the conversation moving → https://www.vantriqai.com/products/follow-up-agent
+
+**Instagram:**
+
+> The conversation isn't over. 🔁
+>
+> Quiet enquiries, unanswered quotes and abandoned carts get one polite follow-up, at the right hour, so customers come back to the chat.
+>
+> Keep the conversation moving, link in bio.
+
+---
+
+## 17 · From interested to paid.
+
+**Post on:** 2026-10-11
+**Headline (ad field):** From interested to paid
+**Hashtags:** #VantriqAI #VantriqAgents #PaymentReminders #InvoiceAutomation #SmallBusinessPakistan
+**Primary text / Facebook:**
+
+> A customer says yes, and then the chasing starts.
+>
+> The VantriqAI Payments Agent sends the payment link inside the conversation, confirms receipt, and follows up on outstanding invoices on the schedule you set.
+>
+> ✓ Payment link sent
+> ✓ Receipt confirmed
+> ✓ Reminder scheduled
+>
+> Simplify payment follow-ups → https://www.vantriqai.com/products/payments-agent
+
+**Instagram:**
+
+> From interested to paid. ⚡
+>
+> Payment links sent in the chat, receipts confirmed and unpaid invoices followed up on your schedule.
+>
+> Simplify payment follow-ups, link in bio.
+
+---
+
+## 18 · Vantriq Pulse: See what conversations reveal.
+
+**Post on:** 2026-10-12
+**Headline (ad field):** See what your conversations reveal
+**Hashtags:** #VantriqAI #VantriqPulse #CustomerAnalytics #BusinessInsights #AIinPakistan
+**Primary text / Facebook:**
+
+> Every customer conversation tells you something. Vantriq Pulse shows you what.
+>
+> Live analytics on leads made and closed, time to close, your busiest hours, customer satisfaction, and what the AI resolved on its own, all in plain English.
+>
+> Included in every VantriqAI plan.
+>
+> Discover Pulse → https://www.vantriqai.com/products/vantriq-pulse
+
+**Instagram:**
+
+> See what your conversations reveal. 📈
+>
+> Vantriq Pulse: live insight into leads, conversions, busiest hours and customer satisfaction. In every plan.
+>
+> Discover Pulse, link in bio.
+
+---
+
+## 19 · Vantriq Echo: Hear every customer.
+
+**Post on:** 2026-10-13
+**Headline (ad field):** Hear every customer. Improve what matters.
+**Hashtags:** #VantriqAI #VantriqEcho #CustomerFeedback #CustomerSatisfaction #VantriqPulse
+**Primary text / Facebook:**
+
+> How was your experience? Ask every customer, not just the loudest ones.
+>
+> Vantriq Echo sends one short survey at the right moment, in English or Urdu: after a WhatsApp chat, by QR code at the counter, or by link. Unhappy answers alert your team the same day, and every score flows straight into Pulse.
+>
+> Start listening → https://www.vantriqai.com/products/vantriq-echo
+
+**Instagram:**
+
+> Hear every customer. Improve what matters. 💬
+>
+> Feedback in English and Urdu, scores that flow into Pulse, and unhappy answers that reach your team the same day.
+>
+> Start listening, link in bio.
