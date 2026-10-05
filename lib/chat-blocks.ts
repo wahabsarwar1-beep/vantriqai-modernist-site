@@ -66,7 +66,10 @@ function validate(raw: unknown): ChatBlock | null {
           if (!label || !Array.isArray(row.values)) return null;
           const values = columns.map((_, i) => {
             const v = (row.values as unknown[])[i];
-            return typeof v === "boolean" ? v : str(v, 80) ?? "";
+            if (typeof v === "boolean") return v;
+            // The model sometimes quotes its booleans; a cell reading "true" helps nobody.
+            const text = str(v, 80) ?? "";
+            return /^(true|yes)$/i.test(text) ? true : /^(false|no)$/i.test(text) ? false : text;
           });
           return { label, values };
         })
@@ -139,7 +142,9 @@ export function parseReply(reply: string): ParsedReply {
     }
     return "";
   });
-  text = text.replace(OPEN_FENCE, "").replace(/\n{3,}/g, "\n\n").trim();
+  // A stray fence line left behind after the block (the model doubling its
+  // closing ```) would otherwise print as three backticks.
+  text = text.replace(OPEN_FENCE, "").replace(/^[ \t]*```[a-z]*[ \t]*$/gm, "").replace(/\n{3,}/g, "\n\n").trim();
 
   // One form, one picker and one row of suggestions per reply is plenty;
   // the model sometimes repeats itself.

@@ -8,6 +8,10 @@ let r=c.parseReply('Here you go.\n\n```vq\n{"type":"compare","title":"Packages",
 assert.equal(r.text,'Here you go.\n\nWhich fits?');assert.equal(r.blocks.length,1);
 assert.deepEqual(plain(r.blocks[0].rows[1]),{label:'CRM sync',values:[false,'Included']});assert.equal(r.blocks[0].highlight,1);
 
+// Quoted booleans become ticks; a doubled closing fence never prints.
+r=c.parseReply('Side by side:\n```vq\n[{"type":"compare","columns":["A","B"],"rows":[{"label":"24/7","values":["true","No"]}]}]\n```\n```');
+assert.equal(r.text,'Side by side:');assert.deepEqual(plain(r.blocks[0].rows[0].values),[true,false]);
+
 // Malformed JSON, unknown types and unclosed fences are dropped, never printed.
 r=c.parseReply('Hi\n```vq\n{not json}\n```\n```vq\n{"type":"script","src":"x"}\n```\nBye\n```vq\n{"type":"cards"');
 assert.equal(r.text,'Hi\n\nBye');assert.equal(r.blocks.length,0);
