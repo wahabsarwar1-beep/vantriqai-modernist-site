@@ -2339,7 +2339,6 @@ span[data-chev] { display: inline-block; transition: transform .2s ease; }
 .ft-btn:hover { transform: translateY(-2px); }
 .ft-btn-primary { color: #0b0b12; background: #fff; box-shadow: 0 0 0 1px rgba(255,255,255,.6), 0 18px 44px -12px rgba(127,155,242,.8); }
 .ft-btn-primary:hover { color: #0b0b12; }
-.ft-btn-dot { width: 8px; height: 8px; border-radius: 50%; background: #25c16a; }
 .ft-btn-ghost { color: #fff; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.18); }
 .ft-btn-ghost:hover { color: #fff; background: rgba(255,255,255,.12); }
 

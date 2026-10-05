@@ -92,8 +92,8 @@ export default function Footer() {
             </p>
           </div>
           <div className="ft-actions">
-            <a className="ft-btn ft-btn-primary" href={waLink()} target="_blank" rel="noopener">
-              <span aria-hidden="true" className="ft-btn-dot" />
+            <a className="ft-btn ft-btn-primary" href={waLink()} target="_blank" rel="noopener" aria-label={`WhatsApp ${WHATSAPP_DISPLAY}`}>
+              <SocialIcon name="whatsapp" size={18} />
               {WHATSAPP_DISPLAY}
               <span aria-hidden="true">→</span>
             </a>
@@ -149,6 +149,9 @@ export default function Footer() {
             &copy; {year} VantriqAI · Intelligent automation for business
           </p>
           <div className="ft-bottom-right">
+            <a href={waLink()} target="_blank" rel="noopener" aria-label="WhatsApp" title="WhatsApp" className="ft-social">
+              <SocialIcon name="whatsapp" />
+            </a>
             {SOCIAL_PROFILES.map((url) => {
               const key = socialKey(url);
               const label = socialLabel(url);
