@@ -403,7 +403,7 @@ Every figure is one the site already publishes. The 78% card credits its source,
 
 ## 13 · Different channels. One connected agent.
 
-**Post on:** 2026-10-06
+**Post on:** 2026-10-17
 **Headline (ad field):** Different channels. One connected agent.
 **Hashtags:** #VantriqAI #VantriqAgents #Omnichannel #ConversationalAI #AIinPakistan
 **Primary text / Facebook:**
@@ -574,10 +574,10 @@ Every figure is one the site already publishes. The 78% card credits its source,
 
 ---
 
-## V03 · Video (Feed, 4:5): Not just answers. Actions.
+## V03 · Video with voiceover (Feed, 4:5): Not just answers. Actions.
 
 **Post on:** 2026-10-14
-**Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@af9e5dadd49f76ccc7895179d385919a57d235ba/marketing/social-ads/vantriqai-video-actions-feed.mp4
+**Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@6b68a42a944d38c909d323f55d4579736b58198f/marketing/social-ads/vantriqai-video-actions-vo-feed.mp4
 **Headline (ad field):** Not just answers. Actions.
 **Hashtags:** #VantriqAI #VantriqAgents #AIagents #BusinessAutomation #AIinPakistan
 **Primary text / Facebook:**
@@ -598,7 +598,7 @@ Every figure is one the site already publishes. The 78% card credits its source,
 
 **Instagram:**
 
-> Not just answers. Actions. ⚡
+> Not just answers. Actions. ⚡ 🔊 Sound on
 >
 > Reply, qualify and book on WhatsApp, Instagram and your website, connected to your calendar, CRM and payments.
 >
@@ -606,10 +606,10 @@ Every figure is one the site already publishes. The 78% card credits its source,
 
 ---
 
-## V04 · Video (Reel, 9:16): Conversation to real-world action.
+## V04 · Video with voiceover (Reel, 9:16): Conversation to real-world action.
 
-**Post on:** 2026-10-17
-**Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@9e71a3d37cf95f0f2f5a5c200118b1c3365fd3c0/marketing/social-ads/vantriqai-video-actions-reels.mp4
+**Post on:** 2026-10-06
+**Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@6b68a42a944d38c909d323f55d4579736b58198f/marketing/social-ads/vantriqai-video-actions-vo-reels.mp4
 **Headline (ad field):** Conversation to real-world action
 **Hashtags:** #VantriqAI #VantriqAgents #ConversationalAI #WhatsAppAutomation #SmallBusinessPakistan
 **Primary text / Facebook:**
@@ -624,7 +624,7 @@ Every figure is one the site already publishes. The 78% card credits its source,
 
 **Instagram:**
 
-> Conversation → real-world action. 🎯
+> Conversation → real-world action. 🎯 🔊 Sound on
 >
 > Bookings confirmed, leads updated and payment links ready, all from the chat. AI agents that reason, then act.
 >
