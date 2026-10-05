@@ -5,7 +5,7 @@ import PrivacyControls from "@/components/PrivacyControls";
 import Footer from "@/components/Footer";
 import CustomCursor from "@/components/CustomCursor";
 import BackToTop from "@/components/BackToTop";
-import ShopAIChat from "@/components/ShopAIChat";
+import VantriqChat from "@/components/VantriqChat";
 import RouteWipe from "@/components/RouteWipe";
 import SmoothScroll from "@/components/SmoothScroll";
 import OrganizationSchema from "@/components/OrganizationSchema";
@@ -68,7 +68,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <BackToTop />
         <Nav />
         {children}
-        <ShopAIChat />
+        <VantriqChat />
         <Footer />
         <PrivacyControls />
       </body>
