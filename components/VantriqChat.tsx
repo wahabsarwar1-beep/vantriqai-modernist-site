@@ -34,13 +34,6 @@ const STARTERS: { title: string; body: string; message: string }[] = [
   { title: "Book a call", body: "Free 15-minute discovery call", message: "I'd like to book a discovery call" },
 ];
 
-const STAGES = [
-  { at: 0, label: "Reading your question" },
-  { at: 2500, label: "Checking the VantriqAI knowledge base" },
-  { at: 7000, label: "Putting your answer together" },
-  { at: 20000, label: "Still working on it — thanks for waiting" },
-];
-
 const newId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 
@@ -138,7 +131,6 @@ export default function VantriqChat() {
   const [sessionId, setSessionId] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [busy, setBusy] = useState(false);
-  const [stage, setStage] = useState(0);
   const [input, setInput] = useState("");
   const [reveal, setReveal] = useState<{ id: string; words: number } | null>(null);
   const [teaser, setTeaser] = useState(false);
@@ -181,15 +173,6 @@ export default function VantriqChat() {
     }, 12000);
     return () => window.clearTimeout(t);
   }, []);
-
-  // Progress label while the agent works.
-  useEffect(() => {
-    if (!busy) return;
-    /* eslint-disable-next-line react-hooks/set-state-in-effect -- reset for each new request */
-    setStage(0);
-    const timers = STAGES.slice(1).map((s, i) => window.setTimeout(() => setStage(i + 1), s.at));
-    return () => timers.forEach(window.clearTimeout);
-  }, [busy]);
 
   // Word-by-word reveal of the newest reply.
   useEffect(() => {
@@ -363,7 +346,7 @@ export default function VantriqChat() {
           })}
 
           {busy && (
-            <div className="vq-row vq-row-bot" aria-label="The assistant is typing">
+            <div className="vq-row vq-row-bot">
               <span className="vq-avatar" aria-hidden="true" />
               <div className="vq-thinking">
                 <span className="vq-dots" aria-hidden="true">
@@ -371,9 +354,7 @@ export default function VantriqChat() {
                   <i />
                   <i />
                 </span>
-                <span key={stage} className="vq-stage">
-                  {STAGES[stage].label}
-                </span>
+                <span className="vq-sr">The assistant is typing</span>
               </div>
             </div>
           )}
