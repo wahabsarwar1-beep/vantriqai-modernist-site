@@ -39,7 +39,7 @@
   const GRAINS = [['day','Day'],['week','Week'],['month','Month'],['quarter','Quarter'],['year','Year']];
 
   let charts = [];
-  let lastSeries = null; // what the CSV button downloads
+  let lastSeries = null; // what "See every figure as a table" shows
 
   /* ------------------------------------------------------------------ */
   /* Small helpers                                                      */
@@ -141,7 +141,21 @@
 .vqa-table th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted,#6b645b);font-weight:700;}
 .vqa details summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--teal,#2f56d9);}
 .vqa-tablewrap{overflow-x:auto;}
+.vqe-break td{vertical-align:middle;}.vqe-break td:nth-child(2){text-align:left;}.vqe-break th:nth-child(2){text-align:left;}.vqe-break tr.muted td{color:var(--muted,#6b645b);}
+.vqe-mini{display:inline-block;vertical-align:middle;width:calc(100% - 64px);max-width:180px;height:8px;border-radius:4px;background:#f0ece5;overflow:hidden;margin-right:6px;}
+.vqe-mini div{height:100%;border-radius:4px;}.vqe-n{font-size:11.5px;color:var(--muted,#6b645b);white-space:nowrap;}
+.vqe-pill{display:inline-block;color:#fff;font-weight:700;font-size:11.5px;padding:2px 8px;border-radius:999px;min-width:38px;text-align:center;}
+.vqe-words{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;}.vqe-words span{border:1px solid;border-radius:999px;padding:3px 11px;font-weight:600;background:#fff;}
+.vqe-words small{opacity:.65;font-weight:500;font-size:11px;}
 .vqa-section{font-family:var(--f-head,inherit);font-size:15px;font-weight:600;margin:22px 0 10px;color:var(--text,#16151a);}
+.vqe-graph{display:block;width:100%;height:auto;margin:12px 0;color:var(--text,#16151a);font-family:inherit;}
+.vqe-three{grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));}
+.vqe-disclosure{margin:18px 0 14px;border:1px solid var(--border,#e7e2da);border-radius:var(--radius,14px);background:var(--card,#fff);box-shadow:var(--shadow-sm,none);}
+.vqa .vqe-disclosure>summary{padding:16px 18px;font-size:14px;color:var(--text,#16151a);}
+.vqe-disclosure>summary:hover{color:var(--teal,#2f56d9);}
+.vqe-disclosure[open]>summary{border-bottom:1px solid var(--border,#e7e2da);}
+.vqe-disclosure-body{padding:14px;}
+.vqe-disclosure-body>.vqa-card:last-child{margin-bottom:0!important;}
 @media (max-width:520px){.vqa-kpi .v{font-size:22px;}.vqa-bar{grid-template-columns:1fr auto;row-gap:5px;}.vqa-bar .tr{grid-column:1/-1;order:3;}}
 `;
     const el = document.createElement('style');
@@ -153,6 +167,11 @@
   /* ------------------------------------------------------------------ */
   /* Building blocks                                                    */
   /* ------------------------------------------------------------------ */
+  /**
+   * The period switch, the comparison note, and — when the page says how to
+   * get it (opts.onReport, a global function's name) — the Excel report:
+   * every figure here plus the people, conversations and answers behind them.
+   */
   function filters(grain, onGrain, note, opts){
     opts = opts || {};
     return `<div class="vqa-filters">
@@ -160,7 +179,7 @@
         ${GRAINS.map(([g, l]) => `<button type="button" class="${g === grain ? 'on' : ''}" aria-pressed="${g === grain}" onclick="${onGrain}('${g}')">${l}</button>`).join('')}
       </div>
       <div class="vqa-note">${note}</div>
-      ${opts.csv === false ? '' : `<button type="button" class="vqa-btn" onclick="VQA.downloadCsv()">Download CSV</button>`}
+      ${opts.onReport ? `<button type="button" class="vqa-btn" onclick="${opts.onReport}()" title="${esc(opts.reportHint || 'Every figure on this page, and the people and conversations behind them — a tab for each')}">${esc(opts.reportLabel || 'Download report (Excel)')}</button>` : ''}
     </div>`;
   }
 
@@ -231,6 +250,30 @@
         <div class="tr"><div class="fl" style="width:${(r.value / max) * 100}%;background:${colors ? colors[i] : color};"></div></div>
         <div class="vl">${esc(valueFmt(r.value))}${r.share != null ? `<span>${r.share}%</span>` : ''}${extra ? `<span>${esc(extra(r))}</span>` : ''}</div>
       </div>`).join('')}</div>`;
+  }
+
+  /** Where the people are: cities from their profiles, countries from their numbers, and how much is known. */
+  function whereHTML(d, audience){
+    if(!d.cities || !d.profile_coverage) return '';
+    const cov = d.profile_coverage;
+    const grey = '#bdb7ad';
+    const rows = (list) => list.slice(0, 8).map(x => ({ name: x.name, value: x.contacts, share: x.share_pct, known: x.known }));
+    const colorsOf = (list) => list.slice(0, 8).map(x => x.known ? C.s1 : grey);
+    const where = audience === 'portal' ? 'on their page under Customers' : 'on their profile (Customers)';
+    return `<div class="vqa-grid vqa-two">
+      <div class="vqa-card">
+        <h3>Where your customers are</h3>
+        <div class="vqa-sub">People who messaged, by city · ${esc(d.period.window_label)} · ${n(cov.with_city)} of ${n(cov.contacts)} known</div>
+        ${barList(rows(d.cities), { colors: colorsOf(d.cities) })}
+        <div class="vqa-sub" style="margin:10px 0 0;">A city comes from what the customer tells your agent or a survey, or what you add ${where}.</div>
+      </div>
+      <div class="vqa-card">
+        <h3>Countries</h3>
+        <div class="vqa-sub">From the number they wrote from · ${esc(d.period.window_label)}</div>
+        ${barList(rows(d.countries), { colors: colorsOf(d.countries) })}
+        <div class="vqa-sub" style="margin:10px 0 0;">Known about them: name ${n(cov.with_name)} · email ${n(cov.with_email)} · city ${n(cov.with_city)} — of ${n(cov.contacts)} people.</div>
+      </div>
+    </div>`;
   }
 
   function heatmap(grid, windowLabel){
@@ -381,22 +424,6 @@
   }
 
   /* ------------------------------------------------------------------ */
-  /* CSV                                                                */
-  /* ------------------------------------------------------------------ */
-  function downloadCsv(){
-    if(!lastSeries) return;
-    const { headers, rows, name } = lastSeries;
-    const q = (v) => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-    const csv = [headers, ...rows].map(r => r.map(q).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = name;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  }
-
-  /* ------------------------------------------------------------------ */
   /* Satisfaction block (shared by the customer and platform views)     */
   /* ------------------------------------------------------------------ */
   function satisfactionHTML(d, { audience, surveysEnabled }){
@@ -405,16 +432,16 @@
       // Surveys are an add-on switched on per account; an account without
       // them is not sent to a Surveys tab it does not have.
       const off = surveysEnabled === false;
-      return `<div class="vqa-section">Customer satisfaction</div>
+      return `<div class="vqa-section">Customer satisfaction <span style="font-size:12px;font-weight:500;color:var(--muted,#6b645b);">· from Vantriq Echo</span></div>
       <div class="vqa-card"><div class="vqa-empty">
         No survey answers yet in the ${esc(d.period.window_label.toLowerCase())}.
         ${audience === 'portal'
           ? (off
-            ? 'Customer-satisfaction surveys are not part of your account yet. Ask Vantriq AI to switch them on: you get a Surveys tab to ask your customers how you did — by QR code, link or WhatsApp — and the satisfaction score, NPS and what people wrote show up here.'
-            : 'Create a survey under the <b>Surveys</b> tab — share it by QR code, link or WhatsApp, and the answers show up here the moment they arrive: the satisfaction score, NPS, how often problems were resolved, and what people wrote.')
+            ? 'Customer-satisfaction surveys are not part of your account yet. Ask Vantriq AI to switch them on: you get Vantriq Echo, an Echo tab to ask your customers how you did — by QR code, link or WhatsApp — and the satisfaction score, NPS and what people wrote show up here.'
+            : 'Create a survey under the <b>Echo</b> tab — share it by QR code, link or WhatsApp, and the answers show up here the moment they arrive: the satisfaction score, NPS, how often problems were resolved, and what people wrote.')
           : (off
-            ? 'Surveys are switched off for this client. An admin switches them on from the client\'s page (Customer-satisfaction surveys); answers posted to <code>POST /api/webhooks/csat</code> by anything else still appear here.'
-            : 'Create a survey for this client under <b>Surveys</b>, or post answers from anything else that asks the question to <code>POST /api/webhooks/csat</code>. Either way they appear here straight away.')}
+            ? 'Vantriq Echo is switched off for this client. An admin switches it on from the client\'s page (Vantriq Echo); answers posted to <code>POST /api/webhooks/csat</code> by anything else still appear here.'
+            : 'Create a survey for this client under <b>Vantriq Echo</b>, or post answers from anything else that asks the question to <code>POST /api/webhooks/csat</code>. Either way they appear here straight away.')}
       </div></div>`;
     }
     const k = s.kpis, w = s.window;
@@ -422,7 +449,7 @@
     const seg = (v) => npsTotal ? (v / npsTotal) * 100 : 0;
     const distMax = Math.max(...s.distribution.map(x => x.n), 1);
     return `
-    <div class="vqa-section">Customer satisfaction</div>
+    <div class="vqa-section">Customer satisfaction <span style="font-size:12px;font-weight:500;color:var(--muted,#6b645b);">· from Vantriq Echo</span></div>
     <div class="vqa-grid vqa-kpis">
       ${kpi({ label: 'Satisfied (4–5 of 5)', value: k.csat.current == null ? '—' : k.csat.current, unit: k.csat.current == null ? '' : '%',
               delta: k.csat.current == null ? undefined : k.csat.delta_pts, deltaUnit: 'pts', prevLabel: d.period.previous_label,
@@ -474,6 +501,61 @@
   /* ------------------------------------------------------------------ */
   /* Conversations view — one customer, or every customer               */
   /* ------------------------------------------------------------------ */
+
+  function pulseAdvancedHTML(d, audience){
+    const a=d.advanced;if(!a)return '';
+    const time=v=>v==null?'—':v<60?v+' sec':Math.round(v/60*10)/10+' min';
+    const percent=v=>v==null?'—':v+'%';
+    const trackedNote=`${n(a.tracked)} of ${n(a.conversations)} conversations have outcome or service measurements. Missing measurements are unknown, not failures.`;
+    return `<details class="vqe-disclosure" aria-label="Advanced Pulse insights"><summary>Advanced insights · conversions, response speed &amp; agents</summary><div class="vqe-disclosure-body">
+      <div class="vqa-card" style="margin-bottom:14px;"><h3>Tracking coverage</h3><div class="vqa-sub">${esc(d.period.current_label)} · conversations first recorded in this period. ${trackedNote}</div>
+        ${a.sampled?'<div class="vqa-empty">Data limit reached: latest 50,000 conversations / 100,000 events only. Results may be incomplete.</div>':''}
+        ${a.unlinked_events?`<div class="vqa-empty">${n(a.unlinked_events)} events do not match a conversation that started this period; excluded from conversion and agent figures.</div>`:''}
+        ${!a.tracked?'<div class="vqa-empty">Outcome and timing measurements are not reporting yet. These insights will populate when your agent starts reporting them.</div>':''}</div>
+      <div class="vqa-grid vqa-two"><div class="vqa-card"><h3>Conversation-to-sale outcomes</h3><div class="vqa-sub">Distinct conversations with explicitly reported outcomes. Stages can be skipped; these are not a sequential drop-off funnel. Sales refer to your automation’s recorded outcomes.</div>
+        ${barList([{name:'Conversations',value:a.conversations},{name:'Qualified leads',value:a.outcomes.qualified},{name:'Meetings booked',value:a.outcomes.meetings},{name:'Deals won',value:a.outcomes.won}])}
+        <details style="margin-top:14px;"><summary>Compare channels</summary>${table(['Channel','Conversations','Tracked','Qualified','Meetings','Won'],a.outcomes.channels.map(x=>[CHANNELS[x.name]||x.name,x.conversations,x.tracked,x.qualified,x.meetings,x.won]))}</details></div>
+      <div class="vqa-card"><h3>Response speed</h3><div class="vqa-sub">First reply duration explicitly reported by the automation, one measurement per conversation. A missing timestamp does not prove the customer was left unanswered.</div>
+        <div class="vqa-grid vqa-two">${kpi({label:'Median first reply',value:time(a.response.median_seconds)})}${kpi({label:'95th percentile',value:time(a.response.p95_seconds)})}${kpi({label:'First replies over 60 sec',value:n(a.response.over_60_seconds),foot:'Reference threshold, not a contractual SLA'})}${kpi({label:'Unmeasured conversations',value:n(a.response.unmeasured),foot:`${n(a.response.measured)} recorded timings`})}</div></div></div>
+      <div class="vqa-card" style="margin-bottom:14px;"><h3>Agent performance matrix</h3><div class="vqa-sub">Assigned to the first recorded agent in the conversation. Handoffs use only reported handoff status; confirmed resolution is independently reported. Small samples are descriptive.</div>
+        <div class="vqa-tablewrap">${table(['Agent','Conversations','Tracked','Handoff %','Confirmed resolved','Median reply','Qualification %','Qualified / booked / won'],a.agents.map(x=>[x.name+(audience==='platform'?' — '+x.company:''),x.conversations,x.tracked,percent(x.handoff_pct),x.resolved+' / '+x.resolution_reported,time(x.median_seconds),percent(x.qualification_pct)+' ('+n(x.qualification_reported)+' reported)',x.qualified+' / '+x.meetings+' / '+x.won]))}</div></div>
+      <div class="vqa-grid vqa-two"><div class="vqa-card"><h3>Customer intents</h3><div class="vqa-sub">Agent-reported categories, counted once per conversation per category. Categories can overlap; no sentiment or inferred intent is claimed.</div>${a.intents.length?barList(a.intents):'<div class="vqa-empty">No intent measurements yet.</div>'}</div>
+      <div class="vqa-card"><h3>Why customers need a person</h3><div class="vqa-sub">Reported reasons for conversations with a confirmed human handoff. Reasons can overlap.</div>${a.handoff_reasons.length?barList(a.handoff_reasons):'<div class="vqa-empty">No handoff reasons reported yet.</div>'}</div></div>
+      ${audience==='platform'?`<div class="vqa-grid vqa-two"><div class="vqa-card"><h3>Automation health</h3><div class="vqa-sub">Explicit success/failure events this period, including events outside the conversation cohort. Coverage depends on workflow reporting; this is not an uptime measure.</div>${barList([{name:'Reported successes',value:a.health.success},{name:'Reported failures',value:a.health.failure}])}</div>
+      <div class="vqa-card"><h3>Reported business value</h3><div class="vqa-sub">Incremental amounts sent by your automation; partial coverage, PKR only. Revenue is reported attribution, not verified collections. Time saved is an estimate supplied by the workflow.</div><div class="vqa-grid vqa-two">${kpi({label:'Recorded cost',value:a.value.cost_events?money(a.value.cost):'—',foot:n(a.value.cost_events)+' cost measurements'})}${kpi({label:'Attributed revenue',value:a.value.revenue_events?money(a.value.revenue):'—',foot:n(a.value.revenue_events)+' revenue measurements'})}${kpi({label:'Estimated minutes saved',value:a.value.saved_events?n(a.value.saved):'—',foot:n(a.value.saved_events)+' estimates'})}</div></div></div>`:''}
+    </div></details>`;
+  }
+  function websiteCountry(code){
+    if(!code)return 'Unknown location';
+    try{return new Intl.DisplayNames(['en'],{type:'region'}).of(code)||code;}catch{return code;}
+  }
+  function websiteHTML(d, audience){
+    const a=d.website;if(audience!=='platform'||!a)return '';
+    const labels={page_view:'Page views',chat_open:'Chat opens',whatsapp_click:'WhatsApp clicks',brief_sent:'Successful briefs'};
+    const locations=a.locations||[],countries=a.countries||[];
+    const known=countries.filter(r=>r.country).reduce((sum,r)=>sum+r.page_view,0);
+    const cities=locations.filter(r=>r.city).slice(0,12).map(r=>({name:`${r.city}, ${websiteCountry(r.country)}`,value:r.page_view}));
+    return `<section aria-label="Website insights" style="margin:14px 0;">
+      <div class="vqa-card"><h3>Website insights · opt-in activity</h3><div class="vqa-sub">vantriqai.com · ${esc(d.period.current_label)} · Asia/Karachi. Page views are not unique visitors. Independent actions cannot be joined into a conversion funnel. Retention: 180 calendar days.</div></div>
+      <div class="vqa-grid vqa-four">${Object.keys(labels).map(k=>kpi({label:labels[k],value:n(a.totals[k]||0)})).join('')}</div>
+      <div class="vqa-grid vqa-two"><div class="vqa-card"><h3>Countries · page views</h3>${barList(countries.slice(0,12).map(r=>({name:websiteCountry(r.country),value:r.page_view})))}</div>
+        <div class="vqa-card"><h3>Cities · page views</h3>${cities.length?barList(cities):'<div class="vqa-empty">No city resolved in this period yet.</div>'}</div></div>
+      <div class="vqa-card"><h3>Approximate visitor location</h3><div class="vqa-sub">Country known for ${n(known)} of ${n(a.totals.page_view||0)} page views. IP-based network location can differ from the visitor’s actual city, especially with mobile networks and VPNs. Unknown includes unresolved addresses and activity recorded before location collection. Lookups run inside VantriqAI; analytics store no IP addresses, coordinates or visitor IDs. GeoLite location data by MaxMind (maxmind.com), September 2026.</div>
+        ${locations.length?table(['Country','Region / state','City',...Object.values(labels)],locations.slice(0,100).map(r=>[websiteCountry(r.country),r.subdivision||'—',r.city||'Unknown',...Object.keys(labels).map(e=>r[e]||0)])):'<div class="vqa-empty">No opted-in website activity recorded yet. Location reporting starts with new accepted visits.</div>'}
+        ${locations.length>100?'<div class="vqa-sub">Top 100 locations shown. Download the report for every location.</div>':''}</div>
+      <div class="vqa-grid vqa-two"><div class="vqa-card"><h3>Activity by section</h3>${Object.keys(a.sections).length?table(['Section',...Object.values(labels)],Object.entries(a.sections).map(([k,v])=>[k,...Object.keys(labels).map(e=>v[e]||0)])):'<div class="vqa-empty">No opted-in website activity recorded yet.</div>'}</div>
+      <div class="vqa-card"><h3>Page views by website version</h3><div class="vqa-sub">Pakistan / Global describes the version opened, not visitor location.</div>${barList(Object.entries(a.regions).map(([k,v])=>({name:k==='pk'?'Pakistan site':'Global site',value:v.page_view||0})))}</div></div>
+      <div class="vqa-card"><h3>Daily page views</h3>${barList(Object.entries(a.days).map(([name,v])=>({name,value:v.page_view||0})))}</div>
+      <div class="vqa-card"><h3>Daily activity</h3>${table(['Date',...Object.values(labels)],Object.entries(a.days).map(([k,v])=>[k,...Object.keys(labels).map(e=>v[e]||0)]))}</div>
+    </section>`;
+  }
+  function websiteTrafficHTML(d, opts={}){
+    const ranges=[['today','Today'],['7d','Last 7 days'],['30d','Last 30 days'],['90d','Last 90 days'],['180d','Last 180 days']];
+    return `<div class="vqa"><div class="vqa-top"><div><h2>Website traffic</h2><div class="vqa-sub">Where vantriqai.com is accessed and what consenting visitors do.</div></div></div>
+      <div class="vqa-seg" style="flex-wrap:wrap;">${ranges.map(([id,label])=>`<button class="${d.range===id?'on':''}" aria-pressed="${d.range===id}" onclick="${opts.onRange}('${id}')">${label}</button>`).join('')}</div>
+      <button class="btn btn-ghost btn-sm" style="margin:12px 0;" onclick="${opts.onReport}()">Download website report (Excel)</button>
+      ${websiteHTML(d,'platform')}</div>`;
+  }
   function conversationsHTML(d, opts){
     opts = opts || {};
     const audience = opts.audience || 'portal';
@@ -483,7 +565,6 @@
     const q = d.quota;
 
     lastSeries = {
-      name: `vantriq-${opts.fileTag || 'analytics'}-${g}-${new Date().toISOString().slice(0, 10)}.csv`,
       headers: ['Period', 'Conversations', 'Messages', 'Contacts', 'New contacts', 'Returning contacts', 'Satisfied %', 'Survey answers', 'NPS'],
       rows: series.map((s, i) => {
         const sat = (d.satisfaction && d.satisfaction.series[i]) || {};
@@ -496,12 +577,12 @@
     const agentRows = d.agents.map(a => ({ name: a.name, value: a.conversations, share: a.share_pct }));
 
     return `<div class="vqa">
-      ${filters(g, opts.onGrain, compareNote(d))}
+      ${filters(g, opts.onGrain, compareNote(d), opts)}
       ${insightsCard(d.insights)}
       <div class="vqa-grid vqa-kpis">
         ${kpi({ label: 'Conversations', value: n(k.conversations.current), delta: k.conversations.delta_pct, prevLabel: prev,
                 projected: k.conversations.projected, sparkValues: series.map(s => s.conversations) })}
-        ${kpi({ label: 'New contacts (leads)', value: n(k.new_contacts.current), delta: k.new_contacts.delta_pct, prevLabel: prev,
+        ${kpi({ label: 'New contacts', value: n(k.new_contacts.current), delta: k.new_contacts.delta_pct, prevLabel: prev,
                 projected: k.new_contacts.projected, sparkValues: series.map(s => s.new_contacts) })}
         ${kpi({ label: 'Returning contacts', value: n(k.returning_contacts.current), delta: k.returning_contacts.delta_pct, prevLabel: prev,
                 sparkValues: series.map(s => s.returning_contacts) })}
@@ -510,9 +591,9 @@
         ${kpi({ label: 'Messages per conversation', value: k.messages_per_conversation.current == null ? '—' : k.messages_per_conversation.current,
                 delta: k.messages_per_conversation.current == null ? undefined : k.messages_per_conversation.delta_pct, goodWhenUp: null, prevLabel: prev,
                 sparkValues: series.map(s => s.conversations ? s.messages / s.conversations : null) })}
-        ${k.containment ? kpi({ label: 'Handled fully by AI', value: k.containment.current == null ? '—' : k.containment.current, unit: k.containment.current == null ? '' : '%',
+        ${k.containment ? kpi({ label: 'No human handoff', value: k.containment.current == null ? '—' : k.containment.current, unit: k.containment.current == null ? '' : '%',
                 delta: k.containment.current == null ? undefined : k.containment.delta_pct, deltaUnit: 'pts', prevLabel: prev,
-                foot: `${n(k.containment.handed_off)} of ${n(k.containment.reported_conversations)} passed to a person` }) : ''}
+                foot: `${n(k.containment.handed_off)} of ${n(k.containment.reported_conversations)} passed to a person · not confirmed resolution` }) : ''}
       </div>
 
       ${q ? `<div class="vqa-card" style="margin-bottom:14px;">
@@ -560,6 +641,8 @@
         </div>
       </div>
 
+      ${whereHTML(d, audience)}
+
       <div class="vqa-card" style="margin-bottom:14px;">
         <h3>When people message</h3>
         <div class="vqa-sub">Conversations started, by day and hour (${esc(d.time_zone.replace('Asia/', ''))} time) · ${esc(d.period.window_label)}</div>
@@ -567,6 +650,8 @@
       </div>`}
 
       ${satisfactionHTML(d, { audience, surveysEnabled: opts.surveysEnabled })}
+      ${pulseAdvancedHTML(d, audience)}
+      ${websiteHTML(d, audience)}
 
       <div class="vqa-card" style="margin-top:14px;">
         <details>
@@ -597,14 +682,13 @@
     opts = opts || {};
     const k = d.kpis, g = d.grain, prev = d.period.previous_label;
     lastSeries = {
-      name: `vantriq-sales-${g}-${new Date().toISOString().slice(0, 10)}.csv`,
       headers: ['Period', 'New leads', 'Won', 'Lost', 'Prospect conversations'],
       rows: d.series.map((s, i) => [bucketLabel(s.bucket, g, true), s.new_leads, s.won, s.lost, (d.prospect_series[i] || {}).conversations || 0]),
     };
     const top = d.funnel[0] ? d.funnel[0].n : 0;
     const topics = d.topics.filter(t => t.conversations > 0);
     return `<div class="vqa">
-      ${filters(g, opts.onGrain, compareNote(d))}
+      ${filters(g, opts.onGrain, compareNote(d), opts)}
       ${insightsCard(d.insights)}
       <div class="vqa-grid vqa-kpis">
         ${kpi({ label: 'New leads', value: n(k.new_leads.current), delta: k.new_leads.delta_pct, prevLabel: prev, projected: k.new_leads.projected, sparkValues: d.series.map(s => s.new_leads) })}
@@ -669,11 +753,207 @@
     groupedChart('vqaWonLost', d.series, { key: 'won', label: 'Won', color: C.s1 }, { key: 'lost', label: 'Lost', color: C.s2 }, d.grain);
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Echo view — every survey together (portal and CRM)                 */
+  /* ------------------------------------------------------------------ */
+  function satColor(v){ return v == null ? '#bdb7ad' : v >= 80 ? '#2f7d5f' : v >= 60 ? '#7f9bf2' : v >= 40 ? '#d9a441' : '#b4402f'; }
+  function sign(v){ return v == null ? '—' : (v > 0 ? '+' : '') + v; }
+
+  /** One row per group: how many answered (bar), satisfied %, average, NPS. */
+  function breakdown(list, first){
+    if(!list || !list.length) return `<div class="vqa-empty">Nothing yet.</div>`;
+    const max = Math.max(...list.map(x => x.responses), 1);
+    return `<div style="overflow-x:auto;"><table class="vqa-table vqe-break"><thead><tr><th>${esc(first)}</th><th style="width:34%">Answers</th><th class="r">Satisfied</th><th class="r">Avg</th><th class="r">NPS</th></tr></thead><tbody>
+      ${list.slice(0, 10).map(x => `<tr${x.known === false ? ' class="muted"' : ''}><td><b>${esc(x.name)}</b></td>
+        <td><div class="vqe-mini"><div style="width:${(x.responses / max) * 100}%;background:${x.known === false ? '#bdb7ad' : C.s1}"></div></div><span class="vqe-n">${n(x.responses)}${x.share != null ? ` · ${x.share}%` : ''}</span></td>
+        <td class="r"><span class="vqe-pill" style="background:${satColor(x.csat)}">${x.csat == null ? '—' : x.csat + '%'}</span></td>
+        <td class="r">${x.csat_average == null ? '—' : x.csat_average}</td><td class="r">${sign(x.nps)}</td></tr>`).join('')}
+    </tbody></table></div>`;
+  }
+
+  function words(list, color){
+    if(!list || !list.length) return `<div class="vqa-empty" style="padding:10px;">Not enough comments yet.</div>`;
+    const max = Math.max(...list.map(w => w.n));
+    return `<div class="vqe-words">${list.map(w => `<span style="font-size:${12 + Math.round((w.n / max) * 8)}px;border-color:${color};color:${color}">${esc(w.word)} <small>${w.n}</small></span>`).join('')}</div>`;
+  }
+
+  /** Response counts on one labelled axis, with shares visible without hovering. */
+  function responseGraph(list, label){
+    const rows=(list||[]).slice().sort((a,b)=>b.responses-a.responses);
+    const total=rows.reduce((sum,x)=>sum+Number(x.responses||0),0);
+    if(!total) return `<svg class="vqe-graph" viewBox="0 0 480 160" role="img" aria-label="${esc(label)}: no responses yet"><path d="M24 20V132H456" fill="none" stroke="${C.axis}"/><path d="M24 48H456M24 76H456M24 104H456" stroke="${C.grid}"/><text x="240" y="78" text-anchor="middle" fill="${C.muted}" font-size="14">No responses yet</text><text x="240" y="153" text-anchor="middle" fill="${C.muted}" font-size="12">Answers</text></svg>`;
+    const shown=rows.slice(0,9);
+    if(rows.length>9) shown.push({name:'Other categories',responses:rows.slice(9).reduce((sum,x)=>sum+Number(x.responses||0),0)});
+    const max=Math.max(...shown.map(x=>x.responses),1), height=shown.length*48+38;
+    return `<svg class="vqe-graph" viewBox="0 0 480 ${height}" role="img" aria-label="${esc(label)} · ${n(total)} answers"><title>${esc(label)}: ${shown.map(x=>`${esc(x.name)} ${n(x.responses)} (${Math.round(x.responses/total*100)}%)`).join('; ')}</title>
+      ${[0,.5,1].map(t=>`<path d="M${18+330*t} 20V${height-28}" stroke="${C.grid}"/>`).join('')}
+      ${shown.map((x,i)=>`<g><text x="18" y="${i*48+15}" fill="currentColor" font-size="12">${esc(x.name)}</text><rect x="18" y="${i*48+22}" width="${330*x.responses/max}" height="12" rx="4" fill="${x.known===false?C.axis:C.s1}"/><text x="465" y="${i*48+33}" text-anchor="end" fill="currentColor" font-size="12">${n(x.responses)} · ${Math.round(x.responses/total*100)}%</text></g>`).join('')}
+      <text x="18" y="${height-10}" fill="${C.muted}" font-size="11">0</text><text x="348" y="${height-10}" text-anchor="end" fill="${C.muted}" font-size="11">${n(max)} answers</text></svg>`;
+  }
+
+  function responseGraphCard(title,list,dimension,subtitle){
+    return `<div class="vqa-card"><h3>${esc(title)}</h3><div class="vqa-sub">${esc(subtitle)} · answer count and share</div>${responseGraph(list,title)}${list&&list.length?`<details><summary>View satisfaction and scores</summary>${breakdown(list,dimension)}</details>`:''}</div>`;
+  }
+
+  function echoAdvancedHTML(d){
+    const a=d.advanced;
+    if(!a) return '';
+    const service=a.service;
+    const hours=v=>v==null?'—':v<1?Math.round(v*60)+' min':v+' h';
+    return `<details class="vqe-disclosure" aria-label="Advanced Echo insights">
+      <summary>Advanced insights · complaint trends, branches &amp; service</summary>
+      <div class="vqe-disclosure-body">
+      ${d.sampled?'<div class="vqa-card"><b>Response limit reached.</b><div class="vqa-sub">These insights use the latest 50,000 responses in the window and may omit earlier responses.</div></div>':''}
+      <div class="vqa-card" style="margin-bottom:14px;"><h3>Complaint topic trends</h3>
+        <div class="vqa-sub">${esc(d.period.window_label)} · ${n(a.topics.comment_count)} comments from low scores or unresolved answers. English, Urdu and Roman Urdu keyword matching; topics can overlap. This is not AI sentiment analysis.</div>
+        ${a.topics.rows.length?a.topics.rows.map(t=>`<details style="padding:12px 0;border-bottom:1px solid var(--border,#e7e2da);"><summary style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;"><b>${esc(t.label)}</b><span>${n(t.count)} comments · ${t.share}%</span></summary>
+          <div style="max-width:240px;margin-top:8px;">${spark(t.series.map(x=>x.count))}</div>
+          <div class="vqa-sub">Open the period table and supporting comments to inspect this classification.</div>
+          ${table(['Period','Matching comments'],t.series.map(x=>[bucketLabel(x.bucket,d.grain,true),x.count]))}
+          ${t.samples.map(x=>`<div class="vqa-fb"><div>“${esc(x.comment)}”</div><div class="m">${esc(x.survey)}${x.location?' · '+esc(x.location):''} · ${esc(new Date(x.submitted_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',timeZone:d.time_zone}))}</div></div>`).join('')}
+        </details>`).join(''):'<div class="vqa-empty">Not enough data yet. Topics appear when an unhappy or unresolved response includes a comment.</div>'}
+      </div>
+      <div class="vqa-card" style="margin-bottom:14px;"><h3>Branch performance matrix</h3>
+        <div class="vqa-sub">${esc(d.period.current_label)} · open complaints first. Change compares satisfaction with ${esc(d.period.previous_label)} up to the same point. Fewer than five scored answers is labelled low sample; changes require five in both periods and are descriptive, not significance tests.</div>
+        ${a.branches.length?`<div style="overflow-x:auto;"><table class="vqa-table"><thead><tr><th>Branch / customer</th><th>Answers</th><th>Satisfied</th><th>NPS</th><th>Open / contacted</th><th>Change</th></tr></thead><tbody>
+          ${a.branches.map(b=>`<tr><td><b>${esc(b.name)}</b><div class="vqa-sub">${esc(b.company)}</div></td><td>${n(b.responses)}${b.low_sample?'<div class="vqa-sub">Low sample</div>':''}</td><td><span class="vqe-pill" style="background:${b.low_sample?'#bdb7ad':satColor(b.csat)}">${b.csat==null?'—':b.csat+'%'}</span><div class="vqa-sub">${n(b.scored)} scored</div></td><td>${sign(b.nps)}</td><td>${n(b.open)}</td><td>${b.delta_pts==null?'—':sign(b.delta_pts)+' pts'}${b.delta_pts==null?'<div class="vqa-sub">Insufficient comparison data</div>':''}</td></tr>`).join('')}
+        </tbody></table></div>`:'<div class="vqa-empty">Not enough data yet. Responses tagged to a branch will appear here.</div>'}
+        ${a.unlocated_current?`<div class="vqa-sub">${n(a.unlocated_current)} current-period answers have no branch tag and are excluded.</div>`:''}
+      </div>
+      <div class="vqa-card" style="margin-bottom:14px;"><h3>Service response performance</h3>
+        <div class="vqa-sub">Follow-ups for answers submitted in ${esc(d.period.current_label.toLowerCase())}; status as of now. The 48-hour first-response target is a reference threshold. Resolution means your team marked it resolved, not customer confirmation.</div>
+        <div class="vqa-grid vqa-two" style="margin-top:14px;">
+          ${kpi({label:'First response',value:hours(service.median_first_reply_hours),foot:`Median · ${n(service.measured_replies)} recorded first contacts`})}
+          ${kpi({label:'Time to resolve',value:hours(service.median_resolution_hours),foot:`Median · ${n(service.measured_resolutions)} recorded first resolutions`})}
+          ${kpi({label:'Replied within 48 hours',value:service.replied_within_48_pct==null?'—':service.replied_within_48_pct,unit:service.replied_within_48_pct==null?'':'%',foot:'Of recorded first contacts; excludes unknown timings'})}
+          ${kpi({label:'Waiting over 48 hours',value:n(service.overdue),foot:`${n(service.waiting)} open · ${n(service.followups)} follow-ups in this cohort`})}
+        </div>
+        <div class="vqa-sub">First-contact and first-resolution timestamps are captured on new status transitions. Historical timings are not reconstructed from note edits.${service.missing_reply_timestamps?` ${n(service.missing_reply_timestamps)} contacted/resolved follow-ups have unknown first-contact time.`:''}${!service.measured_replies&&!service.measured_resolutions?' Not enough timing data yet.':''}</div>
+      </div>
+      </div>
+    </details>`;
+  }
+
+  function echoHTML(d, opts){
+    opts = opts || {};
+    const k = d.kpis, w = d.window, prev = d.period.previous_label, g = d.grain;
+    lastSeries = {
+      headers: ['Period', 'Answers', 'Satisfied %', 'Average (of 5)', 'NPS', 'Promoters', 'Passives', 'Detractors', 'Resolved %', 'Unhappy', 'Links sent', 'Links answered'],
+      rows: d.series.map(s => [bucketLabel(s.bucket, g, true), s.responses, s.csat == null ? '' : s.csat, s.csat_average == null ? '' : s.csat_average,
+        s.nps == null ? '' : s.nps, s.promoters, s.passives, s.detractors, s.resolution == null ? '' : s.resolution, s.unhappy, s.invites_sent, s.invites_answered]),
+    };
+    const note = `${esc(d.period.current_label)} so far (${d.period.elapsed_pct}% through) compared with ${esc(prev)} up to the same point · ${esc(d.time_zone.replace('Asia/', ''))} time`;
+    // With no answers yet the whole dashboard still shows, at zero, so it is
+    // clear what will fill in — with one line saying how to get there.
+    const waiting = !w.responses ? `<div class="vqa-card" style="margin-bottom:14px;border-left:4px solid ${C.s1};"><h3>Waiting for the first answer</h3>
+      <div class="vqa-sub" style="margin:4px 0 0;">No survey answers in the ${esc(d.period.window_label.toLowerCase())} yet. Share your survey — by QR code, link, WhatsApp, a kiosk tablet or your website — and every tile, chart and breakdown here fills in the moment answers arrive.</div></div>` : '';
+    const npsTotal = w.promoters + w.passives + w.detractors;
+    const seg = (v) => npsTotal ? (v / npsTotal) * 100 : 0;
+    const f = d.followups;
+    const funnelRows = [
+      { name: 'Links sent', value: d.funnel.sent }, { name: 'Opened', value: d.funnel.opened, share: d.funnel.sent ? Math.round(d.funnel.opened / d.funnel.sent * 100) : null },
+      { name: 'Answered', value: d.funnel.answered, share: d.funnel.sent ? Math.round(d.funnel.answered / d.funnel.sent * 100) : null },
+    ];
+    const demo = d.demographics;
+    const demoCards = [['By gender', demo.gender, 'Gender'], ['By age group', demo.age, 'Age group'], ['By city', demo.city, 'City']];
+    return `<div class="vqa vqe">
+      ${filters(g, opts.onGrain, note, opts)}
+      ${waiting}
+      ${insightsCard(d.insights)}
+      <div class="vqa-grid vqa-kpis">
+        ${kpi({ label: 'Answers', value: n(k.responses.current), delta: k.responses.delta_pct, prevLabel: prev, projected: k.responses.projected, sparkValues: d.series.map(s => s.responses) })}
+        ${kpi({ label: 'Satisfied (4–5 of 5)', value: k.csat.current == null ? '—' : k.csat.current, unit: k.csat.current == null ? '' : '%', delta: k.csat.current == null ? undefined : k.csat.delta_pts, deltaUnit: 'pts', prevLabel: prev, foot: k.csat.average != null ? `Average ${k.csat.average} / 5 · ${n(k.csat.responses)} answers` : 'No scores this period', sparkValues: d.series.map(s => s.csat) })}
+        ${kpi({ label: 'Net Promoter Score', value: sign(k.nps.current), delta: k.nps.current == null ? undefined : k.nps.delta_pts, deltaUnit: 'pts', prevLabel: prev, foot: k.nps.responses ? `${n(k.nps.responses)} answers` : 'Not asked this period', sparkValues: d.series.map(s => s.nps) })}
+        ${kpi({ label: 'Problems resolved', value: k.resolution.current == null ? '—' : k.resolution.current, unit: k.resolution.current == null ? '' : '%', delta: k.resolution.current == null ? undefined : k.resolution.delta_pts, deltaUnit: 'pts', prevLabel: prev, foot: k.resolution.responses ? `${n(k.resolution.responses)} answers` : 'Not asked this period' })}
+        ${kpi({ label: 'Unhappy customers', value: n(k.unhappy.current), foot: `${k.unhappy.share == null ? 0 : k.unhappy.share}% of answers · ${n(f.open)} waiting for a reply`, sparkValues: d.series.map(s => s.unhappy) })}
+        ${kpi({ label: 'Invites answered', value: k.response_rate.current == null ? '—' : k.response_rate.current, unit: k.response_rate.current == null ? '' : '%', delta: k.response_rate.current == null ? undefined : k.response_rate.delta_pts, deltaUnit: 'pts', prevLabel: prev, foot: `${n(k.response_rate.sent)} personal links sent` })}
+        ${k.ces.current != null ? kpi({ label: 'Customer effort', value: k.ces.current, unit: ' / 7', foot: 'Higher is easier' }) : ''}
+        ${w.median_seconds != null ? kpi({ label: 'Time to answer', value: w.median_seconds < 60 ? w.median_seconds : Math.round(w.median_seconds / 60), unit: w.median_seconds < 60 ? ' sec' : ' min', foot: 'Median, whole survey' }) : ''}
+      </div>
+
+      <div class="vqa-grid vqa-two">
+        <div class="vqa-card"><h3>Answers over time</h3><div class="vqa-sub">${esc(d.period.window_label)} · ${n(w.responses)} in total · the pale bar is still under way</div>
+          <div class="vqa-plot"><canvas id="vqeResp" aria-label="Answers per period"></canvas></div></div>
+        <div class="vqa-card"><h3>Satisfaction over time</h3><div class="vqa-sub">Share scoring 4 or 5 · ${esc(d.period.window_label)} · ${w.csat == null ? '—' : w.csat + '%'} overall</div>
+          <div class="vqa-plot"><canvas id="vqeCsat" aria-label="Satisfaction per period"></canvas></div></div>
+      </div>
+
+      <div class="vqa-grid vqa-two">
+        <div class="vqa-card"><h3>How people scored their experience</h3><div class="vqa-sub">${n(w.csat_responses)} answers · average ${w.csat_average == null ? '—' : w.csat_average} / 5</div>
+          ${barList(d.distribution.slice().reverse().map(x => ({ name: ['😠 1', '🙁 2', '😐 3', '🙂 4', '😍 5'][x.score - 1], value: x.n, share: w.csat_responses ? Math.round(x.n / w.csat_responses * 100) : 0 })), { colors: SCORE.slice().reverse() })}</div>
+        <div class="vqa-card"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;"><div><h3>Would they recommend you?</h3><div class="vqa-sub">0–10 · ${n(w.nps_responses)} answers</div></div><div class="vqa-big">${sign(w.nps)}</div></div>
+          ${w.nps_responses ? `<div class="vqa-plot sm"><canvas id="vqeNpsDist" aria-label="How people answered 0 to 10"></canvas></div>
+          <div class="vqa-stack" role="img" aria-label="${w.detractors} detractors, ${w.passives} passives, ${w.promoters} promoters">
+            ${w.detractors ? `<div style="width:${seg(w.detractors)}%;background:${SCORE[0]}"></div>` : ''}${w.passives ? `<div style="width:${seg(w.passives)}%;background:${SCORE[2]}"></div>` : ''}${w.promoters ? `<div style="width:${seg(w.promoters)}%;background:${SCORE[4]}"></div>` : ''}
+          </div>${legend([[`Detractors 0–6 · ${n(w.detractors)}`, SCORE[0]], [`Passives 7–8 · ${n(w.passives)}`, SCORE[2]], [`Promoters 9–10 · ${n(w.promoters)}`, SCORE[4]]])}` : (w.responses ? '<div class="vqa-empty">No survey asked "would you recommend us" in this period.</div>' : '<div class="vqa-empty">The 0–10 spread and Net Promoter Score appear with the first answers.</div>')}</div>
+      </div>
+
+      ${w.nps_responses ? `<div class="vqa-card" style="margin-bottom:14px;"><h3>Net Promoter Score over time</h3><div class="vqa-sub">From −100 to +100 · ${esc(d.period.window_label)}</div><div class="vqa-plot sm"><canvas id="vqeNps" aria-label="NPS per period"></canvas></div></div>` : ''}
+
+      <div class="vqa-grid vqa-two">
+        <div class="vqa-card"><h3>Every survey</h3><div class="vqa-sub">${esc(d.period.window_label)} · best and worst at a glance</div>${breakdown(d.surveys.some(s => s.responses) ? d.surveys.filter(s => s.responses) : d.surveys, 'Survey')}</div>
+        <div class="vqa-card"><h3>Personal links: sent → opened → answered</h3><div class="vqa-sub">After-chat WhatsApp invites and one-time links · ${esc(d.period.window_label)}</div>
+          ${d.funnel.sent ? barList(funnelRows, { colors: [FUNNEL[0], FUNNEL[2], FUNNEL[4]] }) : '<div class="vqa-empty">No personal links sent in this period.</div>'}
+          <div class="vqa-sub" style="margin:12px 0 0;">${w.views ? `${n(w.views)} survey page visits · ${w.completion_rate == null ? '—' : w.completion_rate + '%'} went on to answer` : ''}</div></div>
+      </div>
+
+      <div class="vqa-grid vqa-two">
+        ${responseGraphCard('By channel',d.channels,'Channel','How the survey was answered')}
+        ${responseGraphCard('By language',d.languages,'Language','English, Urdu or another recorded language')}
+      </div>
+      ${d.locations.length?`<div style="margin-bottom:14px;">${responseGraphCard('By location',d.locations,'Location','Branch or site, from the QR code or link')}</div>`:''}
+
+      <section aria-label="Who answers"><h3 class="vqa-section">Who answers</h3>
+        <div class="vqa-sub">From the survey's “about you” questions. Unspecified answers stay labelled; shares are within each breakdown.</div>
+        ${!demoCards.some(x=>x[1].some(r=>r.responses))?'<div class="vqa-empty" style="margin-bottom:12px;">Add Gender, Age group or City in Survey → Questions → Add a question → About you to collect respondent details.</div>':''}
+        <div class="vqa-grid vqe-three">${demoCards.map(x=>responseGraphCard(x[0],x[1],x[2],'Respondent profile')).join('')}</div>
+      </section>
+
+      <div class="vqa-grid vqa-two">
+        <div class="vqa-card"><h3>What unhappy customers write about</h3><div class="vqa-sub">Words used most in comments scoring 1–2, NPS 0–6 or not resolved</div>${words(d.themes.unhappy, SCORE[0])}</div>
+        <div class="vqa-card"><h3>What happy customers love</h3><div class="vqa-sub">Words used most in comments scoring 4–5 or NPS 9–10</div>${words(d.themes.happy, C.s1)}</div>
+      </div>
+
+      <div class="vqa-grid vqa-two">
+        <div class="vqa-card"><h3>Closing the loop</h3><div class="vqa-sub">All-time follow-up backlog · every unhappy answer opens a follow-up</div>
+          ${barList([{ name: 'Waiting for a reply', value: f.open }, { name: 'Contacted', value: f.contacted }, { name: 'Resolved', value: f.resolved }], { colors: [SCORE[0], '#d9a441', '#2f7d5f'] })}
+          <div class="vqa-sub" style="margin:12px 0 0;">${f.median_hours_to_reply != null ? `Typical time to get back to them: <b>${f.median_hours_to_reply < 1 ? 'under an hour' : f.median_hours_to_reply < 48 ? f.median_hours_to_reply + ' hours' : Math.round(f.median_hours_to_reply / 24) + ' days'}</b>` : 'No first-contact timings recorded yet'}${f.overdue ? ` · <b style="color:${SCORE[0]}">${n(f.overdue)} waiting over 48 hours</b>` : ''}</div></div>
+        <div class="vqa-card"><h3>When people answer</h3><div class="vqa-sub">By day and hour (${esc(d.time_zone.replace('Asia/', ''))} time) · ${esc(d.period.window_label)}</div>${heatmap(d.heatmap, d.period.window_label)}</div>
+      </div>
+
+      ${d.recent_comments.length ? `<div class="vqa-card" style="margin-bottom:14px;"><h3>Latest comments</h3><div class="vqa-sub">What customers wrote, newest first</div><div class="vqa-feedback">
+        ${d.recent_comments.map(c => `<div class="vqa-fb"><div>“${esc(c.comment)}”</div><div class="m">${c.score != null ? `${'★'.repeat(c.score)}${'☆'.repeat(5 - c.score)} · ` : ''}${c.nps != null ? `NPS ${c.nps} · ` : ''}${c.resolved != null ? (c.resolved ? 'Resolved · ' : 'Not resolved · ') : ''}${esc(c.channel)} · ${esc(c.survey)} · ${esc(new Date(c.submitted_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }))}</div></div>`).join('')}
+      </div></div>` : ''}
+
+      ${echoAdvancedHTML(d)}
+      <div class="vqa-card"><details><summary>See every figure as a table</summary>${table(lastSeries.headers, lastSeries.rows)}</details></div>
+    </div>`;
+  }
+
+  function drawEcho(d){
+    destroyCharts();
+    if(!d || !d.window || !chartReady()) return;
+    setChartFont();
+    columnChart('vqeResp', d.series, 'responses', 'Answers', d.grain);
+    lineChart('vqeCsat', d.series, 'csat', d.grain, { label: 'satisfied' });
+    if(d.window.nps_responses){
+      lineChart('vqeNps', d.series.map(s => ({ ...s, responses: s.nps_responses })), 'nps', d.grain, { min: -100, max: 100, suffix: '', label: 'NPS' });
+      mount('vqeNpsDist', {
+        type: 'bar',
+        data: { labels: d.nps_distribution.map(x => String(x.score)), datasets: [{ label: 'Answers', data: d.nps_distribution.map(x => x.n),
+          backgroundColor: d.nps_distribution.map(x => x.score <= 6 ? SCORE[0] : x.score <= 8 ? SCORE[2] : SCORE[4]), borderRadius: 4, maxBarThickness: 26 }] },
+        options: baseOptions({ plugins: { legend: { display: false }, tooltip: Object.assign(baseOptions().plugins.tooltip, {
+          callbacks: { title: (items) => `Scored ${items[0].label} of 10`, label: (ctx) => ` ${n(ctx.raw)} answers` } }) } }),
+      });
+    }
+  }
+
   window.VQA = {
     injectStyles,
-    conversationsHTML, drawConversations,
+    conversationsHTML, drawConversations, websiteTrafficHTML,
     salesHTML, drawSales,
-    destroyCharts, downloadCsv,
+    echoHTML, drawEcho,
+    destroyCharts,
     grains: GRAINS,
   };
 })();

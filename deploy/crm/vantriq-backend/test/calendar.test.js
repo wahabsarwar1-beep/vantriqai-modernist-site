@@ -1,0 +1,66 @@
+// Runs the real PostgreSQL queries in an isolated PGlite database; no production data.
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const {PGlite}=require('@electric-sql/pglite');
+const express=require('express');
+const {randomUUID}=require('node:crypto');
+const pg=new PGlite();
+let tail=Promise.resolve();
+const acquire=async()=>{const previous=tail;let release;tail=new Promise(r=>release=r);await previous;return {query:(sql,params)=>pg.query(sql,params),release};};
+const db={query:(sql,params)=>pg.query(sql,params),pool:{connect:acquire}};
+require.cache[require.resolve('../src/db')]={exports:db};
+const {errorHandler}=require('../src/utils/asyncErrors');
+const cal=require('../src/utils/calendar');
+const repA=randomUUID(),repB=randomUUID(),leadA=randomUUID(),leadB=randomUUID(),leadC=randomUUID();
+// Conflict tests need future meetings: completed time slots do not block reassignment.
+const start=new Date(Date.now()+2*86400000);start.setUTCHours(5,0,0,0);
+const slot={title:'Discovery demo',starts_at:start.toISOString(),ends_at:new Date(+start+30*60000).toISOString(),channel:'website',external_id:'web-session-demo-1'};
+const rejected=async(fn,status)=>assert.rejects(fn,e=>e.status===status);
+(async()=>{
+ await pg.exec(`create table sales_reps(id uuid primary key,name text,email text,active boolean);
+ create table clients(id uuid primary key,name text,company text,email text,phone text,source text,external_ref text unique,owner_rep_id uuid references sales_reps(id),sales_stage text,updated_at timestamptz default now());`);
+ const schema=fs.readFileSync(path.join(__dirname,'../db/schema.sql'),'utf8');
+ await pg.exec(schema.slice(schema.indexOf('-- CRM calendar and explicit sales ownership.'),schema.indexOf('-- Pulse measurements are separate')));
+ await pg.exec(schema.slice(schema.indexOf('-- CRM calendar and explicit sales ownership.'),schema.indexOf('-- Pulse measurements are separate'))); // migration is repeatable
+ await pg.query('insert into sales_reps values ($1,$2,$3,true),($4,$5,$6,true)',[repA,'Rep A','a@example.test',repB,'Rep B','b@example.test']);
+ for(const [id,ref] of [[leadA,'web-a'],[leadB,'wa-b'],[leadC,'web-c']])await pg.query('insert into clients (id,name,company,source,external_ref) values ($1,$2,$3,$4,$5)',[id,ref,'Test company','AI agent',ref]);
+ await rejected(()=>cal.createEvent({...slot,external_ref:'missing'},'agent',true),404);
+ await rejected(()=>cal.createEvent({...slot,external_ref:'web-a',starts_at:'2026-10-03T10:00'},'agent',true),400);
+ await rejected(()=>cal.createEvent({...slot,external_ref:'web-a',external_id:''},'agent',true),400);
+ await rejected(()=>cal.assignLead(leadA,randomUUID(),'admin','Route to rep'),400);
+ await rejected(()=>cal.assignLead(leadA,repA,'admin',''),400);
+ await cal.assignLead(leadA,repA,'admin@example.test','Website enquiry');
+ assert.equal((await pg.query('select sales_stage from clients where id=$1',[leadA])).rows[0].sales_stage,'qualification');
+ const created=await cal.createEvent({...slot,external_ref:'web-a'},'agent',true);assert.equal(created.created,true);
+ const again=await cal.createEvent({...slot,external_ref:'web-a'},'agent',true);assert.equal(again.created,false);assert.equal(again.event.id,created.event.id);
+ await rejected(()=>cal.createEvent({...slot,external_ref:'web-a',title:'Different'},'agent',true),409);
+ await rejected(()=>cal.createEvent({...slot,external_ref:'web-a',external_id:'second'},'agent',true),409);
+ await cal.assignLead(leadB,repA,'admin','WhatsApp enquiry');
+ await rejected(()=>cal.createEvent({...slot,external_ref:'wa-b',channel:'whatsapp',external_id:'wa-1'},'agent',true),409);
+ await cal.assignLead(leadB,repB,'admin','Route to Rep B');
+ await cal.createEvent({...slot,external_ref:'wa-b',channel:'whatsapp',external_id:'wa-1'},'agent',true);
+ await rejected(()=>cal.assignLead(leadA,repB,'admin','Reassign'),409);
+ const query={from:new Date(+start-86400000).toISOString(),to:new Date(+start+86400000).toISOString()};
+ assert.equal((await cal.listEvents(query,repA)).length,1);
+ assert.equal((await cal.listEvents({...query,rep_id:repB},repA))[0].client_id,leadA); // rep cannot override identity
+ const app=express();app.use(express.json());app.use((req,res,next)=>{req.user={email:'admin@example.test',role:req.header('x-test-role')||'admin'};next();});
+ app.use('/api/calendar',require('../src/routes/calendar'));app.use('/api/clients',require('../src/routes/clients'));app.use(errorHandler);
+ const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.on('listening',r));const base='http://127.0.0.1:'+server.address().port;
+ const patch=async(url,body,role='admin')=>fetch(base+url,{method:'PATCH',headers:{'content-type':'application/json','x-test-role':role},body:JSON.stringify(body)});
+ assert.equal((await patch('/api/clients/'+leadC+'/assignment',{rep_id:repA,reason:'Route'},'staff')).status,403);
+ assert.equal((await patch('/api/calendar/'+created.event.id,{status:'cancelled'})).status,200);
+ assert.equal((await patch('/api/calendar/'+created.event.id,{client_id:leadC})).status,400);
+ await cal.assignLead(leadA,repB,'admin','Reassign after cancellation');
+ assert.equal((await cal.listEvents(query,repA)).length,0);assert.equal((await cal.listEvents(query,repB)).length,2);
+ assert.equal((await fetch(base+'/api/clients/'+leadA+'/assignment-history',{headers:{'x-test-role':'staff'}})).status,403);
+ const history=await (await fetch(base+'/api/clients/'+leadA+'/assignment-history')).json();assert.equal(history.length,2);assert.equal(history[0].to_rep_name,'Rep B');
+ await pg.query('update sales_reps set active=false where id=$1',[repA]);
+ await rejected(()=>cal.assignLead(leadC,repA,'admin','Route'),400);
+ await cal.assignLead(leadA,null,'admin','Return to queue');
+ assert.equal((await cal.listEvents({...query,rep_id:'unassigned'})).length,1);
+ const exportText=await (await fetch(base+'/api/calendar/export?'+new URLSearchParams(query))).text();assert.match(exportText,/BEGIN:VCALENDAR/);assert.ok(exportText.includes('DTSTART:'+slot.starts_at.replace(/[-:]/g,'').replace(/\.\d{3}/,'')));assert.match(exportText,/STATUS:CANCELLED/);
+ const escaped=cal.ics([{...created.event,title:'Demo\nATTENDEE:evil@example.test',notes:'é'.repeat(100),updated_at:new Date()}]);
+ assert.ok(!escaped.split('\r\n').some(l=>l.startsWith('ATTENDEE:')));assert.ok(escaped.split('\r\n').every(l=>Buffer.byteLength(l)<=75));
+ await new Promise(r=>server.close(r));await pg.close();console.log('Calendar integration checks passed: migration, input validation, retries, overlaps, reassignment, rep isolation, admin-only assignment and ICS export.');
+})().catch(async e=>{console.error(e);process.exitCode=1;await pg.close();});

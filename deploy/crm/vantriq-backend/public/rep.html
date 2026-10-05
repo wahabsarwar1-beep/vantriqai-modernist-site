@@ -120,6 +120,7 @@ td{border-bottom-color:var(--border-2);}
   outline:none;border-color:var(--teal);box-shadow:0 0 0 4px var(--teal-light);
 }
 </style>
+<link rel="stylesheet" href="/calendar.css">
 </head>
 <body>
 <div id="app"></div>
@@ -239,7 +240,8 @@ async function boot(){
     const [leadsRes, summaryRes, productsRes] = await Promise.all([
       API.get('/api/rep/leads'), API.get('/api/rep/summary'), API.get('/api/rep/products'),
     ]);
-    leads = leadsRes; summary = summaryRes; products = productsRes;
+    leads = leadsRes; summary = summaryRes;
+  await loadRepCalendar(); products = productsRes;
     render();
   }catch(e){
     connectError = e.message || 'Could not log in.';
@@ -251,8 +253,23 @@ async function boot(){
 async function refreshAll(){
   const [leadsRes, summaryRes] = await Promise.all([API.get('/api/rep/leads'), API.get('/api/rep/summary')]);
   leads = leadsRes; summary = summaryRes;
+  await loadRepCalendar();
 }
 
+let repCalendarMonth=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Karachi',year:'numeric',month:'2-digit'}).format(new Date());
+let repCalendarEvents=[],repCalendarError='';
+async function loadRepCalendar(){
+  const [y,m]=repCalendarMonth.split('-').map(Number);
+  const q=new URLSearchParams({from:repCalendarMonth+'-01T00:00:00+05:00',to:new Date(Date.UTC(y,m,1)).toISOString().slice(0,10)+'T00:00:00+05:00'});
+  try{repCalendarEvents=await API.get('/api/rep/calendar?'+q);repCalendarError='';}catch(e){repCalendarError=e.message;}
+  const root=document.getElementById('rep-calendar-rows');if(root)root.innerHTML=repCalendarRows();
+}
+function repCalendarRows(){
+  if(repCalendarError)return `<tr><td colspan="4" role="alert">${esc(repCalendarError)}</td></tr>`;
+  const dt=d=>new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Karachi',dateStyle:'medium',timeStyle:'short'}).format(new Date(d));
+  return repCalendarEvents.map(e=>`<tr><td>${esc(dt(e.starts_at))}<br>until ${esc(dt(e.ends_at))}</td><td>${esc(e.title)}<br>${esc(e.location)}${e.notes?'<br>'+esc(e.notes):''}</td><td>${esc(e.lead_name)}<br>${esc(e.company)}</td><td>${esc(e.channel)} · ${esc(e.status.replace('_',' '))}</td></tr>`).join('')||'<tr><td colspan="4">No appointments assigned to you this month.</td></tr>';
+}
+function repCalendarHTML(){return `<div class="card" style="padding:18px;margin-bottom:20px;"><h3>My calendar</h3><p class="footnote">Appointments for leads currently assigned to you. All times: Pakistan (UTC+05:00).</p><div class="calendar-toolbar"><div class="field calendar-filter"><label for="rep_calendar_month">Month</label><input id="rep_calendar_month" type="month" aria-label="My calendar month" value="${repCalendarMonth}" onchange="if(this.value){repCalendarMonth=this.value;loadRepCalendar()}"></div><button class="btn btn-ghost" onclick="loadRepCalendar()">Refresh calendar</button></div><div class="table-wrap"><table><thead><tr><th>Time (PKT)</th><th>Appointment</th><th>Lead</th><th>Source / status</th></tr></thead><tbody id="rep-calendar-rows">${repCalendarRows()}</tbody></table></div></div>`;}
 function render(){
   document.getElementById('app').innerHTML = `
     <div class="topbar">
@@ -278,6 +295,7 @@ function render(){
         </div>
       </div>
 
+      ${repCalendarHTML()}
       ${repStageBar()}
       ${repStage!=='all' ? repStageList(REP_TABS.find(t=>t.id===repStage)) : `
       <div class="kanban">

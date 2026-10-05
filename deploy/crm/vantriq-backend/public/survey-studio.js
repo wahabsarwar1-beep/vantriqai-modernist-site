@@ -51,6 +51,21 @@
     text: ['Is there anything else you would like to tell us?', 'کیا آپ ہمیں کچھ اور بتانا چاہیں گے؟'],
     contact: ['Would you like us to get back to you?', 'کیا آپ چاہتے ہیں کہ ہم آپ سے رابطہ کریں؟'],
   };
+  // "About you": answers that split the results and go on the customer's profile.
+  var CITIES = [['karachi', 'Karachi', 'کراچی'], ['lahore', 'Lahore', 'لاہور'], ['islamabad', 'Islamabad', 'اسلام آباد'], ['rawalpindi', 'Rawalpindi', 'راولپنڈی'],
+    ['faisalabad', 'Faisalabad', 'فیصل آباد'], ['multan', 'Multan', 'ملتان'], ['peshawar', 'Peshawar', 'پشاور'], ['quetta', 'Quetta', 'کوئٹہ'],
+    ['hyderabad', 'Hyderabad', 'حیدرآباد'], ['sialkot', 'Sialkot', 'سیالکوٹ'], ['gujranwala', 'Gujranwala', 'گوجرانوالہ']];
+  var PROFILE_Q = {
+    gender: { icon: '⚧', label: 'Gender', hint: 'Male, female or prefer not to say — see satisfaction by gender.',
+      q: { type: 'single', profile: 'gender', title: { en: 'Are you…', ur: 'آپ…' },
+        options: [['male', 'Male', 'مرد'], ['female', 'Female', 'خاتون'], ['prefer_not', 'Prefer not to say', 'بتانا نہیں چاہتے']] } },
+    age: { icon: '🎂', label: 'Age group', hint: 'Under 18 to 65+ — see satisfaction by age.',
+      q: { type: 'single', profile: 'age', title: { en: 'Your age group', ur: 'آپ کی عمر کا گروپ' },
+        options: [['u18', 'Under 18', '18 سے کم'], ['18_24', '18–24', '18–24'], ['25_34', '25–34', '25–34'], ['35_44', '35–44', '35–44'], ['45_54', '45–54', '45–54'], ['55_64', '55–64', '55–64'], ['65p', '65+', '65+']] } },
+    city: { icon: '📍', label: 'City', hint: 'Pakistan\'s main cities, or type another — see satisfaction by city.',
+      q: { type: 'single', profile: 'city', allow_other: true, title: { en: 'Which city are you in?', ur: 'آپ کس شہر میں ہیں؟' }, options: CITIES } },
+  };
+  var PROFILE_NAME = { gender: 'gender', age: 'age group', city: 'city' };
   var RANGE = { csat: [1, 5], rating: [1, 5], nps: [0, 10], ces: [1, 7] };
   var OTHER = '__other';
   var STATUS = {
@@ -74,7 +89,11 @@
     openQ: null, addingQ: false,
     grain: 'month', analytics: null,
     resp: null, rFilter: 'all', rLoc: '', rQ: '', rBusy: false, openResp: null,
-    invites: null,
+    invites: null, reportGrain: 'month', dash: null,
+    // The template library: its shelves, the shelf and search in view, the
+    // template open in Preview, and industries changed here (client id → key).
+    categories: null, tplCat: 'all', tplQ: '', tplOpen: null, industries: {}, ownId: null,
+    shareId: null,           // the survey the home page's Share panel is showing
   };
 
   /* ------------------------------------------------------------------ */
@@ -121,8 +140,18 @@
   /* ------------------------------------------------------------------ */
   /* Loading                                                             */
   /* ------------------------------------------------------------------ */
+  function dashQuery(){
+    return '/dashboard?grain=' + encodeURIComponent(st.reportGrain) + (st.clientFilter ? '&client_id=' + encodeURIComponent(st.clientFilter) : '');
+  }
+  /** The Echo dashboard, at the period chosen on it. Repaints only the home page. */
+  function loadDash(){
+    var mine = dashQuery();
+    return api('GET', mine).then(function(d){ if (mine !== dashQuery()) return; st.dash = d; if (st.view === 'home') render(); })
+      .catch(function(e){ st.dash = { error: e.message || 'Could not load the dashboard.' }; if (st.view === 'home') render(); });
+  }
   function loadHome(){
     var q = st.clientFilter ? '?client_id=' + encodeURIComponent(st.clientFilter) : '';
+    loadDash();
     return Promise.all([api('GET', q), api('GET', '/overview' + q)]).then(function(r){
       st.list = r[0]; st.overview = r[1];
       // Repaint only the list. A survey open in the builder must not be
@@ -130,9 +159,21 @@
       if (st.view === 'home') render();
     }).catch(function(e){ st.list = { error: e.message || 'Could not load your surveys.' }; if (st.view === 'home') render(); });
   }
+  var tplLoading = null, tplGen = 0;
+  /** The template library, once: every template, its shelves, and (in the portal) this business's industry. */
   function loadTemplates(){
     if (st.templates) return Promise.resolve(st.templates);
-    return api('GET', '/templates').then(function(t){ st.templates = t; return t; });
+    if (tplLoading) return tplLoading;
+    var gen = tplGen;
+    tplLoading = api('GET', '/templates/library').then(function(r){
+      // Signed out and in as someone else meanwhile: this answer was theirs.
+      if (gen !== tplGen) return loadTemplates();
+      tplLoading = null;
+      st.templates = r.templates; st.categories = r.categories;
+      if (r.client) { st.ownId = r.client.id; if (!(r.client.id in st.industries)) st.industries[r.client.id] = r.client.industry || ''; }
+      return st.templates;
+    }, function(e){ if (gen === tplGen) tplLoading = null; throw e; });
+    return tplLoading;
   }
   function openSurvey(id, tab){
     st.view = 'survey'; st.tab = tab || 'results';
@@ -334,9 +375,23 @@
       '.vqs-logic{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12.5px;}',
       '.vqs-logic select{width:auto;min-width:120px;flex:1 1 140px;}',
       '.vqs-phone-wrap{position:sticky;top:14px;}',
-      '.vqs-phone{width:100%;max-width:340px;height:640px;border-radius:38px;border:10px solid #16151a;background:#16151a;overflow:hidden;box-shadow:0 30px 60px -30px rgba(22,21,26,.5);margin:0 auto;}',
-      '.vqs-phone iframe{width:100%;height:100%;border:0;border-radius:28px;background:#fff;}',
-      '.vqs-phone-cap{text-align:center;font-size:11.5px;color:var(--muted,#6b645b);margin-top:8px;}',
+      '.vqs-phone-cap{text-align:center;font-size:11.5px;color:var(--muted,#6b645b);margin:12px auto 0;max-width:300px;line-height:1.45;}',
+      /* a real phone: the page inside is laid out on a 390 x 844 screen, then the whole phone is drawn at --s */
+      '.vqs-dev{--s:.72;position:relative;box-sizing:content-box;width:calc(390px * var(--s));height:calc(844px * var(--s));padding:11px;margin:0 auto;border-radius:calc(55px * var(--s) + 11px);'
+        + 'background:linear-gradient(150deg,#46464c 0%,#1b1b1f 14%,#0c0c0e 55%,#232327 88%,#3a3a40 100%);'
+        + 'box-shadow:inset 0 0 0 1.5px #5d5d64,inset 0 0 0 3.5px #0a0a0b,0 1px 2px rgba(0,0,0,.18),0 26px 50px -22px rgba(22,21,26,.55),0 60px 90px -60px rgba(22,21,26,.45);}',
+      '.vqs-dev::before,.vqs-dev::after{content:"";position:absolute;width:3px;background:linear-gradient(90deg,#1c1c1f,#3d3d43);}',
+      '.vqs-dev::before{left:-3px;top:calc(844px * var(--s) * .2 + 11px);height:calc(844px * var(--s) * .07);border-radius:2px 0 0 2px;box-shadow:0 calc(844px * var(--s) * .095) 0 #2a2a2e;}',
+      '.vqs-dev::after{right:-3px;top:calc(844px * var(--s) * .25 + 11px);height:calc(844px * var(--s) * .11);border-radius:0 2px 2px 0;}',
+      '.vqs-dev-screen{position:relative;width:100%;height:100%;border-radius:calc(55px * var(--s));overflow:hidden;background:#f7f5f1;isolation:isolate;box-shadow:0 0 0 1px #000;}',
+      '.vqs-dev-vp{position:absolute;top:0;left:0;width:390px;height:844px;transform:scale(var(--s));transform-origin:0 0;}',
+      '.vqs-dev-vp iframe{display:block;width:390px;height:844px;border:0;background:#f7f5f1;}',
+      '.vqs-dev-bar{position:absolute;top:0;left:0;right:0;height:54px;display:flex;align-items:center;justify-content:space-between;padding:3px 28px 0 46px;pointer-events:none;'
+        + 'font:600 16.5px/1 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;letter-spacing:-.01em;color:#0b0b0c;}',
+      '.vqs-dev-bar .ic{display:inline-flex;align-items:center;gap:6px;}',
+      '.vqs-dev-bar svg{display:block;}',
+      '.vqs-dev-island{position:absolute;top:11px;left:50%;width:122px;height:35px;margin-left:-61px;border-radius:20px;background:#000;pointer-events:none;}',
+      '.vqs-dev-home{position:absolute;bottom:8px;left:50%;width:136px;height:5px;margin-left:-68px;border-radius:3px;background:rgba(11,11,12,.85);pointer-events:none;}',
       /* share */
       '.vqs-url{display:flex;gap:8px;align-items:center;background:var(--border-2,#f0ece5);border-radius:12px;padding:8px 8px 8px 12px;}',
       '.vqs-url code{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--f-mono,monospace);font-size:12.5px;}',
@@ -347,6 +402,73 @@
       '@media (max-width:720px){.vqs-hero{grid-template-columns:1fr;}}',
       '.vqs-hero ul{margin:10px 0 0;padding:0 0 0 18px;font-size:13px;line-height:1.8;}',
       '.vqs-danger{border-color:#f0c7bf;}',
+      /* share, on the home page */
+      '.vqs-start{margin-bottom:14px;border-color:var(--teal-300,#a9bbf7);}',
+      '.vqs-start-steps{list-style:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;padding:0;margin:20px 0;}',
+      '.vqs-start-steps li{display:flex;gap:10px;min-width:0;}.vqs-step-number{display:flex;align-items:center;justify-content:center;flex:0 0 28px;height:28px;border-radius:50%;background:var(--teal-light,#e8ecfd);color:var(--teal,#2f56d9);font-weight:700;}',
+      '.vqs-start-steps b{font-size:13px;}.vqs-start-steps p{font-size:12px;line-height:1.6;color:var(--muted,#6b645b);margin:5px 0 0;}',
+      '.vqs-start-foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;border-top:1px solid var(--border,#e7e2da);padding-top:14px;font-size:11px;color:var(--muted,#6b645b);}',
+      '@media(max-width:760px){.vqs-start-steps{grid-template-columns:minmax(0,1fr);gap:14px;}.vqs-start-foot .vqs-btn{min-height:44px;}}',
+      '.vqs-share{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;border-color:var(--teal-300,#a9bbf7);background:linear-gradient(135deg,var(--teal-light,#e8ecfd),var(--card,#fff) 55%);margin:0 0 14px;}',
+      '.vqs-share-qr{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;text-decoration:none;}',
+      '@media (max-width:560px){.vqs-share-qr{width:100%;}}',
+      '.vqs-share-qr img{width:128px;height:128px;border-radius:14px;border:1px solid var(--border,#e7e2da);background:#fff;padding:6px;display:block;}',
+      '.vqs-share-qr span{font-size:11px;color:var(--muted,#6b645b);font-weight:600;}',
+      '.vqs-share-main{flex:1 1 340px;min-width:0;}',
+      '.vqs-share-main h3{font-size:15.5px;}',
+      '.vqs-share-main select{width:auto;max-width:100%;min-width:200px;}',
+      '.vqs-share-btns{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px;}',
+      '.vqs-scard-acts{border-top:1px solid var(--border-2,#f0ece5);padding-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;}',
+      '.vqs-scard-acts .vqs-btn{justify-content:center;padding-left:8px;padding-right:8px;}',
+      /* template library */
+      '.vqs-lib{margin-top:18px;}',
+      '.vqs-lib-head{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap;margin:0 0 14px;}',
+      '.vqs-lib-head h3{font-size:16px;margin:0 0 3px;}',
+      '.vqs-lib-head .sub{margin:0;max-width:640px;}',
+      '.vqs-lib-head>div:first-child{flex:1 1 420px;min-width:0;}',
+      '.vqs-lib-pick{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;flex:0 1 auto;}',
+      '.vqs-ind{display:flex;flex-direction:column;gap:4px;min-width:220px;flex:0 1 260px;}',
+      '@media (max-width:560px){.vqs-lib-pick,.vqs-lib-pick .vqs-ind{flex:1 1 100%;}}',
+      '.vqs-ind>span{font-size:11.5px;font-weight:700;color:var(--muted,#6b645b);}',
+      '.vqs-ind .hint{font-style:normal;font-size:11.5px;color:var(--muted,#6b645b);}',
+      '.vqs-lib-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 12px;}',
+      '.vqs-cats{display:flex;gap:6px;flex-wrap:wrap;flex:1 1 420px;}',
+      '.vqs-cats button{border:1px solid var(--border,#e7e2da);background:var(--card,#fff);font:inherit;font-size:12.5px;font-weight:600;color:var(--text,#16151a);padding:6px 11px;border-radius:999px;cursor:pointer;white-space:nowrap;}',
+      '.vqs-cats button b{font-weight:700;color:var(--muted,#6b645b);margin-left:5px;font-size:11px;}',
+      '.vqs-cats button:hover{border-color:var(--teal,#2f56d9);}',
+      '.vqs-cats button.on{background:var(--teal,#2f56d9);border-color:var(--teal,#2f56d9);color:#fff;}',
+      '.vqs-cats button.on b{color:rgba(255,255,255,.8);}',
+      '.vqs .vqs-lib-search{flex:0 1 300px;min-width:200px;width:auto;}',
+      '.vqs-recs{background:linear-gradient(135deg,var(--teal-light,#e8ecfd),rgba(232,236,253,0) 75%);border:1px solid var(--border,#e7e2da);border-radius:var(--radius,14px);padding:14px;margin:0 0 16px;}',
+      '.vqs-recs h4{margin:0 0 10px;font-size:13.5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}',
+      '.vqs-tcard{gap:8px;}',
+      '.vqs-tcard .top{display:flex;align-items:center;justify-content:space-between;gap:8px;}',
+      '.vqs-tico{width:40px;height:40px;border-radius:12px;background:var(--border-2,#f0ece5);display:inline-flex;align-items:center;justify-content:center;font-size:21px;flex:0 0 40px;line-height:1;}',
+      '.vqs-tcard .cat{font-size:11px;color:var(--muted,#6b645b);font-weight:600;text-align:right;line-height:1.3;}',
+      '.vqs-tcard .meta{font-size:11.5px;color:var(--muted,#6b645b);}',
+      '.vqs-tcard .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;}',
+      '.vqs-tag.best{background:#e4f2eb;color:#1f5c45;}',
+      '.vqs-tag.pop{background:#fbeee4;color:#94512b;}',
+      '.vqs-chosen{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;}',
+      '.vqs-chosen>div{flex:1 1 300px;min-width:0;}',
+      /* how it works */
+      '.vqs-steps{display:grid;gap:10px;}',
+      '.vqs-step{display:flex;gap:12px;align-items:flex-start;background:var(--paper,#fbf9f6);border:1px solid var(--border-2,#f0ece5);border-radius:12px;padding:11px 12px;}',
+      '.vqs-step .no{flex:0 0 28px;height:28px;border-radius:50%;background:var(--teal,#2f56d9);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:13px;}',
+      '.vqs-step b{display:block;font-size:13.5px;margin-bottom:1px;}',
+      '.vqs-step span{font-size:12.5px;color:var(--muted,#6b645b);line-height:1.45;}',
+      /* template preview */
+      'body.vqs-noscroll{overflow:hidden;}',
+      '.vqs-modal{position:fixed;inset:0;z-index:1000;background:rgba(22,21,26,.55);display:flex;align-items:center;justify-content:center;padding:18px;}',
+      '.vqs-modal-box{position:relative;background:var(--card,#fff);color:var(--text,#16151a);border-radius:20px;max-width:900px;width:100%;max-height:calc(100vh - 36px);overflow:auto;padding:22px;box-shadow:0 30px 80px rgba(0,0,0,.35);}',
+      '.vqs-modal-x{position:absolute;top:12px;right:12px;border:0;background:var(--border-2,#f0ece5);width:34px;height:34px;border-radius:50%;font-size:20px;line-height:1;cursor:pointer;color:var(--text,#16151a);z-index:1;}',
+      '.vqs-modal-grid{display:grid;grid-template-columns:320px minmax(0,1fr);gap:24px;align-items:start;}',
+      '.vqs-modal h2{padding-right:36px;}',
+      '.vqs-qlist{margin:6px 0 14px;padding:0 0 0 22px;font-size:13px;line-height:1.5;}',
+      '.vqs-qlist li{margin:0 0 5px;}',
+      '.vqs-qlist .cond{font-size:11.5px;color:var(--muted,#6b645b);}',
+      '.vqs-steppers{display:flex;justify-content:space-between;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border-2,#f0ece5);}',
+      '@media (max-width:760px){.vqs-modal{padding:0;align-items:stretch;}.vqs-modal-box{border-radius:0;max-height:100vh;height:100%;padding:56px 16px 16px;}.vqs-modal-grid{grid-template-columns:1fr;}}',
     ].join('\n');
     var el = document.createElement('style');
     el.id = 'vqs-styles';
@@ -406,7 +528,7 @@
     var clients = (!isPortal() && host.clients ? host.clients() : []).filter(function(c){
       return c.surveys_enabled !== false || listed.some(function(s){ return s.client_id === c.id; });
     });
-    var head = '<div class="vqs-top"><div><h2>Customer satisfaction surveys</h2>'
+    var head = '<div class="vqs-top"><div><h2>Customer-satisfaction surveys</h2>'
       + '<p>Ask customers how you did — by QR code on the table, a link on WhatsApp, a tablet at the counter or your website — and see every answer here the moment it arrives. Unhappy answers raise a follow-up so nobody slips through.</p></div>'
       + '<div class="vqs-row">'
       + (clients.length ? '<select data-a-change="client-filter" style="width:auto;min-width:180px;"><option value="">All clients</option>' + clients.map(function(c){ return '<option value="' + esc(c.id) + '"' + (st.clientFilter === c.id ? ' selected' : '') + '>' + esc(c.company) + '</option>'; }).join('') + '</select>' : '')
@@ -416,28 +538,85 @@
     var surveys = st.list.surveys || [];
     if (!surveys.length) return head + emptyHome();
     var o = st.overview || {};
-    var trend = o.responses_prev_30d ? Math.round(((o.responses_30d - o.responses_prev_30d) / o.responses_prev_30d) * 100) : null;
+    var firstAnswers = surveys.every(function(s){ return Number(s.responses || 0) === 0; });
     return head
-      + '<div class="vqs-kpis">'
-      + kpi('Responses, last 30 days', n(o.responses_30d), '', 'vs the 30 days before', o.responses_prev_30d ? chip(trend, '%') : '')
-      + kpi('Satisfied (4–5 of 5)', o.csat_30d == null ? '—' : o.csat_30d, o.csat_30d == null ? '' : '%', o.csat_responses_30d ? n(o.csat_responses_30d) + ' answers' : 'No answers yet')
-      + kpi('Net Promoter Score', sign(o.nps_30d), '', o.nps_responses_30d ? n(o.nps_responses_30d) + ' answers' : 'No answers yet')
-      + kpi('Waiting for follow-up', n((o.followups || {}).open), '', ((o.followups || {}).contacted ? n(o.followups.contacted) + ' contacted, not yet resolved' : 'Unhappy customers nobody has contacted'))
-      + kpi('Live surveys', n(o.live), '', n(o.surveys) + ' in total')
-      + '</div>'
+      + (firstAnswers ? '<details class="vqs-card" style="margin-bottom:14px;"><summary style="cursor:pointer;font-weight:600;">Get your first responses · sharing guide</summary>' + firstResponsesPanel(surveys) + sharePanel(surveys, true) + '</details>' : '')
+      + dashboard()
+      + (!firstAnswers ? sharePanel(surveys) : '')
       + (o.followup_queue && o.followup_queue.length ? followupQueue(o.followup_queue) : '')
-      + '<div class="vqs-grid vqs-g3" style="margin-top:14px;">' + surveys.map(surveyCard).join('') + '</div>';
+      + '<div class="vqs-spread" style="margin:18px 0 0;"><h3 style="margin:0;">Your surveys</h3><span class="sub" style="margin:0;">' + n(o.live) + ' live · ' + n(o.surveys) + ' in total</span></div>'
+      + '<div class="vqs-grid vqs-g3" style="margin-top:10px;">' + surveys.map(surveyCard).join('') + '</div>'
+      + library(false);
+  }
+
+  /**
+   * The first thing to do with a live survey is share it, so the home page
+   * leads with it: the QR code, the link, WhatsApp, the printable poster and
+   * table cards, the kiosk link for a counter tablet and the website code —
+   * for the survey chosen here (the newest still waiting for its first answer
+   * unless someone picks another). Staff see it for the client they picked.
+   */
+  function firstResponsesPanel(surveys){
+    var live = surveys.filter(function(s){ return s.status === 'live' && !s.closed && s.client_surveys_enabled !== false && s.links; });
+    return '<section class="vqs-card vqs-start" aria-label="Get your first responses">'
+      + '<div class="vqs-spread"><div><h3>Get your first responses</h3><div class="sub">Your full dashboard stays visible below. Charts fill in as responses arrive.</div></div><span class="vqs-tag">' + live.length + ' ready to share</span></div>'
+      + '<ol class="vqs-start-steps"><li><span class="vqs-step-number">1</span><div><b>' + (live.length ? 'Choose a live survey' : 'Publish a survey') + '</b><p>' + (live.length ? 'Pick the survey below. Each link and QR code belongs to that survey.' : 'Open a draft and set it live before collecting answers.') + '</p></div></li>'
+      + '<li><span class="vqs-step-number">2</span><div><b>Share with your customers</b><p>Copy a link, print a QR poster, or open the WhatsApp sharing option.</p></div></li>'
+      + '<li><span class="vqs-step-number">3</span><div><b>Watch the first answer arrive</b><p>Satisfaction, trends and follow-ups appear as real responses come in.</p></div></li></ol>'
+      + '<div class="vqs-start-foot"><span>No responses yet. Sharing progress is not tracked by this checklist.</span><button class="vqs-btn sm" onclick="VQS.echoReport()">Download Echo report (Excel)</button></div></section>';
+  }
+
+  function sharePanel(surveys, allowAllClients){
+    if (!isPortal() && !st.clientFilter && !allowAllClients) return '';
+    var live = surveys.filter(function(x){ return x.status === 'live' && !x.closed && x.client_surveys_enabled !== false && x.links; });
+    if (!live.length) {
+      var draft = surveys.find(function(x){ return x.status === 'draft'; });
+      return draft ? '<div class="vqs-banner warn"><b>“' + esc(draft.title) + '” is a draft,</b> so it cannot be shared yet. '
+        + '<button class="vqs-link" data-a="open" data-id="' + esc(draft.id) + '" data-tab="settings">Set it live</button> and its QR code, link, WhatsApp, kiosk and website options appear here.</div>' : '';
+    }
+    var sv = live.find(function(x){ return x.id === st.shareId; }) || live.find(function(x){ return !x.responses; }) || live[0];
+    var L = sv.links, first = !sv.responses;
+    return '<div class="vqs-card vqs-share" id="vqs-share">'
+      + '<a class="vqs-share-qr" href="' + esc(L.poster) + '" target="_blank" rel="noopener" title="Open the printable QR poster">'
+      + '<img src="/s/' + encodeURIComponent(sv.slug) + '/qr.svg?size=256" alt="QR code for ' + esc(sv.title) + '" width="128" height="128"><span>Scan to answer</span></a>'
+      + '<div class="vqs-share-main">'
+      + '<div class="vqs-spread" style="align-items:flex-start;"><div style="min-width:0;flex:1 1 260px;"><h3>' + (first ? '🚀 Your survey is live — share it to get your first answers' : '📣 Share your survey') + '</h3>'
+      + '<div class="sub" style="margin:2px 0 10px;">Customers answer on their own phone: they scan the QR code, tap the link on WhatsApp, use a tablet at your counter, or find it on your website.</div></div>'
+      + (live.length > 1
+        ? '<select data-a-change="share-pick" aria-label="Which survey to share">' + live.map(function(x){
+          return '<option value="' + esc(x.id) + '"' + (x.id === sv.id ? ' selected' : '') + '>' + esc((!isPortal() && !st.clientFilter && x.company ? x.company + ' · ' : '') + x.title) + '</option>';
+        }).join('') + '</select>'
+        : '<span class="vqs-tag" style="font-size:11.5px;padding:3px 9px;">' + esc(sv.title) + '</span>')
+      + '</div>'
+      + '<div class="vqs-url"><code>' + esc(L.url) + '</code><button class="vqs-btn sm primary" data-a="copy" data-text="' + esc(L.url) + '" data-label="Link copied">Copy link</button></div>'
+      + '<div class="vqs-share-btns">'
+      + '<a class="vqs-btn sm" href="' + esc(L.whatsapp) + '" target="_blank" rel="noopener">🟢 Send on WhatsApp</a>'
+      + '<a class="vqs-btn sm" href="' + esc(L.poster) + '" target="_blank" rel="noopener">🖨 QR poster</a>'
+      + '<a class="vqs-btn sm" href="' + esc(L.poster) + '?layout=cards" target="_blank" rel="noopener">🃏 Table cards</a>'
+      + '<button class="vqs-btn sm" data-a="copy" data-text="' + esc(L.kiosk) + '" data-label="Kiosk link copied — open it on the tablet at your counter" title="For a tablet at the counter: it starts over for each customer">🖥 Kiosk link</button>'
+      + '<button class="vqs-btn sm" data-a="copy" data-text="' + esc(L.embed) + '" data-label="Website code copied — paste it into your site" title="Code to paste into your website">🌐 Website code</button>'
+      + '<button class="vqs-link" data-a="open" data-id="' + esc(sv.id) + '" data-tab="share">All sharing options →</button>'
+      + '</div>'
+      + '<div class="sub" style="margin:10px 0 0;">' + (first
+        ? 'No answers yet — they appear on this page the moment they arrive.'
+        : n(sv.responses) + ' answer' + (sv.responses === 1 ? '' : 's') + ' so far' + (sv.last_response_at ? ' · the last ' + ago(sv.last_response_at) : '') + '.') + '</div>'
+      + '</div></div>';
   }
 
   function surveyCard(s){
-    return '<div class="vqs-card vqs-scard" data-a="open" data-id="' + esc(s.id) + '" role="button" tabindex="0">'
+    // No answers yet: the next step is sharing it, so that is where it opens.
+    return '<div class="vqs-card vqs-scard" data-a="open" data-id="' + esc(s.id) + '"' + (s.responses ? '' : ' data-tab="share"') + ' role="button" tabindex="0">'
       + '<div class="vqs-spread">' + status(s) + '<span class="vqs-row"><span class="vqs-swatch" style="background:' + esc(s.brand_color) + '"></span>'
-      + (s.client_surveys_enabled === false && !isPortal() ? '<span class="vqs-tag" title="Surveys are switched off for this client, so it is paused for respondents">Surveys off</span>' : '')
+      + (s.client_surveys_enabled === false && !isPortal() ? '<span class="vqs-tag" title="Vantriq Echo is switched off for this client, so it is paused for respondents">Echo off</span>' : '')
       + (s.open_followups ? '<span class="vqs-tag" style="background:#fbe8e4;color:#8f3527;">' + s.open_followups + ' to follow up</span>' : '') + '</span></div>'
       + '<div><div class="t">' + esc(s.title) + '</div>'
       + '<div class="co">' + (isPortal() ? esc(s.display_name) : esc(s.company)) + ' · ' + s.question_count + ' questions' + (s.location_count ? ' · ' + s.location_count + ' locations' : '') + '</div></div>'
       + '<div class="vqs-stats"><div>Responses<b>' + n(s.responses_30d) + '</b></div><div>Satisfied<b>' + (s.csat_30d == null ? '—' : s.csat_30d + '%') + '</b></div><div>NPS<b>' + sign(s.nps_30d) + '</b></div></div>'
       + '<div class="vqs-spread" style="font-size:11.5px;color:var(--muted,#6b645b);"><span>Last 30 days · ' + n(s.responses) + ' all time</span><span>' + (s.last_response_at ? 'Last answer ' + ago(s.last_response_at) : 'No answers yet') + '</span></div>'
+      + (s.links && s.status === 'live' && !s.closed
+        ? '<div class="vqs-row vqs-scard-acts"><button class="vqs-btn sm" data-a="copy" data-text="' + esc(s.links.url) + '" data-label="Link copied">🔗 Copy link</button>'
+          + '<button class="vqs-btn sm" data-a="open" data-id="' + esc(s.id) + '" data-tab="share">📣 Share · QR</button></div>'
+        : '')
       + '</div>';
   }
 
@@ -462,66 +641,285 @@
   }
 
   function emptyHome(){
-    var t = st.templates;
-    if (!t) loadTemplates().then(render).catch(function(){});
-    var picks = t ? ['restaurant', 'fmcg_consumer', 'telecom', 'healthcare', 'retail', 'support_chat'].map(function(k){ return t.find(function(x){ return x.key === k; }); }).filter(Boolean) : [];
+    var steps = [
+      ['Pick the survey for your industry', 'Ready-made surveys for restaurants, shops, clinics, pharmacies, banks, schools and more.'],
+      ['Preview it and change anything', 'See it on a phone exactly as your customers will. Reword, add or remove any question.'],
+      ['Share it everywhere', 'A QR code for the table or counter, a WhatsApp link, a kiosk tablet or your website.'],
+      ['Watch the answers arrive', 'Satisfaction, NPS and every comment on your Echo dashboard, with unhappy customers flagged for a reply.'],
+    ];
     return '<div class="vqs-card"><div class="vqs-hero"><div>'
       + '<h2>Start hearing from every customer</h2>'
-      + '<p class="sub" style="font-size:13.5px;">Pick your industry and a ready-made survey is live in a minute — in English and Urdu, in your colours, with a QR code to print.</p>'
+      + '<p class="sub" style="font-size:13.5px;">Choose the survey made for your industry and it is live in a minute — in English and Urdu, in your colours, with a QR code to print. '
+      + 'Its QR code, link, WhatsApp message, kiosk link and website code then appear at the top of this page, ready to share.</p>'
       + '<ul><li><b>Link, QR code, WhatsApp, kiosk or website</b> — one survey, every channel</li>'
       + '<li><b>CSAT, NPS and effort</b> scores, with trends and plain-English findings</li>'
       + '<li><b>Unhappy answers raise a follow-up</b> and can email you the moment they arrive</li>'
       + '<li><b>Happy customers</b> are invited to leave a Google review</li></ul>'
-      + '<div style="margin-top:16px;"><button class="vqs-btn primary" data-a="new">＋ Create your first survey</button></div></div>'
-      + '<div class="vqs-grid vqs-g2" style="grid-template-columns:1fr 1fr;">' + picks.map(function(p){
-        return '<div class="vqs-card vqs-tpl" data-a="new" data-tpl="' + esc(p.key) + '"><div class="vqs-ic">' + esc(p.icon) + '</div><div class="nm">' + esc(p.name) + '</div></div>';
-      }).join('') + '</div></div></div>';
+      + '<div class="vqs-row" style="margin-top:16px;"><button class="vqs-btn primary" data-a="lib-scroll">Choose a template ↓</button>'
+      + '<button class="vqs-btn" data-a="use-tpl" data-tpl="blank">Start from scratch</button></div></div>'
+      + '<div class="vqs-steps">' + steps.map(function(x, i){
+        return '<div class="vqs-step"><div class="no">' + (i + 1) + '</div><div><b>' + esc(x[0]) + '</b><span>' + esc(x[1]) + '</span></div></div>';
+      }).join('') + '</div></div></div>'
+      + library(true);
   }
 
   /* ------------------------------------------------------------------ */
-  /* New survey: the template gallery and the few things worth asking    */
+  /* The template library: every industry's survey, theirs first         */
+  /* ------------------------------------------------------------------ */
+  function byKey(k){ return (st.templates || []).find(function(x){ return x.key === k; }) || null; }
+  function clientById(id){ return (host.clients ? host.clients() : []).find(function(x){ return x.id === id; }) || null; }
+  /** Whose library this is: the portal's own business, or in the CRM the client being worked on. */
+  function ctxClientId(){
+    if (isPortal()) return st.ownId || '';
+    if (st.view === 'new' && st.newForm.client_id) return st.newForm.client_id;
+    return st.clientFilter || '';
+  }
+  function industryOf(id){
+    if (!id) return '';
+    if (Object.prototype.hasOwnProperty.call(st.industries, id)) return st.industries[id] || '';
+    var c = clientById(id);
+    return (c && c.industry) || '';
+  }
+  function ctxCompany(){
+    if (isPortal()) return (host.company && host.company()) || '';
+    var c = clientById(ctxClientId());
+    return c ? c.company : '';
+  }
+  /** Their industry's template and what else suits that industry, best first. */
+  function recommended(ind){
+    var me = byKey(ind);
+    if (!me) return [];
+    var keys = [me.key].concat(me.related || []);
+    st.templates.forEach(function(x){ if (x.category === me.category && keys.indexOf(x.key) < 0 && x.key !== 'blank') keys.push(x.key); });
+    return keys.slice(0, 4).map(byKey).filter(Boolean);
+  }
+  function tplMeta(x, langs){ return x.question_count + ' questions · about ' + x.minutes + ' min' + (langs ? ' · English & اردو' : ''); }
+  function tplCard(x, ind){
+    // In New survey a card chooses the template; anywhere else it opens the preview.
+    var pick = st.view === 'new';
+    return '<div class="vqs-card vqs-tpl vqs-tcard' + (pick && x.key === st.newTpl ? ' on' : '') + '" data-a="' + (pick ? 'pick-tpl' : 'tpl-preview') + '" data-tpl="' + esc(x.key) + '" role="button" tabindex="0">'
+      + '<div class="top"><span class="vqs-tico">' + esc(x.icon) + '</span>'
+      + (x.key === ind ? '<span class="vqs-tag best">✓ Your industry</span>' : '<span class="cat">' + esc(x.category_label) + '</span>') + '</div>'
+      + '<div class="nm">' + esc(x.name) + '</div>'
+      + '<div class="ds">' + esc(x.description) + '</div>'
+      + '<div class="meta">' + esc(tplMeta(x)) + '</div>'
+      + (x.measures.length ? '<div>' + x.measures.map(function(m){ return '<span class="vqs-tag">' + esc(m) + '</span>'; }).join('') + '</div>' : '')
+      + '<div class="acts"><button type="button" class="vqs-btn sm" data-a="tpl-preview" data-tpl="' + esc(x.key) + '">👁 Preview</button>'
+      + '<button type="button" class="vqs-btn sm primary" data-a="use-tpl" data-tpl="' + esc(x.key) + '">Use this template</button></div>'
+      + '</div>';
+  }
+  /** "Your industry": a customer says theirs; staff set the client's. Their templates then come first. */
+  function industryPicker(){
+    var id = ctxClientId();
+    if (!id) return isPortal() ? '' : '<div class="sub" style="margin:0;max-width:280px;">Choose a client to put their industry’s templates first.</div>';
+    var ind = industryOf(id);
+    var who = isPortal() ? 'Your industry' : (ctxCompany() || 'The client') + '’s industry';
+    var groups = (st.categories || []).map(function(c){
+      var opts = st.templates.filter(function(x){ return x.category === c.key && x.is_industry; });
+      if (!opts.length) return '';
+      return '<optgroup label="' + esc(c.label) + '">' + opts.map(function(x){
+        return '<option value="' + esc(x.key) + '"' + (x.key === ind ? ' selected' : '') + '>' + esc(x.icon + ' ' + x.industry_label) + '</option>';
+      }).join('') + '</optgroup>';
+    }).join('');
+    return '<label class="vqs-ind"><span>' + esc(who) + '</span>'
+      + '<select data-a-change="industry"><option value="">' + (ind ? 'Not set' : 'Choose an industry…') + '</option>' + groups + '</select>'
+      + (ind ? '' : '<em class="hint">Tell us, and its templates come first.</em>') + '</label>';
+  }
+  /** Staff choose the client first in New survey, so the library can recommend for them. */
+  function clientPicker(){
+    if (isPortal() || st.view !== 'new') return '';
+    var clients = (host.clients ? host.clients() : []).filter(function(c){ return c.surveys_enabled !== false; });
+    if (!clients.length) return '';
+    return '<label class="vqs-ind"><span>For which client?</span><select data-nf="client_id"><option value="">Choose a client…</option>'
+      + clients.map(function(c){ return '<option value="' + esc(c.id) + '"' + (st.newForm.client_id === c.id ? ' selected' : '') + '>' + esc(c.company) + '</option>'; }).join('')
+      + '</select></label>';
+  }
+  function tplMatches(x){
+    var q = st.tplQ.trim().toLowerCase();
+    if (q) {
+      var hay = [x.name, x.description, x.category_label, x.industry_label, x.keywords].concat(x.preview).join(' ').toLowerCase();
+      return q.split(/\s+/).every(function(w){ return hay.indexOf(w) >= 0; });
+    }
+    if (st.tplCat === 'popular') return !!x.popular;
+    if (st.tplCat && st.tplCat !== 'all') return x.category === st.tplCat;
+    return true;
+  }
+  function libGrid(){
+    var ind = industryOf(ctxClientId());
+    var list = st.templates.filter(tplMatches);
+    if (!list.length) {
+      return '<div class="vqs-card"><div class="vqs-empty">No template matches “' + esc(st.tplQ) + '”. Try another word — or start from '
+        + '<button class="vqs-link" data-a="tpl-preview" data-tpl="general">General satisfaction</button>, which fits any business.</div></div>';
+    }
+    return '<div class="vqs-grid vqs-g3">' + list.map(function(x){ return tplCard(x, ind); }).join('') + '</div>';
+  }
+  function libChips(){
+    var t = st.templates;
+    var shelves = [['all', '', 'All', t.length], ['popular', '🔥', 'Popular', t.filter(function(x){ return x.popular; }).length]]
+      .concat((st.categories || []).map(function(c){ return [c.key, c.icon, c.label, c.count]; }));
+    return shelves.map(function(c){
+      return '<button type="button" data-a="tpl-cat" data-cat="' + esc(c[0]) + '" class="' + (!st.tplQ && st.tplCat === c[0] ? 'on' : '') + '" aria-pressed="' + (!st.tplQ && st.tplCat === c[0]) + '">'
+        + (c[1] ? esc(c[1]) + ' ' : '') + esc(c[2]) + '<b>' + c[3] + '</b></button>';
+    }).join('');
+  }
+  /**
+   * The library. In full (New survey, and a home with no survey yet): what
+   * suits them, every shelf, search. Otherwise (under their surveys): what
+   * suits them, and a way into the rest.
+   */
+  function library(full){
+    var t = st.templates;
+    if (!t) {
+      loadTemplates().then(function(){ if (st.view !== 'survey') render(); }).catch(function(){});
+      return full ? loading('Loading the template library…') : '';
+    }
+    var id = ctxClientId(), ind = industryOf(id), me = byKey(ind);
+    var recs = me ? recommended(ind) : t.filter(function(x){ return x.popular; }).slice(0, full ? 0 : 4);
+    var forWho = isPortal() ? 'you' : (ctxCompany() || 'this client');
+    var head = '<div class="vqs-lib-head"><div><h3>📚 Survey templates for every industry</h3>'
+      + '<div class="sub">' + t.length + ' ready-made surveys, each written for its industry, in English and Urdu. Preview any of them as your customers will see it, then use it in a click — every question can be changed.</div></div>'
+      + '<div class="vqs-lib-pick">' + clientPicker() + industryPicker() + '</div></div>';
+    var recBlock = recs.length ? '<div class="vqs-recs"><h4>' + (me ? '⭐ Recommended for ' + esc(forWho) + ' <span class="vqs-tag best">' + esc(me.icon + ' ' + me.industry_label) + '</span>' : '🔥 Most popular') + '</h4>'
+      + '<div class="vqs-grid vqs-g3">' + recs.map(function(x){ return tplCard(x, ind); }).join('') + '</div></div>' : '';
+    if (!full) {
+      return '<div class="vqs-card vqs-lib" id="vqs-lib">' + head + recBlock
+        + '<div class="vqs-cats">' + (st.categories || []).map(function(c){
+          return '<button type="button" data-a="lib-open" data-cat="' + esc(c.key) + '">' + esc(c.icon + ' ' + c.label) + '<b>' + c.count + '</b></button>';
+        }).join('') + '</div>'
+        + '<div class="vqs-row" style="margin-top:12px;"><button class="vqs-btn" data-a="lib-open" data-cat="all">Browse all ' + t.length + ' templates →</button></div></div>';
+    }
+    return '<div class="vqs-lib" id="vqs-lib">' + head + recBlock
+      + '<div class="vqs-lib-tools"><div class="vqs-cats" id="vqs-lib-cats">' + libChips() + '</div>'
+      + '<input type="search" class="vqs-lib-search" data-a-tsearch placeholder="Search — clinic, delivery, school…" value="' + esc(st.tplQ) + '" aria-label="Search the templates"></div>'
+      + '<div id="vqs-lib-grid">' + libGrid() + '</div></div>';
+  }
+
+  /** Preview: the template on a phone, as a respondent sees it, beside everything it asks. */
+  function previewModal(){
+    var x = byKey(st.tplOpen);
+    if (!x) return '';
+    var name = ctxCompany() || 'Your business';
+    var ind = industryOf(ctxClientId());
+    var src = '/s/_template/' + encodeURIComponent(x.key) + '?device=1&business=' + encodeURIComponent(name);
+    var narrow = window.innerWidth <= 760;
+    var list = st.templates.filter(tplMatches);
+    if (!list.some(function(y){ return y.key === x.key; })) list = st.templates;
+    var at = list.findIndex(function(y){ return y.key === x.key; });
+    var prev = list[(at - 1 + list.length) % list.length], next = list[(at + 1) % list.length];
+    return '<div class="vqs-modal" data-a="tpl-close-bg">'
+      + '<div class="vqs-modal-box" role="dialog" aria-modal="true" aria-labelledby="vqs-tpl-h">'
+      + '<button type="button" class="vqs-modal-x" data-a="tpl-close" aria-label="Close the preview">×</button>'
+      + '<div class="vqs-modal-grid">'
+      + '<div>' + device('<iframe id="vqs-tpl-frame" title="The ' + esc(x.name) + ' survey, as a customer sees it" src="' + esc(src) + '"></iframe>',
+        narrow ? Math.min(340, window.innerWidth - 32) : 300, narrow ? 0 : 150)
+      + '<div class="vqs-phone-cap">Preview — tap through it as a customer would. Nothing answered here is saved.</div></div>'
+      + '<div>'
+      + '<div class="vqs-row"><span class="vqs-tico">' + esc(x.icon) + '</span><span class="vqs-tag">' + esc(x.category_label) + '</span>'
+      + (x.key === ind ? '<span class="vqs-tag best">✓ Your industry</span>' : '') + (x.popular ? '<span class="vqs-tag pop">Popular</span>' : '') + '</div>'
+      + '<h2 id="vqs-tpl-h" style="margin-top:10px;">' + esc(x.name) + '</h2>'
+      + '<div class="sub">' + esc(tplMeta(x, true)) + '</div>'
+      + '<p style="font-size:13.5px;line-height:1.55;margin:0 0 10px;">' + esc(x.description) + '</p>'
+      + (x.measures.length ? '<div style="margin:0 0 12px;font-size:12px;color:var(--muted,#6b645b);">Measures ' + x.measures.map(function(m){ return '<span class="vqs-tag">' + esc(m) + '</span>'; }).join('') + '</div>' : '')
+      + '<h3>What it asks</h3><ol class="vqs-qlist">' + (x.outline || []).map(function(q){
+        var ty = QTYPES[q.type];
+        var notes = [q.when ? 'only ' + q.when : '', q.about_you ? 'about them, optional' : ''].filter(Boolean);
+        return '<li>' + (ty ? '<span title="' + esc(ty.label) + '">' + esc(ty.icon) + '</span> ' : '') + esc(String(q.title || '').replace(/\{business\}/g, name))
+          + (notes.length ? ' <span class="cond">— ' + esc(notes.join('; ')) + '</span>' : '') + '</li>';
+      }).join('') + '</ol>'
+      + (x.setup_hint ? '<div class="vqs-banner warn">' + esc(x.setup_hint) + '</div>' : '')
+      + '<div class="vqs-row"><button type="button" class="vqs-btn primary" data-a="use-tpl" data-tpl="' + esc(x.key) + '">Use this template</button>'
+      + '<button type="button" class="vqs-btn" data-a="tpl-close">Close</button></div>'
+      + '<div class="sub" style="margin:10px 0 0;">It goes live in ' + (isPortal() ? 'your' : 'the client’s') + ' name and colours, in English and Urdu. Reword, add or remove any question afterwards.</div>'
+      + (list.length > 1 ? '<div class="vqs-steppers"><button type="button" class="vqs-link" data-a="tpl-preview" data-tpl="' + esc(prev.key) + '">← ' + esc(prev.icon + ' ' + prev.name) + '</button>'
+        + '<button type="button" class="vqs-link" data-a="tpl-preview" data-tpl="' + esc(next.key) + '">' + esc(next.icon + ' ' + next.name) + ' →</button></div>' : '')
+      + '</div></div></div></div>';
+  }
+  var modalEl = null, modalFrom = null;
+  /** The preview lives outside the studio's own element, so a background refresh never reloads the phone. */
+  function renderModal(){
+    var html = st.tplOpen && st.templates ? previewModal() : '';
+    if (!modalEl && !html) return;
+    if (!modalEl) {
+      modalEl = document.createElement('div');
+      modalEl.id = 'vqs-modal-root';
+      modalEl.addEventListener('click', onClick);
+      modalEl.addEventListener('keydown', onKey);
+      document.body.appendChild(modalEl);
+    }
+    var wasOpen = !!modalEl.firstChild;
+    if (html && !wasOpen) modalFrom = document.activeElement;
+    modalEl.innerHTML = html ? '<div class="vqs">' + html + '</div>' : '';
+    if (html) fitDevices(modalEl);
+    document.body.classList.toggle('vqs-noscroll', !!html);
+    if (html) { var x = modalEl.querySelector('.vqs-modal-x'); if (x) x.focus(); }
+    else if (wasOpen && modalFrom && document.body.contains(modalFrom)) { try { modalFrom.focus(); } catch (e) { /* gone */ } }
+  }
+  function closePreview(){ st.tplOpen = null; renderModal(); }
+  /** A fresh New survey form: in the CRM, for the client already being looked at. */
+  function freshForm(){
+    if (isPortal() || !st.clientFilter) return {};
+    var c = clientById(st.clientFilter);
+    return c && c.surveys_enabled !== false ? { client_id: c.id } : {};
+  }
+  function setIndustry(value){
+    var id = ctxClientId();
+    if (!id) return;
+    var before = industryOf(id);
+    st.industries[id] = value;
+    render();
+    api('PATCH', '/industry', isPortal() ? { industry: value } : { industry: value, client_id: id }).then(function(){
+      var x = byKey(value);
+      toast(x ? 'Saved — ' + x.industry_label + ' templates now come first' : 'Industry cleared');
+      if (host.industryChanged) host.industryChanged(id, value);
+    }).catch(function(e){ st.industries[id] = before; render(); toast(e.message || 'Could not save the industry.', true); });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* New survey: the template library, then the few things worth asking  */
   /* ------------------------------------------------------------------ */
   function viewNew(){
     var t = st.templates;
     if (!t) { loadTemplates().then(render).catch(function(e){ toast(e.message, true); }); return back() + loading('Loading templates…'); }
     var f = st.newForm;
-    var tpl = st.newTpl ? t.find(function(x){ return x.key === st.newTpl; }) : null;
+    var tpl = st.newTpl ? byKey(st.newTpl) : null;
     var all = !isPortal() && host.clients ? host.clients() : [];
     var clients = all.filter(function(c){ return c.surveys_enabled !== false; });
     var hint = host.enableHint ? host.enableHint() : '';
     var noneOn = !isPortal() && all.length && !clients.length;
-    return back()
-      + (noneOn ? '<div class="vqs-banner warn"><b>No client has surveys switched on yet.</b> ' + esc(hint) + '</div>' : '')
-      + '<div class="vqs-top"><div><h2>New survey</h2><p>Choose the template closest to your business. Every question can be reworded, reordered or removed afterwards.</p></div></div>'
-      + '<div class="vqs-grid vqs-g3">' + t.map(function(x){
-        return '<div class="vqs-card vqs-tpl' + (x.key === st.newTpl ? ' on' : '') + '" data-a="pick-tpl" data-tpl="' + esc(x.key) + '" role="button" tabindex="0">'
-          + '<div class="vqs-spread"><span class="vqs-ic">' + esc(x.icon) + '</span><span style="font-size:11px;color:var(--muted,#6b645b);">' + x.question_count + ' questions</span></div>'
-          + '<div class="nm">' + esc(x.name) + '</div><div class="ds">' + esc(x.description) + '</div>'
-          + '<div>' + x.measures.map(function(m){ return '<span class="vqs-tag">' + esc(m) + '</span>'; }).join('') + '</div></div>';
-      }).join('') + '</div>'
-      + (tpl ? '<div class="vqs-card" id="vqs-setup" style="margin-top:16px;">'
-        + '<h3>' + esc(tpl.icon + ' ' + tpl.name) + '</h3>'
-        + '<div class="sub">The questions: ' + tpl.preview.map(esc).join(' · ') + '</div>'
-        + (tpl.setup_hint ? '<div class="vqs-banner warn">' + esc(tpl.setup_hint) + '</div>' : '')
-        + (clients.length ? '<label class="vqs-f"><span>Client <em>— clients with surveys switched on</em></span><select data-nf="client_id"><option value="">Choose a client…</option>'
-          + clients.map(function(c){ return '<option value="' + esc(c.id) + '"' + (f.client_id === c.id ? ' selected' : '') + '>' + esc(c.company) + '</option>'; }).join('') + '</select></label>'
-          + (all.length > clients.length && hint ? '<div class="sub" style="margin:-4px 0 10px;">Not listed? ' + esc(hint) + '</div>' : '') : '')
-        + '<div class="vqs-two">'
-        + '<label class="vqs-f"><span>Survey name <em>— only you see this</em></span><input type="text" data-nf="title" maxlength="160" value="' + esc(f.title || tpl.name + ' survey') + '"></label>'
-        + '<label class="vqs-f"><span>Business name customers see</span><input type="text" data-nf="display_name" maxlength="120" placeholder="' + esc(defaultBusinessName()) + '" value="' + esc(f.display_name || '') + '"></label>'
-        + '</div>'
-        + '<div class="vqs-f"><span>Languages</span>'
-        + ['en', 'ur'].map(function(l){ return '<label class="vqs-check"><input type="checkbox" data-nf-lang="' + l + '"' + ((f.languages || ['en', 'ur']).indexOf(l) >= 0 ? ' checked' : '') + '>' + LANGS[l] + '</label>'; }).join('')
-        + '<div class="sub" style="margin:2px 0 0;">With both on, customers switch with one tap. Urdu reads right to left.</div></div>'
-        + '<div class="vqs-f"><span>Brand colour</span>' + colorPicker(f.brand_color || '#2f56d9', 'nf') + '</div>'
-        + '<label class="vqs-f"><span>Branches or locations <em>— optional, one per line; each gets its own QR code</em></span><textarea data-nf="locations" rows="3" placeholder="Gulberg&#10;DHA Phase 5">' + esc(f.locations || '') + '</textarea></label>'
-        + '<div class="vqs-two">'
-        + '<label class="vqs-f"><span>Google review link <em>— optional; shown to delighted customers</em></span><input type="url" data-nf="review_url" placeholder="https://g.page/r/…/review" value="' + esc(f.review_url || '') + '"></label>'
-        + '<label class="vqs-f"><span>Email unhappy answers to <em>— optional</em></span><input type="text" data-nf="alert_emails" placeholder="' + esc(defaultAlertEmail() || 'manager@yourbusiness.com') + '" value="' + esc(f.alert_emails != null ? f.alert_emails : '') + '"></label>'
-        + '</div>'
-        + '<div class="vqs-row" style="margin-top:6px;"><button class="vqs-btn primary" data-a="create" data-status="live"' + (st.creating || noneOn ? ' disabled' : '') + '>' + (st.creating ? 'Creating…' : 'Create and go live') + '</button>'
-        + '<button class="vqs-btn" data-a="create" data-status="draft"' + (st.creating || noneOn ? ' disabled' : '') + '>Save as a draft</button></div>'
-        + '</div>' : '');
+    var banner = noneOn ? '<div class="vqs-banner warn"><b>No client has Vantriq Echo switched on yet.</b> ' + esc(hint) + '</div>' : '';
+    if (!tpl) {
+      return back() + banner
+        + '<div class="vqs-top"><div><h2>New survey</h2><p><b>Step 1 of 2</b> — choose the template closest to ' + (isPortal() ? 'your business' : 'the client’s business') + '. Every question can be reworded, reordered or removed afterwards.</p></div></div>'
+        + library(true);
+    }
+    return back() + banner
+      + '<div class="vqs-top"><div><h2>New survey</h2><p><b>Step 2 of 2</b> — a few details, and it is ready to share.</p></div></div>'
+      + '<div class="vqs-card vqs-chosen"><span class="vqs-tico">' + esc(tpl.icon) + '</span><div>'
+      + '<h3>' + esc(tpl.name) + '</h3><div class="sub" style="margin:0 0 6px;">' + esc(tpl.category_label + ' · ' + tplMeta(tpl, true)) + '</div>'
+      + '<div class="sub" style="margin:0;">The questions: ' + tpl.preview.map(function(q){ return esc(q.replace(/\{business\}/g, f.display_name || defaultBusinessName() || 'your business')); }).join(' · ') + '</div></div>'
+      + '<div class="vqs-row"><button type="button" class="vqs-btn sm" data-a="tpl-preview" data-tpl="' + esc(tpl.key) + '">👁 Preview</button>'
+      + '<button type="button" class="vqs-btn sm" data-a="change-tpl">Change template</button></div></div>'
+      + '<div class="vqs-card" id="vqs-setup">'
+      + (tpl.setup_hint ? '<div class="vqs-banner warn">' + esc(tpl.setup_hint) + '</div>' : '')
+      + (clients.length ? '<label class="vqs-f"><span>Client <em>— clients with Vantriq Echo switched on</em></span><select data-nf="client_id"><option value="">Choose a client…</option>'
+        + clients.map(function(c){ return '<option value="' + esc(c.id) + '"' + (f.client_id === c.id ? ' selected' : '') + '>' + esc(c.company) + '</option>'; }).join('') + '</select></label>'
+        + (all.length > clients.length && hint ? '<div class="sub" style="margin:-4px 0 10px;">Not listed? ' + esc(hint) + '</div>' : '') : '')
+      + '<div class="vqs-two">'
+      + '<label class="vqs-f"><span>Survey name <em>— only you see this</em></span><input type="text" data-nf="title" maxlength="160" value="' + esc(f.title || tpl.name + ' survey') + '"></label>'
+      + '<label class="vqs-f"><span>Business name customers see</span><input type="text" data-nf="display_name" maxlength="120" placeholder="' + esc(defaultBusinessName()) + '" value="' + esc(f.display_name || '') + '"></label>'
+      + '</div>'
+      + '<div class="vqs-f"><span>Languages</span>'
+      + ['en', 'ur'].map(function(l){ return '<label class="vqs-check"><input type="checkbox" data-nf-lang="' + l + '"' + ((f.languages || ['en', 'ur']).indexOf(l) >= 0 ? ' checked' : '') + '>' + LANGS[l] + '</label>'; }).join('')
+      + '<div class="sub" style="margin:2px 0 0;">With both on, customers switch with one tap. Urdu reads right to left.</div></div>'
+      + '<div class="vqs-f"><span>Brand colour</span>' + colorPicker(f.brand_color || '#2f56d9', 'nf') + '</div>'
+      + '<label class="vqs-f"><span>Branches or locations <em>— optional, one per line; each gets its own QR code</em></span><textarea data-nf="locations" rows="3" placeholder="Gulberg&#10;DHA Phase 5">' + esc(f.locations || '') + '</textarea></label>'
+      + '<div class="vqs-two">'
+      + '<label class="vqs-f"><span>Google review link <em>— optional; shown to delighted customers</em></span><input type="url" data-nf="review_url" placeholder="https://g.page/r/…/review" value="' + esc(f.review_url || '') + '"></label>'
+      + '<label class="vqs-f"><span>Email unhappy answers to <em>— optional</em></span><input type="text" data-nf="alert_emails" placeholder="' + esc(defaultAlertEmail() || 'manager@yourbusiness.com') + '" value="' + esc(f.alert_emails != null ? f.alert_emails : '') + '"></label>'
+      + '</div>'
+      + '<div class="vqs-row" style="margin-top:6px;"><button class="vqs-btn primary" data-a="create" data-status="live"' + (st.creating || noneOn ? ' disabled' : '') + '>' + (st.creating ? 'Creating…' : 'Create and go live') + '</button>'
+      + '<button class="vqs-btn" data-a="create" data-status="draft"' + (st.creating || noneOn ? ' disabled' : '') + '>Save as a draft</button></div>'
+      + '</div>';
   }
   function defaultBusinessName(){
     if (isPortal()) return (host.company && host.company()) || '';
@@ -574,18 +972,19 @@
     var s = st.survey;
     if (!s) return back() + loading('Opening the survey…');
     var fu = st.overview && st.overview.followup_queue ? st.overview.followup_queue.filter(function(r){ return r.survey_id === s.id && r.followup_status === 'open'; }).length : 0;
-    var tabs = [['results', 'Results'], ['responses', 'Responses'], ['questions', 'Questions'], ['share', 'Share'], ['settings', 'Settings']];
+    var tabs = [['results', 'Results'], ['responses', 'Responses'], ['questions', 'Questions'], ['share', '📣 Share · QR'], ['settings', 'Settings']];
     return back()
       + '<div class="vqs-top"><div>'
       + '<div class="vqs-row">' + status(s) + '<span style="font-size:12px;color:var(--muted,#6b645b);">' + esc(s.template ? s.template.icon + ' ' + s.template.name : '') + (!isPortal() ? ' · ' + esc(s.company) : '') + '</span></div>'
       + '<h2 style="margin-top:6px;">' + esc(s.title) + '</h2>'
       + '<p>' + esc(biz(s)) + ' · ' + s.questions.length + ' questions · about ' + s.estimated_minutes + ' min · ' + s.languages.map(function(l){ return LANGS[l]; }).join(' + ') + '</p></div>'
       + '<div class="vqs-row">'
-      + '<button class="vqs-btn" data-a="copy" data-text="' + esc(s.links.url) + '">Copy link</button>'
+      + (st.tab !== 'share' ? '<button class="vqs-btn primary" data-a="tab" data-tab="share">📣 Share · QR code</button>' : '')
+      + '<button class="vqs-btn" data-a="copy" data-text="' + esc(s.links.url) + '" data-label="Link copied">Copy link</button>'
       + '<a class="vqs-btn" href="' + esc(s.status === 'live' ? s.links.url : s.links.preview) + '" target="_blank" rel="noopener">Open survey ↗</a>'
       + '</div></div>'
       + (s.client_surveys_enabled === false && !isPortal()
-        ? '<div class="vqs-banner warn"><b>Surveys are switched off for ' + esc(s.company) + ',</b> so this survey is paused for respondents and no new links can be made. '
+        ? '<div class="vqs-banner warn"><b>Vantriq Echo is switched off for ' + esc(s.company) + ',</b> so this survey is paused for respondents and no new links can be made. '
           + 'Its answers are kept. ' + esc(host.enableHint ? host.enableHint() : '') + '</div>' : '')
       + '<div class="vqs-tabs" role="tablist">' + tabs.map(function(t){
         return '<button role="tab" aria-selected="' + (st.tab === t[0]) + '" class="' + (st.tab === t[0] ? 'on' : '') + '" data-a="tab" data-tab="' + t[0] + '">' + t[1]
@@ -640,8 +1039,40 @@
         + (w.detractors ? '<div style="width:' + seg(w.detractors) + '%;background:' + NPS_C.det + '"></div>' : '') + (w.passives ? '<div style="width:' + seg(w.passives) + '%;background:' + NPS_C.pas + '"></div>' : '') + (w.promoters ? '<div style="width:' + seg(w.promoters) + '%;background:' + NPS_C.pro + '"></div>' : '') + '</div>'
         + '<div class="vqs-legend"><span><i style="background:' + NPS_C.det + '"></i>Detractors 0–6 · ' + w.detractors + '</span><span><i style="background:' + NPS_C.pas + '"></i>Passives 7–8 · ' + w.passives + '</span><span><i style="background:' + NPS_C.pro + '"></i>Promoters 9–10 · ' + w.promoters + '</span></div></div>' : '')
       + (a.locations.length ? locationsCard(a) : '')
+      + demographicsCards(a.demographics, a.period.window_label)
       + '<div class="vqs-grid vqs-g2" style="margin-top:14px;">' + a.questions.map(questionResult).join('') + (a.channels.length > 1 ? '<div class="vqs-card"><h3>Where answers came from</h3><div class="sub">' + esc(a.period.window_label) + '</div>' + bars(a.channels.map(function(c){ return { name: c.name, value: c.responses, share: Math.round(c.responses / w.responses * 100) }; })) + '</div>' : '') + '</div>'
       + (a.sampled ? '<p class="sub" style="margin-top:10px;">Question breakdowns use the latest 20,000 answers in the period; the headline figures use all of them.</p>' : '');
+  }
+
+  /** Echo's dashboard (drawn by analytics-view.js, the same kit as Pulse). */
+  function dashboard(){
+    if (!window.VQA) return '';
+    if (window.VQA.injectStyles) window.VQA.injectStyles();
+    if (!st.dash) return '<div class="vqs-card" style="margin-bottom:14px;"><div class="vqs-loading">Working out your results…</div></div>';
+    if (st.dash.error) return errorCard(st.dash.error, 'reload-dash');
+    return window.VQA.echoHTML(st.dash, { onGrain: 'VQS.dashGrain', onReport: 'VQS.echoReport', reportLabel: 'Download Echo report (Excel)',
+      reportHint: 'Satisfaction, NPS, every survey and answer, who answered (gender, age, city), follow-ups and respondents — a tab for each' });
+  }
+
+  /**
+   * Who answered, by gender, age group and city — each group's share of the
+   * answers and how satisfied it is. Nothing to show until a survey asks.
+   */
+  function demographicsCards(demo, sub){
+    demo = demo || {};
+    var parts = [['gender', 'By gender'], ['age', 'By age group'], ['city', 'By city']].filter(function(x){ return demo[x[0]] && demo[x[0]].length; });
+    if (!parts.length) {
+      return '<div class="vqs-card" style="margin-top:14px;"><h3>Who answers</h3><div class="sub">Gender, age group and city</div>'
+        + '<div class="vqs-empty" style="padding:12px;">Add the <b>Gender</b>, <b>Age group</b> or <b>City</b> question to a survey (open it → Questions → Add a question → About you) to see how satisfaction differs between groups. Answers also fill in the customer\'s profile.</div></div>';
+    }
+    return '<div class="vqs-grid vqs-g3" style="margin-top:14px;">' + parts.map(function(x){
+      var list = demo[x[0]].slice(0, 8);
+      return '<div class="vqs-card"><h3>' + x[1] + '</h3><div class="sub">' + esc(sub) + ' · bar: how many answered · figure: % satisfied</div>'
+        + bars(list.map(function(g){
+          return { name: g.name + ' (' + n(g.responses) + ')', value: g.responses, color: g.known ? undefined : '#bdb7ad',
+            label: g.csat != null ? g.csat + '% 😊' : '—' };
+        })) + '</div>';
+    }).join('') + '</div>';
   }
 
   function locationsCard(a){
@@ -793,6 +1224,8 @@
       + qs.map(function(q, i){ return questionEditor(q, i, qs); }).join('')
       + (st.addingQ ? '<div class="vqs-card" style="margin-top:10px;"><div class="vqs-spread" style="margin-bottom:10px;"><h3>Add a question</h3><button class="vqs-link" data-a="add-cancel">Cancel</button></div><div class="vqs-types">'
         + Object.keys(QTYPES).map(function(t){ return '<button data-a="add-q" data-type="' + t + '"><span style="font-size:18px;">' + QTYPES[t].icon + '</span><span><b>' + esc(QTYPES[t].label) + '</b><span>' + esc(QTYPES[t].hint) + '</span></span></button>'; }).join('')
+        + '</div><div class="sub" style="margin:14px 0 8px;"><b>About you</b> — optional, saved to the customer\'s profile, and splits your results</div><div class="vqs-types">'
+        + Object.keys(PROFILE_Q).map(function(k){ var pq = PROFILE_Q[k]; var has = qs.some(function(x){ return x.profile === k; }); return '<button data-a="add-profile" data-p="' + k + '"' + (has ? ' disabled title="This survey already asks it"' : '') + '><span style="font-size:18px;">' + pq.icon + '</span><span><b>' + esc(pq.label) + '</b><span>' + esc(has ? 'Already in this survey.' : pq.hint) + '</span></span></button>'; }).join('')
         + '</div></div>'
         : '<div style="margin-top:12px;"><button class="vqs-btn" data-a="add-open"' + (qs.length >= 40 ? ' disabled' : '') + '>＋ Add a question</button></div>')
       + '</div>' + phone() + '</div>';
@@ -807,6 +1240,7 @@
       + '<span class="qt">' + esc(title) + '</span>'
       + (q.show_if ? '<span class="vqs-tag" title="Only shown to some people">⑂ logic</span>' : '')
       + (q.required ? '<span class="vqs-tag" style="background:#fbeee4;color:#94512b;">required</span>' : '')
+      + (q.profile ? '<span class="vqs-tag" style="background:#e8ecfd;color:#1f3a95;" title="The answer is saved to the customer\'s profile and splits the results">about you · ' + esc(PROFILE_NAME[q.profile] || q.profile) + '</span>' : '')
       + '<span class="ty">' + esc(t.label) + '</span>'
       + '<button class="vqs-mini" data-a="move-q" data-i="' + i + '" data-d="-1" title="Move up"' + (i === 0 ? ' disabled' : '') + '>↑</button>'
       + '<button class="vqs-mini" data-a="move-q" data-i="' + i + '" data-d="1" title="Move down"' + (i === qs.length - 1 ? ' disabled' : '') + '>↓</button>'
@@ -828,8 +1262,8 @@
       body += '<label class="vqs-check"><input type="checkbox" data-q-bool="' + i + '" data-k="metric_resolved"' + (q.metric === 'resolved' ? ' checked' : '') + '>Counts towards “Resolved” — “No” opens a follow-up</label>';
     }
     if (q.type === 'contact') {
-      body += '<div class="vqs-f"><span>Ask for</span>' + ['name', 'phone', 'email', 'company'].map(function(f){
-        return '<label class="vqs-check"><input type="checkbox" data-q-field="' + i + '" data-field="' + f + '"' + ((q.fields || []).indexOf(f) >= 0 ? ' checked' : '') + '>' + { name: 'Name', phone: 'Phone / WhatsApp', email: 'Email', company: 'Business name' }[f] + '</label>';
+      body += '<div class="vqs-f"><span>Ask for</span>' + ['name', 'phone', 'email', 'company', 'city'].map(function(f){
+        return '<label class="vqs-check"><input type="checkbox" data-q-field="' + i + '" data-field="' + f + '"' + ((q.fields || []).indexOf(f) >= 0 ? ' checked' : '') + '>' + { name: 'Name', phone: 'Phone / WhatsApp', email: 'Email', company: 'Business name', city: 'City' }[f] + '</label>';
       }).join('') + '<div class="sub" style="margin:4px 0 0;">Respondents also tick whether you may contact them.</div></div>';
     }
     body += logicEditor(q, i, qs)
@@ -889,11 +1323,45 @@
     return q;
   }
 
+  /* ---------------------------- A real phone ---------------------------- */
+  // A preview is the page as it really is on a phone: laid out on a 390 x 844
+  // screen (an everyday iPhone; most Androids are within a few points of it),
+  // under a status bar and camera island and above the home bar, then the
+  // whole phone is drawn smaller to fit. Never the page squeezed into a box.
+  var PHONE_W = 390, PHONE_H = 844, BEZEL = 11;
+  var SB_SIGNAL = '<svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="7.5" width="3.2" height="4.5" rx="1"/><rect x="4.9" y="5" width="3.2" height="7" rx="1"/><rect x="9.8" y="2.5" width="3.2" height="9.5" rx="1"/><rect x="14.7" y="0" width="3.2" height="12" rx="1"/></svg>';
+  var SB_WIFI = '<svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.4c2.3 0 4.4.9 6 2.4l1.2-1.3A10.3 10.3 0 0 0 8.5.6 10.3 10.3 0 0 0 1.3 3.5l1.2 1.3a8.5 8.5 0 0 1 6-2.4z"/><path d="M8.5 5.9c1.4 0 2.6.5 3.6 1.4l1.2-1.3a6.9 6.9 0 0 0-9.6 0l1.2 1.3c1-.9 2.2-1.4 3.6-1.4z"/><path d="M8.5 9.3c.5 0 1 .2 1.3.5L8.5 11.2 7.2 9.8c.3-.3.8-.5 1.3-.5z"/></svg>';
+  var SB_BATTERY = '<svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".38"/><rect x="2" y="2" width="20" height="9" rx="2.5" fill="currentColor"/><path d="M25 4.4v4.2a2.3 2.3 0 0 0 0-4.2z" fill="currentColor" opacity=".4"/></svg>';
+  /** How small to draw the phone: as wide as the room allows, and short enough to fit the window when asked. */
+  function phoneScale(maxW, fitH){
+    var sc = (maxW - 2 * BEZEL) / PHONE_W;
+    if (fitH) sc = Math.min(sc, (window.innerHeight - fitH - 2 * BEZEL) / PHONE_H);
+    return Math.max(0.42, Math.min(0.86, sc));
+  }
+  function device(iframe, maxW, fitH){
+    return '<div class="vqs-dev" data-max-w="' + maxW + '"' + (fitH ? ' data-fit-h="' + fitH + '"' : '') + ' style="--s:' + phoneScale(maxW, fitH).toFixed(4) + '">'
+      + '<div class="vqs-dev-screen"><div class="vqs-dev-vp">' + iframe
+      + '<div class="vqs-dev-bar" aria-hidden="true"><span>9:41</span><span class="ic">' + SB_SIGNAL + SB_WIFI + SB_BATTERY + '</span></div>'
+      + '<div class="vqs-dev-island" aria-hidden="true"></div><div class="vqs-dev-home" aria-hidden="true"></div>'
+      + '</div></div></div>';
+  }
+  /** Once drawn: fit each phone to the room it really has (a narrow column, a small window). */
+  function fitDevices(scope){
+    if (!scope) return;
+    var list = scope.querySelectorAll('.vqs-dev');
+    for (var i = 0; i < list.length; i++) {
+      var el = list[i], maxW = Number(el.getAttribute('data-max-w')) || 320;
+      var room = el.parentNode ? el.parentNode.clientWidth : 0;
+      el.style.setProperty('--s', phoneScale(room ? Math.min(maxW, room) : maxW, Number(el.getAttribute('data-fit-h')) || 0).toFixed(4));
+    }
+  }
+
   /* ---------------------------- Live phone preview ---------------------------- */
   function phone(){
     var s = st.survey;
-    return '<div class="vqs-phone-wrap"><div class="vqs-phone"><iframe id="vqs-preview" title="Live preview" src="/s/' + encodeURIComponent(s.slug) + '?preview=1"></iframe></div>'
-      + '<div class="vqs-phone-cap">Live preview — nothing you do here is recorded</div></div>';
+    return '<div class="vqs-phone-wrap">'
+      + device('<iframe id="vqs-preview" title="Live preview" src="/s/' + encodeURIComponent(s.slug) + '?preview=1&device=1"></iframe>', 332, 64)
+      + '<div class="vqs-phone-cap">Live preview, as it looks on a customer’s phone — nothing you do here is recorded</div></div>';
   }
   var previewTimer = null, pendingGoto = null;
   function pushPreview(goto){
@@ -1044,15 +1512,27 @@
   /* ------------------------------------------------------------------ */
   function onClick(e){
     var b = e.target.closest('[data-a]');
-    if (!b || !root.contains(b) || b.disabled) return;
+    if (!b || !(root.contains(b) || (modalEl && modalEl.contains(b))) || b.disabled) return;
     var a = b.getAttribute('data-a'), ds = b.dataset;
     if (a === 'tab' || a === 'home' || a === 'open' || a === 'new') st.justCreated = false;
     var d = st.draft;
     switch (a) {
       case 'home': if (!leaveCheck()) return; st.view = 'home'; st.survey = null; st.draft = null; destroyCharts(); render(); if (!st.list) loadHome(); break;
       case 'reload-home': st.list = null; render(); loadHome(); break;
-      case 'new': st.view = 'new'; st.newTpl = ds.tpl || null; st.newForm = {}; render(); if (ds.tpl) setTimeout(scrollSetup, 50); break;
-      case 'pick-tpl': st.newTpl = ds.tpl; render(); setTimeout(scrollSetup, 50); break;
+      case 'new': st.view = 'new'; st.newTpl = ds.tpl || null; st.newForm = freshForm(); st.tplQ = ''; st.tplCat = 'all'; render(); toTop(); if (ds.tpl) setTimeout(scrollSetup, 50); break;
+      case 'pick-tpl': st.newTpl = ds.tpl; render(); toTop(); break;
+      /* the template library */
+      case 'tpl-preview': st.tplOpen = ds.tpl; renderModal(); break;
+      case 'tpl-close': closePreview(); break;
+      case 'tpl-close-bg': if (e.target === b) closePreview(); break;
+      case 'use-tpl':
+        closePreview();
+        if (st.view !== 'new') { st.newForm = freshForm(); st.view = 'new'; }
+        st.newTpl = ds.tpl; render(); toTop(); break;
+      case 'change-tpl': st.newTpl = null; render(); toTop(); break;
+      case 'tpl-cat': st.tplCat = ds.cat; st.tplQ = ''; render(); break;
+      case 'lib-open': st.view = 'new'; st.newTpl = null; st.newForm = freshForm(); st.tplCat = ds.cat || 'all'; st.tplQ = ''; render(); toTop(); break;
+      case 'lib-scroll': var lib = document.getElementById('vqs-lib'); if (lib) lib.scrollIntoView({ behavior: 'smooth', block: 'start' }); break;
       case 'create': createSurvey(ds.status); break;
       case 'open': e.preventDefault(); openSurvey(ds.id, ds.tab); break;
       case 'tab':
@@ -1067,7 +1547,7 @@
       case 'export':
         host.download('/' + st.survey.id + '/responses.xlsx', st.survey.slug + '-responses.xlsx').catch(function(err){ toast(err.message || 'Could not download.', true); });
         break;
-      case 'copy': copy(ds.text); break;
+      case 'copy': copy(ds.text, ds.label); break;
       case 'resp-filter': st.tab = 'responses'; st.rFilter = ds.f; loadResponses(true); break;
       case 'reload-resp': case 'more': loadResponses(a !== 'more'); break;
       case 'toggle-resp': st.openResp = st.openResp === ds.id ? null : ds.id; render(); break;
@@ -1096,6 +1576,21 @@
       case 'add-cancel': st.addingQ = false; render(); break;
       case 'add-q':
         var q = newQuestion(ds.type); d.questions.push(q); st.addingQ = false; st.openQ = q.id; render(); pushPreview(q.id); break;
+      case 'add-profile':
+        var pq = PROFILE_Q[ds.p].q;
+        var pnew = { id: ds.p === 'age' ? 'age' : ds.p, type: pq.type, profile: pq.profile, required: false, title: clone(pq.title),
+          options: pq.options.map(function(o){ return { id: o[0], label: { en: o[1], ur: o[2] } }; }) };
+        if (pq.allow_other) pnew.allow_other = true;
+        if (d.questions.some(function(x){ return x.id === pnew.id; })) pnew.id = rid('q');
+        var at = d.questions.findIndex(function(x){ return x.type === 'contact'; });
+        if (at < 0) d.questions.push(pnew); else d.questions.splice(at, 0, pnew);
+        st.addingQ = false; st.openQ = pnew.id; render(); pushPreview(pnew.id); break;
+      case 'reload-dash': st.dash = null; render(); loadDash(); break;
+      case 'echo-report':
+        host.download('/report.xlsx?grain=' + encodeURIComponent(st.reportGrain) + (st.clientFilter ? '&client_id=' + encodeURIComponent(st.clientFilter) : ''),
+          'vantriq-echo-' + st.reportGrain + '-' + new Date().toISOString().slice(0, 10) + '.xlsx')
+          .catch(function(err){ toast(err.message || 'Could not build the report.', true); });
+        break;
       case 'dup-q':
         var copyQ = clone(d.questions[Number(ds.i)]); copyQ.id = rid('q'); delete copyQ.show_if;
         d.questions.splice(Number(ds.i) + 1, 0, copyQ); st.openQ = copyQ.id; render(); pushPreview(copyQ.id); break;
@@ -1140,6 +1635,12 @@
     }
   }
   function scrollSetup(){ var el = document.getElementById('vqs-setup'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  /** A new step starts at its top, not wherever the last one was scrolled to. */
+  function toTop(){
+    if (!root) return;
+    var r = root.getBoundingClientRect();
+    if (r.top < 0) window.scrollBy(0, r.top - 12);
+  }
 
   function onInput(e){
     var el = e.target;
@@ -1157,6 +1658,14 @@
       else if (st.draft) { st.draft.brand_color = el.value; touched(); }
       return;
     }
+    if (el.hasAttribute('data-a-tsearch')) {
+      // Only the cards and the shelves change, so the search box keeps its focus and caret.
+      st.tplQ = el.value;
+      var grid = document.getElementById('vqs-lib-grid'), cats = document.getElementById('vqs-lib-cats');
+      if (grid) grid.innerHTML = libGrid();
+      if (cats) cats.innerHTML = libChips();
+      return;
+    }
     if (el.hasAttribute('data-a-search')) {
       clearTimeout(onInput.t);
       onInput.t = setTimeout(function(){ st.rQ = el.value.trim(); loadResponses(true); }, 350);
@@ -1167,7 +1676,10 @@
     var el = e.target, d = st.draft;
     if (el.hasAttribute('data-a-change')) {
       var which = el.getAttribute('data-a-change');
-      if (which === 'client-filter') { st.clientFilter = el.value; st.list = null; render(); loadHome(); }
+      if (which === 'client-filter') { st.clientFilter = el.value; st.list = null; st.dash = null; render(); loadHome(); }
+      if (which === 'industry') setIndustry(el.value);
+      if (which === 'share-pick') { st.shareId = el.value; render(); }
+      if (which === 'report-grain') { st.reportGrain = el.value; }
       if (which === 'resp-loc') { st.rLoc = el.value; loadResponses(true); }
       return;
     }
@@ -1190,7 +1702,7 @@
       var cq = d.questions[Number(el.getAttribute('data-q-field'))], f = el.getAttribute('data-field');
       var fields = (cq.fields || []).filter(function(x){ return x !== f; });
       if (el.checked) fields.push(f);
-      cq.fields = ['name', 'phone', 'email', 'company'].filter(function(x){ return fields.indexOf(x) >= 0; });
+      cq.fields = ['name', 'phone', 'email', 'company', 'city'].filter(function(x){ return fields.indexOf(x) >= 0; });
       if (!cq.fields.length) { cq.fields = ['name']; toast('Keep at least one detail to ask for.', true); }
       render(); pushPreview(cq.id); return;
     }
@@ -1237,6 +1749,9 @@
   function onKey(e){
     if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[role=button][data-a]')) { e.preventDefault(); e.target.click(); }
   }
+  function onDocKey(e){
+    if (e.key === 'Escape' && st.tplOpen) { e.preventDefault(); closePreview(); }
+  }
 
   /* ------------------------------------------------------------------ */
   /* Render                                                              */
@@ -1254,6 +1769,11 @@
       fresh.parentNode.replaceChild(old, fresh);
     } else if (fresh) {
       fresh.addEventListener('load', function(){ pushPreview(st.openQ); });
+    }
+    if (fresh) fitDevices(root);
+    if (st.view === 'home' && st.dash && !st.dash.error && window.VQA) {
+      var dd = st.dash;
+      if (window.requestAnimationFrame) requestAnimationFrame(function(){ window.VQA.drawEcho(dd); }); else window.VQA.drawEcho(dd);
     }
     if (st.view === 'survey' && st.tab === 'results' && st.analytics && !st.analytics.error) {
       if (window.requestAnimationFrame) requestAnimationFrame(drawCharts); else drawCharts();
@@ -1275,6 +1795,15 @@
       el.addEventListener('keydown', onKey);
       el.__vqs = true;
     }
+    if (!mount.docKeys) {
+      document.addEventListener('keydown', onDocKey);
+      var fitT = null;
+      window.addEventListener('resize', function(){
+        clearTimeout(fitT);
+        fitT = setTimeout(function(){ fitDevices(root); fitDevices(modalEl); }, 120);
+      });
+      mount.docKeys = true;
+    }
     if (!st.loaded) { st.loaded = true; loadHome(); loadTemplates().catch(function(){}); }
     render();
   }
@@ -1283,7 +1812,27 @@
     mount: mount,
     open: function(id, tab){ openSurvey(id, tab); },
     hasUnsaved: function(){ return dirty(); },
-    reset: function(){ st.loaded = false; st.list = null; st.overview = null; st.view = 'home'; st.survey = null; st.draft = null; },
+    reset: function(){
+      st.loaded = false; st.list = null; st.overview = null; st.dash = null; st.view = 'home'; st.survey = null; st.draft = null;
+      // The library's "your industry" is per account: the next sign-in loads its own.
+      st.templates = null; st.industries = {}; st.ownId = null; st.tplQ = ''; st.tplCat = 'all'; st.newTpl = null; st.newForm = {};
+      tplGen += 1; tplLoading = null;
+      closePreview();
+    },
+    dashGrain: function(g){ st.reportGrain = g; loadDash(); },
+    /** The host changed a client's industry elsewhere (the CRM's client page). */
+    setIndustry: function(id, industry){ st.industries[id] = industry || ''; if (host && st.view !== 'survey') render(); },
+    /** Open on one client's surveys (the CRM's client page links here). */
+    showClient: function(id){
+      st.clientFilter = id || ''; st.view = 'home'; st.survey = null; st.draft = null;
+      st.list = null; st.overview = null; st.dash = null;
+      if (st.loaded && host) loadHome();
+    },
+    echoReport: function(){
+      host.download('/report.xlsx?grain=' + encodeURIComponent(st.reportGrain) + (st.clientFilter ? '&client_id=' + encodeURIComponent(st.clientFilter) : ''),
+        'vantriq-echo-' + st.reportGrain + '-' + new Date().toISOString().slice(0, 10) + '.xlsx')
+        .catch(function(err){ toast(err.message || 'Could not build the report.', true); });
+    },
     destroyCharts: destroyCharts,
   };
 })();

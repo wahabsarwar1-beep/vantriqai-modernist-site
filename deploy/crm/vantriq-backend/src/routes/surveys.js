@@ -27,7 +27,7 @@ const isPortal = (req) => !!req.portalClient;
 router.use((req, res, next) => {
   if (isPortal(req) && !req.portalClient.surveys_enabled) {
     return res.status(403).json({
-      error: 'Customer-satisfaction surveys are not switched on for your account. Ask Vantriq AI to turn them on.',
+      error: 'Vantriq Echo (customer-satisfaction surveys) is not switched on for your account. Ask Vantriq AI to turn it on.',
       code: 'surveys_disabled',
     });
   }
@@ -66,8 +66,68 @@ function scopeId(req) {
   return id;
 }
 
+/**
+ * The Echo workbook: satisfaction, NPS, every survey and answer, who
+ * answered (gender, age group, city), follow-ups and respondents — for one
+ * client (the portal's own, or ?client_id= in the CRM) or every client.
+ */
+router.get('/report.xlsx', async (req, res) => {
+  const { echoReport, sendReport } = require('../utils/analyticsReport');
+  const grain = String(req.query.grain || 'month');
+  let client = null;
+  if (isPortal(req)) client = req.portalClient;
+  else {
+    const id = scopeId(req);
+    if (id) {
+      client = await S.getClient(id);
+      if (!client) throw new S.SurveyError(404, 'Client not found');
+    }
+  }
+  sendReport(res, await echoReport(client, { grain }));
+});
+
+/** Echo's dashboard: every survey in view together, by period — trends, scores, funnel, breakdowns, findings. */
+router.get('/dashboard', async (req, res) => {
+  const { echoDashboard } = require('../utils/echoDashboard');
+  res.json(await echoDashboard({ clientId: scopeId(req), grain: String(req.query.grain || 'month') }));
+});
+
 /** The industry template gallery: restaurant, FMCG, telecom, healthcare and the rest. */
 router.get('/templates', (req, res) => res.json(S.templateSummaries()));
+
+/**
+ * The template library as the studio shows it: every template, the shelves
+ * they sit on, and whose library it is — the client's industry puts their
+ * own templates first. A customer's is always their own; staff pass
+ * ?client_id= (without it there is no "your industry").
+ */
+router.get('/templates/library', async (req, res) => {
+  let client = null;
+  if (isPortal(req)) client = req.portalClient;
+  else {
+    const id = scopeId(req);
+    if (id) client = await S.getClient(id);
+  }
+  res.json({
+    templates: S.templateSummaries(),
+    categories: S.templateCategories(),
+    client: client ? { id: client.id, company: client.company, industry: client.industry || '' } : null,
+  });
+});
+
+/**
+ * PATCH { industry[, client_id] } — which industry's templates fit this
+ * business ('' for "not said"). A customer sets their own; staff name the
+ * client.
+ */
+router.patch('/industry', async (req, res) => {
+  const body = req.body || {};
+  const clientId = isPortal(req) ? req.portalClient.id : body.client_id;
+  if (!clientId) throw new S.SurveyError(400, 'Choose which client this is for.');
+  const row = await S.setClientIndustry(clientId, body.industry);
+  if (!row) throw new S.SurveyError(404, 'Client not found');
+  res.json(row);
+});
 
 /** Every survey in view, with its last 30 days of results and its public address. */
 router.get('/', async (req, res) => {

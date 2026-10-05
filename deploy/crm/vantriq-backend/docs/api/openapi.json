@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "VantriqAI CRM API",
-    "version": "9.15.0",
-    "description": "The CRM behind VantriqAI: clients, invoices, payments, quotes and proposals,\ncontracts, statements, and the webhook surface the AI agents write through.\n\n## Authentication\n\nTwo ways in, and one of them is for people:\n\n- **Staff session** — `Authorization: Bearer <token>`, issued by `POST /api/auth/verify`\n  after a password and an emailed one-time code. A staff member's role decides reach.\n- **API key** — `x-api-key: <key>`, for machines. Keys are scoped.\n\n## Scopes\n\nLeast to most: `webhook` < `automation` < `staff` < `admin`. A scope opens everything\nbelow it. The admin key opens everything and is intended as break-glass only — set\n`ALLOW_API_KEY_LOGIN=false` once staff accounts exist.\n\n## Automation writes through this API, never to the database\n\nn8n and any other integration must use these endpoints rather than connecting to\nPostgres. Tenancy, quota and tax rules live here; a direct write bypasses all three."
+    "version": "9.22.0",
+    "description": "The CRM behind VantriqAI: clients, invoices, payments, quotes and proposals,\ncontracts, statements, and the webhook surface the AI agents write through.\n\n## Authentication\n\nTwo ways in, and one of them is for people:\n\n- **Staff session** — `Authorization: Bearer <token>`, issued by `POST /api/auth/verify`\n  after a password and an emailed one-time code. A staff member's role decides reach.\n- **API key** — `x-api-key: <key>`, for machines. Keys are scoped.\n- **Emergency session** — `Authorization: Bearer bg_…`, issued by\n  `POST /api/auth/breakglass/verify` for the admin key plus a code emailed to the CEO.\n\n## Scopes\n\nLeast to most: `webhook` < `automation` < `staff` < `admin`. A scope opens everything\nbelow it. The admin key is break-glass, and on its own it opens nothing from outside the\nserver (v9.22): it starts emergency access, which needs the CEO's code and lasts two\nhours. Set `ALLOW_API_KEY_LOGIN=false` to switch emergency access off.\n\n## Automation writes through this API, never to the database\n\nn8n and any other integration must use these endpoints rather than connecting to\nPostgres. Tenancy, quota and tax rules live here; a direct write bypasses all three."
   },
   "servers": [
     {
@@ -33,6 +33,9 @@
       "name": "accounting"
     },
     {
+      "name": "addons"
+    },
+    {
       "name": "agents"
     },
     {
@@ -54,7 +57,13 @@
       "name": "clients"
     },
     {
+      "name": "contacts"
+    },
+    {
       "name": "contracts"
+    },
+    {
+      "name": "costing"
     },
     {
       "name": "dashboard"
@@ -85,6 +94,9 @@
     },
     {
       "name": "portal"
+    },
+    {
+      "name": "pricingDocs"
     },
     {
       "name": "procurement"
@@ -130,7 +142,7 @@
           "accounting"
         ],
         "summary": "GET /api/accounting/balance-sheet",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -170,7 +182,7 @@
           "accounting"
         ],
         "summary": "A period against the one immediately before it, same length. Two columns is what makes a statement readable — a single number tells you nothing about whether it is good.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -210,7 +222,7 @@
           "accounting"
         ],
         "summary": "GET /api/accounting/pnl",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -250,7 +262,7 @@
           "accounting"
         ],
         "summary": "GET /api/accounting/pnl/monthly?from=&to= One P&L per month from the first thing that ever happened (or `from`) to today (or `to`). This is the monthly report the business runs on: the trend matters more than any single month's number.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -290,7 +302,7 @@
           "accounting"
         ],
         "summary": "GET /api/accounting/remittances",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -328,7 +340,7 @@
           "accounting"
         ],
         "summary": "POST /api/accounting/remittances",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -379,7 +391,7 @@
           "accounting"
         ],
         "summary": "DELETE /api/accounting/remittances/:id",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -428,8 +440,204 @@
           "accounting"
         ],
         "summary": "The FBR position: GST we have collected and owe, AIT clients have withheld and we can recover, and what has already been settled either way.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/addons": {
+      "get": {
+        "tags": [
+          "addons"
+        ],
+        "summary": "GET /api/addons",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "addons"
+        ],
+        "summary": "POST /api/addons",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
+        "parameters": [],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/addons/{id}": {
+      "delete": {
+        "tags": [
+          "addons"
+        ],
+        "summary": "Retires an add-on from new quotes. Quotes that already name it keep it.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "addons"
+        ],
+        "summary": "PUT /api/addons/:id",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success",
@@ -712,8 +920,8 @@
         "tags": [
           "analytics"
         ],
-        "summary": "One customer's analytics — identical to what they see on their portal's Analytics tab.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "summary": "One customer's analytics — identical to what they see on their portal's Pulse tab (Vantriq Pulse).",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -756,13 +964,62 @@
         ]
       }
     },
+    "/api/analytics/clients/{id}/report.xlsx": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "One customer's Pulse workbook: their contacts (new and returning, who they are and where), conversations and transcripts. Echo has its own report.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
     "/api/analytics/platform": {
       "get": {
         "tags": [
           "analytics"
         ],
         "summary": "Every customer's conversations and satisfaction together, with the busiest customers.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [],
         "responses": {
           "200": {
@@ -772,6 +1029,46 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/analytics/platform/report.xlsx": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Every customer's workbook in one: each customer side by side, then every contact and conversation.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
                 }
               }
             }
@@ -802,7 +1099,7 @@
           "analytics"
         ],
         "summary": "Our own leads, wins, losses, funnel, sources and what prospects ask the sales agent.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [],
         "responses": {
           "200": {
@@ -836,13 +1133,53 @@
         ]
       }
     },
+    "/api/analytics/sales/report.xlsx": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "The sales workbook: every lead, the funnel, sources, and each prospect conversation.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
     "/api/archive": {
       "get": {
         "tags": [
           "archive"
         ],
         "summary": "GET /api/archive — what is live, what has been archived, and past runs.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -882,7 +1219,7 @@
           "archive"
         ],
         "summary": "GET /api/archive/download?months=12 The workbook, and the run that a purge will have to name. The hash is of the exact bytes sent, so the file on disk can be checked against it later.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -922,7 +1259,7 @@
           "archive"
         ],
         "summary": "GET /api/archive/preview?months=12 — what a run would take, and nothing else.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -962,7 +1299,7 @@
           "archive"
         ],
         "summary": "POST /api/archive/purge { sha256, confirm: 'PURGE' } Deletes exactly what the matching archive run covered, after writing its monthly totals into the books. One transaction: either the rows are gone and the totals are recorded, or neither happened.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -1005,6 +1342,236 @@
             "staffSession": []
           }
         ]
+      }
+    },
+    "/api/auth/breakglass/end-all": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Everyone in on emergency access, out — and no code still waiting can be used.",
+        "description": "The CEO only: the owner account (ceo@vantriqai.com) signed in with its own session. No API key, no emergency session and no other admin reaches it. Costing, Financials, the business documents, the list of emergency sessions.",
+        "parameters": [],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/auth/breakglass/sessions": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "The CEO's view of them: who opened one, from where, until when — and the means to end them. Not even an emergency session sees this list.",
+        "description": "The CEO only: the owner account (ceo@vantriqai.com) signed in with its own session. No API key, no emergency session and no other admin reaches it. Costing, Financials, the business documents, the list of emergency sessions.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/auth/breakglass/sessions/{id}/end": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Ends one emergency session: whoever is using it is signed out on their next request.",
+        "description": "The CEO only: the owner account (ceo@vantriqai.com) signed in with its own session. No API key, no emergency session and no other admin reaches it. Costing, Financials, the business documents, the list of emergency sessions.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/auth/breakglass/start": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Step 1: the key. Answers with a challenge, and emails its code to the CEO.",
+        "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
+        "parameters": [],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/auth/breakglass/verify": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Step 2: the CEO's code. Opens the emergency session.",
+        "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
+        "parameters": [],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": []
       }
     },
     "/api/auth/change-password": {
@@ -3022,6 +3589,66 @@
         ]
       }
     },
+    "/api/clients/{id}/industry": {
+      "patch": {
+        "tags": [
+          "clients"
+        ],
+        "summary": "PATCH /api/clients/:id/industry { industry } — which Echo template fits this client ('' to clear). Puts their industry's surveys first in the library.",
+        "description": "Requires the **automation** scope or higher. Automation key or any staff session. Clients, invoices, packages, agents.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
     "/api/clients/{id}/portal-credentials": {
       "delete": {
         "tags": [
@@ -3341,7 +3968,7 @@
         "tags": [
           "clients"
         ],
-        "summary": "PATCH /api/clients/:id/surveys { enabled: true|false } Customer-satisfaction surveys are an add-on, off for every client until an admin turns them on here — the same pattern as API access above. On: the client gets a Surveys tab in their portal, staff can build surveys for them, and their agents' after-chat invites are answered. Off: every survey they have is paused for respondents at once, the tab disappears and invites are refused; the surveys and their answers are kept for when it comes back on.",
+        "summary": "PATCH /api/clients/:id/surveys { enabled: true|false[, industry, starter_survey: true] } Customer-satisfaction surveys are an add-on, off for every client until an admin turns them on here — the same pattern as API access above. On: the client gets a Surveys tab in their portal, staff can build surveys for them, and their agents' after-chat invites are answered. Off: every survey they have is paused for respondents at once, the tab disappears and invites are refused; the surveys and their answers are kept for when it comes back on. With starter_survey, switching on also makes a live survey from their industry's template (General when none is set) — only if they have none.",
         "description": "Requires the **automation** scope or higher. Automation key or any staff session. Clients, invoices, packages, agents.",
         "parameters": [
           {
@@ -3505,13 +4132,216 @@
         ]
       }
     },
+    "/api/contacts": {
+      "get": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "The directory: search, segments (new, returning, regulars, at risk, unhappy…), city filter, sort.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/contacts/{clientId}/{key}": {
+      "get": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "One customer: profile, stats, every conversation with its transcript, survey answers.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
+        "parameters": [
+          {
+            "name": "clientId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "Edit what is known about them. A person's edit always wins over what an agent or survey filled in.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
+        "parameters": [
+          {
+            "name": "clientId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/contacts/export.xlsx": {
+      "get": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "Every customer ever, as a workbook: directory, segments, every conversation, every transcript line.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
     "/api/contracts": {
       "get": {
         "tags": [
           "contracts"
         ],
         "summary": "GET /api/contracts[?client_id=&status=&expiring=true]",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [],
         "responses": {
           "200": {
@@ -3549,7 +4379,7 @@
           "contracts"
         ],
         "summary": "POST /api/contracts",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -3600,7 +4430,7 @@
           "contracts"
         ],
         "summary": "DELETE /api/contracts/:id",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -3647,7 +4477,7 @@
           "contracts"
         ],
         "summary": "GET /api/contracts/:id",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -3694,7 +4524,7 @@
           "contracts"
         ],
         "summary": "PATCH /api/contracts/:id",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -3754,7 +4584,7 @@
           "contracts"
         ],
         "summary": "POST /api/contracts/:id/supersede — a renewal that replaces this one. Copies the terms forward, points the old contract at the new one and marks it superseded. Done as one step because doing it by hand means three edits and a chance to forget the third, leaving two contracts both reading active.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -3808,13 +4638,201 @@
         ]
       }
     },
+    "/api/costing": {
+      "get": {
+        "tags": [
+          "costing"
+        ],
+        "summary": "Products & Pricing, the cost side — the CEO's alone (mounted behind requireScope('admin') + requireCeo in src/index.js, v9.21). Everything here is margin, which other admins, staff, every API key and customers never see. GET /api/costing the whole model: rate card, assumptions, every package's economics, the steady state, the bulk-model what-if, flags PUT /api/costing change rates and/or assumptions { rates: {key: {input, output, ...}|null}, assumptions: {...}, utilization } utilization is the costing's own typical use (0.1–1), not Financials' projection PATCH /api/costing/packages/:id one package's cost profile POST /api/costing/reset back to the business model's defaults Package PRICES are not changed here — they stay locked to the business model (routes/products.js). Every change here re-costs every package and writes delivery_cost_full, so Financials moves with it.",
+        "description": "The CEO only: the owner account (ceo@vantriqai.com) signed in with its own session. No API key, no emergency session and no other admin reaches it. Costing, Financials, the business documents, the list of emergency sessions.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "costing"
+        ],
+        "summary": "PUT /api/costing",
+        "description": "The CEO only: the owner account (ceo@vantriqai.com) signed in with its own session. No API key, no emergency session and no other admin reaches it. Costing, Financials, the business documents, the list of emergency sessions.",
+        "parameters": [],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/costing/packages/{id}": {
+      "patch": {
+        "tags": [
+          "costing"
+        ],
+        "summary": "PATCH /api/costing/packages/:id",
+        "description": "The CEO only: the owner account (ceo@vantriqai.com) signed in with its own session. No API key, no emergency session and no other admin reaches it. Costing, Financials, the business documents, the list of emergency sessions.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/costing/reset": {
+      "post": {
+        "tags": [
+          "costing"
+        ],
+        "summary": "POST /api/costing/reset",
+        "description": "The CEO only: the owner account (ceo@vantriqai.com) signed in with its own session. No API key, no emergency session and no other admin reaches it. Costing, Financials, the business documents, the list of emergency sessions.",
+        "parameters": [],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
     "/api/dashboard": {
       "get": {
         "tags": [
           "dashboard"
         ],
         "summary": "GET /api/dashboard",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [],
         "responses": {
           "200": {
@@ -3854,7 +4872,7 @@
           "expenses"
         ],
         "summary": "GET /api/expenses?include_derived=1&from=&to= The typed-in expenses \\u2014 rent, salaries, subscriptions \\u2014 and, when asked for, the one cost nobody types in: what VantriqAI's own agents cost to run. That figure is already an invoice on the internal account, so re-entering it by hand would double it. It is derived instead, and marked `derived` so the UI shows it as a cost without offering to edit something that is really an invoice. It is converted to PKR on the way out. The internal invoices behind it are raised in dollars, and this list is a list of rupees.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -3892,7 +4910,7 @@
           "expenses"
         ],
         "summary": "POST /api/expenses",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -3943,7 +4961,7 @@
           "expenses"
         ],
         "summary": "DELETE /api/expenses/:id",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -3990,7 +5008,7 @@
           "expenses"
         ],
         "summary": "Ending a recurring expense rather than deleting it. Deleting the row also deletes it from every past month's P&L, which is not what \"we cancelled that subscription in March\" means.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -4050,7 +5068,7 @@
           "exportBase"
         ],
         "summary": "GET /api/export/contracts.xlsx[?view=expiring] With no view it writes one sheet per filter on the Contracts tab plus an \"All contracts\" sheet, so the whole book and each section separately arrive together. With ?view= it writes that section alone.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -4090,7 +5108,7 @@
           "exportBase"
         ],
         "summary": "GET /api/export/crm.xlsx Optional ?from=&to= narrows the transactional sheets (invoices, payments, usage). The reference sheets — clients, packages, agents — are always complete, because a filtered invoice list that points at clients you cannot see is not much use to anyone.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -4130,7 +5148,7 @@
           "exportBase"
         ],
         "summary": "GET /api/export/pipeline.xlsx[?stage=lead] The pipeline as a spreadsheet. With no stage it writes one sheet per stage plus an \"All stages\" sheet holding every row — so the whole pipeline and each stage on its own arrive in a single file, which is what you want when the question is \"where is everything sitting\". With ?stage= it writes that one stage alone. The columns are the ones you work a lead from — who, how to reach them, where they came from, what it is worth, who owns it and how long it has sat there — rather than every column the table happens to have. Days in stage comes off updated_at, which is what the stage-change trigger touches.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -4605,8 +5623,8 @@
         "tags": [
           "financials"
         ],
-        "summary": "GET /api/financials",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "summary": "Revenue, delivery cost and margin by package at a chosen utilisation. The CEO's alone (v9.21).",
+        "description": "The CEO only: the owner account (ceo@vantriqai.com) signed in with its own session. No API key, no emergency session and no other admin reaches it. Costing, Financials, the business documents, the list of emergency sessions.",
         "parameters": [],
         "responses": {
           "200": {
@@ -4631,9 +5649,6 @@
           }
         },
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "staffSession": []
           }
@@ -5233,7 +6248,7 @@
           "packageRequests"
         ],
         "summary": "Package changes customers ask for from their portal. Admin-only. Approving is what actually moves the client onto the new package and raises the invoices — nothing bills off the customer's click alone.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [],
         "responses": {
           "200": {
@@ -5273,7 +6288,7 @@
           "packageRequests"
         ],
         "summary": "Approve: move the client onto the requested package. Invoices are raised only for a client already active — a lead still bills when they go active.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -5333,7 +6348,7 @@
           "packageRequests"
         ],
         "summary": "POST /api/package-requests/:id/reject",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -5393,7 +6408,7 @@
           "payments"
         ],
         "summary": "GET /api/payments?client_id=&invoice_id=&from=&to=&kind=",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [],
         "responses": {
           "200": {
@@ -5431,7 +6446,7 @@
           "payments"
         ],
         "summary": "POST /api/payments — record one ledger row against one invoice.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -5482,7 +6497,7 @@
           "payments"
         ],
         "summary": "Deleting a ledger row is a correction, so the invoice restates itself.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -5531,7 +6546,7 @@
           "payments"
         ],
         "summary": "GET /api/payments/statement/:client_id One client's account: every invoice raised, everything received against it, and what is still outstanding — the document you send when someone asks \"what do we owe you?\".",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "client_id",
@@ -5678,7 +6693,7 @@
         "tags": [
           "portal"
         ],
-        "summary": "GET /api/portal/analytics?grain=day|week|month|quarter|year The dashboard: conversations, contacts (new and returning), channels, agents, busiest hours, satisfaction, and a few plain-English findings. Only counts leave the server — never a session id or anything else that would identify one of this customer's own customers.",
+        "summary": "GET /api/portal/analytics?grain=day|week|month|quarter|year The dashboard: conversations, contacts (new and returning), channels, agents, busiest hours, satisfaction, and a few plain-English findings. Counts only — the people behind them are in the report below.",
         "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
         "parameters": [],
         "responses": {
@@ -5689,6 +6704,39 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/portal/analytics/report.xlsx": {
+      "get": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "GET /api/portal/analytics/report.xlsx?grain=… Pulse as a workbook, with the detail behind it: this customer's own contacts (by the number they wrote from — new, and who came back, with name, email and city when known), each conversation and its transcript. Only ever this customer's own; see utils/analyticsReport.js. Echo's report is at /api/portal/surveys/report.xlsx.",
+        "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
                 }
               }
             }
@@ -5978,6 +7026,165 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/portal/contacts": {
+      "get": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "GET /api/portal/contacts?q=&segment=&city=&sort=&limit=&offset= — the directory, searchable.",
+        "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/portal/contacts/{key}": {
+      "get": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "GET /api/portal/contacts/:key — one customer: profile, every conversation and what was said, their survey answers.",
+        "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": []
+      },
+      "patch": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "PATCH /api/portal/contacts/:key — name, email, city, gender, age group, company, tags, notes, do-not-contact.",
+        "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/portal/contacts/export.xlsx": {
+      "get": {
+        "tags": [
+          "portal"
+        ],
+        "summary": "GET /api/portal/contacts/export.xlsx — every customer ever, every detail, every conversation.",
+        "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
                 }
               }
             }
@@ -7221,6 +8428,83 @@
         "security": []
       }
     },
+    "/api/portal/surveys/dashboard": {
+      "get": {
+        "tags": [
+          "surveys"
+        ],
+        "summary": "Echo's dashboard: every survey in view together, by period — trends, scores, funnel, breakdowns, findings.",
+        "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/portal/surveys/industry": {
+      "patch": {
+        "tags": [
+          "surveys"
+        ],
+        "summary": "PATCH { industry[, client_id] } — which industry's templates fit this business ('' for \"not said\"). A customer sets their own; staff name the client.",
+        "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
+        "parameters": [],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": []
+      }
+    },
     "/api/portal/surveys/overview": {
       "get": {
         "tags": [
@@ -7254,12 +8538,78 @@
         "security": []
       }
     },
+    "/api/portal/surveys/report.xlsx": {
+      "get": {
+        "tags": [
+          "surveys"
+        ],
+        "summary": "The Echo workbook: satisfaction, NPS, every survey and answer, who answered (gender, age group, city), follow-ups and respondents — for one client (the portal's own, or ?client_id= in the CRM) or every client.",
+        "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": []
+      }
+    },
     "/api/portal/surveys/templates": {
       "get": {
         "tags": [
           "surveys"
         ],
         "summary": "The industry template gallery: restaurant, FMCG, telecom, healthcare and the rest.",
+        "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/portal/surveys/templates/library": {
+      "get": {
+        "tags": [
+          "surveys"
+        ],
+        "summary": "The template library as the studio shows it: every template, the shelves they sit on, and whose library it is — the client's industry puts their own templates first. A customer's is always their own; staff pass ?client_id= (without it there is no \"your industry\").",
         "description": "Open, or authenticated by the route itself (portal and staff sign-in).",
         "parameters": [],
         "responses": {
@@ -7318,6 +8668,181 @@
           }
         },
         "security": []
+      }
+    },
+    "/api/pricing/documents": {
+      "get": {
+        "tags": [
+          "pricingDocs"
+        ],
+        "summary": "Every business document, newest first, without its bytes; `current` marks the newest of each kind and format.",
+        "description": "The CEO only: the owner account (ceo@vantriqai.com) signed in with its own session. No API key, no emergency session and no other admin reaches it. Costing, Financials, the business documents, the list of emergency sessions.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "pricingDocs"
+        ],
+        "summary": "Upload one: { filename, data (base64), content_type?, kind?, title?, note? }. Up to 25 MB; the same file twice is one version.",
+        "description": "The CEO only: the owner account (ceo@vantriqai.com) signed in with its own session. No API key, no emergency session and no other admin reaches it. Costing, Financials, the business documents, the list of emergency sessions.",
+        "parameters": [],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/pricing/documents/{id}": {
+      "delete": {
+        "tags": [
+          "pricingDocs"
+        ],
+        "summary": "Delete one version for good.",
+        "description": "The CEO only: the owner account (ceo@vantriqai.com) signed in with its own session. No API key, no emergency session and no other admin reaches it. Costing, Financials, the business documents, the list of emergency sessions.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/pricing/documents/{id}/file": {
+      "get": {
+        "tags": [
+          "pricingDocs"
+        ],
+        "summary": "The file itself, as an attachment that is never cached. Each opening is counted.",
+        "description": "The CEO only: the owner account (ceo@vantriqai.com) signed in with its own session. No API key, no emergency session and no other admin reaches it. Costing, Financials, the business documents, the list of emergency sessions.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ]
       }
     },
     "/api/products": {
@@ -7737,7 +9262,7 @@
           "procurement"
         ],
         "summary": "GET /api/purchase-orders",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -7775,7 +9300,7 @@
           "procurement"
         ],
         "summary": "POST /api/purchase-orders",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -7826,7 +9351,7 @@
           "procurement"
         ],
         "summary": "DELETE /api/purchase-orders/:id",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -7873,7 +9398,7 @@
           "procurement"
         ],
         "summary": "PUT /api/purchase-orders/:id",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -7933,7 +9458,7 @@
           "quota"
         ],
         "summary": "GET /api/quota",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [],
         "responses": {
           "200": {
@@ -7973,7 +9498,7 @@
           "quota"
         ],
         "summary": "Records the decision. 'bill_overage' also raises the overage invoice there and then, priced off the client's live usage for that month, so the decision and the charge cannot drift apart.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -8033,7 +9558,7 @@
           "quotes"
         ],
         "summary": "A quote with its body, or a list of them.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [],
         "responses": {
           "200": {
@@ -8071,7 +9596,7 @@
           "quotes"
         ],
         "summary": "POST /api/quotes",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -8122,7 +9647,7 @@
           "quotes"
         ],
         "summary": "DELETE /api/quotes/:id",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -8169,7 +9694,7 @@
           "quotes"
         ],
         "summary": "GET /api/quotes/:id",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -8216,7 +9741,7 @@
           "quotes"
         ],
         "summary": "PATCH /api/quotes/:id",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -8276,7 +9801,7 @@
           "quotes"
         ],
         "summary": "POST /api/quotes/:id/accept",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -8336,7 +9861,7 @@
           "quotes"
         ],
         "summary": "POST /api/quotes/:id/decline",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -8396,7 +9921,7 @@
           "quotes"
         ],
         "summary": "GET /api/quotes/:id/document",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -8445,7 +9970,7 @@
           "quotes"
         ],
         "summary": "The proposal as JSON, for the CRM to preview without rendering a PDF.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -8494,7 +10019,7 @@
           "quotes"
         ],
         "summary": "The proposal as a PDF, ready to send.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -8543,7 +10068,7 @@
           "quotes"
         ],
         "summary": "Marks it sent. The customer sees it in their portal from this point.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -8872,7 +10397,7 @@
           "reps"
         ],
         "summary": "List reps, with a live count of leads each one owns (admin visibility — this is exactly the cross-rep view individual reps never get).",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -8910,7 +10435,7 @@
           "reps"
         ],
         "summary": "Create a rep and issue their login key — shown once, same pattern as admin/webhook keys.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -8961,7 +10486,7 @@
           "reps"
         ],
         "summary": "DELETE /api/reps/:id",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -9008,7 +10533,7 @@
           "reps"
         ],
         "summary": "PUT /api/reps/:id",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -9068,7 +10593,7 @@
           "reps"
         ],
         "summary": "Issue a brand-new key for an existing rep (e.g. their old one leaked). Old key stops working immediately.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -9128,7 +10653,7 @@
           "settings"
         ],
         "summary": "GET /api/settings",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -9166,7 +10691,7 @@
           "settings"
         ],
         "summary": "PUT /api/settings",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -9217,7 +10742,7 @@
           "settings"
         ],
         "summary": "GET /api/settings/email — is email working, and if not, why? Every send path in the CRM fails soft: a chase that cannot send is logged as skipped and the invoice still stands. That is the right behaviour and it is also why a broken mail token is silent for weeks. This says it out loud, without sending anything.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -9257,7 +10782,7 @@
           "settings"
         ],
         "summary": "POST /api/settings/email/test { to } — send one real email, and report exactly what the mail API said. The alternative way to test this is to raise a real invoice for a real customer, which is a poor way to find out your token is wrong.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -9308,7 +10833,7 @@
           "settings"
         ],
         "summary": "GET /api/settings/internal-account",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -9346,7 +10871,7 @@
           "settings"
         ],
         "summary": "Idempotent: creates what is missing, leaves what exists alone.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -9397,7 +10922,7 @@
           "settings"
         ],
         "summary": "VantriqAI's own account — the site assistant and the WhatsApp agent metered and priced like any customer, with the billing landing as cost rather than revenue. See src/utils/internalClient.js. The tax authorities we bill under. Read-mostly: the rates change once a year at most, and each one is a statutory figure somebody has to stand behind. The endpoint therefore updates one authority at a time rather than accepting a bulk overwrite, so a malformed payload cannot quietly zero all five.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -9437,7 +10962,7 @@
           "settings"
         ],
         "summary": "PUT /api/settings/jurisdictions/:code",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "code",
@@ -9947,7 +11472,7 @@
           "surveys"
         ],
         "summary": "Every survey in view, with its last 30 days of results and its public address.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [],
         "responses": {
           "200": {
@@ -9985,7 +11510,7 @@
           "surveys"
         ],
         "summary": "A new survey from an industry template. Staff name the client; a customer's is always their own.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -10036,7 +11561,7 @@
           "surveys"
         ],
         "summary": "Deletes the survey and every answer to it. Staff scope, so no automation key can reach it.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -10083,7 +11608,7 @@
           "surveys"
         ],
         "summary": "The definition, its share links (link, QR, poster, kiosk, embed, per location) and its template.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -10130,7 +11655,7 @@
           "surveys"
         ],
         "summary": "Any change — questions, wording, languages, branding, locations, alerts, status. Validated as a whole.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -10190,7 +11715,7 @@
           "surveys"
         ],
         "summary": "Results for a period (grain=day|week|month|quarter|year): KPIs, trend, every question, locations, themes.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -10239,7 +11764,7 @@
           "surveys"
         ],
         "summary": "A draft copy of a survey, with a new address.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -10299,7 +11824,7 @@
           "surveys"
         ],
         "summary": "Personal one-time links (count 1–500): each is answered once and counts towards the response rate.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -10359,7 +11884,7 @@
           "surveys"
         ],
         "summary": "One page of responses, newest first. filter=all|unhappy|happy|followup|comments|contact, location=, q=.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -10408,7 +11933,7 @@
           "surveys"
         ],
         "summary": "Every response as an Excel workbook, one column per question, with a summary sheet.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -10457,7 +11982,7 @@
           "surveys"
         ],
         "summary": "Closing the loop on one response: followup_status open → contacted → resolved, and a note.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [
           {
             "name": "id",
@@ -10519,13 +12044,13 @@
         ]
       }
     },
-    "/api/surveys/overview": {
+    "/api/surveys/dashboard": {
       "get": {
         "tags": [
           "surveys"
         ],
-        "summary": "Totals across every survey in view, and the unhappy customers still waiting for a reply.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "summary": "Echo's dashboard: every survey in view together, by period — trends, scores, funnel, breakdowns, findings.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [],
         "responses": {
           "200": {
@@ -10559,13 +12084,184 @@
         ]
       }
     },
+    "/api/surveys/industry": {
+      "patch": {
+        "tags": [
+          "surveys"
+        ],
+        "summary": "PATCH { industry[, client_id] } — which industry's templates fit this business ('' for \"not said\"). A customer sets their own; staff name the client.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
+        "parameters": [],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/surveys/overview": {
+      "get": {
+        "tags": [
+          "surveys"
+        ],
+        "summary": "Totals across every survey in view, and the unhappy customers still waiting for a reply.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/surveys/report.xlsx": {
+      "get": {
+        "tags": [
+          "surveys"
+        ],
+        "summary": "The Echo workbook: satisfaction, NPS, every survey and answer, who answered (gender, age group, city), follow-ups and respondents — for one client (the portal's own, or ?client_id= in the CRM) or every client.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
     "/api/surveys/templates": {
       "get": {
         "tags": [
           "surveys"
         ],
         "summary": "The industry template gallery: restaurant, FMCG, telecom, healthcare and the rest.",
-        "description": "Requires the **staff** scope or higher. Staff session, or an admin key. Day-to-day CRM work.",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
+    "/api/surveys/templates/library": {
+      "get": {
+        "tags": [
+          "surveys"
+        ],
+        "summary": "The template library as the studio shows it: every template, the shelves they sit on, and whose library it is — the client's industry puts their own templates first. A customer's is always their own; staff pass ?client_id= (without it there is no \"your industry\").",
+        "description": "Requires the **staff** scope or higher. Staff session or an emergency session. Day-to-day CRM work.",
         "parameters": [],
         "responses": {
           "200": {
@@ -10605,7 +12301,7 @@
           "team"
         ],
         "summary": "GET /api/team",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -10643,7 +12339,7 @@
           "team"
         ],
         "summary": "POST /api/team",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -10694,7 +12390,7 @@
           "team"
         ],
         "summary": "POST /api/team/:id/activate",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -10754,7 +12450,7 @@
           "team"
         ],
         "summary": "POST /api/team/:id/deactivate",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -10814,7 +12510,7 @@
           "team"
         ],
         "summary": "Set an employee's password: type one in `password`, or leave it out for a generated one. Either way every session they had open is closed.",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -10874,7 +12570,7 @@
           "team"
         ],
         "summary": "POST /api/team/:id/role",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -10934,7 +12630,7 @@
           "procurement"
         ],
         "summary": "GET /api/vendors",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "responses": {
           "200": {
@@ -10972,7 +12668,7 @@
           "procurement"
         ],
         "summary": "POST /api/vendors",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [],
         "requestBody": {
           "required": false,
@@ -11023,7 +12719,7 @@
           "procurement"
         ],
         "summary": "DELETE /api/vendors/:id",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -11070,7 +12766,7 @@
           "procurement"
         ],
         "summary": "PUT /api/vendors/:id",
-        "description": "Requires the **admin** scope or higher. Admin only. Financials, settings, procurement, archive, exports.",
+        "description": "Requires the **admin** scope or higher. Admin only: an admin's session or an emergency session. Settings, procurement, accounting, archive, exports.",
         "parameters": [
           {
             "name": "id",
@@ -11124,12 +12820,63 @@
         ]
       }
     },
+    "/api/webhooks/contact": {
+      "post": {
+        "tags": [
+          "usage"
+        ],
+        "summary": "POST /api/webhooks/csat A customer-satisfaction answer, from whatever asked the question — a WhatsApp button reply at the end of a conversation, a web form, or a separate survey app. One call per answer. Body: { \"external_ref\": \"923001234567\", // or client_id / agent_ref / agent_id, exactly as /usage \"session_id\": \"923009998888-2026-08-16\", // optional — the conversation being rated \"channel\": \"whatsapp\", \"score\": 5, // optional — CSAT, 1 to 5 \"nps\": 9, // optional — 0 to 10 \"resolved\": true, // optional — \"did we sort out what you needed?\" \"comment\": \"Quick and clear, thanks\", \"source\": \"survey-app\", \"external_id\": \"resp_8f2c\", // optional — your id for this answer; a repeat is ignored, not double-counted \"responded_at\": \"2026-08-16T11:02:00Z\" // optional, defaults to now() } At least one of score, nps or resolved is required. POST /api/webhooks/contact What an agent learned about a customer during the conversation — \"I'm Ayesha, from Lahore\" — saved to their profile so it shows in the CRM, the business's portal (Customers) and every report. Body: { external_ref | agent_ref | client_id, session_id | phone, name, email, city, gender, age_band, company } Fills blanks only: anything a person has typed into the profile stays.",
+        "description": "Requires the **webhook** scope or higher. Webhook key. The narrowest scope — usage, lead and conversation ingestion only.",
+        "parameters": [],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or an invalid or revoked key"
+          },
+          "403": {
+            "description": "Authenticated, but not to this scope"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "staffSession": []
+          }
+        ]
+      }
+    },
     "/api/webhooks/conversation": {
       "post": {
         "tags": [
           "usage"
         ],
-        "summary": "POST /api/webhooks/conversation Stores what was actually said. The agents keep only a short in-memory buffer that a restart wipes, so without this the transcript behind a lead is gone by the time anyone opens the CRM to read it. Body: { external_ref, session_id, channel, messages: [{ role, content }] } role is \"customer\" or \"agent\". Unknown roles are dropped rather than failing the batch — a lost turn is better than a lost conversation.",
+        "summary": "POST /api/webhooks/conversation Stores what was actually said. The agents keep only a short in-memory buffer that a restart wipes, so without this the transcript behind a lead is gone by the time anyone opens the CRM to read it. Body: { external_ref, session_id, channel, messages: [{ role, content, at, id, delivered, error }] } role is \"customer\" or \"agent\". Unknown roles are dropped rather than failing the batch — a lost turn is better than a lost conversation. external_ref the client's ref, or one of its agents' (the number or site a customer's customers write to) — or name the agent outright with agent_ref / agent_id, exactly as /usage takes them. A ref the CRM does not know still lands with whichever agent metered the same session_id, when exactly one did. session_id the conversation: \"<customer>-<YYYY-MM-DD>\", as /usage names it. One sent without its day (a website chat's own id) gets the day /usage filed that chat under, or else the day its first line was said, UTC. at when it was said: ISO 8601, or Unix seconds / milliseconds (WhatsApp's own timestamp). Defaults to now. A time more than a year back or in the future is not trusted, and now is used. id the channel's id for the message (a WhatsApp wamid). A message already stored under that id is skipped, so an n8n retry or a history backfill run twice never doubles a transcript. delivered false, with error, for a reply the agent wrote but the channel refused. Given at the top level it applies to the batch's agent lines. The customer's words are kept either way; a fresh failure emails the team, at most once an hour per agent.",
         "description": "Requires the **webhook** scope or higher. Webhook key. The narrowest scope — usage, lead and conversation ingestion only.",
         "parameters": [],
         "requestBody": {
@@ -11180,7 +12927,7 @@
         "tags": [
           "usage"
         ],
-        "summary": "POST /api/webhooks/csat A customer-satisfaction answer, from whatever asked the question — a WhatsApp button reply at the end of a conversation, a web form, or a separate survey app. One call per answer. Body: { \"external_ref\": \"923001234567\", // or client_id / agent_ref / agent_id, exactly as /usage \"session_id\": \"923009998888-2026-08-16\", // optional — the conversation being rated \"channel\": \"whatsapp\", \"score\": 5, // optional — CSAT, 1 to 5 \"nps\": 9, // optional — 0 to 10 \"resolved\": true, // optional — \"did we sort out what you needed?\" \"comment\": \"Quick and clear, thanks\", \"source\": \"survey-app\", \"external_id\": \"resp_8f2c\", // optional — your id for this answer; a repeat is ignored, not double-counted \"responded_at\": \"2026-08-16T11:02:00Z\" // optional, defaults to now() } At least one of score, nps or resolved is required.",
+        "summary": "POST /api/webhooks/csat",
         "description": "Requires the **webhook** scope or higher. Webhook key. The narrowest scope — usage, lead and conversation ingestion only.",
         "parameters": [],
         "requestBody": {
@@ -11373,7 +13120,7 @@
         "tags": [
           "usage"
         ],
-        "summary": "POST /api/webhooks/usage Called by n8n (or any automation step) immediately after an AI model call returns, or when a WhatsApp 24-hour session closes. This is what makes usage numbers real-time instead of manually entered. Body: { \"external_ref\": \"923001234567\", // required unless client_id given — the client's ref, or one of its agents' refs \"client_id\": \"uuid\", // alternative to external_ref, if n8n already knows Vantriq's internal client id \"agent_ref\": \"instagram:@khantraders\", // optional — which of the client's agents handled this \"agent_id\": \"uuid\", // alternative to agent_ref \"session_id\": \"923009998888-2026-08-16\", // required — one id per 24h conversation window \"channel\": \"whatsapp\", // whatsapp | web | voice | instagram \"ai_model\": \"claude-sonnet-4-6\", \"input_tokens\": 812, \"output_tokens\": 340, \"messages_count\": 1, \"handoff\": false, // optional — true if a human had to take over (drives AI containment) \"occurred_at\": \"2026-08-16T10:32:00Z\" // optional, defaults to now() } n8n gets input_tokens/output_tokens straight from the AI provider's response JSON (Claude, OpenAI, and DeepSeek all return a `usage` object on every completion) — no extra computation needed on the n8n side.",
+        "summary": "POST /api/webhooks/usage Called by n8n (or any automation step) immediately after an AI model call returns, or when a WhatsApp 24-hour session closes. This is what makes usage numbers real-time instead of manually entered. Body: { \"external_ref\": \"923001234567\", // required unless client_id given — the client's ref, or one of its agents' refs \"client_id\": \"uuid\", // alternative to external_ref, if n8n already knows Vantriq's internal client id \"agent_ref\": \"instagram:@khantraders\", // optional — which of the client's agents handled this \"agent_id\": \"uuid\", // alternative to agent_ref \"session_id\": \"923009998888-2026-08-16\", // required — one id per 24h conversation window \"channel\": \"whatsapp\", // whatsapp | web | voice | instagram \"ai_model\": \"claude-sonnet-4-6\", \"input_tokens\": 812, \"output_tokens\": 340, \"messages_count\": 1, \"handoff\": false, // optional — true if a human had to take over (drives AI containment) \"occurred_at\": \"2026-08-16T10:32:00Z\", // optional, defaults to now() \"contact_name\": \"Ayesha\" // optional — the customer's WhatsApp profile name; also contact_email, // city, gender, age_band, or all of them as \"contact\": { … }. // Fills blanks on the customer's profile; never overwrites. } n8n gets input_tokens/output_tokens straight from the AI provider's response JSON (Claude, OpenAI, and DeepSeek all return a `usage` object on every completion) — no extra computation needed on the n8n side.",
         "description": "Requires the **webhook** scope or higher. Webhook key. The narrowest scope — usage, lead and conversation ingestion only.",
         "parameters": [],
         "requestBody": {

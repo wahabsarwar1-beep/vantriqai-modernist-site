@@ -4,7 +4,70 @@ const { recordQuotaCrossing } = require('../utils/quota');
 const { serviceStatusFor } = require('../utils/serviceStatus');
 const { sendMail, mailConfigured } = require('../utils/mailer');
 const S = require('../utils/surveys');
+const C = require('../utils/contacts');
 const router = express.Router();
+const { validatePulse } = require('../utils/pulseAdvanced');
+const { validateSiteEvent, recordSiteEvent } = require('../utils/siteAnalytics');
+
+router.post('/site-event', async (req,res) => {
+  try { validateSiteEvent(req.body); } catch(err){return res.status(400).json({error:err.message});}
+  try { await recordSiteEvent(req.body);res.json({ok:true}); } catch(err){ console.error('[site-event]',err.message);res.status(500).json({error:'Could not record website activity'}); }
+});
+
+/** Non-billable, idempotent outcome/timing telemetry; protected by the existing webhook scope. */
+router.post('/pulse-event', async (req,res) => {
+  const body=req.body||{},uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  let data;
+  try {
+    data=validatePulse(body.data);
+    for(const key of ['client_id','agent_id']) if(body[key]&&!uuid.test(body[key]))throw new Error(key+' must be a UUID');
+    for(const [key,max] of [['session_id',200],['event_id',128]])if(typeof body[key]!=='string'||!body[key].trim()||body[key].length>max)throw new Error(key+' is required (maximum '+max+' characters)');
+    if(body.occurred_at && (!Number.isFinite(Date.parse(body.occurred_at))||Date.parse(body.occurred_at)>Date.now()+300000))throw new Error('occurred_at must be a valid timestamp, no more than five minutes ahead');
+  } catch(err){return res.status(400).json({error:err.message});}
+  try {
+    let clientId=body.client_id||null,agentId=null;
+    if(body.agent_id||body.agent_ref){
+      const {rows}=await db.query('select id,client_id from client_agents where '+(body.agent_id?'id=$1':'external_ref=$1'),[body.agent_id||body.agent_ref]);
+      if(!rows[0])return res.status(404).json({error:'Agent not found'});
+      if(clientId&&clientId!==rows[0].client_id)return res.status(400).json({error:'Agent does not belong to this client'});
+      clientId=rows[0].client_id;agentId=rows[0].id;
+    }
+    if(!clientId&&body.external_ref){
+      const {rows}=await db.query('select id from clients where external_ref=$1',[body.external_ref]);
+      if(rows[0])clientId=rows[0].id;
+      else {const {rows:agents}=await db.query('select id,client_id from client_agents where external_ref=$1',[body.external_ref]);if(agents[0]){clientId=agents[0].client_id;agentId=agents[0].id;}}
+    }
+    if(!clientId)return res.status(400).json({error:'A valid client_id, external_ref, agent_id or agent_ref is required'});
+    const {rows:clients}=await db.query('select id from clients where id=$1',[clientId]);if(!clients[0])return res.status(404).json({error:'Client not found'});
+    const session=body.session_id.trim(),event=body.event_id.trim();
+    const {rows}=await db.query(`insert into pulse_events(client_id,agent_id,session_id,event_id,occurred_at,data)
+      values($1,$2,$3,$4,coalesce($5::timestamptz,now()),$6::jsonb) on conflict(client_id,event_id) do nothing returning id`,[clientId,agentId,session,event,body.occurred_at||null,JSON.stringify(data)]);
+    if(!rows.length){
+      const {rows:existing}=await db.query(`select id,(session_id=$2 and data=$3::jsonb and agent_id is not distinct from $4::uuid) matches from pulse_events where client_id=$1 and event_id=$5`,[clientId,session,JSON.stringify(data),agentId,event]);
+      if(!existing[0]?.matches)return res.status(409).json({error:'event_id already exists with different measurements'});
+      return res.json({event_id:event,duplicate:true});
+    }
+    res.status(201).json({event_id:event,duplicate:false});
+  }catch(err){console.error('[pulse-event]',err.message);res.status(500).json({error:'Could not record Pulse measurements'});}
+});
+
+/**
+ * What a caller says about the customer, in whichever shape it sends it:
+ * { contact: { name, email, city, gender, age_band, company } } or the same
+ * fields at the top level (contact_name, contact_email, city, gender, …).
+ */
+function contactFields(body) {
+  const c = body && typeof body.contact === 'object' && body.contact ? body.contact : {};
+  return {
+    name: c.name || body.contact_name || body.name || '',
+    email: c.email || body.contact_email || body.email || '',
+    city: c.city || body.contact_city || body.city || '',
+    gender: c.gender || body.gender || '',
+    age_band: c.age_band || body.age_band || '',
+    company: c.company || body.contact_company || '',
+    phone: c.phone || body.contact_phone || '',
+  };
+}
 
 /**
  * POST /api/webhooks/usage
@@ -26,7 +89,10 @@ const router = express.Router();
  *   "output_tokens": 340,
  *   "messages_count": 1,
  *   "handoff": false,                    // optional — true if a human had to take over (drives AI containment)
- *   "occurred_at": "2026-08-16T10:32:00Z" // optional, defaults to now()
+ *   "occurred_at": "2026-08-16T10:32:00Z", // optional, defaults to now()
+ *   "contact_name": "Ayesha"             // optional — the customer's WhatsApp profile name; also contact_email,
+ *                                        // city, gender, age_band, or all of them as "contact": { … }.
+ *                                        // Fills blanks on the customer's profile; never overwrites.
  * }
  *
  * n8n gets input_tokens/output_tokens straight from the AI provider's
@@ -113,6 +179,11 @@ router.post('/usage', async (req, res) => {
     [resolvedClientId, month]
   );
 
+  // Whatever the flow knows about the customer — the WhatsApp profile name at
+  // least — fills the blanks on their profile. Never fails the event.
+  await C.fillProfile(resolvedClientId, C.keyOf(session_id), contactFields(body), { source: resolvedChannel })
+    .catch((err) => console.error('[usage] contact profile not updated:', err.message));
+
   // Crossing the 80% line or the quota itself is recorded once per client per
   // month, for an admin to decide on. Service is never cut off here — running
   // over quota is a billing question, not a reason to stop answering the
@@ -197,6 +268,13 @@ router.get('/service-status', async (req, res) => {
  * blanks only. Whatever a human has typed into the CRM outranks whatever
  * the agent inferred on the next message.
  */
+// Agent booking is separate from lead capture: a failed booking never loses a lead.
+router.post('/appointment', async(req,res)=>{
+  const {createEvent}=require('../utils/calendar');
+  const saved=await createEvent(req.body||{},'AI agent webhook',true);
+  res.status(saved.created?201:200).json({ok:true,created:saved.created,event_id:saved.event.id,client_id:saved.event.client_id});
+});
+
 router.post('/lead', async (req, res) => {
   const body = req.body || {};
   const externalRef = String(body.external_ref || '').trim();
@@ -288,27 +366,7 @@ router.post('/lead', async (req, res) => {
 /** Emails whoever is on the notify list that a new lead just arrived. */
 async function notifyNewLead(client, channel) {
   if (!mailConfigured()) return;
-  let configured = '';
-  try {
-    const { rows } = await db.query(`select lead_notify_emails from settings limit 1`);
-    configured = (rows[0] && rows[0].lead_notify_emails) || '';
-  } catch (err) {
-    // Settings row or column missing on an un-migrated install — fall back.
-  }
-  // Semicolons as well as commas: mail clients separate addresses with a
-  // semicolon, so that is what people paste in. Accepting only commas turns
-  // the whole list into one malformed address and every send fails — and it
-  // fails quietly, which is the worst way for a lead alert to break.
-  // TEAM_NOTIFY_EMAIL is where the rest of the app sends internal alerts, so
-  // it belongs in this chain. MAIL_FROM stays at the end because installs
-  // predating its removal may still have it set, and losing a lead alert to
-  // a rename would be a silent regression.
-  const recipients = (configured
-    || process.env.LEAD_NOTIFY_EMAIL
-    || process.env.TEAM_NOTIFY_EMAIL
-    || process.env.MAIL_FROM
-    || '')
-    .split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+  const recipients = await teamRecipients();
   if (!recipients.length) return;
 
   const named = client.company && client.company !== '—' ? ` (${client.company})` : '';
@@ -329,6 +387,23 @@ async function notifyNewLead(client, channel) {
   ));
 }
 
+// Time and delivery values as n8n sends them — see POST /api/webhooks/conversation.
+const YEAR_MS = 366 * 86400000;
+const ALERT_FRESH_MS = 30 * 60000;
+
+function spokenAt(v) {
+  if (v === undefined || v === null || v === '') return null;
+  const numeric = typeof v === 'number' || /^\d+(\.\d+)?$/.test(String(v).trim());
+  // Seconds (WhatsApp, Unix) or milliseconds (JavaScript) — told apart by size.
+  const ms = numeric ? (Number(v) < 1e11 ? Number(v) * 1000 : Number(v)) : Date.parse(String(v));
+  if (!Number.isFinite(ms)) return null;
+  const now = Date.now();
+  return ms < now - YEAR_MS || ms > now + 10 * 60000 ? null : new Date(ms);
+}
+
+const isFalse = (v) => v === false || v === 'false';
+const isTrue = (v) => v === true || v === 'true';
+
 /**
  * POST /api/webhooks/conversation
  *
@@ -336,9 +411,30 @@ async function notifyNewLead(client, channel) {
  * buffer that a restart wipes, so without this the transcript behind a
  * lead is gone by the time anyone opens the CRM to read it.
  *
- * Body: { external_ref, session_id, channel, messages: [{ role, content }] }
+ * Body: { external_ref, session_id, channel, messages: [{ role, content, at, id, delivered, error }] }
  * role is "customer" or "agent". Unknown roles are dropped rather than
  * failing the batch — a lost turn is better than a lost conversation.
+ *
+ *   external_ref  the client's ref, or one of its agents' (the number or site a
+ *                 customer's customers write to) — or name the agent outright
+ *                 with agent_ref / agent_id, exactly as /usage takes them. A ref
+ *                 the CRM does not know still lands with whichever agent
+ *                 metered the same session_id, when exactly one did.
+ *   session_id    the conversation: "<customer>-<YYYY-MM-DD>", as /usage names
+ *                 it. One sent without its day (a website chat's own id) gets
+ *                 the day /usage filed that chat under, or else the day its
+ *                 first line was said, UTC.
+ *
+ *   at         when it was said: ISO 8601, or Unix seconds / milliseconds
+ *              (WhatsApp's own timestamp). Defaults to now. A time more than
+ *              a year back or in the future is not trusted, and now is used.
+ *   id         the channel's id for the message (a WhatsApp wamid). A message
+ *              already stored under that id is skipped, so an n8n retry or a
+ *              history backfill run twice never doubles a transcript.
+ *   delivered  false, with error, for a reply the agent wrote but the channel
+ *              refused. Given at the top level it applies to the batch's
+ *              agent lines. The customer's words are kept either way; a fresh
+ *              failure emails the team, at most once an hour per agent.
  */
 router.post('/conversation', async (req, res) => {
   const body = req.body || {};
@@ -347,35 +443,222 @@ router.post('/conversation', async (req, res) => {
 
   const CHANNELS = ['whatsapp', 'website', 'instagram', 'voice', 'email'];
   const channel = CHANNELS.includes(body.channel) ? body.channel : 'whatsapp';
-  const sessionId = String(body.session_id || '').trim().slice(0, 200);
+  let sessionId = String(body.session_id || '').trim().slice(0, 200);
+  const batchDelivered = !isFalse(body.delivered);
+  const batchError = String(body.error || '').trim();
 
   const incoming = Array.isArray(body.messages) ? body.messages : [];
+  const seen = new Set();
   const messages = incoming
-    .map((m) => ({ role: m && m.role, content: String((m && m.content) ?? '').trim() }))
+    .map((m) => {
+      const x = m || {};
+      const delivered = x.role !== 'agent' ? true : isFalse(x.delivered) ? false : isTrue(x.delivered) ? true : batchDelivered;
+      const id = x.id == null || String(x.id).trim() === '' ? null : String(x.id).trim().slice(0, 200);
+      return {
+        role: x.role,
+        content: String(x.content ?? '').trim(),
+        at: spokenAt(x.at),
+        id,
+        delivered,
+        error: delivered ? '' : (String(x.error || batchError).trim() || 'The channel did not accept the reply.').slice(0, 500),
+      };
+    })
     .filter((m) => (m.role === 'customer' || m.role === 'agent') && m.content !== '')
+    // The same id twice in one batch is one message.
+    .filter((m) => !m.id || (!seen.has(m.id) && seen.add(m.id)))
     .slice(0, 50);
   if (!messages.length) {
     return res.status(400).json({ error: 'messages must contain at least one customer or agent turn' });
   }
 
-  const { rows: clientRows } = await db.query(`select id from clients where external_ref = $1`, [externalRef]);
-  const clientId = clientRows[0] ? clientRows[0].id : null;
+  // A conversation is a customer and a day, the way usage names it. A website
+  // chat sends its own id with no day, and its words then never met its
+  // counts: the customer's page showed the conversation twice, once empty.
+  // The day is the one usage filed this chat under, whatever clock the sender
+  // keeps (never more than a day either side of UTC); failing that, the day
+  // its first line was said, UTC.
+  if (sessionId && !/-\d{4}-\d{2}-\d{2}$/.test(sessionId)) {
+    const first = messages.find((m) => m.at);
+    const at = first ? first.at : new Date();
+    const chat = sessionId.slice(0, 188); // room for the day within the 200 kept
+    const days = [-1, 0, 1].map((d) => `${chat}-${new Date(at.getTime() + d * 86400000).toISOString().slice(0, 10)}`);
+    const { rows: filed } = await db.query(
+      `select session_id from usage_events where session_id = any($1::text[])
+        order by abs(extract(epoch from occurred_at - $2::timestamptz)) limit 1`,
+      [days, at.toISOString()]
+    );
+    sessionId = filed[0] ? filed[0].session_id : days[1];
+  }
 
+  // Whose conversation? The agent named outright, as /usage takes it; or the
+  // ref is a client's (a lead filed as wa-<number>, or a customer) or one of a
+  // client's agents — the number or site a customer's customers write to.
+  let clientId = null;
+  let agentId = null;
+  if (body.agent_id || body.agent_ref) {
+    const { rows: named } = body.agent_id
+      ? await db.query(`select id, client_id from client_agents where id::text = $1`, [String(body.agent_id)])
+      : await db.query(`select id, client_id from client_agents where external_ref = $1`, [String(body.agent_ref).trim()]);
+    if (named[0]) { agentId = named[0].id; clientId = named[0].client_id; }
+  }
+  if (!clientId) {
+    const { rows: clientRows } = await db.query(`select id from clients where external_ref = $1`, [externalRef]);
+    clientId = clientRows[0] ? clientRows[0].id : null;
+  }
+  if (!clientId) {
+    const { rows: ag } = await db.query(`select id, client_id from client_agents where external_ref = $1`, [externalRef]);
+    if (ag[0]) { agentId = ag[0].id; clientId = ag[0].client_id; }
+  }
+  // A ref nobody knows still belongs to whoever metered this conversation —
+  // provided exactly one client's agent did. The website assistant logged its
+  // lines under 'web-<chat id>', no client's ref, and for weeks they were
+  // stored but belonged to no business, so no Customers page could show them.
+  if (!clientId && sessionId) {
+    const { rows: metered } = await db.query(
+      `select distinct client_id, agent_id from usage_events where session_id = $1`, [sessionId]
+    );
+    if (metered.length === 1) { clientId = metered[0].client_id; agentId = metered[0].agent_id; }
+  }
+
+  const COLS = ['client_id', 'external_ref', 'session_id', 'channel', 'role', 'content', 'agent_id', 'external_id', 'delivered', 'delivery_error', 'created_at'];
   const values = [];
+  // A batch shares one "now"; a millisecond apart each keeps the turns in the
+  // order they were said when a transcript is read back — also when two lines
+  // carry the same one-second WhatsApp timestamp.
   const placeholders = messages.map((m, i) => {
-    const base = i * 6;
-    values.push(clientId, externalRef, sessionId, channel, m.role, m.content.slice(0, 8000));
-    return `($${base + 1},$${base + 2},$${base + 3},$${base + 4},$${base + 5},$${base + 6})`;
+    const base = i * COLS.length;
+    values.push(clientId, externalRef, sessionId, channel, m.role, m.content.slice(0, 8000), agentId,
+      m.id, m.delivered, m.error, m.at ? m.at.toISOString() : null);
+    const p = COLS.map((_, j) => `$${base + j + 1}`);
+    p[COLS.length - 1] = `coalesce(${p[COLS.length - 1]}::timestamptz, now()) + interval '${i} milliseconds'`;
+    return `(${p.join(',')})`;
   });
 
-  await db.query(
-    `insert into conversation_messages (client_id, external_ref, session_id, channel, role, content)
-     values ${placeholders.join(',')}`,
+  const { rows: stored } = await db.query(
+    `insert into conversation_messages (${COLS.join(', ')})
+     values ${placeholders.join(',')}
+     on conflict (external_ref, external_id) where external_id is not null do nothing
+     returning role, content, delivered, delivery_error, created_at`,
     values
   );
+  if (agentId && sessionId) {
+    await C.fillProfile(clientId, C.keyOf(sessionId), contactFields(body), { source: channel })
+      .catch((err) => console.error('[conversation] contact profile not updated:', err.message));
+  }
 
-  res.status(201).json({ ok: true, stored: messages.length, client_id: clientId });
+  // A reply that never reached the customer is somebody's problem right now:
+  // nobody who writes in is being answered. Only a fresh one alerts — a
+  // backfill of last week's failures is history, not news.
+  const failed = stored.find((r) => r.role === 'agent' && r.delivered === false
+    && Date.now() - new Date(r.created_at).getTime() < ALERT_FRESH_MS);
+  if (failed) {
+    const said = stored.filter((r) => r.role === 'customer').map((r) => r.content).join('\n');
+    notifyUndelivered({ ref: agentId || clientId || externalRef, clientId, agentId, externalRef, sessionId, channel, said, error: failed.delivery_error, at: failed.created_at })
+      .catch((err) => console.error('[conversation] undelivered-reply alert failed:', err.message));
+  }
+
+  res.status(stored.length ? 201 : 200).json({
+    ok: true, stored: stored.length, duplicates: messages.length - stored.length,
+    undelivered: stored.filter((r) => r.delivered === false).length, client_id: clientId, agent_id: agentId,
+  });
 });
+
+/** Everyone on the team's notify list: the CRM setting, then the environment. */
+async function teamRecipients() {
+  let configured = '';
+  try {
+    const { rows } = await db.query(`select lead_notify_emails from settings limit 1`);
+    configured = (rows[0] && rows[0].lead_notify_emails) || '';
+  } catch (err) {
+    // Settings row or column missing on an un-migrated install — fall back.
+  }
+  // Semicolons as well as commas: mail clients separate addresses with a
+  // semicolon, so that is what people paste in. Accepting only commas turns
+  // the whole list into one malformed address and every send fails — and it
+  // fails quietly, which is the worst way for an alert to break.
+  // TEAM_NOTIFY_EMAIL is where the rest of the app sends internal alerts, so
+  // it belongs in this chain. MAIL_FROM stays at the end because installs
+  // predating its removal may still have it set, and losing an alert to
+  // a rename would be a silent regression.
+  return (configured
+    || process.env.LEAD_NOTIFY_EMAIL
+    || process.env.TEAM_NOTIFY_EMAIL
+    || process.env.MAIL_FROM
+    || '')
+    .split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+}
+
+/**
+ * Tells the team a customer went unanswered: the channel refused the reply, or
+ * the AI model never wrote one. One email an hour per agent while it lasts:
+ * the first says what broke, later ones how many more messages went
+ * unanswered in between.
+ */
+async function notifyUndelivered({ ref, clientId, agentId, sessionId, channel, said, error, at }) {
+  if (!mailConfigured()) return;
+  const { rows: due } = await db.query(
+    `update delivery_alerts d set last_sent_at = now(), failures_since = 0
+       from (select failures_since as missed from delivery_alerts where ref = $1) o
+      where d.ref = $1 and d.last_sent_at < now() - interval '1 hour'
+      returning o.missed`,
+    [String(ref)]
+  );
+  let missed = 0;
+  if (due[0]) {
+    missed = due[0].missed || 0;
+  } else {
+    const { rows: first } = await db.query(
+      `insert into delivery_alerts (ref) values ($1)
+       on conflict (ref) do update set failures_since = delivery_alerts.failures_since + 1
+       returning (xmax = 0) as fresh`,
+      [String(ref)]
+    );
+    if (!first[0] || !first[0].fresh) return; // already told within the hour
+  }
+  const to = await teamRecipients();
+  if (!to.length) return;
+
+  const { rows: who } = await db.query(
+    `select c.company, a.name as agent from clients c left join client_agents a on a.id = $2 where c.id = $1`,
+    [clientId, agentId]
+  );
+  const company = who[0] && who[0].company ? who[0].company : '';
+  const agent = (who[0] && who[0].agent) || `${channel} agent`;
+  const key = C.keyOf(sessionId);
+  const phone = /^\d{8,15}$/.test(key);
+  // A website visitor has no number: "Web visitor 1b2c3d", as Customers names them.
+  const number = phone ? `+${key}` : key ? C.labelOf(key) : 'unknown';
+  const when = new Date(at || Date.now()).toLocaleString('en-GB', { timeZone: 'Asia/Karachi', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  // Two causes so far, each with its own fix: WhatsApp refusing the send (the
+  // access token), and the AI model refusing to write the reply (the API key).
+  const aiFailed = /AI model|OpenAI|API key/i.test(error) && !/Cannot call API/i.test(error);
+  const lines = [
+    `${company ? `${company}'s ` : ''}${agent} could not answer a customer: ${aiFailed ? 'no reply was written' : 'the reply never reached them'}.`,
+    '',
+    `Customer:   ${number}`,
+    `They said:  ${said ? `"${said.slice(0, 400)}"` : '(not recorded)'}`,
+    `When:       ${when} (Karachi)`,
+    `Why:        ${error}`,
+    '',
+    'Until this is fixed, customers who write in are not being answered.',
+    phone ? `Reply to this one yourself: https://wa.me/${key}`
+      : channel === 'website' ? 'A website visitor can only be written back to if they left their details in the chat.' : '',
+    'The conversation is in the CRM, under Customers.',
+    '',
+    !aiFailed && /WhatsApp|Cannot call API|OAuth|token/i.test(error)
+      ? 'This usually means the WhatsApp access token in n8n has expired or lost its access. Create a new one in Meta Business Settings → System users (permissions whatsapp_business_messaging and whatsapp_business_management), and paste it into n8n → Credentials → "WhatsApp account".'
+      : '',
+    aiFailed
+      ? 'The AI service refused the request: check the OpenAI credential the agent uses in n8n (a revoked or mistyped API key, or no credit left on the OpenAI account).'
+      : '',
+    missed ? `${missed} more ${missed === 1 ? 'message' : 'messages'} went unanswered since the last email.` : '',
+    'You get at most one of these an hour while the problem lasts.',
+  ].filter((l, i, all) => l !== '' || (all[i - 1] !== '' && i > 0));
+
+  await Promise.all(to.map((addr) =>
+    sendMail({ to: addr, subject: `Customer not answered: ${number}${company ? ` (${company})` : ''}`, text: lines.join('\n') })
+  ));
+}
 
 /**
  * POST /api/webhooks/csat
@@ -400,6 +683,53 @@ router.post('/conversation', async (req, res) => {
  *
  * At least one of score, nps or resolved is required.
  */
+/**
+ * POST /api/webhooks/contact
+ *
+ * What an agent learned about a customer during the conversation — "I'm
+ * Ayesha, from Lahore" — saved to their profile so it shows in the CRM, the
+ * business's portal (Customers) and every report.
+ *
+ * Body: { external_ref | agent_ref | client_id, session_id | phone,
+ *         name, email, city, gender, age_band, company }
+ * Fills blanks only: anything a person has typed into the profile stays.
+ */
+router.post('/contact', async (req, res) => {
+  const body = req.body || {};
+  let clientId = null;
+  try {
+    if (body.agent_ref || body.agent_id) {
+      const { rows } = body.agent_id
+        ? await db.query(`select client_id from client_agents where id = $1`, [body.agent_id])
+        : await db.query(`select client_id from client_agents where external_ref = $1`, [String(body.agent_ref).trim()]);
+      clientId = rows[0] ? rows[0].client_id : null;
+    } else if (body.client_id) {
+      const { rows } = await db.query(`select id from clients where id = $1`, [body.client_id]);
+      clientId = rows[0] ? rows[0].id : null;
+    } else if (body.external_ref) {
+      const ref = String(body.external_ref).trim();
+      const { rows } = await db.query(
+        `select id as client_id from clients where external_ref = $1
+         union all select client_id from client_agents where external_ref = $1 limit 1`, [ref]);
+      clientId = rows[0] ? rows[0].client_id : null;
+    } else {
+      return res.status(400).json({ error: 'external_ref, agent_ref or client_id is required' });
+    }
+  } catch (err) {
+    if (err.code === '22P02') return res.status(400).json({ error: 'That id is not valid.' });
+    throw err;
+  }
+  if (!clientId) return res.status(404).json({ error: 'No client or agent found for that reference.' });
+  const key = String(body.contact_key || '').trim() || C.keyOf(body.session_id) || C.phoneDigits(body.phone);
+  if (!key) return res.status(400).json({ error: 'session_id or phone is required, to know who this is.' });
+  // The number is who they are, not news about them: something else must come with it.
+  const fields = { ...contactFields(body), phone: '' };
+  const touched = await C.fillProfile(clientId, key, fields, { source: 'agent' });
+  if (!touched) return res.status(400).json({ error: 'Nothing to save: send at least one of name, email, city, gender, age_band, company.' });
+  const { rows } = await db.query(`select * from contacts where client_id = $1 and contact_key = $2`, [clientId, key]);
+  res.status(201).json({ ok: true, client_id: clientId, contact_key: key, profile: rows[0] });
+});
+
 router.post('/csat', (req, res, next) => recordCsat(req, res).catch((err) => {
   // A malformed uuid is the caller's mistake, not a server fault.
   if (err.code === '22P02') return res.status(400).json({ error: 'client_id or agent_id is not a valid id' });
@@ -545,7 +875,7 @@ router.post('/survey-invite', async (req, res) => {
   const { rows: [on] } = await db.query(`select surveys_enabled from clients where id = $1`, [clientId]);
   if (!on || !on.surveys_enabled) {
     return res.status(403).json({
-      error: 'Customer-satisfaction surveys are not switched on for this client. An admin turns them on in the CRM.',
+      error: 'Vantriq Echo (customer-satisfaction surveys) is not switched on for this client. An admin turns it on in the CRM.',
       code: 'surveys_disabled',
     });
   }

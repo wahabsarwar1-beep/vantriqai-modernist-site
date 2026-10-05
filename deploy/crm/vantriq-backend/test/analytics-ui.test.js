@@ -9,6 +9,7 @@
  */
 const { chromium } = require('playwright-core');
 const fs = require('fs');
+const { signInAsAdmin, endUiSessions } = require('./ui-session');
 const B = 'http://127.0.0.1:8099';
 const ADMIN_KEY = fs.readFileSync('/tmp/adminkey', 'utf8').trim();
 const AH = { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY };
@@ -43,7 +44,7 @@ const post = (p, b) => fetch(B + p, { method: 'POST', headers: AH, body: JSON.st
     await page.fill('input[type=password]', 'UiAnalyticsPass123');
     await page.keyboard.press('Enter');
     await page.waitForSelector('.tab');
-    await page.click('.tab:has-text("Analytics")');
+    await page.click('.tab:has-text("Pulse")');
     await page.waitForSelector('#vqaConv', { timeout: 10000 }).catch(() => {});
     ok(!!(await page.$('#vqaConv')), 'the conversations chart is drawn');
     ok(await page.evaluate(() => !!document.querySelector('#vqaConv') && Chart.getChart(document.querySelector('#vqaConv')) != null), 'as a live Chart.js chart');
@@ -57,9 +58,12 @@ const post = (p, b) => fetch(B + p, { method: 'POST', headers: AH, body: JSON.st
     await page.click('.vqa-seg button:has-text("Year")');
     await page.waitForFunction(() => document.querySelector('.vqa-note') && /This year/.test(document.querySelector('.vqa-note').textContent), null, { timeout: 10000 }).catch(() => {});
     ok(/This year/.test(await page.innerText('.vqa-note')), 'switching to Year reloads the page for years');
-    ok(await page.evaluate(() => document.body.classList.contains('wide')), 'the portal widens for analytics');
+    const appWidth = () => page.evaluate(() => document.getElementById('app').getBoundingClientRect().width);
+    const pulseWidth = await appWidth();
     await page.click('.tab:has-text("Overview")');
-    ok(!(await page.evaluate(() => document.body.classList.contains('wide'))), 'and goes back to its usual width elsewhere');
+    ok(Math.abs((await appWidth()) - pulseWidth) < 1, 'every tab is the same width — Overview is not squeezed after Pulse', `${pulseWidth} vs ${await appWidth()}`);
+    if (width >= 1200) ok(pulseWidth > 1000, 'and on a desktop that width is the wide one', String(pulseWidth));
+    else ok(pulseWidth <= width, 'and on a phone it still fits the screen', String(pulseWidth));
     await page.close();
   }
 
@@ -67,9 +71,9 @@ const post = (p, b) => fetch(B + p, { method: 'POST', headers: AH, body: JSON.st
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   page.on('pageerror', (e) => errors.push(`crm: ${e.message}`));
   await page.goto(B + '/');
-  await page.evaluate((k) => localStorage.setItem('vantriq_api_key', k), ADMIN_KEY);
+  await signInAsAdmin(page);
   await page.goto(B + '/');
-  await page.click('.nav-item:has-text("Analytics")');
+  await page.click('.nav-item:has-text("Vantriq Pulse")');
   await page.waitForSelector('#vqaLeads', { timeout: 10000 }).catch(() => {});
   ok(!!(await page.$('#vqaLeads')), 'Sales & leads: the new-leads chart is drawn');
   ok(!!(await page.$('text=Funnel')), 'with the funnel');
@@ -89,5 +93,6 @@ const post = (p, b) => fetch(B + p, { method: 'POST', headers: AH, body: JSON.st
 
   await fetch(`${B}/api/clients/${client.id}`, { method: 'DELETE', headers: AH });
   console.log(`\n==== ${pass} passed, ${fail} failed ====\n`);
+  await endUiSessions();
   process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

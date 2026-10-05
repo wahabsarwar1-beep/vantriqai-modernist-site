@@ -24,8 +24,14 @@ const get = (p) => fetch(B + p, { headers: H }).then(async (r) => ({ status: r.s
 const send = (m) => (p, b) => fetch(B + p, { method: m, headers: H, body: JSON.stringify(b || {}) })
   .then(async (r) => ({ status: r.status, body: await J(r) }));
 const post = send('POST'), patch = send('PATCH'), del = send('DELETE');
+// A package's add-on pricing is the CEO's to set (v9.21).
+const { ceoSession, db } = require('./ceo-session');
+let CEO = null;
+const price = (p, b) => fetch(B + p, { method: 'PATCH', headers: CEO.headers, body: JSON.stringify(b || {}) })
+  .then(async (r) => ({ status: r.status, body: await J(r) }));
 
 (async () => {
+  CEO = await ceoSession();
   const products = (await get('/api/products')).body;
   const growth = products.find((p) => p.name === 'Growth');
   ok(!!growth, 'Growth exists to price and bill against');
@@ -57,7 +63,7 @@ const post = send('POST'), patch = send('PATCH'), del = send('DELETE');
     'three numbers, unpriced, add no line — matches the pre-v9.8 behaviour exactly');
 
   console.log('\n== priced, but under the included count — still nothing extra ==');
-  await patch(`/api/products/${growth.id}/addon-pricing`, { included_agents: 3, extra_agent_price: 5000 });
+  await price(`/api/products/${growth.id}/addon-pricing`, { included_agents: 3, extra_agent_price: 5000 });
   const future2 = '2031-02-01';
   const dry2 = await post('/api/billing/run-monthly', { month: future2, dry_run: true, client_id: clientId });
   const bill2 = dry2.body.invoices[0];
@@ -65,7 +71,7 @@ const post = send('POST'), patch = send('PATCH'), del = send('DELETE');
     '3 active numbers against 3 included bills nothing extra — headroom is headroom', JSON.stringify(bill2.lines.map(l=>l.kind)));
 
   console.log('\n== over the included count, it actually charges ==');
-  await patch(`/api/products/${growth.id}/addon-pricing`, { included_agents: 1, extra_agent_price: 5000 });
+  await price(`/api/products/${growth.id}/addon-pricing`, { included_agents: 1, extra_agent_price: 5000 });
   const future3 = '2031-03-01';
   const dry3 = await post('/api/billing/run-monthly', { month: future3, dry_run: true, client_id: clientId });
   const bill3 = dry3.body.invoices[0];
@@ -122,13 +128,14 @@ const post = send('POST'), patch = send('PATCH'), del = send('DELETE');
   await del(`/api/quotes/${quote.body.id}`);
   await del(`/api/invoices/${raised.invoice_id}`);
   for (const id of agentsCreated) await del(`/api/agents/${id}`);
-  await patch(`/api/products/${growth.id}/addon-pricing`, { included_agents: 1, extra_agent_price: 0 });
+  await price(`/api/products/${growth.id}/addon-pricing`, { included_agents: 1, extra_agent_price: 0 });
   await del(`/api/clients/${clientId}`);
   const gone = await get(`/api/clients/${clientId}`);
   ok(gone.status === 404, 'the test client is gone, nothing left behind on the real books');
   const restored = (await get('/api/products')).body.find((p) => p.id === growth.id);
   ok(Number(restored.extra_agent_price) === 0, 'Growth\'s pricing is back to "not charged"');
 
+  await CEO.end(); await db.pool.end();
   console.log(`\n==== ${pass} passed, ${fail} failed ====\n`);
   process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

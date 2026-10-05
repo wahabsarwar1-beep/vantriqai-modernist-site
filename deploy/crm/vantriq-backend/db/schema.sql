@@ -145,6 +145,7 @@ create table if not exists usage_events (
 create index if not exists idx_usage_client_time on usage_events(client_id, occurred_at);
 create index if not exists idx_usage_session on usage_events(session_id);
 
+
 -- Rolled-up monthly usage per client, derived from usage_events.
 -- Used by the dashboard/billing to show "sessions used this month"
 -- and to compute overage without re-scanning raw events each time.
@@ -1579,7 +1580,8 @@ create table if not exists csat_responses (
   agent_id uuid references client_agents(id) on delete set null,
   -- Kept for joining a response back to its conversation. Like
   -- usage_events.session_id it is built from the end customer's phone
-  -- number, so it never leaves the CRM (not the portal, not the API).
+  -- number: never sent as it is, and the number in it only in the Excel
+  -- report, to the customer whose customer it is (utils/analyticsReport.js).
   session_id text not null default '',
   channel text not null default 'whatsapp',
   score smallint check (score between 1 and 5),
@@ -1702,13 +1704,19 @@ create unique index if not exists idx_survey_responses_submission
 create index if not exists idx_survey_responses_followup
   on survey_responses(client_id, followup_status) where followup_status in ('open','contacted');
 
+-- Echo service timing: historical updates do not identify first contact.
+-- Keep historical timestamps unknown; capture only new status transitions.
+alter table survey_responses add column if not exists first_contacted_at timestamptz;
+alter table survey_responses add column if not exists first_resolved_at timestamptz;
+
 create table if not exists survey_invites (
   id uuid primary key default gen_random_uuid(),
   survey_id uuid not null references surveys(id) on delete cascade,
   client_id uuid not null references clients(id) on delete cascade,
   token text not null unique,
   -- The conversation this invite follows. Built from the end customer's
-  -- phone number like every session id, so it never leaves the CRM.
+  -- phone number like every session id: never sent as it is, and the number
+  -- only in the Excel report, to that customer (utils/analyticsReport.js).
   session_id text not null default '',
   channel text not null default 'whatsapp',
   created_at timestamptz not null default now(),
@@ -1776,3 +1784,427 @@ end $$;
 -- them in CRM → Settings → The VantriqAI app. See deploy/crm/ANDROID-APP.md.
 alter table settings add column if not exists android_package text not null default 'com.vantriqai.app';
 alter table settings add column if not exists android_sha256 text not null default '';
+
+-- =====================================================================
+-- v9.17 — Customers: who each business's customers are.
+--
+-- Activity (conversations, messages, first and last contact) is always
+-- worked out from usage_events, so it can never drift. What usage cannot
+-- say — a name, an email, the city, gender and age group, tags and notes —
+-- lives here, one row per customer of a client, keyed like analytics keys a
+-- contact: the WhatsApp number (session id without its date), or a web
+-- visitor's id. Rows appear the first time anything is known about someone.
+--
+-- Where it comes from: the WhatsApp profile name the agent passes with each
+-- message, a survey the customer answered (their own details, and the gender
+-- / city / age questions), and edits by staff in the CRM or by the business
+-- in its portal. Automatic sources only ever fill a blank; a person's edit
+-- always wins and is recorded with who made it.
+-- =====================================================================
+create table if not exists contacts (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  contact_key text not null,
+  name text not null default '',
+  phone text not null default '',
+  email text not null default '',
+  city text not null default '',
+  gender text not null default '',
+  age_band text not null default '',
+  company text not null default '',
+  tags text[] not null default '{}',
+  notes text not null default '',
+  do_not_contact boolean not null default false,
+  name_source text not null default '',
+  edited_by text not null default '',
+  edited_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (client_id, contact_key)
+);
+create index if not exists idx_contacts_client on contacts(client_id, updated_at desc);
+drop trigger if exists trg_contacts_updated on contacts;
+create trigger trg_contacts_updated before update on contacts
+  for each row execute function touch_updated_at();
+
+-- Echo's "about you" questions (a question marked profile: gender, city or
+-- age): the answer in words, kept on the response so results can be broken
+-- down by them without re-reading every answer.
+alter table survey_responses add column if not exists gender text not null default '';
+alter table survey_responses add column if not exists city text not null default '';
+alter table survey_responses add column if not exists age_band text not null default '';
+
+-- Which agent a transcript line came through, when it was logged against an
+-- agent's number rather than a client's, so a customer's own customers'
+-- conversations stay theirs and out of VantriqAI's sales view.
+alter table conversation_messages add column if not exists agent_id uuid references client_agents(id) on delete set null;
+create index if not exists idx_usage_client_session on usage_events(client_id, session_id);
+
+-- v9.19 — the client's industry, as the key of the Echo survey template that
+-- fits them best (restaurant, pharmacy, …) or '' when nobody has said. It
+-- puts their industry's templates first in the Echo library (CRM and portal),
+-- and it is what the starter survey is made from when an admin switches
+-- Vantriq Echo on. Set by staff on the client's page or by the client in
+-- their portal's template library.
+alter table clients add column if not exists industry text not null default '';
+
+-- =====================================================================
+-- v9.20 — PRODUCTS & PRICING, COSTED AT TODAY'S PRICES
+--
+-- The package ladder's prices are fixed by the business model and stay
+-- locked. What moves is what it costs us to serve them: model prices, the
+-- exchange rate, how many messages a conversation takes, how many hours a
+-- client needs. Until now one number stood for all of that —
+-- delivery_cost_full, typed in once from the August 2026 model — and it
+-- had gone stale: that model costed Gemini 3 Flash at Gemini 1.5 Flash's
+-- old price, and the live agents run on GPT-4o mini anyway.
+--
+-- So the cost side becomes a model the CRM computes (src/utils/
+-- costingEngine.js, behind the admin-only /api/costing) from inputs an
+-- admin can see and change:
+--
+--   products.*          each package's cost profile — the context its
+--                       agent reads per turn, the share of turns escalated
+--                       to the premium model, management and build hours,
+--                       how much of that is founder time, the usage a
+--                       client of that size typically has. NULL means "the
+--                       business model's value for a package of this name".
+--   settings.costing    the rate card and the assumptions (exchange rate,
+--                       bulk and premium model, token sizes, labour rates,
+--                       infrastructure, the steady-state client mix), as
+--                       overrides on the defaults in costingEngine.js.
+--
+-- delivery_cost_full and ai_model are now written BY the model (on every
+-- migrate and every change in Products & Pricing), so Financials and the
+-- dashboard read today's cost, not August's.
+-- =====================================================================
+alter table products add column if not exists context_tokens int;
+alter table products add column if not exists premium_share numeric;
+alter table products add column if not exists mgmt_hours numeric;
+alter table products add column if not exists build_hours numeric;
+alter table products add column if not exists founder_share numeric;
+alter table products add column if not exists typical_min int;
+alter table products add column if not exists typical_max int;
+alter table products add column if not exists bulk_model text;
+alter table products add column if not exists premium_model text;
+
+alter table settings add column if not exists costing jsonb not null default '{}'::jsonb;
+
+-- The add-ons catalogue: everything sold on top of a package, priced
+-- separately so a client is never repriced when the catalogue grows.
+--
+--   price_basis  fixed     the price below is the price
+--                from      a starting price; the scope can raise it
+--                included  part of every plan — shown, never charged
+--                scope     priced after scoping; setup/monthly are NULL
+--
+-- est_monthly_cost and est_build_hours are ours, not the client's: what
+-- serving the add-on costs, so its margin can be shown to the CEO (v9.21).
+-- They are never sent to anyone else, a customer or a document.
+create table if not exists catalog_addons (
+  id uuid primary key default gen_random_uuid(),
+  key text not null unique,
+  name text not null,
+  family text not null default 'capability'
+    check (family in ('capability','solution','insight','deployment')),
+  summary text not null default '',
+  setup_fee numeric,
+  monthly_fee numeric,
+  price_basis text not null default 'fixed'
+    check (price_basis in ('fixed','from','included','scope')),
+  price_note text not null default '',
+  availability text not null default '',
+  est_monthly_cost numeric not null default 0,
+  est_build_hours numeric not null default 0,
+  cost_note text not null default '',
+  is_new boolean not null default false,
+  sort_order int not null default 0,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+drop trigger if exists trg_catalog_addons_updated on catalog_addons;
+create trigger trg_catalog_addons_updated before update on catalog_addons
+  for each row execute function touch_updated_at();
+
+-- Seeded from the business model (capabilities and the four flagship
+-- solutions, at its prices) and the product range on vantriqai.com. Echo and
+-- Human Support are new since that model and carry the prices the September
+-- 2026 update of it proposes. Inserted once per key: an admin's edit is never
+-- overwritten by a later migrate.
+insert into catalog_addons
+  (key, name, family, summary, setup_fee, monthly_fee, price_basis, price_note, availability,
+   est_monthly_cost, est_build_hours, cost_note, is_new, sort_order)
+values
+  ('voice-understanding', 'Voice understanding', 'capability',
+   'Voice notes in Urdu, Punjabi, Sindhi, Pashto, English or a mix — understood, and answered back in natural speech when that suits the customer better.',
+   25000, 12000, 'fixed', '', 'Any package', 2500, 6,
+   'Transcription and spoken replies, at about 1,500 voice notes a month.', false, 10),
+  ('image-recognition', 'Image recognition', 'capability',
+   'A photo of a product, a damaged delivery, a prescription, a receipt or a meter reading — identified, and discussed intelligently.',
+   20000, 9000, 'fixed', '', 'Any package', 1500, 5,
+   'Vision input at about 1,000 images a month.', false, 20),
+  ('voice-call-agent', 'Voice call agent', 'capability',
+   'A real phone line answered in natural speech: questions handled, appointments booked, details captured, and the call transferred to a person when that is right.',
+   60000, 35000, 'fixed', '', 'Any package', 15000, 20,
+   'Real-time voice and telephony at about 1,000 call minutes a month; heavier use is priced per minute.', false, 30),
+  ('website-chat', 'Website & blog chat', 'capability',
+   'The same agent on your website, landing pages and blog — one brain, so the answer on WhatsApp matches the answer on your site.',
+   25000, 10000, 'fixed', '', 'Any package', 0, 4,
+   'Web conversations count against the package''s own allowance, so they add no model cost of their own.', false, 40),
+  ('lead-generation', 'AI lead generation', 'solution',
+   'Lead captured, enriched, qualified and scored, written to your CRM, followed up with personalised outreach — and your salesperson alerted the moment a high-value lead appears.',
+   90000, 45000, 'fixed', '', 'Any package', 4000, 30, 'Enrichment and model calls.', false, 110),
+  ('support-after-sales', 'AI support & after-sales', 'solution',
+   'Understands the issue, searches your documentation, looks up the order, raises the ticket and escalates — and at the top tier performs approved actions such as updating an address or logging a warranty claim.',
+   45000, 22000, 'from', 'From', 'Any package', 2500, 16, 'Model calls and ticketing.', false, 120),
+  ('sales-assistant', 'AI sales assistant', 'solution',
+   'Researches the account, scores the opportunity, drafts follow-ups, flags stalled deals and hands your salesperson a pre-meeting brief: pain points, past objections, decision maker, recommended approach.',
+   95000, 48000, 'fixed', '', 'Any package', 4000, 32, 'Research and model calls.', false, 130),
+  ('document-processing', 'AI document processing', 'solution',
+   'Invoices, contracts, purchase orders, receipts, CVs and forms — extracted, validated, pushed into your system of record and routed to the right department. Nobody retypes anything.',
+   85000, 40000, 'fixed', '', 'Any package', 5000, 28, 'Document parsing and model calls.', false, 140),
+  ('email-automation', 'Email automation', 'solution',
+   'Inbound email read, sorted and answered or routed to the right person; follow-ups drafted for approval.',
+   null, null, 'scope', 'Typically PKR 35,000–110,000 setup and 16,000–55,000 a month', 'Any package', 0, 0, '', false, 150),
+  ('recruitment', 'Recruitment', 'solution',
+   'CVs screened against the role, candidates shortlisted and interviews booked — with every decision left to your team.',
+   null, null, 'scope', 'Typically PKR 35,000–110,000 setup and 16,000–55,000 a month', 'Any package', 0, 0, '', false, 160),
+  ('marketing-content', 'Marketing content', 'solution',
+   'Posts, captions and campaign copy drafted in your brand voice, ready for your approval.',
+   null, null, 'scope', 'Typically PKR 35,000–110,000 setup and 16,000–55,000 a month', 'Any package', 0, 0, '', false, 170),
+  ('social-media', 'Social media management', 'solution',
+   'Comments and messages across your pages triaged, replies drafted, and posts scheduled.',
+   null, null, 'scope', 'Typically PKR 35,000–110,000 setup and 16,000–55,000 a month', 'Any package', 0, 0, '', false, 180),
+  ('reporting', 'Reporting', 'solution',
+   'Weekly and monthly reports assembled from your own systems and sent in plain language.',
+   null, null, 'scope', 'Typically PKR 35,000–110,000 setup and 16,000–55,000 a month', 'Any package', 0, 0, '', false, 190),
+  ('finance-operations', 'Finance operations', 'solution',
+   'Invoices matched, payments chased and reconciliations prepared for your accountant to review.',
+   null, null, 'scope', 'Typically PKR 35,000–110,000 setup and 16,000–55,000 a month', 'Any package', 0, 0, '', false, 200),
+  ('ecommerce-operations', 'E-commerce operations', 'solution',
+   'Orders, returns, stock alerts and abandoned carts handled end to end.',
+   null, null, 'scope', 'Typically PKR 35,000–110,000 setup and 16,000–55,000 a month', 'Any package', 0, 0, '', false, 210),
+  ('appointment-booking', 'Appointment booking', 'solution',
+   'Scheduling across branches, staff and rooms, with reminders, reschedules and no-show follow-up.',
+   null, null, 'scope', 'Typically PKR 35,000–110,000 setup and 16,000–55,000 a month', 'Any package', 0, 0, '', false, 220),
+  ('knowledge-assistant', 'Internal knowledge assistant', 'solution',
+   'A private assistant for your own staff, answering from your policies, manuals and past cases.',
+   null, null, 'scope', 'Typically PKR 35,000–110,000 setup and 16,000–55,000 a month', 'Any package', 0, 0, '', false, 230),
+  ('pulse', 'Vantriq Pulse', 'insight',
+   'Live analytics on every conversation: leads made and closed, time to close, busiest hours, satisfaction and what the AI resolved on its own — with an Excel report of all of it.',
+   0, 0, 'included', '', 'Every plan', 0, 0, '', true, 300),
+  ('customers', 'Customer directory', 'insight',
+   'Who your customers are — name, number, city — with every conversation and what they said, kept up to date by the agent itself.',
+   0, 0, 'included', '', 'Every plan', 0, 0, '', true, 310),
+  ('portal-app', 'Client portal & Android app', 'insight',
+   'Invoices, usage, statements, Pulse, customers and surveys in one sign-in — in the browser, or as the VantriqAI app on Android.',
+   0, 0, 'included', '', 'Every plan', 0, 0, '', true, 320),
+  ('echo', 'Vantriq Echo', 'insight',
+   'Customer-satisfaction surveys in English and Urdu — after a WhatsApp chat, by QR code, link, kiosk or on your site — from 28 ready-made industry templates, with alerts on unhappy customers, follow-ups, and every answer flowing into Pulse.',
+   12000, 6000, 'fixed', 'First location included · unlimited surveys and responses', 'Any package', 1500, 2.5,
+   'No AI or messaging cost of its own: themes are counted, not generated, and survey messages go out on the client''s own WhatsApp number, billed by their provider. The cost is people: about 2.5 hours to set up (branding, the first survey, QR posters, the after-chat hook, a handover) and about 30 minutes a month of results review and support, plus a share of the server.', true, 330),
+  ('echo-location', 'Vantriq Echo — additional location', 'insight',
+   'Another branch, outlet or site on Echo: its own survey link, QR poster and kiosk, and its own line in every result, so branches can be compared like for like.',
+   2000, 1500, 'fixed', 'Per location, up to 10 · more than 10 priced on scope', 'With Vantriq Echo', 300, 0.5,
+   'About 30 minutes to set up each location and a few minutes a month after that.', true, 335),
+  ('human-support', 'Human Support', 'insight',
+   'AI assist for your team: when a person takes over a chat, it hands them the summary, the customer''s history and a drafted reply in the customer''s language — they decide what is sent.',
+   20000, 15000, 'fixed', '', 'Any package', 2000, 6, 'A summary and a drafted reply per handover, at about 1,000 handovers a month.', true, 340),
+  ('private-deployment', 'Private deployment', 'deployment',
+   'The whole stack self-hosted on your own infrastructure, for strict data-residency requirements. Same agents; nothing leaves your network.',
+   null, null, 'scope', 'Priced after an infrastructure review', 'From Enterprise', 0, 0, '', false, 400),
+  ('custom-module', 'Custom module', 'deployment',
+   'The one thing only your business does, built during onboarding: your name for it, your tone, your rules, and your sign-off before it acts.',
+   null, null, 'scope', 'Priced on scope', 'From Scale', 0, 0, '', false, 410)
+on conflict (key) do nothing;
+
+-- v9.20.1 — Vantriq Echo, priced on what it costs to run.
+--
+-- v9.20.0 seeded Echo at a provisional 15,000 setup + 8,000 a month, flat,
+-- whatever the size of the business. Echo has no AI or messaging cost of its
+-- own — the cost is setup time and a short monthly review, and both grow with
+-- the number of locations. So it is now PKR 12,000 + 6,000 a month for the
+-- first location (unlimited surveys and responses) and PKR 2,000 + 1,500 a
+-- month for each further one, so a single branch pays less than it did while
+-- a chain pays in step with what it gets. More than ten locations is priced
+-- on scope.
+--
+-- Once, and only where Echo still carries the provisional figures: a price an
+-- admin has already set is theirs, and is never overwritten.
+do $$
+begin
+  if exists (select 1 from applied_migrations where name = 'v9_20_1_echo_pricing') then
+    return;
+  end if;
+  update catalog_addons set
+      setup_fee = 12000, monthly_fee = 6000,
+      price_note = 'First location included · unlimited surveys and responses',
+      est_monthly_cost = 1500, est_build_hours = 2.5,
+      summary = 'Customer-satisfaction surveys in English and Urdu — after a WhatsApp chat, by QR code, link, kiosk or on your site — from 28 ready-made industry templates, with alerts on unhappy customers, follow-ups, and every answer flowing into Pulse.',
+      cost_note = 'No AI or messaging cost of its own: themes are counted, not generated, and survey messages go out on the client''s own WhatsApp number, billed by their provider. The cost is people: about 2.5 hours to set up (branding, the first survey, QR posters, the after-chat hook, a handover) and about 30 minutes a month of results review and support, plus a share of the server.'
+   where key = 'echo' and setup_fee = 15000 and monthly_fee = 8000;
+  insert into applied_migrations (name, note)
+  values ('v9_20_1_echo_pricing', 'Vantriq Echo: 12,000 + 6,000/mo for the first location, 2,000 + 1,500/mo per further location.');
+end $$;
+
+-- v9.20.2 — transcripts that are complete, in order, and honest about
+-- replies that never arrived.
+--
+-- external_id: the channel's own id for the message (a WhatsApp wamid). The
+--   same message sent twice — n8n retrying after a timeout, or a history
+--   backfill run again — is stored once.
+-- delivered: false when the agent wrote a reply but the channel refused it
+--   (WhatsApp rejected the token, the 24-hour window had closed, …). The
+--   customer's words are still kept, and the customer's page shows the reply
+--   as not delivered, so nobody assumes they were answered.
+-- delivery_error: what the channel said, for whoever has to fix it.
+alter table conversation_messages add column if not exists external_id text;
+alter table conversation_messages add column if not exists delivered boolean not null default true;
+alter table conversation_messages add column if not exists delivery_error text not null default '';
+create unique index if not exists uq_conv_external_id
+  on conversation_messages(external_ref, external_id) where external_id is not null;
+
+-- When the team was last told that an agent's replies are failing, so one
+-- outage is one email an hour rather than one per customer message.
+create table if not exists delivery_alerts (
+  ref text primary key,
+  last_sent_at timestamptz not null default now(),
+  failures_since integer not null default 0
+);
+
+-- v9.21 — the CEO's business documents: the business model, the client pitch
+-- deck, the product portfolio. Kept here, in the database, and never in the
+-- code repository (which anyone can read). Only the CEO's own signed-in
+-- account lists, opens, uploads or deletes them (routes/pricingDocs.js).
+-- Every upload is a new row: the newest file of each kind and format is the
+-- current one, the rest are its history.
+create table if not exists owner_documents (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null default 'other'
+    check (kind in ('business_model','pitch_deck','portfolio','other')),
+  title text not null default '',
+  filename text not null,
+  content_type text not null default 'application/octet-stream',
+  size_bytes integer not null,
+  sha256 text not null,
+  content bytea not null,
+  note text not null default '',
+  uploaded_by text not null default '',
+  uploaded_at timestamptz not null default now(),
+  opened_count integer not null default 0,
+  last_opened_at timestamptz
+);
+create index if not exists idx_owner_documents_kind on owner_documents(kind, uploaded_at desc);
+
+-- v9.22 — the admin API key is no longer a way in on its own.
+--
+-- Typed into the CRM's "Emergency access" screen, the key only asks for a
+-- one-time code, and the code goes to the CEO (PRICING_EMAIL), never to
+-- whoever typed the key: the CEO decides whether to read it out. A correct
+-- code opens an emergency session of two hours, listed for the CEO under
+-- Team → Emergency access and ended from there. The key sent on its own,
+-- from anywhere but the server itself, is refused — which signs out every
+-- browser that was still holding it.
+--
+-- Codes and session tokens are stored hashed: nothing in either table opens
+-- the CRM if read.
+create table if not exists breakglass_challenges (
+  id uuid primary key default gen_random_uuid(),
+  key_id uuid not null references api_keys(id) on delete cascade,
+  code_hash text not null,
+  sent_to text not null default '',
+  expires_at timestamptz not null,
+  attempts integer not null default 0,
+  consumed boolean not null default false,
+  ip text not null default '',
+  user_agent text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_breakglass_challenges_key on breakglass_challenges(key_id, created_at desc);
+
+create table if not exists breakglass_sessions (
+  id uuid primary key default gen_random_uuid(),
+  token_hash text not null unique,
+  key_id uuid not null references api_keys(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null,
+  last_seen_at timestamptz not null default now(),
+  ip text not null default '',
+  user_agent text not null default '',
+  ended_at timestamptz,
+  ended_by text not null default ''
+);
+create index if not exists idx_breakglass_sessions_recent on breakglass_sessions(created_at desc);
+
+-- CRM calendar and explicit sales ownership. Additive; existing records retain ownership.
+alter table clients add column if not exists assigned_at timestamptz;
+alter table clients add column if not exists assigned_by text;
+create table if not exists lead_assignment_history (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  from_rep_id uuid references sales_reps(id),
+  to_rep_id uuid references sales_reps(id),
+  assigned_by text not null,
+  reason text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_lead_assignment_history on lead_assignment_history(client_id, created_at);
+create table if not exists calendar_events (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  title text not null,
+  starts_at timestamptz not null,
+  ends_at timestamptz not null,
+  channel text not null check (channel in ('manual','website','whatsapp')),
+  kind text not null default 'meeting' check (kind in ('meeting','demo','call','follow_up')),
+  status text not null default 'scheduled' check (status in ('scheduled','completed','cancelled','no_show')),
+  location text not null default '',
+  notes text not null default '',
+  external_id text,
+  created_by text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (ends_at > starts_at),
+  unique(channel, external_id)
+);
+create index if not exists idx_calendar_events_time on calendar_events(starts_at, ends_at);
+create index if not exists idx_calendar_events_client on calendar_events(client_id);
+
+-- Pulse measurements are separate from usage/billing. Stable event ids make retries idempotent.
+create table if not exists pulse_events (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  agent_id uuid references client_agents(id) on delete set null,
+  session_id text not null check (length(session_id) between 1 and 200),
+  event_id text not null check (length(event_id) between 1 and 128),
+  occurred_at timestamptz not null default now(),
+  data jsonb not null,
+  created_at timestamptz not null default now(),
+  unique(client_id,event_id)
+);
+create index if not exists idx_pulse_client_time on pulse_events(client_id,occurred_at);
+
+-- Opt-in public website activity: aggregate counters only, no visitor/contact identifiers.
+create table if not exists website_activity (
+  day date not null,
+  region text not null check (region in ('pk','global')),
+  section text not null check (section in ('home','products','pricing','industries','contact','how-it-works','resources','privacy','cookies','other')),
+  event text not null check (event in ('page_view','chat_open','whatsapp_click','brief_sent')),
+  total bigint not null default 0 check (total >= 0),
+  primary key (day,region,section,event)
+);
+
+-- Approximate network locations, independent of contacts and chat sessions.
+-- No IP, coordinates, visitor identifiers, or individual event records.
+create table if not exists website_location_activity (
+  day date not null,
+  region text not null check (region in ('pk','global')),
+  section text not null,
+  event text not null check (event in ('page_view','chat_open','whatsapp_click','brief_sent')),
+  country text not null default '' check (country = '' or country ~ '^[A-Z]{2}$'),
+  subdivision text not null default '' check (length(subdivision) <= 16),
+  city text not null default '' check (length(city) <= 120),
+  total bigint not null default 0 check (total >= 0),
+  primary key (day,region,section,event,country,subdivision,city)
+);

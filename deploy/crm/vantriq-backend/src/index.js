@@ -9,7 +9,7 @@ const cors = require('cors');
 const path = require('path');
 const db = require('./db');
 
-const { requireScope } = require('./middleware/auth');
+const { requireScope, requireCeo } = require('./middleware/auth');
 const { requireRep } = require('./middleware/repAuth');
 const productsRoutes = require('./routes/products');
 const clientsRoutes = require('./routes/clients');
@@ -19,6 +19,7 @@ const expensesRoutes = require('./routes/expenses');
 const usageRoutes = require('./routes/usage');
 const dashboardRoutes = require('./routes/dashboard');
 const analyticsRoutes = require('./routes/analytics');
+const contactsRoutes = require('./routes/contacts');
 const financialsRoutes = require('./routes/financials');
 const settingsRoutes = require('./routes/settings');
 const portalRoutes = require('./routes/portal');
@@ -42,6 +43,9 @@ const billingOpsRoutes = require('./routes/billingOps');
 const surveysRoutes = require('./routes/surveys');
 const publicSurveyApiRoutes = require('./routes/publicSurveyApi');
 const surveyPagesRoutes = require('./routes/surveyPages');
+const costingRoutes = require('./routes/costing');
+const pricingDocsRoutes = require('./routes/pricingDocs');
+const addonsRoutes = require('./routes/addons');
 
 const app = express();
 
@@ -57,6 +61,10 @@ app.use(cors({ origin: corsOrigin }));
 // for a 10 MB file plus a third for the encoding. Everything else stays at
 // 1mb — a generous default body limit is a cheap way to be knocked over.
 app.use('/api/clients/:id/documents', express.json({ limit: '15mb' }));
+// The CEO's business documents: a deck runs to several MB and base64 adds a
+// third. A body that size is read only once the request has proven it is the
+// CEO — nobody else gets to make the server parse 40 MB.
+app.use('/api/pricing/documents', requireScope('admin'), requireCeo, express.json({ limit: '40mb' }));
 app.use(express.json({ limit: '1mb' }));
 
 // Health check — no auth, used by hosting platforms and n8n connection tests
@@ -119,16 +127,29 @@ app.use('/api/quotes', requireScope('staff'), quotesRoutes);
 // Contracts carry the counterparty's legal identity, so they sit behind the
 // same gate as quotes: staff who work accounts, not automation keys.
 app.use('/api/contracts', requireScope('staff'), contractsRoutes);
+app.use('/api/calendar', requireScope('staff'), require('./routes/calendar'));
 app.use('/api/reps', requireScope('admin'), repsRoutes);
 app.use('/api/package-requests', requireScope('staff'), packageRequestsRoutes);
 app.use('/api/expenses', requireScope('admin'), expensesRoutes);
 app.use('/api/dashboard', requireScope('staff'), dashboardRoutes);
 app.use('/api/analytics', requireScope('staff'), analyticsRoutes);
+// Our clients' own customers: the directory each client also sees in its portal.
+app.use('/api/contacts', requireScope('staff'), contactsRoutes);
 // Every client's surveys, their results and follow-ups. The same router is
 // mounted for customers at /api/portal/surveys, scoped to their own.
 app.use('/api/surveys', requireScope('staff'), surveysRoutes);
 app.use('/api/quota', requireScope('staff'), quotaRoutes);
-app.use('/api/financials', requireScope('admin'), financialsRoutes);
+// Revenue against what serving it costs, and the margin by package: the
+// price book applied to today's clients, so the CEO's alone (v9.21).
+app.use('/api/financials', requireScope('admin'), requireCeo, financialsRoutes);
+// What each package costs us to serve and what it earns: the rate card, the
+// assumptions, margins, the steady state — and the business documents behind
+// them. The CEO's alone (v9.21): not another admin, not any key.
+app.use('/api/costing', requireScope('admin'), requireCeo, costingRoutes);
+app.use('/api/pricing', requireScope('admin'), requireCeo, pricingDocsRoutes);
+// The add-ons catalogue. Staff read it (the quote builder offers these as
+// lines); only the CEO changes it or sees what an add-on costs us.
+app.use('/api/addons', requireScope('staff'), addonsRoutes);
 // The receipts ledger. Staff record what came in; they do not see the books.
 app.use('/api/payments', requireScope('staff'), paymentsRoutes);
 // P&L, income statement, balance sheet and the FBR position — admin only,
@@ -203,6 +224,11 @@ app.get('*', (req, res, next) => {
 // Every failure lands here, async ones included (utils/asyncErrors.js). A
 // value the caller got wrong answers 4xx with a reason; anything else is 500.
 app.use(errorHandler);
+
+// Retention also runs while there are no new website events. No personal records are touched.
+const purgeWebsiteActivity = () => require('./utils/siteAnalytics').purgeSiteAnalytics().catch(err => console.error('[website retention]', err.message));
+purgeWebsiteActivity();
+setInterval(purgeWebsiteActivity, 60 * 60 * 1000).unref();
 
 const port = process.env.PORT || 8080;
 app.listen(port, () => {

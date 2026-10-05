@@ -1,0 +1,90 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const {randomUUID}=require('node:crypto');
+const {PGlite}=require('@electric-sql/pglite');
+const express=require('express');
+const {echoAdvanced}=require('../src/utils/echoAdvanced');
+const bounds={cur_start:'2026-10-01',prev_start:'2026-09-01',prev_point:'2026-09-03'};
+const row={client_id:'a',survey_id:'s',submitted_at:'2026-10-02T00:00Z',bucket:'2026-10-01',score:2,nps:3,followup_status:'open',location_name:'DHA',comment:'Long queue, rude cashier <script>'};
+const names=new Map([['s',{company:'A',title:'Feedback'}],['t',{company:'B',title:'Feedback'}]]);
+const rows=[...Array.from({length:6},()=>({...row})),...Array.from({length:6},()=>({...row,submitted_at:'2026-09-02T00:00Z',bucket:'2026-09-01',score:5,nps:10,comment:'',followup_status:'none'})),
+  {...row,client_id:'b',survey_id:'t',score:5,comment:'',followup_status:'none'},
+  {...row,location_name:'',comment:'قیمت مہنگی ہے'},
+  {...row,location_name:'',comment:'mehnga aur der'},
+  {...row,location_name:'',comment:'serviceable',followup_status:'resolved',first_contacted_at:'2026-10-02T02:00Z',first_resolved_at:'2026-10-02T04:00Z'},
+  {...row,location_name:'',comment:'',followup_status:'contacted',first_contacted_at:'2026-10-02T04:00Z'},
+  {...row,location_name:'',comment:'',followup_status:'contacted'}];
+const a=echoAdvanced(rows,{bounds,buckets:['2026-09-01','2026-10-01'],surveyNames:names,now:new Date('2026-10-05')});
+assert.equal(a.branches.length,2,'same branch name across clients stays separate');
+assert.equal(a.branches.find(b=>b.company==='A').delta_pts,-100);
+assert.equal(a.branches.find(b=>b.company==='B').low_sample,true);
+assert.equal(a.topics.rows.find(t=>t.key==='waiting').count,7);
+assert.equal(a.topics.rows.find(t=>t.key==='price').count,2,'Urdu and Roman Urdu');
+assert.equal(a.topics.rows.find(t=>t.key==='staff').count,6,'word boundaries avoid serviceable');
+assert.equal(a.service.median_first_reply_hours,3,'median averages middle two values');
+assert.equal(a.service.median_resolution_hours,4);
+assert.equal(a.service.missing_reply_timestamps,1,'historical timings stay unknown');
+assert.equal(a.service.replied_within_48_pct,100);
+
+(async()=>{
+  const pg=new PGlite();
+  require.cache[require.resolve('../src/db')]={exports:{query:(q,p)=>pg.query(q,p)}};
+  await pg.exec(`create table clients(id uuid primary key,company text,surveys_enabled boolean);
+    create table surveys(id uuid primary key,client_id uuid,title text,status text,slug text,created_at timestamptz default now());
+    create table survey_responses(id uuid primary key,client_id uuid,survey_id uuid,score int,nps int,ces int,resolved boolean,comment text default '',location_id text default '',location_name text default '',channel text default 'link',language text default 'en',gender text default '',city text default '',age_band text default '',followup_status text default 'open',followup_note text default '',followup_by text default '',followup_at timestamptz,submitted_at timestamptz default now(),duration_sec int,answers jsonb default '{}');
+    create table survey_invites(client_id uuid,survey_id uuid,created_at timestamptz,opened_at timestamptz,response_id uuid,channel text);
+    create table survey_views(survey_id uuid,day date,views int);`);
+  const migration=fs.readFileSync(require.resolve('../db/schema.sql'),'utf8').split('\n').filter(l=>/^alter table survey_responses add column if not exists first_/.test(l)).join('\n');
+  await pg.exec(migration);await pg.exec(migration);
+  const clientA=randomUUID(),clientB=randomUUID(),surveyA=randomUUID(),surveyB=randomUUID(),response=randomUUID();
+  await pg.query("insert into clients values($1,'Company A',true),($2,'Company B',true)",[clientA,clientB]);
+  await pg.query("insert into surveys(id,client_id,title,status,slug) values($1,$2,'A feedback','live','a'),($3,$4,'B feedback','live','b')",[surveyA,clientA,surveyB,clientB]);
+  await pg.query("insert into survey_responses(id,client_id,survey_id,score,comment,location_name) values($1,$2,$3,2,'slow queue','DHA'),($4,$5,$6,2,'foreign parcel','DHA')",[response,clientA,surveyA,randomUUID(),clientB,surveyB]);
+  const S=require('../src/utils/surveys');
+  const survey={id:surveyA,questions:[]};
+  await S.setFollowUp(survey,response,{status:'contacted'},'test');
+  const stamp=(await pg.query('select first_contacted_at from survey_responses where id=$1',[response])).rows[0].first_contacted_at;
+  await S.setFollowUp(survey,response,{note:'Follow-up note'},'test');
+  await S.setFollowUp(survey,response,{status:'resolved'},'test');
+  let timing=(await pg.query('select * from survey_responses where id=$1',[response])).rows[0];
+  assert.equal(+new Date(timing.first_contacted_at),+new Date(stamp),'note and closure preserve first contact');
+  assert.ok(timing.first_resolved_at);
+  await S.setFollowUp(survey,response,{status:'open'},'test');
+  await S.setFollowUp(survey,response,{status:'resolved'},'test');
+  const again=(await pg.query('select * from survey_responses where id=$1',[response])).rows[0];
+  assert.equal(+new Date(again.first_resolved_at),+new Date(timing.first_resolved_at),'reopening preserves first resolution');
+  await pg.query("update survey_responses set first_contacted_at=null,first_resolved_at=null,followup_status='contacted' where id=$1",[response]);
+  await S.setFollowUp(survey,response,{status:'resolved'},'test');
+  timing=(await pg.query('select * from survey_responses where id=$1',[response])).rows[0];
+  assert.equal(timing.first_contacted_at,null,'legacy contacted history is not invented');
+  const {echoDashboard}=require('../src/utils/echoDashboard');
+  const own=await echoDashboard({clientId:clientA,grain:'month'});
+  assert.equal(own.advanced.topics.comment_count,1);
+  assert.doesNotMatch(JSON.stringify(own),/foreign parcel|Company B/);
+  const app=express();
+  app.use('/portal',(req,res,next)=>{req.portalClient={id:clientA,company:'Company A',surveys_enabled:true};next();},require('../src/routes/surveys'));
+  app.use('/staff',require('../src/routes/surveys'));
+  const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.on('listening',r));
+  const base='http://127.0.0.1:'+server.address().port;
+  const portal=await (await fetch(base+'/portal/dashboard?client_id='+clientB+'&grain=month')).json();
+  const staff=await (await fetch(base+'/staff/dashboard?client_id='+clientA+'&grain=month')).json();
+  assert.deepEqual(portal.advanced,staff.advanced,'portal ignores supplied other client and matches staff scope');
+  const ctx=vm.createContext({window:{},console});
+  vm.runInContext(fs.readFileSync(require.resolve('../public/analytics-view.js'),'utf8'),ctx);
+  const html=ctx.window.VQA.echoHTML(own,{});
+  for(const title of ['Answers over time','Satisfaction over time','Complaint topic trends','Branch performance matrix','Service response performance'])assert.ok(html.includes(title),title);
+  const empty=await echoDashboard({clientId:randomUUID(),grain:'month'});
+  assert.match(ctx.window.VQA.echoHTML(empty,{}),/Not enough data yet/);
+  own.advanced.topics.rows[0].samples[0].comment='<img src=x onerror=alert(1)>';
+  assert.match(ctx.window.VQA.echoHTML(own,{}),/&lt;img/,'comments escaped');
+  const ExcelJS=require('exceljs');
+  const wb=new ExcelJS.Workbook();
+  require('../src/utils/analyticsReport').appendEchoAdvancedReport(wb,own,'Company A','month');
+  const parsed=new ExcelJS.Workbook();await parsed.xlsx.load(await wb.xlsx.writeBuffer());
+  for(const title of ['Complaint topics','Topic trends','Branch matrix','Service performance'])assert.ok(parsed.getWorksheet(title),title);
+  assert.ok(JSON.stringify(parsed.getWorksheet('Complaint topics').getSheetValues()).includes('Waiting & speed'));
+  assert.doesNotMatch(JSON.stringify(parsed.worksheets.map(s=>s.getSheetValues())),/foreign parcel|Company B/);
+  server.close();await pg.close();
+  console.log('PASS: topic counts/trends, branch comparisons, SQL timestamps, median timing, tenant isolation, portal parity, empty states, existing charts and escaping.');
+})().catch(e=>{console.error(e);process.exit(1);});

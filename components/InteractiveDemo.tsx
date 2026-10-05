@@ -205,7 +205,7 @@ export default function InteractiveDemo() {
 
   /** Open the real assistant, or fall back to WhatsApp if it has not loaded. */
   const openLiveAgent = () => {
-    const toggle = document.querySelector<HTMLElement>(".chat-window-toggle");
+    const toggle = document.querySelector<HTMLElement>("[data-chat-launcher]");
     if (toggle) toggle.click();
     else window.open(waLink(), "_blank", "noopener");
   };

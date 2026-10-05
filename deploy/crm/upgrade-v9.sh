@@ -233,6 +233,22 @@ BEFORE=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
   -c "select count(*) from information_schema.tables where table_schema='public'")
 ok "database '$DB_NAME' reachable — $BEFORE tables today"
 
+# Which API keys are in use, by scope: how many, and when each scope was last
+# used. Read-only and printed in dry runs too, so a change to how a key is
+# accepted can be checked against real traffic before it ships. Counts and
+# times only — never a key, its name or a hash.
+KEY_USE=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At -F '|' -c "
+  select scope,
+         count(*) filter (where not revoked),
+         coalesce(round(extract(epoch from now() - max(last_used_at) filter (where not revoked)) / 60)::text, 'never')
+    from api_keys group by scope order by scope" 2>/dev/null || true)
+if [ -n "$KEY_USE" ]; then
+  echo "$KEY_USE" | while IFS='|' read -r scope active mins; do
+    if [ "$mins" = "never" ]; then when="never used"; else when="last used $mins min ago"; fi
+    ok "API keys, $scope scope: $active active, $when"
+  done
+fi
+
 # ---------------------------------------------------------------- 2. backup
 bold "2. Backing up first"
 mkdir -p backups
@@ -419,6 +435,73 @@ else
   else
     warn "the survey end-to-end check failed — lines above"; FAILED=1
   fi
+  chk "v9.17 customers: the contacts table, and gender/city/age on survey answers" 4 \
+    "select (select count(*) from information_schema.tables where table_name='contacts')
+          + (select count(*) from information_schema.columns where table_name='survey_responses' and column_name in ('gender','city','age_band'))"
+  chk "v9.19 template library: each client's industry (clients.industry)" 1 \
+    "select count(*) from information_schema.columns where table_name='clients' and column_name='industry'"
+  # Every template in the library must open in its preview (the survey app,
+  # as a respondent sees it — never recorded), from inside the container.
+  if docker exec "$APP_CONTAINER" node -e "const T=require('/app/src/utils/surveyTemplates').templateSummaries();Promise.all(T.map(t=>fetch('http://127.0.0.1:8080/s/_template/'+t.key).then(r=>r.status))).then(s=>{const bad=s.filter(x=>x!==200).length;console.log('    '+T.length+' templates, '+(T.length-bad)+' open in preview');process.exit(bad||T.length<28?1:0)}).catch(e=>{console.error('    '+e.message);process.exit(1)})"; then
+    ok "the survey template library: every industry's template previews"
+  else
+    warn "a survey template did not open in preview — lines above"; FAILED=1
+  fi
+  INDUSTRIES=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
+    -c "select count(*) from clients where industry <> ''" 2>/dev/null || echo '?')
+  ok "clients with their industry set: $INDUSTRIES (their templates come first in Echo; set it on the client's page)"
+  chk "v9.20 pricing: package cost profiles, the stored rate card, the add-ons catalogue" 3 \
+    "select (select count(*) from information_schema.columns where table_name='products' and column_name in ('context_tokens','premium_share'))
+          + (select count(*) from information_schema.columns where table_name='settings' and column_name='costing')"
+  ADDONS=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
+    -c "select count(*) from catalog_addons where active" 2>/dev/null || echo '?')
+  ok "add-ons in the catalogue: $ADDONS (capabilities, solutions, Pulse, Echo, Human Support…)"
+  # Prices, costs and margins are the CEO's alone (v9.21) and this log is
+  # public, so only whether things are in place is printed — never a figure.
+  ECHO_PRICED=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
+    -c "select count(*) from catalog_addons where key in ('echo','echo-location') and setup_fee is not null and monthly_fee is not null" 2>/dev/null || echo '?')
+  ok "Vantriq Echo is priced in the catalogue ($ECHO_PRICED of 2 lines)"
+  # The costing model runs and every package comes out costed at current prices.
+  if docker exec "$APP_CONTAINER" node -e "require('dotenv').config();require('/app/src/utils/costing').costingModel({withAddons:false}).then(m=>{console.log('    '+m.packages.length+' packages costed at current prices');process.exit(m.packages.length&&m.packages.every(r=>r.cost_per_session>0)?0:1)}).catch(e=>{console.error('    '+e.message);process.exit(1)})"; then
+    ok "every package is costed at current prices (Products & Pricing and Financials — the CEO's)"
+  else
+    warn "the costing model did not run — lines above"; FAILED=1
+  fi
+  # The Excel workbooks — Pulse, Echo and the customer directory — are built
+  # from this install's real data (read-only). Only whether each built is
+  # printed: they hold customers' numbers and this log is public.
+  if docker exec "$APP_CONTAINER" node -e "require('dotenv').config();const R=require('/app/src/utils/analyticsReport');Promise.all([R.pulseReport(null,{grain:'week'}),R.echoReport(null,{grain:'week'}),R.contactsWorkbook(null)]).then(rs=>process.exit(rs.every(r=>r.buffer.slice(0,2).toString()==='PK'&&r.buffer.length>5000)?0:1)).catch(e=>{console.error('    '+e.message);process.exit(1)})"; then
+    ok "the Pulse, Echo and customer-directory workbooks build from this install's data"
+  else
+    warn "a report workbook did not build — lines above"; FAILED=1
+  fi
+  CUSTOMERS=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
+    -c "select count(*) from contacts" 2>/dev/null || echo '?')
+  ok "customer profiles on file: $CUSTOMERS (they fill in as agents pass names and customers answer surveys)"
+  chk "v9.20.2 transcripts: message ids, delivery state, the alert throttle" 4 \
+    "select (select count(*) from information_schema.columns where table_name='conversation_messages' and column_name in ('external_id','delivered','delivery_error'))
+          + (select count(*) from information_schema.tables where table_name='delivery_alerts')"
+  # Counts only — transcripts are customers' words and this log is public.
+  TRANSCRIPTS=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At -F '|' \
+    -c "select count(*), count(*) filter (where created_at >= now() - interval '7 days'), count(*) filter (where not delivered),
+               coalesce(to_char(max(created_at) at time zone 'Asia/Karachi', 'DD Mon HH24:MI'), 'never')
+          from conversation_messages" 2>/dev/null || echo '?|?|?|?')
+  IFS='|' read -r T_ALL T_WEEK T_FAILED T_LAST <<< "$TRANSCRIPTS"
+  ok "transcript lines kept: $T_ALL ($T_WEEK in the last 7 days, latest $T_LAST Karachi time); agent replies not delivered: $T_FAILED"
+  # v9.20.4: website chats, counts only. The migrate above placed every line a
+  # website chat had filed under no business; any still unplaced is stored but
+  # shows on no Customers page, so it is worth a warning — not a failed deploy.
+  WEBCHATS=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At -F '|' \
+    -c "select count(*), count(distinct regexp_replace(session_id, '-[0-9]{4}-[0-9]{2}-[0-9]{2}\$', '')) filter (where agent_id is not null),
+               count(*) filter (where agent_id is null and client_id is null),
+               coalesce(to_char(max(created_at) at time zone 'Asia/Karachi', 'DD Mon HH24:MI'), 'never')
+          from conversation_messages where channel = 'website'" 2>/dev/null || echo '?|?|?|?')
+  IFS='|' read -r W_ALL W_VISITORS W_LOOSE W_LAST <<< "$WEBCHATS"
+  if [ "$W_LOOSE" = "0" ]; then
+    ok "website chat lines: $W_ALL from $W_VISITORS visitors, each with its business (latest $W_LAST Karachi time)"
+  else
+    warn "website chat lines: $W_ALL, of which $W_LOOSE belong to no business — stored, but on no Customers page"
+  fi
   # Whether an unhappy answer is actually emailed to anyone. Reported, never
   # failed on — and this log is public, so it says yes or no, nothing more.
   MAIL_SET=$(docker exec "$APP_CONTAINER" node -e "require('dotenv').config();process.stdout.write(require('/app/src/utils/mailer').mailDiagnosis().configured?'yes':'no')" 2>/dev/null || echo '?')
@@ -448,6 +531,40 @@ else
     ok "a protected owner account exists"
   else
     warn "no protected owner account yet — run 'docker exec -it $APP_CONTAINER npm run seed-owner' by hand, over SSH, not through this pipeline"
+  fi
+  # v9.21: Pricing, Financials and the business documents open for one
+  # account only — the protected owner, at PRICING_EMAIL (ceo@vantriqai.com
+  # unless crm_app says otherwise). Yes or no; nothing else is printed.
+  PRICING_TO=$(docker exec "$APP_CONTAINER" node -e "require('dotenv').config();process.stdout.write(String(process.env.PRICING_EMAIL||'ceo@vantriqai.com').trim().toLowerCase())" 2>/dev/null | tr -cd 'a-z0-9@._+-')
+  PRICING_TO=${PRICING_TO:-ceo@vantriqai.com}
+  CEO_READY=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
+    -c "select count(*) from internal_users where is_owner and active and lower(email) = '$PRICING_TO'" 2>/dev/null || echo '?')
+  if [ "$CEO_READY" = "1" ]; then
+    ok "Pricing, Financials and the business documents open only for $PRICING_TO, the protected owner account"
+  else
+    warn "Pricing opens only for $PRICING_TO as the protected owner account, and that account is not set up — nobody can open Pricing until it is"
+  fi
+  CEO_DOCS=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
+    -c "select count(*) from owner_documents" 2>/dev/null || echo '?')
+  ok "business documents on file for the CEO: $CEO_DOCS"
+  # v9.22: the admin key opens nothing on its own from outside the server.
+  # Emergency access is the key plus a code emailed to the CEO. Checked
+  # without a real key and without sending anything: a made-up key is turned
+  # away by the emergency route, and a made-up emergency session is told it
+  # is signed out. Counts only.
+  BG_TABLES=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
+    -c "select count(*) from information_schema.tables where table_schema='public' and table_name in ('breakglass_challenges','breakglass_sessions')" 2>/dev/null || echo '?')
+  if [ "$BG_TABLES" = "2" ] && docker exec "$APP_CONTAINER" node -e "
+    const B='http://127.0.0.1:8080/api/auth';
+    Promise.all([
+      fetch(B+'/breakglass/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:'vq_deploy_check_not_a_key'})}).then(r=>r.status===401||r.status===403),
+      fetch(B+'/me',{headers:{Authorization:'Bearer bg_deploy_check_not_a_session'}}).then(r=>r.json().then(j=>r.status===401&&j.signed_out===true)),
+    ]).then(a=>process.exit(a.every(Boolean)?0:1)).catch(()=>process.exit(1))" 2>/dev/null; then
+    BG_OPEN=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
+      -c "select count(*) from breakglass_sessions where ended_at is null and expires_at > now()" 2>/dev/null || echo '?')
+    ok "the admin key alone opens nothing; emergency access needs a code emailed to $PRICING_TO (open now: $BG_OPEN)"
+  else
+    warn "emergency access is not answering as expected"; FAILED=1
   fi
 
   AFTER=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
@@ -518,5 +635,69 @@ cat <<'NEXT'
      (WhatsApp)" workflow in n8n sends the after-chat survey an hour after a
      conversation goes quiet — see "After every WhatsApp conversation" in
      deploy/crm/SURVEYS.md.
+
+  7. Reports (v9.17). Pulse → "Download Pulse report (Excel)": every
+     figure, each contact (new and returning, who and where), conversation
+     and transcript. Echo → "Echo report (Excel)": satisfaction, NPS, every
+     survey and answer, who answered (gender, age, city), follow-ups.
+     Customers → "All customers (Excel)": everyone ever, every detail.
+     Clients have the same three in their portal, for their own customers.
+
+  8. Customers (v9.17). CRM → Customers, and a Customers tab in every
+     client's portal: each customer's profile, every conversation and what
+     was said, their survey answers, tags and notes. Names arrive with the
+     WhatsApp agent's usage calls (contact_name); cities and more through
+     POST /api/webhooks/contact or a survey's About-you questions.
+
+  9. Survey templates (v9.19). Echo → New survey: 28 ready-made surveys on
+     eight shelves, in English and Urdu, each with a phone preview. Set a
+     client's industry on their page (CRM → Clients → the client → Vantriq
+     Echo): their templates come first, here and in their portal, and
+     switching Echo on can create their first survey from it, live.
+
+ 10. Products & Pricing (v9.20). Every package now shows its messages per
+     session, what a session costs at today's AI prices, and its margin —
+     at full use and at average use — with overage cover, setup margin and
+     headroom; below it the unit-economics table, the add-ons catalogue and
+     the steady state. "Rates & assumptions" changes a model price or the
+     exchange rate and re-costs everything, Financials included. Prices
+     themselves stay locked to the business model.
+
+ 11. Vantriq Echo pricing (v9.20.1): priced per location, first location and
+     each further one, in the add-ons catalogue — Products & Pricing.
+
+ 12. Transcripts (v9.20.2). Customers → a customer → Conversations: every
+     line in the order it was said, at the time it was said. A customer who
+     went unanswered — WhatsApp refused the reply (an expired access token)
+     or the AI never wrote one (a revoked OpenAI key) — is kept, with the
+     reply marked "not delivered", and the team is emailed at once, at most
+     once an hour per agent, with the fix for that cause. n8n sends each
+     WhatsApp message's id, so a retry or a history backfill never stores a
+     line twice.
+
+ 13. Website chats (v9.20.4). Someone who chats on a client's website is a
+     customer like any other: Customers → "Web visitor 1b2c3d" (their name
+     once they give it), every line of the chat on their page — in the CRM
+     and in that client's portal. Chats stored under no business before now
+     were placed on this deploy (counted above). New client agents copy the
+     transcript step from the wiring kit: vantriq-backend/n8n/README.md.
+
+ 14. Pricing is the CEO's (v9.21). Products & Pricing, Financials, every
+     cost and margin, and the new Business documents open only for
+     ceo@vantriqai.com signed in to its own account — not other admins, not
+     any API key. Upload the business model, pitch deck and portfolio there
+     once (drop them on the card): they live in the database, never in the
+     code. This log no longer prints prices, costs or margins.
+
+ 15. Emergency access (v9.22). The admin API key no longer opens the CRM
+     on its own: anyone still signed in with it is shut out by this deploy —
+     everything it asks for is refused, and on reload the page drops the key
+     and shows sign-in. "Emergency access with an API key" on the
+     sign-in page now emails a 6-digit code to ceo@vantriqai.com, saying
+     where the request came from; only that code, if the CEO gives it out,
+     opens the CRM — as an admin, without Pricing — for two hours. The CEO
+     sees each one and ends it under Team → Emergency access. If email is
+     down, the way in is the server itself (SSH). If you are not sure who
+     has had the admin key, rotate it.
 NEXT
 printf '\n'

@@ -21,7 +21,7 @@ process.env.MAIL_FROM = 'support@vantriqai.com';
 delete process.env.LEAD_NOTIFY_EMAIL;
 
 // --- stubs ------------------------------------------------------------
-const state = { clients: [], products: [{ id: 'uuid-starter', sort_order: 1 }], conversations: [], stageHistory: [], settings: { lead_notify_emails: '' } };
+const state = { clients: [], agents: [], usage: [], products: [{ id: 'uuid-starter', sort_order: 1 }], conversations: [], alerts: {}, stageHistory: [], settings: { lead_notify_emails: '' } };
 const sent = [];
 let nextId = 1;
 
@@ -64,14 +64,56 @@ const dbStub = {
       state.stageHistory.push({ client_id: params[0], comment: params[1] });
       return { rows: [] };
     }
+    // v9.17: a ref that is no client's may be one of a client's agents; v9.20.4
+    // takes the agent named outright, by id or by ref, as /usage does.
+    if (q.startsWith('select id, client_id from client_agents where')) {
+      const byId = q.includes('id::text = $1');
+      const hit = state.agents.find((a) => (byId ? a.id === params[0] : a.external_ref === params[0]));
+      return { rows: hit ? [{ id: hit.id, client_id: hit.client_id }] : [] };
+    }
+    // v9.20.4: the day usage filed a chat under (the nearest in time), and who metered it.
+    if (q.startsWith('select session_id from usage_events where session_id = any')) {
+      const at = new Date(params[1]).getTime();
+      const hits = state.usage.filter((u) => params[0].includes(u.session_id))
+        .sort((a, b) => Math.abs(new Date(a.occurred_at) - at) - Math.abs(new Date(b.occurred_at) - at));
+      return { rows: hits.slice(0, 1).map((u) => ({ session_id: u.session_id })) };
+    }
+    if (q.startsWith('select distinct client_id, agent_id from usage_events where session_id')) {
+      const owners = new Map();
+      for (const u of state.usage.filter((x) => x.session_id === params[0])) owners.set(`${u.client_id}|${u.agent_id}`, { client_id: u.client_id, agent_id: u.agent_id });
+      return { rows: [...owners.values()] };
+    }
     if (q.startsWith('insert into conversation_messages')) {
-      for (let i = 0; i < params.length; i += 6) {
-        state.conversations.push({
-          client_id: params[i], external_ref: params[i + 1], session_id: params[i + 2],
-          channel: params[i + 3], role: params[i + 4], content: params[i + 5],
-        });
+      // One group of values per turn, as many as the statement names columns
+      // (created_at's value is the time it was said, or null for now). A
+      // message id already stored is skipped, as the unique index does.
+      const cols = q.slice(q.indexOf('(') + 1, q.indexOf(')')).split(',').map((c) => c.trim());
+      const stored = [];
+      for (let i = 0; i < params.length; i += cols.length) {
+        const row = {};
+        cols.forEach((c, j) => { row[c] = params[i + j]; });
+        if (row.external_id && state.conversations.some((x) => x.external_ref === row.external_ref && x.external_id === row.external_id)) continue;
+        row.created_at = row.created_at || new Date().toISOString();
+        state.conversations.push(row);
+        stored.push(row);
       }
+      return { rows: stored };
+    }
+    // v9.20.2: at most one undelivered-reply email an hour per agent.
+    if (q.startsWith('update delivery_alerts')) {
+      const a = state.alerts[params[0]];
+      if (a && a.hoursAgo >= 1) { const missed = a.missed; state.alerts[params[0]] = { hoursAgo: 0, missed: 0 }; return { rows: [{ missed }] }; }
       return { rows: [] };
+    }
+    if (q.startsWith('insert into delivery_alerts')) {
+      const a = state.alerts[params[0]];
+      if (a) { a.missed += 1; return { rows: [{ fresh: false }] }; }
+      state.alerts[params[0]] = { hoursAgo: 0, missed: 0 };
+      return { rows: [{ fresh: true }] };
+    }
+    if (q.startsWith('select c.company, a.name as agent from clients c')) {
+      const c = state.clients.find((x) => x.id === params[0]);
+      return { rows: c ? [{ company: c.company, agent: null }] : [] };
     }
     throw new Error('unstubbed query: ' + q.slice(0, 90));
   },
@@ -216,6 +258,120 @@ const settle = () => new Promise((r) => setTimeout(r, 20));
   });
   assert.strictEqual(state.conversations.at(-1).channel, 'whatsapp');
   console.log('✓ an unknown channel falls back to a permitted one');
+
+  // 12. v9.20.2: the time it was said, and the channel's id, are kept; the
+  // same message sent twice (an n8n retry, a backfill run again) is stored once.
+  const said = Math.floor(Date.now() / 1000) - 3600;
+  r = await post('/api/webhooks/conversation', {
+    external_ref: '923001112233', session_id: '923005550000-2026-09-25', channel: 'whatsapp',
+    messages: [{ role: 'customer', content: 'Timings?', at: said, id: 'wamid.A' }, { role: 'agent', content: '9 to 9.', at: new Date(said * 1000 + 4000).toISOString(), id: 'wamid.B' }],
+  });
+  assert.strictEqual(r.status, 201);
+  assert.strictEqual(r.body.stored, 2);
+  assert.strictEqual(state.conversations.at(-2).created_at, new Date(said * 1000).toISOString(), 'Unix seconds become the time it was said');
+  assert.strictEqual(state.conversations.at(-2).external_id, 'wamid.A');
+  r = await post('/api/webhooks/conversation', {
+    external_ref: '923001112233', session_id: '923005550000-2026-09-25',
+    messages: [{ role: 'customer', content: 'Timings?', at: said, id: 'wamid.A' }, { role: 'agent', content: '9 to 9.', id: 'wamid.B' }],
+  });
+  assert.strictEqual(r.status, 200);
+  assert.deepStrictEqual([r.body.stored, r.body.duplicates], [0, 2]);
+  r = await post('/api/webhooks/conversation', { external_ref: '923001112233', messages: [{ role: 'customer', content: 'far future', at: '2999-01-01T00:00:00Z' }] });
+  assert.strictEqual(state.conversations.at(-1).created_at && state.conversations.at(-1).created_at.startsWith('2999'), false, 'a time in the future is not trusted');
+  console.log('✓ times and message ids are kept; a repeat is stored once; a future time is ignored');
+
+  // 13. A reply WhatsApp refused: the customer's words are kept, the reply is
+  // marked not delivered, and the team hears about it — once an hour.
+  sent.length = 0;
+  state.settings.lead_notify_emails = 'ops@vantriqai.com';
+  const refused = (content, extra = {}) => post('/api/webhooks/conversation', {
+    external_ref: '923001112233', session_id: '923701917578-2026-09-29', channel: 'whatsapp',
+    delivered: false, error: 'Cannot call API for app 1775 on behalf of user 1221',
+    messages: [{ role: 'customer', content }, { role: 'agent', content: 'Assalam o alaikum! We build AI agents…' }], ...extra,
+  });
+  r = await refused('Hi, I have an IT business');
+  await settle();
+  assert.strictEqual(r.status, 201);
+  assert.strictEqual(r.body.undelivered, 1);
+  assert.strictEqual(state.conversations.at(-2).delivered, true, 'the customer line is never "undelivered"');
+  assert.strictEqual(state.conversations.at(-1).delivered, false);
+  assert.match(state.conversations.at(-1).delivery_error, /Cannot call API/);
+  assert.strictEqual(sent.length, 1, 'one alert');
+  assert.deepStrictEqual(sent.map((m) => m.to), ['ops@vantriqai.com']);
+  assert.match(sent[0].subject, /not answered: \+923701917578/);
+  assert.match(sent[0].text, /Hi, I have an IT business/);
+  assert.match(sent[0].text, /wa\.me\/923701917578/);
+  assert.match(sent[0].text, /System users/, 'a token error says where the fix is');
+  await refused('Hello?');
+  await settle();
+  assert.strictEqual(sent.length, 1, 'a second failure within the hour does not email again');
+  state.alerts['client-1'].hoursAgo = 2;
+  await refused('Anyone there?');
+  await settle();
+  assert.strictEqual(sent.length, 2, 'an hour later it does');
+  assert.match(sent[1].text, /1 more message went unanswered since the last email/);
+  await refused('Old one', { messages: [{ role: 'customer', content: 'Last week', at: said - 7 * 86400 }, { role: 'agent', content: 'x', at: said - 7 * 86400 + 5 }] });
+  state.alerts['client-1'].hoursAgo = 2;
+  await settle();
+  assert.strictEqual(sent.length, 2, 'a backfilled old failure is history, not an alert');
+  console.log('✓ a refused reply is kept as not delivered and alerts the team at most hourly');
+
+  // 14. The AI model failing to write a reply at all (a revoked OpenAI key)
+  // alerts the same way, and points at the AI credential, not WhatsApp.
+  state.alerts['client-1'].hoursAgo = 2;
+  await post('/api/webhooks/conversation', {
+    external_ref: '923001112233', session_id: '923455100726-2026-09-29', channel: 'whatsapp',
+    messages: [{ role: 'customer', content: 'hello' },
+      { role: 'agent', content: '(No reply was written: the AI model failed.)', delivered: false, error: 'The AI model failed: Your API key has been invalidated.' }],
+  });
+  await settle();
+  assert.strictEqual(sent.length, 3);
+  assert.match(sent[2].text, /could not answer a customer: no reply was written/);
+  assert.match(sent[2].text, /OpenAI credential/);
+  assert.doesNotMatch(sent[2].text, /System users/, 'no WhatsApp-token advice for an AI failure');
+  console.log('✓ an AI failure alerts too, with the right fix');
+
+  // 15. v9.20.4: a website chat. It sends its own id with no day, under a ref
+  // that is the chat's and no business's — and still lands with the agent
+  // that metered that chat, in the very conversation usage counted, even when
+  // the sender's clock had already moved on to tomorrow.
+  const dayOf = (offset) => new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10);
+  const chat = 'c9d5a29e-6f10-4fb4-b863-1226d518ca84';
+  state.clients.push({ id: 'client-web', external_ref: 'shopco', name: 'Shop Co', company: 'Shop Co' });
+  state.agents.push({ id: 'agent-web', client_id: 'client-web', external_ref: 'shop.example' });
+  state.usage.push(
+    { session_id: `${chat}-${dayOf(-1)}`, client_id: 'client-web', agent_id: 'agent-web', occurred_at: new Date(Date.now() - 30 * 3600000).toISOString() },
+    { session_id: `${chat}-${dayOf(1)}`, client_id: 'client-web', agent_id: 'agent-web', occurred_at: new Date().toISOString() },
+  );
+  r = await post('/api/webhooks/conversation', {
+    external_ref: `web-${chat}`, session_id: chat, channel: 'website',
+    messages: [{ role: 'customer', content: 'Appointment booking' }, { role: 'agent', content: 'Our Booking Agent…' }],
+  });
+  assert.strictEqual(r.status, 201);
+  assert.deepStrictEqual([r.body.client_id, r.body.agent_id], ['client-web', 'agent-web'], 'the agent that metered the chat owns it');
+  assert.strictEqual(state.conversations.at(-1).session_id, `${chat}-${dayOf(1)}`, 'the day usage filed it under');
+  assert.strictEqual(state.conversations.at(-1).channel, 'website');
+  // Two agents metering one session is a question, not an answer.
+  state.usage.push({ session_id: 'shared-2026-09-28', client_id: 'client-1', agent_id: null, occurred_at: new Date().toISOString() },
+    { session_id: 'shared-2026-09-28', client_id: 'client-web', agent_id: 'agent-web', occurred_at: new Date().toISOString() });
+  r = await post('/api/webhooks/conversation', { external_ref: 'nobody', session_id: 'shared-2026-09-28', messages: [{ role: 'customer', content: 'hm' }] });
+  assert.strictEqual(r.body.client_id, null, 'ambiguous usage attributes nothing');
+  // A chat never metered (the AI failed before it answered) names its agent
+  // outright, gets today's day, and the alert speaks of a web visitor.
+  sent.length = 0;
+  r = await post('/api/webhooks/conversation', {
+    external_ref: 'shop.example', agent_ref: 'shop.example', session_id: 'f00dbabe-0000-4000-8000-00000a1b2c3d', channel: 'website',
+    messages: [{ role: 'customer', content: 'Do you deliver to Lahore?' },
+      { role: 'agent', content: '(No reply was written: the AI model failed.)', delivered: false, error: 'The AI model failed: insufficient_quota' }],
+  });
+  await settle();
+  assert.deepStrictEqual([r.body.client_id, r.body.agent_id], ['client-web', 'agent-web']);
+  assert.strictEqual(state.conversations.at(-1).session_id, `f00dbabe-0000-4000-8000-00000a1b2c3d-${dayOf(0)}`);
+  assert.strictEqual(sent.length, 1);
+  assert.match(sent[0].subject, /not answered: Web visitor 1b2c3d \(Shop Co\)/);
+  assert.doesNotMatch(sent[0].text, /wa\.me/, 'no WhatsApp link for a web visitor');
+  assert.match(sent[0].text, /left their details/);
+  console.log('✓ a website chat lands with the agent that metered it, on the day usage counted it');
 
   console.log('\nAll webhook lead/conversation tests passed.');
   server.close();

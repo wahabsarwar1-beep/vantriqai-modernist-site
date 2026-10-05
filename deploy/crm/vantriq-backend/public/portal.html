@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Vantriq AI — Account Portal</title>
 <link rel="icon" href="/brand/mark.svg" type="image/svg+xml">
 <!-- The VantriqAI app (v9.15): installable from the browser, and what the
@@ -20,8 +20,9 @@
 <!-- Served from this origin, like the CRM's — a CDN or network policy
      blocking cdnjs should not take the charts with it. -->
 <script src="/vendor/chart/chart.umd.js"></script>
-<script src="/analytics-view.js"></script>
-<script src="/survey-studio.js"></script>
+<script src="/analytics-view.js?v=9.26.1"></script>
+<script src="/survey-studio.js?v=9.24.2"></script>
+<script src="/contacts-view.js"></script>
 <script src="/invoice-print.js"></script>
 <style>
 /* The portal is the only part of the CRM a customer ever sees, so it is set
@@ -163,10 +164,14 @@ tr.row-click:active{background:#FAF8F3;}
  *  whether the important number is the one your eye lands on first.
  * ==================================================================== */
 
-#app{max-width:760px;}
-/* Analytics needs the room: charts side by side on a desktop, stacked on a phone. */
-body.wide #app{max-width:1100px;}
-body.wide .topbar-inner{max-width:1060px;}
+/* One width for every tab. It used to be a 760px column that only Pulse and
+   Echo widened, so switching tabs made the page jump and everything else
+   looked cramped on a desktop. On a phone this cap never comes into play. */
+#app{max-width:1100px;}
+.topbar-inner{max-width:1060px;}
+/* Cards that sit side by side on a desktop and stack on a phone. */
+.two-up{display:grid;gap:0 18px;}
+@media (min-width:880px){ .two-up{grid-template-columns:1fr 1fr;} }
 
 /* ---------- Header ---------- */
 .topbar{
@@ -267,8 +272,9 @@ td.amt,th.amt{text-align:right;font-variant-numeric:tabular-nums;}
   .modal{border-radius:24px;max-width:640px;}
 }
 </style>
+<link rel="stylesheet" href="/workspace-theme.css?v=9.24.0">
 </head>
-<body>
+<body class="portal-shell">
 <div id="app"></div>
 
 <script>
@@ -443,6 +449,7 @@ async function boot(){
     const contracts = await api('/contracts').catch(()=>[]);
     data = { account, usage, invoices, ledger, packages, agents, bundles, quotes, contracts, activity: null, analytics: null };
     if(/^#surveys\b/.test(location.hash || '') && surveysOn()) currentTab = 'surveys';
+    if(/^#customers\b/.test(location.hash || '')) currentTab = 'customers';
     render();
   }catch(e){
     if(e.expired){ renderLogin('Your session has ended. Please sign in again.'); return; }
@@ -453,18 +460,19 @@ async function boot(){
 /* ----------------------------- Sign in ----------------------------- */
 function renderLogin(msg){
   document.getElementById('app').innerHTML = `
-  <div class="center-screen">
-    <div class="card" style="max-width:380px;width:100%;">
+  <div class="auth-screen portal-auth">
+    <div class="auth-layout"><aside class="auth-story"><div class="workspace-eyebrow">VantriqAI · Customer portal</div><h1>Your agents.<br>Your account.<br><em>All in one place.</em></h1><p>See how your agents are performing, follow your conversations, and stay on top of your account.</p><div class="auth-capabilities"><span>Usage &amp; activity</span><span>Invoices &amp; statements</span><span>Account &amp; support</span></div><div class="auth-story-note"><span class="auth-story-mark">${portalMark()}</span><div><strong>A clearer view of your service.</strong><p>Everything you need to manage your VantriqAI account.</p></div></div></aside>
+    <div class="auth-form-wrap"><div class="auth-card portal-auth-card">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
         <div class="brand-mark">${portalMark()}</div>
         <div><div class="brand-name">Vantriq<em>AI</em></div><div class="brand-sub">Account portal</div></div>
       </div>
-      <h3 style="margin:0 0 4px;">Sign in</h3>
-      <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">Use the username and password Vantriq AI gave you.</p>
+      <h2 class="auth-title">Welcome back.</h2>
+      <p class="auth-description">Sign in with your VantriqAI account details.</p>
       ${msg?`<div id="login-msg" style="background:var(--red-light);color:#8F3527;padding:9px 11px;border-radius:8px;font-size:12.5px;margin-bottom:12px;">${esc(msg)}</div>`:'<div id="login-msg" style="display:none;"></div>'}
-      <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;">Username</label>
+      <label for="lg_user" class="auth-label">Username</label>
       <input id="lg_user" autocomplete="username" style="width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;margin-bottom:10px;box-sizing:border-box;">
-      <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;">Password</label>
+      <label for="lg_pass" class="auth-label">Password</label>
       <input id="lg_pass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()" style="width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;margin-bottom:14px;box-sizing:border-box;">
       <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="doLogin()">Sign in</button>
       <p style="font-size:12px;margin:14px 0 0;text-align:center;">
@@ -473,7 +481,7 @@ function renderLogin(msg){
       <p style="font-size:11.5px;color:var(--muted);margin:8px 0 0;text-align:center;">
         Lost your username too? <a class="wa-link" href="https://wa.me/923006789807" target="_blank" rel="noopener">Message us on WhatsApp</a>
       </p>
-    </div>
+    </div><p class="auth-foot">Your VantriqAI account, in one place.</p></div></div>
   </div>`;
   const u = document.getElementById('lg_user'); if(u) u.focus();
 }
@@ -496,6 +504,7 @@ async function doLogin(){
     setSession(json.session);
     loginBusy = false;
     if(window.VQS) VQS.reset();
+    if(window.VQC) VQC.reset();
     boot();
   }catch(e){
     show('Could not reach the server. Check your connection and try again.');
@@ -533,6 +542,7 @@ async function doLogout(){
   // The survey studio keeps its own state between renders; the next person to
   // sign in on this browser must not see this account's surveys.
   if(window.VQS) VQS.reset();
+  if(window.VQC) VQC.reset();
   data = { account:null, usage:null, invoices:[], ledger:null, packages:null,
     agents:null, bundles:null, quotes:null, activity:null, apiTokens:null };
   currentTab = 'overview';
@@ -550,6 +560,28 @@ function renderError(msg){
   </div>`;
 }
 
+function portalLabelTables(){
+  document.querySelectorAll('.portal-main table').forEach(table=>{
+    const head=table.tHead;
+    if(!head||head.rows.length!==1)return;
+    const headers=Array.from(head.rows[0].cells);
+    if(headers.length<2||headers.some(cell=>cell.colSpan!==1))return;
+    const rows=Array.from(table.tBodies).flatMap(body=>Array.from(body.rows));
+    if(rows.some(row=>row.cells.length!==headers.length))return;
+    table.classList.add('portal-mobile-table');
+    rows.forEach(row=>Array.from(row.cells).forEach((cell,i)=>{cell.dataset.label=headers[i].textContent.trim()||'Actions';}));
+  });
+}
+function portalNavIcon(tab){
+  const paths={overview:'M3 10l9-7 9 7v10H3z M9 20v-7h6v7',analytics:'M4 20V10m8 10V4m8 16v-7',customers:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M20 8v6m-3-3h6',surveys:'M4 4h16v12H9l-5 4z',agents:'M5 8h14v12H5z M12 3v5 M8 12h1m6 0h1 M8 16h8',usage:'M3 12h4l3-8 4 16 3-8h4',activity:'M12 8v5l3 2 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0',invoices:'M6 3h12v18l-3-2-3 2-3-2-3 2z M9 8h6m-6 4h6',ledger:'M4 4h16v16H4z M8 4v16m-4-10h16m-16 5h16',contracts:'M6 3h8l4 4v14H6z M14 3v5h4 M9 12h6m-6 4h6',packages:'M3 7l9-4 9 4v10l-9 4-9-4z M3 7l9 4 9-4 M12 11v10',quotes:'M5 4h14v16H5z M8 8h8m-8 4h8m-8 4h4',security:'M12 3l8 4v5c0 5-8 9-8 9s-8-4-8-9V7z M9 12l2 2 4-4'};
+  return `<svg class="portal-nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[tab]||paths.overview}"/></svg>`;
+}
+function portalViewHeading(){
+  const titles={overview:['Account overview','Your service, usage, and account at a glance.'],analytics:['Vantriq Pulse','See the impact of your customer conversations.'],customers:['Your customers','Contacts, conversations, and the details that matter.'],surveys:['Vantriq Echo','Hear your customers and follow up on their feedback.'],agents:['Your agents','A clear view of the agents working for your business.'],usage:['Usage & allowance','Track your conversations and available allowance.'],activity:['Conversation activity','Explore the conversations behind your usage.'],invoices:['Invoices','Review your invoices and payment status.'],ledger:['Account statement','Your account movements and running balance.'],contracts:['Contracts','Your agreements and renewal dates.'],packages:['Packages & bundles','Explore your package and available add-ons.'],quotes:['Your quotes','Review the proposals shared with your business.'],security:['Account security','Manage your password and account access.']};
+  const [title,description]=titles[currentTab]||titles.overview;
+  return `<header class="portal-view-heading"><div class="workspace-eyebrow">Customer workspace</div><h1>${title}</h1><p>${description}</p></header>`;
+}
+
 function render(){
   const { account } = data;
   document.getElementById('app').innerHTML = `
@@ -562,43 +594,47 @@ function render(){
             <div class="brand-sub">Account portal</div>
           </div>
         </div>
-        <div class="company-name">${esc(account.company)}</div>
+        <div class="portal-header-actions"><a class="btn btn-ghost" href="https://wa.me/923006789807" target="_blank" rel="noopener">Contact support</a><button type="button" class="btn btn-ghost" onclick="doLogout()">Sign out</button></div>
+        <div class="portal-account-heading"><div><div class="workspace-eyebrow">Your account</div><div class="company-name">${esc(account.company)}</div></div>
         <div class="status-row">
           ${stagePill(account.stage)}
           ${account.package ? `<span class="pill pill-active">${esc(account.package.name)} package</span>` : ''}
-        </div>
+        </div></div>
       </div>
     </div>
-    <div class="content">
-      <div class="tabs">
-        <div class="tab ${currentTab==='overview'?'active':''}" onclick="setTab('overview')">Overview</div>
-        <div class="tab ${currentTab==='analytics'?'active':''}" onclick="setTab('analytics')">Analytics</div>
-        ${surveysOn()?`<div class="tab ${currentTab==='surveys'?'active':''}" onclick="setTab('surveys')">Surveys</div>`:''}
-        <div class="tab ${currentTab==='agents'?'active':''}" onclick="setTab('agents')">My agents${data.agents&&data.agents.length?` <span class="tab-n">${data.agents.length}</span>`:''}</div>
-        <div class="tab ${currentTab==='usage'?'active':''}" onclick="setTab('usage')">Usage</div>
-        <div class="tab ${currentTab==='activity'?'active':''}" onclick="setTab('activity')">Activity</div>
-        <div class="tab ${currentTab==='invoices'?'active':''}" onclick="setTab('invoices')">Invoices</div>
-        <div class="tab ${currentTab==='ledger'?'active':''}" onclick="setTab('ledger')">Statement</div>
-        ${data.contracts&&data.contracts.length?`<div class="tab ${currentTab==='contracts'?'active':''}" onclick="setTab('contracts')">Contracts${data.contracts.some(c=>c.expiring_soon)?` <span class="tab-n tab-n-live">${data.contracts.filter(c=>c.expiring_soon).length}</span>`:''}</div>`:''}
-        <div class="tab ${currentTab==='packages'?'active':''}" onclick="setTab('packages')">Packages &amp; bundles</div>
-        ${data.quotes&&data.quotes.length?`<div class="tab ${currentTab==='quotes'?'active':''}" onclick="setTab('quotes')">Quotes${data.quotes.some(q=>q.status==='sent')?` <span class="tab-n tab-n-live">${data.quotes.filter(q=>q.status==='sent').length}</span>`:''}</div>`:''}
-        <div class="tab ${currentTab==='security'?'active':''}" onclick="setTab('security')">Security</div>
-      </div>
-      <div id="tab-content">${renderTab()}</div>
+    <div class="content portal-layout">
+      <nav class="tabs portal-navigation" aria-label="Account navigation">
+        <div class="portal-nav-title">Your workspace</div>
+        <button type="button" class="tab ${currentTab==='overview'?'active':''}" onclick="setTab('overview')" aria-current="${currentTab==='overview'?'page':'false'}">${portalNavIcon('overview')}Overview</button>
+        <button type="button" class="tab ${currentTab==='analytics'?'active':''}" onclick="setTab('analytics')" title="Vantriq Pulse — analytics" aria-current="${currentTab==='analytics'?'page':'false'}">${portalNavIcon('analytics')}Pulse</button>
+        <button type="button" class="tab ${currentTab==='customers'?'active':''}" onclick="setTab('customers')" title="Your customers: who they are, every conversation, what they said" aria-current="${currentTab==='customers'?'page':'false'}">${portalNavIcon('customers')}Customers</button>
+        ${surveysOn()?`<button type="button" class="tab ${currentTab==='surveys'?'active':''}" onclick="setTab('surveys')" title="Vantriq Echo — customer-satisfaction surveys" aria-current="${currentTab==='surveys'?'page':'false'}">${portalNavIcon('surveys')}Echo</button>`:''}
+        <button type="button" class="tab ${currentTab==='agents'?'active':''}" onclick="setTab('agents')" aria-current="${currentTab==='agents'?'page':'false'}">${portalNavIcon('agents')}My agents${data.agents&&data.agents.length?` <span class="tab-n">${data.agents.length}</span>`:''}</button>
+        <button type="button" class="tab ${currentTab==='usage'?'active':''}" onclick="setTab('usage')" aria-current="${currentTab==='usage'?'page':'false'}">${portalNavIcon('usage')}Usage</button>
+        <button type="button" class="tab ${currentTab==='activity'?'active':''}" onclick="setTab('activity')" aria-current="${currentTab==='activity'?'page':'false'}">${portalNavIcon('activity')}Activity</button>
+        <button type="button" class="tab ${currentTab==='invoices'?'active':''}" onclick="setTab('invoices')" aria-current="${currentTab==='invoices'?'page':'false'}">${portalNavIcon('invoices')}Invoices</button>
+        <button type="button" class="tab ${currentTab==='ledger'?'active':''}" onclick="setTab('ledger')" aria-current="${currentTab==='ledger'?'page':'false'}">${portalNavIcon('ledger')}Statement</button>
+        ${data.contracts&&data.contracts.length?`<button type="button" class="tab ${currentTab==='contracts'?'active':''}" onclick="setTab('contracts')" aria-current="${currentTab==='contracts'?'page':'false'}">${portalNavIcon('contracts')}Contracts${data.contracts.some(c=>c.expiring_soon)?` <span class="tab-n tab-n-live">${data.contracts.filter(c=>c.expiring_soon).length}</span>`:''}</button>`:''}
+        <button type="button" class="tab ${currentTab==='packages'?'active':''}" onclick="setTab('packages')" aria-current="${currentTab==='packages'?'page':'false'}">${portalNavIcon('packages')}Packages &amp; bundles</button>
+        ${data.quotes&&data.quotes.length?`<button type="button" class="tab ${currentTab==='quotes'?'active':''}" onclick="setTab('quotes')" aria-current="${currentTab==='quotes'?'page':'false'}">${portalNavIcon('quotes')}Quotes${data.quotes.some(q=>q.status==='sent')?` <span class="tab-n tab-n-live">${data.quotes.filter(q=>q.status==='sent').length}</span>`:''}</button>`:''}
+        <button type="button" class="tab ${currentTab==='security'?'active':''}" onclick="setTab('security')" aria-current="${currentTab==='security'?'page':'false'}">${portalNavIcon('security')}Security</button>
+      </nav>
+      <main class="portal-main"><div id="tab-content">${renderTab()}</div>
       <div class="footer-note">
         Questions about your account? <a class="wa-link" href="https://wa.me/923006789807" target="_blank" rel="noopener">Message Vantriq AI on WhatsApp</a>
         <span style="margin:0 8px;color:var(--border);">|</span>
         <a class="wa-link" href="#" onclick="event.preventDefault();doLogout()">Sign out</a>
-      </div>
+      </div></main>
     </div>
   `;
   if(currentTab==='usage') requestAnimationFrame(drawUsageChart);
-  document.body.classList.toggle('wide', currentTab==='analytics' || currentTab==='surveys');
   if(currentTab==='surveys') mountSurveys();
+  if(currentTab==='customers') mountCustomers();
   if(currentTab==='analytics'){
     if(!data.analytics) loadAnalytics();
     else if(!data.analytics.error) requestAnimationFrame(()=>VQA.drawConversations(data.analytics));
   } else if(window.VQA) VQA.destroyCharts();
+  portalLabelTables();
   renderInvoiceModal();
 }
 
@@ -611,18 +647,19 @@ function setTab(t){
   if(currentTab==='surveys' && t!=='surveys' && window.VQS && VQS.hasUnsaved()
      && !confirm('You have unsaved survey changes. Leave without saving?')) return;
   currentTab=t;
-  try{ history.replaceState(null, '', t==='surveys' ? '#surveys' : location.pathname + location.search); }catch(e){}
+  try{ history.replaceState(null, '', t==='surveys' ? '#surveys' : t==='customers' ? '#customers' : location.pathname + location.search); }catch(e){}
   render();
 }
 
 function renderTab(){
   // The pause notice sits above every tab — it is the first thing that matters.
-  return serviceBanner() + tabBody();
+  return portalViewHeading() + serviceBanner() + tabBody();
 }
 
 function tabBody(){
   if(currentTab==='overview') return renderOverview();
   if(currentTab==='analytics') return renderAnalytics();
+  if(currentTab==='customers') return renderCustomers();
   if(currentTab==='surveys') return surveysOn() ? renderSurveys() : renderOverview();
   if(currentTab==='usage') return renderUsage();
   if(currentTab==='invoices') return renderInvoices();
@@ -673,7 +710,16 @@ function renderOverview(){
   <div class="card" style="background:var(--teal-light);border-color:#BFE3D8;">
     <div style="font-size:13px;color:var(--teal-dark);font-weight:600;">✓ Your account is fully paid up. Nothing due right now.</div>
   </div>`}
+  ${surveysOn() ? `
+  <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;">
+    <div style="flex:1 1 320px;">
+      <h3 style="margin:0 0 4px;">📚 Customer surveys, ready for your industry</h3>
+      <div style="font-size:13px;color:var(--muted);line-height:1.55;">Vantriq Echo has a ready-made satisfaction survey for every industry — restaurants, shops, clinics, pharmacies, banks, schools and more — in English and Urdu. Preview one as your customers will see it, and share it by QR code, link or WhatsApp in a minute.</div>
+    </div>
+    <button class="btn btn-primary" onclick="setTab('surveys')">Open Echo</button>
+  </div>` : ''}
 
+  <div class="two-up">
   <div class="card">
     <h3>Your package</h3>
     ${p ? `
@@ -691,6 +737,7 @@ function renderOverview(){
     <div class="kv"><span class="k">Email</span><span class="v">${esc(account.email||'—')}</span></div>
     <div class="kv"><span class="k">Phone</span><span class="v">${esc(account.phone||'—')}</span></div>
     <div class="kv"><span class="k">Client since</span><span class="v">${fmtDate(account.join_date)}</span></div>
+  </div>
   </div>
   `;
 }
@@ -719,13 +766,46 @@ function renderAnalytics(){
   if(!a) return `<div class="card" style="text-align:center;color:var(--muted);"><span class="loading-dot"></span>&nbsp; Working out your numbers…</div>`;
   if(a.error) return `<div class="card"><div class="empty">${esc(a.error)}</div>
     <button class="btn btn-ghost" style="margin-top:10px;" onclick="data.analytics=null;render()">Try again</button></div>`;
-  return VQA.conversationsHTML(a, { audience:'portal', onGrain:'setAnalyticsGrain', fileTag:'analytics', surveysEnabled: surveysOn() });
+  return productHead('Vantriq Pulse', 'Live analytics on every conversation — leads, busiest hours, satisfaction and what the AI resolved on its own.')
+    + VQA.conversationsHTML(a, { audience:'portal', onGrain:'setAnalyticsGrain', onReport:'downloadAnalyticsReport', surveysEnabled: surveysOn(),
+      reportLabel: 'Download Pulse report (Excel)',
+      reportHint: 'Every figure here, plus your customers (new and returning, who and where), each conversation and what was said — a tab for each' });
+}
+
+/** Pulse as an Excel workbook, at the period on screen. */
+function downloadAnalyticsReport(){
+  portalDownload(`/analytics/report.xlsx?grain=${encodeURIComponent(analyticsGrain)}`,
+    `vantriq-pulse-${analyticsGrain}-${new Date().toISOString().slice(0,10)}.xlsx`, 'Building your report…');
+}
+
+/** The product name at the top of Pulse and Echo, matching vantriqai.com. */
+function productHead(name, line){
+  return `<div style="margin:2px 0 14px;"><div style="font-family:var(--f-head);font-size:19px;font-weight:600;letter-spacing:-.01em;">${esc(name)}</div>
+    <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">${esc(line)}</div></div>`;
+}
+
+/* ---- Customers: who they are, every conversation, what they said (/contacts-view.js) ---- */
+function renderCustomers(){
+  if(!window.VQC) return `<div class="card"><div class="empty">The Customers page could not load in this browser.</div></div>`;
+  return `<div id="vqc-root"></div>`;
+}
+function mountCustomers(){
+  const el = document.getElementById('vqc-root');
+  if(!el || !window.VQC) return;
+  VQC.mount(el, {
+    audience: 'portal',
+    api: (method, path, body) => api('/contacts' + path, { method, body: body !== undefined ? JSON.stringify(body) : undefined })
+      .catch(e => { if(e.expired){ renderLogin('Your session has ended. Please sign in again.'); } throw e; }),
+    download: (path, filename) => portalDownload('/contacts' + path, filename, 'Building your customer workbook…'),
+    toast: (msg, warn) => toast(msg, warn),
+  });
 }
 
 /* ---- Surveys: build, share and read customer-satisfaction surveys (/survey-studio.js) ---- */
 function renderSurveys(){
-  if(!window.VQS) return `<div class="card"><div class="empty">The surveys page could not load in this browser.</div></div>`;
-  return `<div id="vqs-root"></div>`;
+  if(!window.VQS) return `<div class="card"><div class="empty">The Vantriq Echo page could not load in this browser.</div></div>`;
+  return productHead('Vantriq Echo', 'Customer-satisfaction surveys in English and Urdu — by QR code, link, WhatsApp, kiosk or on your site — with every answer flowing into Pulse.')
+    + `<div id="vqs-root"></div>`;
 }
 function mountSurveys(){
   const el = document.getElementById('vqs-root');

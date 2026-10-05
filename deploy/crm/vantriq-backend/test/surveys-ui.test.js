@@ -9,6 +9,7 @@
  */
 const { chromium } = require('playwright-core');
 const fs = require('fs');
+const { signInAsAdmin, endUiSessions } = require('./ui-session');
 const B = 'http://127.0.0.1:8099';
 const ADMIN_KEY = fs.readFileSync('/tmp/adminkey', 'utf8').trim();
 const AH = { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY };
@@ -62,6 +63,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     ok(/like most/i.test(await p.innerText('.qtitle')), 'a promoter is asked what they liked — not what to improve');
     await p.fill('#text', 'Lovely chai <img src=x onerror=alert(1)>');
     await tap(p, '[data-act=next]');
+    ok(/Are you/i.test(await p.innerText('.qtitle')), 'then the optional "about you" questions: gender…');
+    await tap(p, '[data-opt=female]');
+    ok(/Which city/i.test(await p.innerText('.qtitle')), '…and city (v9.17)');
+    await tap(p, '[data-act=next]');
     ok(/get back to you/i.test(await p.innerText('.qtitle')), 'then the optional contact question');
     ok(/Submit/.test(await p.innerText('[data-act=next]')), 'which is last, so the button says Submit');
     await tap(p, '[data-act=next]');
@@ -107,6 +112,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     ok(/better/i.test(await p.innerText('.qtitle')), 'a detractor is asked what to improve');
     await p.fill('#text', 'Slow counter');
     await tap(p, '[data-act=next]');
+    await tap(p, '[data-act=next]'); // gender — optional, skipped
+    await tap(p, '[data-act=next]'); // city — optional, skipped
     await p.fill('[data-field=name]', 'Sana');
     await p.fill('[data-field=phone]', '12');
     await p.locator('[data-field=phone]').blur();
@@ -141,6 +148,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await tap(p, '[data-act=next]');
     await tap(p, '.pt[data-val="8"]');
     await tap(p, '[data-act=next]');
+    await tap(p, '[data-act=next]'); // gender — optional, skipped
+    await tap(p, '[data-act=next]'); // city — optional, skipped
     await tap(p, '[data-act=next]');
     await p.waitForSelector('.tick', { timeout: 10000 });
     ok(!!(await p.$('#restart')), 'a countdown to the next customer');
@@ -164,9 +173,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await page.fill('#lg_pass', 'UiSurveysPass123');
     await page.keyboard.press('Enter');
     await page.waitForSelector('.vqs-scard', { timeout: 10000 });
-    ok(await page.locator('.tab.active').innerText() === 'Surveys', 'a #surveys link opens straight onto the tab');
+    ok(await page.locator('.tab.active').innerText() === 'Echo', 'a #surveys link opens straight onto the tab');
     const home = await page.innerText('.vqs');
-    ok(/UI dine-in/.test(home) && /Waiting for follow-up\s*\n?\s*1/.test(home), 'the survey, and one unhappy customer waiting', home.slice(0, 300));
+    ok(/UI dine-in/.test(home) && /1 waiting for a reply/.test(home), 'the survey, and one unhappy customer waiting', home.slice(0, 300));
 
     await page.click('.vqs-btn.primary:has-text("New survey")');
     await page.click('.vqs-tpl[data-tpl="healthcare"]');
@@ -186,6 +195,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const frame = page.frameLocator('#vqs-preview');
     const previewTitle = await frame.locator('.qtitle').innerText().catch(() => '');
     ok(previewTitle === 'How was your visit today?', 'the phone preview shows the edit as it is typed', previewTitle);
+    const phoneW = await frame.locator('html').evaluate(() => innerWidth);
+    ok(phoneW === 390 && !!(await page.$('.vqs-phone-wrap .vqs-dev .vqs-dev-bar')), 'on a real phone\'s screen, with its status bar (v9.19.1)', String(phoneW));
     ok(!!(await page.$('#vqs-savebar')), 'and the save bar appears');
     await page.click('.vqs-savebar .vqs-btn.primary');
     await page.waitForFunction(() => !document.getElementById('vqs-savebar'), null, { timeout: 8000 }).catch(() => {});
@@ -212,9 +223,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     page.on('pageerror', (e) => errors.push(`crm: ${e.message}`));
     await page.goto(B + '/');
-    await page.evaluate((k) => localStorage.setItem('vantriq_api_key', k), ADMIN_KEY);
+    await signInAsAdmin(page);
     await page.goto(B + '/');
-    await page.click('.nav-item:has-text("Surveys")');
+    await page.click('.nav-item:has-text("Vantriq Echo")');
     await page.waitForSelector('.vqs-scard', { timeout: 10000 });
     await page.selectOption('select[data-a-change="client-filter"]', client.id);
     await page.waitForFunction((co) => document.querySelectorAll('.vqs-scard').length === 2 && document.querySelector('.vqs').innerText.includes(co), client.company, { timeout: 8000 }).catch(() => {});
@@ -230,5 +241,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(errors.length === 0, 'no script errors on any page', errors.join(' | '));
   await fetch(`${B}/api/clients/${client.id}`, { method: 'DELETE', headers: AH });
   console.log(`\n==== ${pass} passed, ${fail} failed ====\n`);
+  await endUiSessions();
   process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

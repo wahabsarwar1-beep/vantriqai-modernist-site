@@ -54,7 +54,7 @@ export const REGIONS: Record<RegionKey, Region> = {
       "A one-time setup fee plus a simple monthly plan, quoted in PKR after we scope your workflow. No hidden surprises, and no charge for normal business volume.",
     quoteOutcome: "Quote accepted · PKR value logged",
     propertyAsk: "Looking for a 2-bed in DHA, under 3 crore.",
-    phonePlaceholder: "+92 341 1120049",
+    phonePlaceholder: "+92 3XX XXXXXXX",
     languagesFigure: "EN·UR",
     languagesLabel: "english & roman urdu",
     languagesPhrase: "English or Roman Urdu",
@@ -107,6 +107,8 @@ export function regionFromPathname(pathname: string): Region {
 
 /** The same page in the other region, for the switcher. */
 export function pathInRegion(pathname: string, region: Region): string {
+  // Shared privacy notices apply to both regions and have one canonical URL.
+  if (pathname === "/privacy" || pathname === "/cookies" || pathname === "/terms") return pathname;
   const current = regionFromPathname(pathname);
   const bare = current.base ? pathname.slice(current.base.length) || "/" : pathname;
   return hrefIn(region, bare);

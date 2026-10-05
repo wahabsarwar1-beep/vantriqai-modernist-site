@@ -68,6 +68,14 @@ button{cursor:pointer;}
   .shell{flex:0 0 auto;}
   .card{padding:30px 34px 26px;min-height:600px;flex:0 0 auto;}
 }
+/* Inside the studio's phone (?device=1): the page fills the phone's screen
+   edge to edge, from below its status bar to above its home bar, scrolls
+   without a desktop scroll bar, and leaves "preview" to the label under the
+   phone — what is on the screen is exactly what a customer sees. */
+html.in-device{scrollbar-width:none;}
+html.in-device::-webkit-scrollbar{display:none;}
+html.in-device .app{padding-top:56px;padding-bottom:24px;}
+html.in-device .ribbon,html.in-device .hint.keys{display:none;}
 .ribbon{background:#fff4dc;color:#7a4b08;font-size:13px;font-weight:700;text-align:center;padding:9px 12px;border-radius:14px;margin-bottom:12px;border:1px solid #f3dfb3;}
 
 /* ---------- header ---------- */
@@ -75,7 +83,9 @@ button{cursor:pointer;}
 .brandmark{width:36px;height:36px;border-radius:11px;flex:0 0 36px;display:grid;place-items:center;overflow:hidden;
   background:var(--brand);color:var(--on-brand);font-weight:800;font-size:17px;font-family:var(--f);}
 .brandmark img{width:100%;height:100%;object-fit:contain;background:#fff;}
-.bname{font-weight:700;font-size:15px;line-height:1.2;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* A long business name wraps to a second line rather than being cut short. */
+.bname{font-weight:700;font-size:15px;line-height:1.25;flex:1;min-width:0;overflow:hidden;overflow-wrap:anywhere;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;}
 html[lang=ur] .bname{line-height:1.9;}
 .lang{display:inline-flex;background:var(--line-2);border-radius:999px;padding:3px;gap:2px;flex:0 0 auto;}
 .lang button{border:0;background:transparent;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;color:var(--muted);min-height:32px;}
@@ -265,6 +275,8 @@ html[lang=ur] .toast{line-height:2;}
   var PREVIEW = !!BOOT.preview;
   var INVITE = BOOT.invite || null;
   var KIOSK = params.get('kiosk') === '1';
+  // Drawn inside the studio's phone: its preview only, never a live page.
+  if (PREVIEW && params.get('device') === '1') document.documentElement.classList.add('in-device');
   var CHANNELS = ['link','qr','whatsapp','sms','email','kiosk','embed','web'];
   var CHANNEL = KIOSK ? 'kiosk' : (CHANNELS.indexOf(params.get('ch')) >= 0 ? params.get('ch') : (INVITE ? 'whatsapp' : 'link'));
   var OTHER = '__other';
@@ -283,7 +295,7 @@ html[lang=ur] .toast{line-height:2;}
       stars:['Poor','Fair','Good','Very good','Excellent'],
       npsLow:'Not at all likely', npsHigh:'Extremely likely', cesLow:'Very difficult', cesHigh:'Very easy',
       yes:'Yes', no:'No', other:'Other', otherPh:'Please tell us…', selectAll:'Choose all that apply',
-      typeHere:'Type your answer…', name:'Your name', company:'Business name', phone:'Phone or WhatsApp', email:'Email',
+      typeHere:'Type your answer…', name:'Your name', company:'Business name', phone:'Phone or WhatsApp', email:'Email', city:'Your city',
       consent:'{business} may contact me about my feedback', location:'Which branch did you visit?',
       thanks:'Thank you!', thanksDefault:'Your feedback goes straight to our team.',
       reviewAsk:'So glad you had a great experience! Would you share it on Google? It really helps us.',
@@ -306,7 +318,7 @@ html[lang=ur] .toast{line-height:2;}
       stars:['خراب','مناسب','اچھا','بہت اچھا','بہترین'],
       npsLow:'بالکل امکان نہیں', npsHigh:'بہت زیادہ امکان', cesLow:'بہت مشکل', cesHigh:'بہت آسان',
       yes:'جی ہاں', no:'جی نہیں', other:'دیگر', otherPh:'براہِ کرم بتائیں…', selectAll:'جو بھی لاگو ہوں منتخب کریں',
-      typeHere:'اپنا جواب یہاں لکھیں…', name:'آپ کا نام', company:'کاروبار کا نام', phone:'فون یا واٹس ایپ', email:'ای میل',
+      typeHere:'اپنا جواب یہاں لکھیں…', name:'آپ کا نام', company:'کاروبار کا نام', phone:'فون یا واٹس ایپ', email:'ای میل', city:'آپ کا شہر',
       consent:'{business} میری رائے کے بارے میں مجھ سے رابطہ کر سکتا ہے', location:'آپ کس برانچ میں تشریف لائے؟',
       thanks:'شکریہ!', thanksDefault:'آپ کی رائے براہِ راست ہماری ٹیم تک پہنچتی ہے۔',
       reviewAsk:'ہمیں خوشی ہے کہ آپ کا تجربہ اچھا رہا! کیا آپ اسے گوگل پر شیئر کریں گے؟ اس سے ہمیں بہت مدد ملتی ہے۔',
@@ -528,7 +540,7 @@ html[lang=ur] .toast{line-height:2;}
       case 'single': return !!a.choice && (a.choice !== OTHER || !!String(a.other || '').trim());
       case 'multi': return a.choices && a.choices.length > 0 && (a.choices.indexOf(OTHER) < 0 || !!String(a.other || '').trim());
       case 'text': return !!String(a).trim();
-      case 'contact': return ['name','company','phone','email'].some(function(f){ return String(a[f] || '').trim(); });
+      case 'contact': return ['name','company','phone','email','city'].some(function(f){ return String(a[f] || '').trim(); });
     }
     return true;
   }
@@ -596,7 +608,7 @@ html[lang=ur] .toast{line-height:2;}
         return '<textarea id="text" maxlength="2000" placeholder="' + esc(t('typeHere')) + '" aria-labelledby="focus">' + esc(s) + '</textarea><div class="count" id="count">' + s.length + ' / 2000</div>';
       case 'contact':
         var c = a || {};
-        var types = { name:['text','name'], company:['text','organization'], phone:['tel','tel'], email:['email','email'] };
+        var types = { name:['text','name'], company:['text','organization'], phone:['tel','tel'], email:['email','email'], city:['text','address-level2'] };
         return q.fields.map(function(f){
           return '<label class="field"><span>' + esc(t(f)) + '</span><input class="in" data-field="' + f + '" type="' + types[f][0] + '" autocomplete="' + types[f][1] + '" maxlength="' + (f === 'email' ? 200 : 120) + '" value="' + esc(c[f] || '') + '"' + (f === 'phone' ? ' inputmode="tel"' : '') + '></label>';
         }).join('') + '<label class="check"><input type="checkbox" id="consent"' + (c.consent ? ' checked' : '') + '><span>' + esc(t('consent', { business:business() })) + '</span></label>';

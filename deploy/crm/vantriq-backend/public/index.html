@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Vantriq Ops — CRM &amp; Revenue Console</title>
 <link rel="icon" href="/brand/mark.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,8 +22,10 @@
      internet for a CDN neither they nor we control. Serving the file
      ourselves removes the dependency outright. -->
 <script src="/vendor/chart/chart.umd.js"></script>
-<script src="/analytics-view.js"></script>
-<script src="/survey-studio.js"></script>
+<script src="/analytics-view.js?v=9.27.0"></script>
+<script src="/survey-studio.js?v=9.24.2"></script>
+<script src="/contacts-view.js"></script>
+<script src="/calendar-view.js"></script>
 <script src="/invoice-print.js"></script>
 <style>
 /* The console is set in VantriqAI's own palette — the cream ground, ink
@@ -254,7 +256,7 @@ tr.row-click:hover td{background:#FBFAF7;}
 .close-x{background:none;border:none;color:var(--muted);font-size:18px;line-height:1;padding:4px;}
 
 /* Product cards */
-.prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;}
+.prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px;}
 .prod-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;position:relative;}
 .prod-card .tier-tag{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--teal-dark);font-weight:700;}
 .prod-card h3{margin:4px 0 2px;font-size:19px;}
@@ -262,10 +264,41 @@ tr.row-click:hover td{background:#FBFAF7;}
 .prod-price{display:flex;align-items:baseline;gap:6px;margin-bottom:14px;}
 .prod-price .amt{font-family:var(--f-mono);font-size:20px;font-weight:600;}
 .prod-price .per{font-size:11.5px;color:var(--muted);}
-.prod-stat-row{display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-top:1px dashed var(--border);}
+.prod-stat-row{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:6px 0;border-top:1px dashed var(--border);}
+.prod-stat-row .v{text-align:right;}
 .prod-stat-row .k{color:var(--muted);}
 .prod-stat-row .v{font-weight:600;font-family:var(--f-mono);}
 .prod-actions{display:flex;gap:6px;margin-top:14px;}
+/* v9.20 — the cost side of a package: what serving it costs, what it keeps. */
+.prod-econ{margin-top:12px;padding:10px 12px 12px;background:var(--teal-light);border-radius:10px;}
+.prod-econ .prod-stat-row{border-top-color:rgba(47,86,217,.16);}
+.prod-econ-h{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--teal-dark);font-weight:700;margin-bottom:4px;}
+.prod-margin{padding:7px 0 5px;border-top:1px dashed rgba(47,86,217,.16);}
+.prod-margin-top{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);}
+.prod-margin-top strong{font-family:var(--f-mono);}
+.prod-margin-track{height:5px;background:rgba(22,21,26,.08);border-radius:99px;margin-top:5px;overflow:hidden;}
+.prod-margin-fill{height:100%;border-radius:99px;}
+.pricing-basis{margin-bottom:16px;}
+.kpi-mini{background:var(--paper);border:1px solid var(--border-2);border-radius:10px;padding:10px 12px;}
+.kpi-mini .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;}
+.kpi-mini .v{font-family:var(--f-head);font-size:17px;font-weight:600;margin-top:4px;}
+.kpi-mini .d{font-size:11px;color:var(--muted);margin-top:2px;}
+.pricing-flag{font-size:12px;padding:7px 10px;border-radius:8px;background:var(--amber-light);color:var(--amber-dark);}
+.pricing-flag.bad{background:var(--red-light);color:var(--red);}
+/* The CEO's business documents (v9.21) */
+.odoc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;border-radius:12px;transition:outline-color .15s;outline:2px dashed transparent;outline-offset:4px;}
+.odoc-grid.drag{outline-color:var(--teal);}
+.odoc{border:1px solid var(--border);border-radius:12px;padding:14px;background:var(--bg);min-width:0;}
+.odoc-t{font-weight:700;font-size:14px;}
+.odoc-s{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.45;}
+.odoc-f{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;font-size:12px;}
+.odoc-fmt{font-weight:700;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:var(--card);border:1px solid var(--border);}
+.odoc-meta{color:var(--muted);flex:1;min-width:110px;}
+.odoc-act{display:flex;gap:6px;}
+.odoc-empty{margin-top:10px;font-size:12px;color:var(--muted);font-style:italic;}
+.odoc-prev{margin-top:8px;font-size:12px;}
+.odoc-prev summary{cursor:pointer;color:var(--muted);}
+.odoc-frame{width:100%;height:min(75vh,900px);border:0;border-radius:8px;background:#fff;}
 
 .empty{
   text-align:center;padding:50px 20px;color:var(--muted);
@@ -615,9 +648,14 @@ td.amt,th.amt,td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
   .topbar{padding:13px 16px;}
   .detail-panel{width:100%;}
 }
+
+
 </style>
+<link rel="stylesheet" href="/calendar.css">
+<link rel="stylesheet" href="/mobile.css?v=9.23.3">
+<link rel="stylesheet" href="/workspace-theme.css?v=9.24.0">
 </head>
-<body>
+<body class="crm-shell">
 <div id="app"></div>
 <div id="modal-root"></div>
 <div id="panel-root"></div>
@@ -633,35 +671,40 @@ td.amt,th.amt,td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
 
 const CURRENCY = 'PKR';
 const LS_BASE = 'vantriq_api_base';
+/* Until v9.22 an admin API key could be kept here and sent with every
+   request. On its own it opens nothing any more, so a browser still holding
+   one drops it on load and is shown sign-in, saying why. */
 const LS_KEY = 'vantriq_api_key';
+let bootNotice = '';
+try{
+  if(localStorage.getItem(LS_KEY)){
+    localStorage.removeItem(LS_KEY);
+    bootNotice = 'Signing in with the admin key alone has ended. Sign in with your account, or use Emergency access below: the key then sends a code to the CEO.';
+  }
+}catch(e){}
 
 /* ---------------------------- API client ---------------------------- */
 const LS_SESS = 'vantriq_staff_session';
 const API = {
   base: localStorage.getItem(LS_BASE) || window.location.origin,
-  key: localStorage.getItem(LS_KEY) || '',
   session: localStorage.getItem(LS_SESS) || '',
-  // Signed in either as an employee (session) or, for emergencies only, with
-  // an admin API key.
-  configured(){ return !!(this.base && (this.session || this.key)); },
+  // Signed in as an employee, or in an emergency session opened with the
+  // admin key and a code the CEO gave (v9.22). Either way, a session token.
+  configured(){ return !!(this.base && this.session); },
   setSession(base, token){
     this.base = (base||this.base||window.location.origin).replace(/\/$/,'');
     this.session = token;
     localStorage.setItem(LS_BASE, this.base); localStorage.setItem(LS_SESS, token);
   },
-  setConfig(base, key){
-    this.base = base.replace(/\/$/,''); this.key = key;
-    localStorage.setItem(LS_BASE, this.base); localStorage.setItem(LS_KEY, this.key);
-  },
   clearConfig(){
     localStorage.removeItem(LS_BASE); localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_SESS);
-    this.base=''; this.key=''; this.session='';
+    this.base=''; this.session='';
   },
   async req(method, path, body){
     let res;
     const headers = {'Content-Type':'application/json'};
-    if(this.session) headers['Authorization'] = 'Bearer ' + this.session;
-    else if(this.key) headers['x-api-key'] = this.key;
+    const sent = this.session;
+    if(sent) headers['Authorization'] = 'Bearer ' + sent;
     try{
       res = await fetch(this.base+path, {
         method, headers,
@@ -674,7 +717,12 @@ const API = {
     // Carry the whole body on the error, not just its message: some endpoints
     // answer a failure with a hint worth showing, and re-issuing the request
     // to go and read it would repeat whatever it just did.
-    if(!res.ok){ throw new ApiError((data&&data.error)||`Request failed (${res.status})`, res.status, data); }
+    if(!res.ok){
+      // The server ended this session — it expired, was signed out elsewhere,
+      // or (emergency access) the CEO ended it: back to sign-in, saying why.
+      if(res.status===401 && data && data.signed_out && sent && sent===this.session) signedOutByServer(data.error);
+      throw new ApiError((data&&data.error)||`Request failed (${res.status})`, res.status, data);
+    }
     return data;
   },
   get(path){ return this.req('GET', path); },
@@ -694,7 +742,7 @@ function productFromApi(p){ return { id:p.id, name:p.name, isStandard:p.is_stand
   extraAgentPrice:(p.extra_agent_price===undefined||p.extra_agent_price===null)?0:+p.extra_agent_price }; }
 function productToApi(p){ return { name:p.name, target_tier:p.targetTier, setup_fee:p.setupFee, retainer:p.retainer, msgs_per_session:p.msgsPerSession, quota:p.quota, overage_rate:p.overageRate, delivery_cost_full:p.deliveryCostFull, automation:p.automation, data_layer:p.dataLayer, ai_model:p.aiModel, channels:p.channels }; }
 
-function clientFromApi(c){ return { id:c.id, name:c.name, company:c.company, email:c.email, phone:c.phone, externalRef:c.external_ref||'', productId:c.product_id, stage:c.stage, estValue:+c.est_value||0, source:c.source, notes:c.notes, joinDate:c.join_date, sessionsUsedThisMonth:0, ownerRepId:c.owner_rep_id||null, salesStage:c.sales_stage||null, closeOutcome:c.close_outcome||null,
+function clientFromApi(c){ return { assignedAt:c.assigned_at||null, assignedBy:c.assigned_by||null, id:c.id, name:c.name, company:c.company, email:c.email, phone:c.phone, externalRef:c.external_ref||'', productId:c.product_id, stage:c.stage, estValue:+c.est_value||0, source:c.source, notes:c.notes, joinDate:c.join_date, sessionsUsedThisMonth:0, ownerRepId:c.owner_rep_id||null, salesStage:c.sales_stage||null, closeOutcome:c.close_outcome||null,
   portalEnabled:!!c.portal_enabled, portalUsername:c.portal_username||'',
   portalPasswordSetBy:c.portal_password_set_by||'', portalPasswordSetAt:c.portal_password_set_at||null,
   parentClientId:c.parent_client_id||null,
@@ -711,7 +759,9 @@ function clientFromApi(c){ return { id:c.id, name:c.name, company:c.company, ema
   customAutomation:c.custom_automation||'', customDataLayer:c.custom_data_layer||'',
   customAiModel:c.custom_ai_model||'', customChannels:c.custom_channels||'',
   apiAccessEnabled:!!c.api_access_enabled,
-  surveysEnabled:!!c.surveys_enabled, surveysEnabledAt:c.surveys_enabled_at||null, surveysEnabledBy:c.surveys_enabled_by||'' }; }
+  surveysEnabled:!!c.surveys_enabled, surveysEnabledAt:c.surveys_enabled_at||null, surveysEnabledBy:c.surveys_enabled_by||'',
+  // v9.19 — their industry: which Echo templates suit them ('' = not said).
+  industry:c.industry||'' }; }
 function clientToApi(c){
   const out = { name:c.name, company:c.company, email:c.email, phone:c.phone, external_ref:c.externalRef||null,
     product_id:c.productId||null, stage:c.stage, est_value:c.estValue, source:c.source, notes:c.notes,
@@ -813,6 +863,8 @@ function fmtNum(n){ return Math.round(n).toLocaleString('en-US'); }
 function uid(prefix){ return prefix+'_'+Math.random().toString(36).slice(2,9); }
 function todayISO(){ return new Date().toISOString().slice(0,10); }
 function fmtDate(d){ if(!d) return '—'; const dt=new Date(d); return dt.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }
+function fmtClock(d){ if(!d) return '—'; return new Date(d).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); }
+function fmtDateTime(d){ if(!d) return '—'; return fmtDate(d)+' '+fmtClock(d); }
 function addMonths(dateStr,n){ const d=new Date(dateStr); d.setMonth(d.getMonth()+n); return d.toISOString().slice(0,10); }
 function esc(s){ return (s+'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -938,8 +990,13 @@ function showToast(msg, kind){
 
 /* ---------------------------- Router / view state ---------------------------- */
 let currentView = 'dashboard';
-let authUser = null;   // {id,email,name,role} when signed in as an employee
-function isAdmin(){ return !authUser || authUser.role === 'admin'; }  // an API-key session is admin
+let authUser = null;   // {id,email,name,role} signed in; {breakglass:true,role:'admin'} in emergency access
+function isAdmin(){ return !!(authUser && authUser.role === 'admin'); }
+function isEmergency(){ return !!(authUser && authUser.breakglass); }
+/* Pricing, what serving it costs, every margin and the business documents are
+   the CEO's alone (v9.21): the server says so on /api/auth/me. Never an
+   emergency session, never another admin. */
+function isCeo(){ return !!(authUser && authUser.pricing === true); }
 let sidebarOpen = false;
 let openPanel = null; // {type:'client'|'invoiceDetail', id}
 let openModal = null; // {type, id}
@@ -948,11 +1005,13 @@ let kanbanDragId = null;
 const NAV = [
   {group:'Overview', items:[
     {id:'dashboard', label:'Dashboard', icon:iconGrid},
-    {id:'analytics', label:'Analytics', icon:iconTrend},
-    {id:'surveys', label:'Surveys', icon:iconSurvey},
+    {id:'analytics', label:'Vantriq Pulse', icon:iconTrend},
+    {id:'surveys', label:'Vantriq Echo', icon:iconSurvey},
+    {id:'customers', label:'Customers', icon:iconPeople},
   ]},
   {group:'Revenue', items:[
     {id:'pipeline', label:'Pipeline', icon:iconFunnel},
+    {id:'calendar', label:'Calendar', icon:iconGrid},
     {id:'clients', label:'Clients', icon:iconUsers},
     {id:'agents', label:'Agents & Automations', icon:iconBot},
     {id:'billing', label:'Billing & Invoices', icon:iconReceipt},
@@ -964,9 +1023,9 @@ const NAV = [
     {id:'reps', label:'Sales Reps', icon:iconUsers},
   ]},
   {group:'Operations', items:[
-    {id:'products', label:'Products & Pricing', icon:iconBox},
+    {id:'products', label:'Products & Pricing', icon:iconBox, ceoOnly:true},
     {id:'procurement', label:'Procurement', icon:iconTruck, adminOnly:true},
-    {id:'financials', label:'Financials', icon:iconChart, adminOnly:true},
+    {id:'financials', label:'Financials', icon:iconChart, adminOnly:true, ceoOnly:true},
     {id:'accounting', label:'Accounts & Statements', icon:iconLedger, adminOnly:true},
     {id:'ops', label:'Billing Automation', icon:iconBolt, adminOnly:true},
   ]},
@@ -979,7 +1038,7 @@ const NAV = [
 /* Nav filtered to what this account may actually open. */
 function visibleNav(){
   return NAV
-    .map(g=>({ ...g, items: g.items.filter(it=> !it.adminOnly || isAdmin()) }))
+    .map(g=>({ ...g, items: g.items.filter(it=> (!it.adminOnly || isAdmin()) && (!it.ceoOnly || isCeo())) }))
     .filter(g=>g.items.length);
 }
 
@@ -1014,6 +1073,7 @@ function iconMail(size){ return icon('<rect x="2.5" y="5" width="19" height="14"
 function iconQuote(){ return icon('<path d="M6 3h9l5 5v13a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M15 3v5h5"/><path d="M9 13h6M9 17h4"/>'); }
 function iconContract(){ return icon('<path d="M7 3h7l4 4v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h4"/><circle cx="16.5" cy="17.5" r="2.6"/>'); }
 function iconBolt(){ return icon('<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'); }
+function iconPeople(){ return icon('<circle cx="12" cy="7.5" r="3.5"/><path d="M5 20c0-3.9 3.1-6.5 7-6.5s7 2.6 7 6.5"/><path d="M3 11.5h2.5M18.5 11.5H21"/>'); }
 function iconSurvey(){ return icon('<rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 8h5M8 12.5h8M8 17h4"/><path d="M15.5 6.5l1.2 1.2 2.3-2.4"/>'); }
 function iconInbox(size){ return icon('<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/>', size); }
 
@@ -1097,22 +1157,53 @@ function render(){
       ${renderTopbar()}
       <div class="content">${renderView()}</div>
     </div>
-    ${sidebarOpen?'<div class="scrim" onclick="sidebarOpen=false;render()"></div>':''}
+    ${renderMobileNav()}
+    ${sidebarOpen?'<div class="scrim nav-scrim" onclick="sidebarOpen=false;render()"></div>':''}
   `;
   renderModal();
   renderPanel();
+  labelMobileTables();
   attachPostRenderHooks();
 }
 
+function labelMobileTables(){
+  document.querySelectorAll('.main .table-wrap table').forEach(table=>{
+    if(table.closest('.calendar-agenda-table')||table.classList.contains('stmt'))return;
+    const head=table.tHead;
+    if(!head||head.rows.length!==1)return;
+    const headers=Array.from(head.rows[0].cells);
+    if(headers.length<2||headers.some(cell=>cell.colSpan!==1))return;
+    const rows=Array.from(table.tBodies).flatMap(body=>Array.from(body.rows));
+    if(rows.some(row=>row.cells.length!==headers.length&&!(row.cells.length===1&&row.cells[0].colSpan===headers.length)))return;
+    table.classList.add('mobile-table');
+    rows.forEach(row=>Array.from(row.cells).forEach((cell,i)=>{
+      if(cell.colSpan===1)cell.dataset.label=headers[i].textContent.trim()||'Actions';
+      else cell.classList.add('mobile-table-empty');
+    }));
+  });
+}
+function renderMobileNav(){
+  const items=visibleNav().flatMap(group=>group.items);
+  const shortcuts=['dashboard','pipeline','calendar','clients'].map(id=>items.find(item=>item.id===id)).filter(Boolean);
+  return `<nav class="mobile-nav" aria-label="Quick navigation">
+    ${shortcuts.map(item=>`<button class="mobile-nav-item ${currentView===item.id?'active':''}" ${currentView===item.id?'aria-current="page"':''} onclick="navigate('${item.id}')">${item.icon()}<span>${item.id==='dashboard'?'Home':esc(item.label)}</span></button>`).join('')}
+    <button class="mobile-nav-item ${sidebarOpen?'active':''}" aria-label="Open all navigation" aria-controls="crm-navigation" aria-expanded="${sidebarOpen}" onclick="sidebarOpen=true;render()">${icon('<path d="M3 6h18M3 12h18M3 18h18"/>',20)}<span>More</span></button>
+  </nav>`;
+}
+document.addEventListener('keydown',event=>{
+  if(event.key==='Escape'&&sidebarOpen){sidebarOpen=false;render();document.querySelector('.hamburger')?.focus();}
+});
+
 function renderSidebar(){
   return `
-  <div class="sidebar ${sidebarOpen?'open':''}">
+  <div id="crm-navigation" class="sidebar ${sidebarOpen?'open':''}" aria-label="Main navigation">
     <div class="brand">
       <div class="brand-mark">${sidebarPulseSVG()}</div>
       <div>
         <div class="brand-name">Vantriq<em>AI</em></div>
         <div class="brand-sub">Revenue Console</div>
       </div>
+      <button class="mobile-menu-close" aria-label="Close navigation" onclick="sidebarOpen=false;render()">${iconX(20)}</button>
     </div>
     <div class="nav">
       ${visibleNav().map(g=>`
@@ -1127,14 +1218,15 @@ function renderSidebar(){
       `).join('')}
     </div>
     <div class="sidebar-foot">
-      ${authUser ? `
+      ${isEmergency() ? `
+        <div style="color:#C7A76B;font-weight:600;font-size:11.5px;">Emergency access</div>
+        <div style="margin-bottom:6px;">Opened with the admin key and the CEO's code · ends ${esc(fmtClock(authUser.expires_at))}</div>
+        <a href="#" onclick="event.preventDefault();signOut()" style="color:var(--teal-400);">Sign out</a>
+      ` : authUser ? `
         <div style="color:#B9C6CE;font-weight:600;font-size:11.5px;">${esc(authUser.name)}</div>
         <div style="margin-bottom:6px;">${esc(authUser.email)} · ${authUser.role==='admin'?'Admin':'Staff'}</div>
         <a href="#" onclick="event.preventDefault();signOut()" style="color:var(--teal-400);">Sign out</a>
-      ` : `
-        <div style="margin-bottom:6px;color:#C7A76B;">Signed in with an API key (emergency access)</div>
-        <a href="#" onclick="event.preventDefault();signOut()" style="color:var(--teal-400);">Sign out</a>
-      `}
+      ` : ''}
       <div style="margin-top:8px;">${esc(state.company.name)} · ${esc(state.company.city)}</div>
       ${serverVersion?`<div class="mono" style="margin-top:2px;font-size:10px;opacity:.6;">v${esc(serverVersion)}</div>`:''}
     </div>
@@ -1156,14 +1248,16 @@ function sidebarPulseSVG(){
 
 const VIEW_TITLES = {
   dashboard:['Dashboard','Where the business stands right now'],
-  analytics:['Analytics','Leads, conversations and customer satisfaction — by day, week, month, quarter or year'],
-  surveys:['Surveys','Customer-satisfaction surveys for every client — results, follow-ups and sharing'],
+  analytics:['Vantriq Pulse','Analytics — leads, conversations and customer satisfaction, by day, week, month, quarter or year'],
+  surveys:['Vantriq Echo','Customer-satisfaction surveys for every client — results, follow-ups and sharing'],
+  customers:['Customers','Every client\'s customers — who they are, every conversation and what was said, their survey answers'],
+  calendar:['Calendar','Bookings and follow-ups from your website and WhatsApp agents'],
   pipeline:['Pipeline','Move deals from lead to active client'],
   clients:['Clients','Every active and past account'],
   billing:['Billing & Invoices','Setup fees, retainers, and overage'],
   reps:['Sales Reps','Manage rep logins and see every rep\'s pipeline'],
   team:['Team','Internal logins for Vantriq AI employees'],
-  products:['Products & Pricing','Standard tiers are fixed by the model; only Enterprise+ is customisable'],
+  products:['Products & Pricing','Prices fixed by the business model — costed at today\'s AI prices, with each package\'s margin'],
   requests:['Package Requests','Changes customers have asked for from their portal'],
   procurement:['Procurement','Vendors, tools, and purchase orders behind delivery'],
   financials:['Financials','Contribution margin and forward projection — live clients and costs, assumed utilization'],
@@ -1179,19 +1273,21 @@ function renderTopbar(){
   const [title,sub] = VIEW_TITLES[currentView]||['',''];
   return `
   <div class="topbar">
-    <div style="display:flex;align-items:center;gap:10px;">
-      <button class="hamburger" onclick="sidebarOpen=true;render()">${icon('<path d="M3 6h18M3 12h18M3 18h18"/>',20)}</button>
+    <div class="topbar-heading" style="display:flex;align-items:center;gap:10px;">
+      <button class="hamburger" aria-label="Open navigation" aria-controls="crm-navigation" aria-expanded="${sidebarOpen}" onclick="sidebarOpen=true;render()">${icon('<path d="M3 6h18M3 12h18M3 18h18"/>',20)}</button>
       <div>
+        <div class="workspace-eyebrow">${esc(NAV.find(group=>group.items.some(item=>item.id===currentView))?.group||'Workspace')}</div>
         <h1>${title}</h1>
         <div class="topbar-sub">${sub}</div>
       </div>
     </div>
-    <div style="display:flex;gap:8px;">
+    <div class="topbar-actions" style="display:flex;gap:8px;">
       ${topbarAction()}
     </div>
   </div>`;
 }
 function topbarAction(){
+  if(currentView==='calendar') return `<button class="btn btn-primary" onclick="VQCAL.openEvent()">New appointment</button>`;
   if(currentView==='pipeline') return `<button class="btn btn-primary" onclick="openModal={type:'client'};render()">${iconPlus(15)} New lead</button>`;
   if(currentView==='clients') return `<button class="btn btn-primary" onclick="openModal={type:'client'};render()">${iconPlus(15)} Add client</button>`;
   if(currentView==='procurement') return `<button class="btn btn-primary" onclick="openModal={type:'vendor'};render()">${iconPlus(15)} Add vendor</button>`;
@@ -1210,7 +1306,9 @@ function renderView(){
   switch(currentView){
     case 'dashboard': return renderDashboard();
     case 'analytics': return renderAnalytics();
-    case 'surveys': return window.VQS ? '<div id="vqs-root"></div>' : '<div class="card"><div class="empty">The surveys page could not load in this browser.</div></div>';
+    case 'surveys': return window.VQS ? '<div id="vqs-root"></div>' : '<div class="card"><div class="empty">The Vantriq Echo page could not load in this browser.</div></div>';
+    case 'customers': return window.VQC ? '<div id="vqc-root"></div>' : '<div class="card"><div class="empty">The Customers page could not load in this browser.</div></div>';
+    case 'calendar': return VQCAL.renderCalendar();
     case 'pipeline': return renderPipeline();
     case 'clients': return renderClients();
     case 'billing': return renderBilling();
@@ -1218,9 +1316,9 @@ function renderView(){
     case 'reps': return renderReps();
     case 'team': return renderTeam();
     case 'requests': return renderRequests();
-    case 'products': return renderProducts();
+    case 'products': return isCeo() ? renderProducts() : renderCeoOnly();
     case 'procurement': return renderProcurement();
-    case 'financials': return renderFinancials();
+    case 'financials': return isCeo() ? renderFinancials() : renderCeoOnly();
     case 'accounting': return renderAccounting();
     case 'quotes': return renderQuotes();
     case 'contracts': return renderContracts();
@@ -1248,6 +1346,10 @@ function renderDashboard(){
   const marginPct = mrrVal>0 ? ((mrrVal-totalDelivery)/mrrVal*100) : 0;
 
   return `
+  <section class="workspace-intro" aria-label="Business overview">
+    <div><div class="workspace-eyebrow">VantriqAI workspace</div><h2>Your business, at a glance.</h2><p>Track your leads, manage your accounts, and keep the next conversation moving.</p></div>
+    <div class="workspace-intro-actions"><button class="btn btn-primary" onclick="navigate('pipeline')">View pipeline ${iconArrowRight(16)}</button><button class="btn btn-ghost" onclick="navigate('calendar')">Open calendar</button></div>
+  </section>
   <div class="grid kpi-row">
     <div class="card kpi">
       <div class="label">Active clients</div>
@@ -1269,7 +1371,7 @@ function renderDashboard(){
       <div class="value mono">${fmtMoney(pipeVal)}</div>
       <div class="delta">${pipelineClients().length} open deals</div>
     </div>
-    ${isAdmin() ? `<div class="card kpi">
+    ${isCeo() ? `<div class="card kpi">
       <div class="label">Est. net monthly result</div>
       <div class="value mono" style="color:${netMonthly>=0?'var(--teal-dark)':'var(--red)'}">${fmtMoney(netMonthly)}</div>
       <div class="delta ${marginPct>=35?'up':'down'}">${marginPct.toFixed(0)}% contribution margin</div>
@@ -1310,7 +1412,7 @@ function renderDashboard(){
   <div class="grid kpi-row">
     <div class="card kpi"><div class="label">Vendor / tooling cost</div><div class="value mono" style="font-size:19px;">${fmtMoney(totalPlatformCostMonthly())}</div></div>
     <div class="card kpi"><div class="label">Contract labour</div><div class="value mono" style="font-size:19px;">${fmtMoney(totalContractLabourMonthly())}</div></div>
-    <div class="card kpi"><div class="label">Est. AI + messaging delivery cost</div><div class="value mono" style="font-size:19px;">${fmtMoney(totalDelivery)}</div></div>
+    ${isCeo() ? `<div class="card kpi"><div class="label">Est. AI + messaging delivery cost</div><div class="value mono" style="font-size:19px;">${fmtMoney(totalDelivery)}</div></div>` : ''}
     <div class="card kpi"><div class="label">Assumed avg. quota utilization</div><div class="value" style="font-size:19px;">${Math.round(state.utilization*100)}%</div></div>
   </div>` : ''}
   `;
@@ -1363,12 +1465,14 @@ function drawDashboardCharts(){
    exactly the page that customer sees for themselves. */
 let analyticsTab = 'sales';          // 'sales' | 'platform' | 'client'
 let analyticsGrain = 'month';
+let analyticsWebsiteRange = '30d';
 let analyticsClientId = null;
 let analyticsData = null;            // { key, data } | { key, error }
 let analyticsLoadingKey = null;
 
 const ANALYTICS_TABS = [
   {id:'sales', label:'Sales & leads'},
+  {id:'website', label:'Website traffic'},
   {id:'platform', label:'All customer conversations'},
   {id:'client', label:'One customer'},
 ];
@@ -1378,9 +1482,10 @@ function analyticsClients(){
     .sort((a,b)=> (b.isInternal?1:0)-(a.isInternal?1:0) || a.company.localeCompare(b.company));
 }
 function analyticsKey(){
-  return `${analyticsTab}|${analyticsGrain}|${analyticsTab==='client' ? analyticsClientId : ''}`;
+  return `${analyticsTab}|${analyticsTab==='website'?analyticsWebsiteRange:analyticsGrain}|${analyticsTab==='client' ? analyticsClientId : ''}`;
 }
 function setAnalyticsTab(t){ analyticsTab = t; render(); }
+function setWebsiteRange(r){ analyticsWebsiteRange=r; render(); }
 function setAnalyticsGrain(g){ analyticsGrain = g; render(); }
 function setAnalyticsClient(id){ analyticsClientId = id || null; render(); }
 
@@ -1388,7 +1493,8 @@ async function loadAnalytics(){
   const key = analyticsKey();
   if(analyticsLoadingKey === key) return;
   analyticsLoadingKey = key;
-  const path = analyticsTab==='sales' ? `/api/analytics/sales?grain=${analyticsGrain}`
+  const path = analyticsTab==='website' ? `/api/analytics/website?range=${encodeURIComponent(analyticsWebsiteRange)}`
+    : analyticsTab==='sales' ? `/api/analytics/sales?grain=${analyticsGrain}`
     : analyticsTab==='platform' ? `/api/analytics/platform?grain=${analyticsGrain}`
     : `/api/analytics/clients/${encodeURIComponent(analyticsClientId)}?grain=${analyticsGrain}`;
   try{
@@ -1420,7 +1526,7 @@ function renderAnalytics(){
       <select onchange="setAnalyticsClient(this.value)">
         ${analyticsClients().map(c=>`<option value="${c.id}" ${c.id===analyticsClientId?'selected':''}>${esc(c.company)}${c.isInternal?' (VantriqAI — our own agents)':''}</option>`).join('')}
       </select>
-      <div class="footnote" style="margin-top:6px;">This is exactly what the customer sees on the Analytics tab of their portal.</div>
+      <div class="footnote" style="margin-top:6px;">This is exactly what the customer sees on the Pulse tab of their portal.</div>
     </div>`;
   if(analyticsTab==='client' && !analyticsClientId){
     return tabs + `<div class="card" style="text-align:center;color:var(--muted);padding:32px;">No active customers yet.</div>`;
@@ -1429,17 +1535,55 @@ function renderAnalytics(){
   if(!cur) return tabs + picker + `<div class="card" style="text-align:center;color:var(--muted);padding:32px;">Working out the numbers…</div>`;
   if(cur.error) return tabs + picker + `<div class="card" style="color:var(--red);">${esc(cur.error)}
     <button class="btn btn-ghost btn-sm" style="margin-left:8px;" onclick="analyticsData=null;render()">Try again</button></div>`;
-  const opts = { onGrain:'setAnalyticsGrain' };
-  if(analyticsTab==='sales') return tabs + VQA.salesHTML(cur.data, opts);
-  if(analyticsTab==='platform') return tabs + VQA.conversationsHTML(cur.data, { ...opts, audience:'platform', fileTag:'all-conversations' });
+  const opts = { onGrain:'setAnalyticsGrain', onReport:'downloadAnalyticsReport', reportLabel:'Download Pulse report (Excel)' };
+  if(analyticsTab==='website') return tabs + VQA.websiteTrafficHTML(cur.data,{onRange:'setWebsiteRange',onReport:'downloadAnalyticsReport'});
+  if(analyticsTab==='sales') return tabs + VQA.salesHTML(cur.data, { ...opts,
+    reportHint:'Every lead, the funnel, sources and each prospect conversation — a tab for each' });
+  if(analyticsTab==='platform') return tabs + VQA.conversationsHTML(cur.data, { ...opts, audience:'platform',
+    reportHint:'Every customer side by side, then every contact (new and returning), conversation and transcript — a tab for each. Survey results are in the Echo report.' });
   const shown = state.clients.find(c=>c.id===analyticsClientId);
-  return tabs + picker + VQA.conversationsHTML(cur.data, { ...opts, audience:'crm', fileTag:'customer', surveysEnabled: shown ? !!shown.surveysEnabled : undefined });
+  return tabs + picker + VQA.conversationsHTML(cur.data, { ...opts, audience:'crm', surveysEnabled: shown ? !!shown.surveysEnabled : undefined,
+    reportHint:'Pulse for this customer: every figure, their contacts (new and returning, who and where), conversations and transcripts — a tab for each' });
+}
+
+/**
+ * The Excel report for whichever Pulse view is open, at its period: the
+ * dashboard's figures plus the contacts, conversations and answers behind
+ * them. Fetched rather than linked, because the session travels in a header.
+ */
+async function downloadAnalyticsReport(){
+  const g = encodeURIComponent(analyticsGrain);
+  const path = analyticsTab==='website' ? `/api/analytics/website/report.xlsx?range=${encodeURIComponent(analyticsWebsiteRange)}`
+    : analyticsTab==='sales' ? `/api/analytics/sales/report.xlsx?grain=${g}`
+    : analyticsTab==='platform' ? `/api/analytics/platform/report.xlsx?grain=${g}`
+    : `/api/analytics/clients/${encodeURIComponent(analyticsClientId)}/report.xlsx?grain=${g}`;
+  const shown = state.clients.find(c=>c.id===analyticsClientId);
+  const who = analyticsTab==='website' ? 'website' : analyticsTab==='sales' ? 'sales' : analyticsTab==='platform' ? 'all-customers'
+    : (String((shown && shown.company) || 'customer').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40) || 'customer');
+  showToast('Building the report…');
+  try{
+    const headers = {};
+    if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
+    const res = await fetch(API.base + path, { headers });
+    if(!res.ok){
+      const err = await res.json().catch(()=>null);
+      throw new Error((err&&err.error) || `Report failed (${res.status})`);
+    }
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `vantriq-${who}-${analyticsTab==='website'?analyticsWebsiteRange:analyticsGrain}-${todayISO()}.xlsx`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    showToast('Report downloaded');
+  }catch(e){ showToast(e.message||'Could not build the report','warn'); }
 }
 
 function drawAnalytics(){
   const cur = analyticsData && analyticsData.key===analyticsKey() ? analyticsData : null;
   if(!cur){ loadAnalytics(); return; }
   if(cur.error || !window.VQA) return;
+  if(analyticsTab==='website') return;
   if(analyticsTab==='sales') VQA.drawSales(cur.data); else VQA.drawConversations(cur.data);
 }
 
@@ -1514,7 +1658,7 @@ function pipelineStageTable(tab){
           <td><span class="pill ${stagePillClass(c.stage)}"><span class="pill-dot"></span>${stageLabel(c.stage)}</span></td>
           <td class="mono">${fmtMoney(c.estValue)}</td>
           <td>${esc(c.source||'—')}</td>
-          <td>${esc(repNameOf(c)||'House')}</td>
+          <td>${esc(repNameOf(c)||(c.ownerRepId?'Assigned rep':'Unassigned'))}</td>
           <td style="white-space:nowrap;">
             ${next.map(ns=>`<button class="btn btn-ghost btn-sm" style="margin-left:4px;"
                onclick="event.stopPropagation();advanceStage('${c.id}','${ns}')">${esc(stageLabel(ns))}</button>`).join('')}
@@ -1550,7 +1694,7 @@ function renderPipeline(){
           const p = productOf(c);
           return `<div class="kcard" draggable="true" ondragstart="kanbanDragId='${c.id}';event.dataTransfer.effectAllowed='move'" onclick="openPanel={type:'client',id:'${c.id}'};render()">
             <div class="name">${esc(c.name)}</div>
-            <div class="co">${esc(c.company)}</div>
+            <div class="co">${esc(c.company)}</div>${VQCAL.badge(c)}
             <div class="meta">
               <span class="tag">${p?esc(p.name):'—'}</span>
       ${c.serviceStatus==='suspended'?`<span class="pill pill-overdue"><span class="pill-dot"></span>Service paused</span>`:''}
@@ -1564,7 +1708,7 @@ function renderPipeline(){
       <div class="kanban-col-head"><span class="t" style="color:#8F3527;">Lost / churned</span><span class="n">${state.clients.filter(c=>c.stage==='lost'||c.stage==='churned').length}</span></div>
       ${state.clients.filter(c=>c.stage==='lost'||c.stage==='churned').map(c=>`
         <div class="kcard" onclick="openPanel={type:'client',id:'${c.id}'};render()">
-          <div class="name">${esc(c.name)}</div><div class="co">${esc(c.company)}</div>
+          <div class="name">${esc(c.name)}</div><div class="co">${esc(c.company)}</div>${VQCAL.badge(c)}
           <div class="meta"><span class="pill ${stagePillClass(c.stage)}"><span class="pill-dot"></span>${stageLabel(c.stage)}</span></div>
         </div>`).join('')}
     </div>
@@ -1683,7 +1827,7 @@ function renderReps(){
       </tbody>
     </table>
   </div>
-  <p class="footnote">Each rep logs in separately at <span class="mono">/rep.html</span> with their own key. They can only see and edit leads they created, move them through Qualification → Needs Assessment → Proposal Submission → Negotiation → Closure, and export their own pipeline to Excel — nothing else in the CRM is visible to them.</p>
+  <p class="footnote">Each rep logs in separately at <span class="mono">/rep.html</span> with their own key. They can only see and edit leads they own, including leads assigned by an admin, move them through Qualification → Needs Assessment → Proposal Submission → Negotiation → Closure, and export their own pipeline to Excel — nothing else in the CRM is visible to them.</p>
   `;
 }
 async function resetRepKey(id){
@@ -1863,8 +2007,10 @@ async function decideQuota(id, decision){
 
 /* ============================== TEAM ============================== */
 let teamUsers = null;
+let emergencyData = null;   // the CEO's list of emergency sessions (v9.22)
 
 async function loadTeam(){
+  emergencyData = null;
   try{ teamUsers = await API.get('/api/team'); render(); }
   catch(e){ showToast(e.message||'Could not load the team','warn'); }
 }
@@ -1872,6 +2018,7 @@ async function loadTeam(){
 function renderTeam(){
   if(teamUsers === null){ requestAnimationFrame(loadTeam); return `<div class="card"><div class="empty"><span class="loading-dot"></span> Loading the team…</div></div>`; }
   return `
+  ${isCeo() ? renderEmergencyCard() : ''}
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
       <div style="font-size:12.5px;color:var(--muted);max-width:520px;">
@@ -1913,6 +2060,82 @@ function renderTeam(){
       </tbody>
     </table>
   </div>`;
+}
+
+/* ---------- Emergency access (v9.22): the CEO's alone ----------
+   The admin API key opens nothing by itself. Typed into "Emergency access" on
+   the sign-in page it emails the CEO a code, and only that code opens the CRM,
+   for a couple of hours. This is where the CEO sees each one and ends it. */
+async function loadEmergency(){
+  try{ emergencyData = await API.get('/api/auth/breakglass/sessions'); }
+  catch(e){ emergencyData = { error: e.message || 'Could not load emergency access' }; }
+  if(currentView==='team') render();
+}
+
+function shortBrowser(ua){
+  ua = String(ua||'');
+  if(!ua) return 'unknown browser';
+  const b = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Firefox\//.test(ua) ? 'Firefox'
+    : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : ua.split(/[ /]/)[0];
+  const os = /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iPhone' : /Windows/.test(ua) ? 'Windows'
+    : /Mac OS X/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : '';
+  return os ? `${b} on ${os}` : b;
+}
+
+function renderEmergencyCard(){
+  if(emergencyData === null){ requestAnimationFrame(loadEmergency); emergencyData = { loading:true }; }
+  const d = emergencyData;
+  const sessions = (d && d.sessions) || [];
+  const live = sessions.filter(x=>x.live);
+  const rows = sessions.map(x=>`
+    <tr>
+      <td>${esc(fmtDateTime(x.created_at))}</td>
+      <td class="mono" style="font-size:12px;">${esc(x.ip||'—')}</td>
+      <td style="font-size:12px;">${esc(shortBrowser(x.user_agent))}</td>
+      <td>${x.live
+        ? `<span class="pill pill-pending"><span class="pill-dot"></span>Open until ${esc(fmtClock(x.expires_at))}</span>`
+        : `<span style="font-size:12px;color:var(--muted);">${x.ended_at ? esc('Ended '+fmtDateTime(x.ended_at)+(x.ended_by?' — '+x.ended_by:'')) : esc('Expired '+fmtDateTime(x.expires_at))}</span>`}</td>
+      <td style="text-align:right;">${x.live ? `<button class="btn btn-danger-ghost btn-sm" onclick="endEmergency('${esc(x.id)}')">End now</button>` : ''}</td>
+    </tr>`).join('');
+  return `
+  <div class="card" id="emergency-card" style="margin-bottom:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+      <div style="max-width:620px;">
+        <h3 style="margin:0 0 6px;font-size:14.5px;">Emergency access</h3>
+        <div style="font-size:12.5px;color:var(--muted);">
+          The admin API key opens nothing on its own. Typed into <em>Emergency access</em> on the sign-in page, it emails a
+          6-digit code to you${d && d.sent_to ? ` (<span class="mono">${esc(d.sent_to)}</span>)` : ''}. Only that code, if you give it,
+          opens the CRM: as an admin, without Pricing or Financials, for ${esc(String((d && d.session_hours) || 2))} hours.
+          You are emailed each time one opens. ${d && d.enabled === false ? '<strong>It is switched off on this server.</strong>' : ''}
+        </div>
+      </div>
+      ${live.length ? `<button class="btn btn-danger-ghost btn-sm" onclick="endAllEmergency()">End all (${live.length})</button>` : ''}
+    </div>
+    ${d && d.error ? `<div class="footnote" style="margin-top:10px;color:var(--danger,#8F3527);">${esc(d.error)}</div>`
+      : d && d.loading ? `<div class="empty" style="padding:14px 0 0;"><span class="loading-dot"></span> Loading…</div>`
+      : sessions.length ? `
+    <div class="table-wrap" style="margin-top:12px;">
+      <table>
+        <thead><tr><th>Opened</th><th>From</th><th>Browser</th><th>Status</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>` : `<div class="footnote" style="margin-top:10px;">Nobody has used emergency access yet.</div>`}
+    ${d && d.codes_waiting ? `<div class="footnote" style="margin-top:8px;">${d.codes_waiting} code${d.codes_waiting===1?'':'s'} sent to you in the last few minutes ${d.codes_waiting===1?'is':'are'} still unused. Ending all also cancels ${d.codes_waiting===1?'it':'them'}.</div>` : ''}
+  </div>`;
+}
+
+async function endEmergency(id){
+  if(!confirm('End this emergency session now?\n\nWhoever is using it is signed out within seconds.')) return;
+  try{ await API.post(`/api/auth/breakglass/sessions/${id}/end`, {}); showToast('Emergency session ended'); }
+  catch(e){ showToast(e.message||'Could not end it','warn'); }
+  emergencyData = null; render();
+}
+
+async function endAllEmergency(){
+  if(!confirm('End every emergency session now, and cancel any code still waiting?')) return;
+  try{ const r = await API.post('/api/auth/breakglass/end-all', {}); showToast(`${r.ended} emergency session${r.ended===1?'':'s'} ended`); }
+  catch(e){ showToast(e.message||'Could not end them','warn'); }
+  emergencyData = null; render();
 }
 
 function showCreds(title, email, password){
@@ -2089,30 +2312,341 @@ async function decideRequest(id, action){
 }
 
 /* ============================== PRODUCTS ============================== */
+/* Products & Pricing, the cost side (v9.20). Admins get the whole model from
+   /api/costing — what a session costs at today's model prices and exchange
+   rate, and what each package earns at the price the business model sets.
+   Everybody gets the add-ons catalogue; only admins see what those cost us. */
+let costingData = null;   // null = not loaded yet
+let addonsData = null;
+async function loadPricing(){
+  try{
+    const [costing, addons, docs] = await Promise.all([
+      isCeo() ? API.get('/api/costing') : Promise.resolve({}),
+      API.get('/api/addons'),
+      isCeo() ? API.get('/api/pricing/documents').catch(e=>({ error: e.message })) : Promise.resolve({ documents: [] }),
+    ]);
+    costingData = costing || {};
+    addonsData = addons || [];
+    ownerDocs = docs || { documents: [] };
+  }catch(e){
+    costingData = { error: e.message || 'Could not load the costing' };
+    addonsData = addonsData || [];
+  }
+  if(currentView==='products' && !openModal) render();
+}
+const pctText = v => v==null||!isFinite(v) ? '—' : (v*100).toFixed(1)+'%';
+const pkr2 = v => v==null ? '—' : 'PKR '+Number(v).toFixed(2);
+function marginTone(m){ return m==null ? 'var(--muted)' : m>=0.65 ? 'var(--teal-dark)' : m>=0.5 ? 'var(--text)' : 'var(--amber-dark)'; }
+function marginBar(label, m){
+  const w = Math.max(0, Math.min(100, (m||0)*100));
+  return `<div class="prod-margin">
+    <div class="prod-margin-top"><span>${esc(label)}</span><strong style="color:${marginTone(m)}">${pctText(m)}</strong></div>
+    <div class="prod-margin-track"><div class="prod-margin-fill" style="width:${w}%;background:${marginTone(m)};"></div></div>
+  </div>`;
+}
+function econFor(id){
+  return costingData && Array.isArray(costingData.packages) ? costingData.packages.find(r=>r.id===id) : null;
+}
+function productEconomicsHTML(p){
+  const e = econFor(p.id);
+  if(!e) return '';
+  const a = costingData.assumptions || {};
+  const util = Math.round((a.utilization||state.utilization||0.7)*100);
+  const head = e.headroom_high==null ? '—'
+    : e.headroom_low==null ? `${e.headroom_high}× typical use` : `${e.headroom_low}–${e.headroom_high}× typical use`;
+  return `<div class="prod-econ">
+    <div class="prod-econ-h">Cost to serve &amp; margin</div>
+    <div class="prod-stat-row"><span class="k">Cost per session</span><span class="v">${pkr2(e.cost_per_session)}</span></div>
+    <div class="prod-stat-row"><span class="k">Tokens per session</span><span class="v">${fmtNum(e.tokens.input)} in · ${fmtNum(e.tokens.output)} out</span></div>
+    <div class="prod-stat-row"><span class="k">AI at full use</span><span class="v">${fmtMoney(e.ai_full)} · ${pctText(e.ai_share_of_price)}</span></div>
+    <div class="prod-stat-row"><span class="k">Management labour</span><span class="v">${fmtMoney(e.mgmt_labour)} · ${e.mgmt_hours} h/mo</span></div>
+    ${marginBar('Margin if the whole allowance is used', e.margin_full)}
+    ${marginBar(`Margin at ${util}% use`, e.margin_util)}
+    <div class="prod-stat-row"><span class="k">Overage vs cost</span><span class="v" style="${e.overage_cover<2?'color:var(--amber-dark);':''}">${e.overage_cover}× cost</span></div>
+    <div class="prod-stat-row"><span class="k">Setup margin</span><span class="v">${pctText(e.setup_margin)} · ${e.build_hours} h build</span></div>
+    <div class="prod-stat-row"><span class="k">Allowance headroom</span><span class="v">${head}</span></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.45;">${esc(e.routing)}</div>
+  </div>`;
+}
+function pricingBasisHTML(){
+  if(!isCeo()) return '';
+  if(costingData===null) return `<div class="card" style="margin-bottom:16px;color:var(--muted);">Costing the packages at today's prices…</div>`;
+  if(costingData.error) return `<div class="card" style="margin-bottom:16px;color:var(--red);">${esc(costingData.error)}</div>`;
+  const a = costingData.assumptions || {};
+  const rate = k => (costingData.rates||[]).find(r=>r.key===k) || {};
+  const ss = costingData.steady_state || {};
+  const shares = (costingData.packages||[]).map(r=>r.premium_share).filter(v=>v!=null);
+  const shareText = shares.length ? `${Math.round(Math.min(...shares)*100)}–${Math.round(Math.max(...shares)*100)}%` : '';
+  const flags = costingData.flags || [];
+  return `<div class="card pricing-basis">
+    <div style="display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-start;">
+      <div style="min-width:260px;flex:1;">
+        <div class="prod-econ-h" style="margin:0 0 4px;">Costed at today's prices</div>
+        <div style="font-size:13px;line-height:1.55;">
+          As of <strong>${fmtDate(a.as_of)}</strong> · USD/PKR <strong>${a.fx_usd_pkr}</strong> ·
+          <strong>${esc(rate(a.bulk_model).label||a.bulk_model)}</strong> for most turns, ${shareText} escalated to
+          <strong>${esc(rate(a.premium_model).label||a.premium_model)}</strong> · typical use ${Math.round((a.utilization||0.7)*100)}% of the allowance
+        </div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:4px;">Package prices stay fixed by the business model. What moves is what serving them costs — every figure below is recomputed from the rate card, and Financials uses the same numbers.</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="openModal={type:'costing'};render()">${iconEdit(13)} Rates &amp; assumptions</button>
+    </div>
+    <div class="grid kpi-row" style="margin-top:14px;">
+      <div class="kpi-mini"><div class="l">Steady state (${ss.clients||0} clients)</div><div class="v">${fmtMoney(ss.revenue)}</div><div class="d">revenue a year</div></div>
+      <div class="kpi-mini"><div class="l">Contribution</div><div class="v">${pctText(ss.margin)}</div><div class="d">${fmtMoney(ss.contribution)} a year</div></div>
+      <div class="kpi-mini"><div class="l">AI · labour · infra</div><div class="v">${pctText(ss.ai_share)} · ${pctText(ss.labour_share)} · ${pctText(ss.infra_share)}</div><div class="d">of revenue</div></div>
+      <div class="kpi-mini"><div class="l">Management load</div><div class="v">${ss.mgmt_hours_month||0} h/mo</div><div class="d">${pctText(ss.fte_share)} of one person</div></div>
+    </div>
+    ${flags.length?`<div style="margin-top:12px;display:flex;flex-direction:column;gap:6px;">${flags.map(f=>`<div class="pricing-flag ${f.level==='bad'?'bad':''}">${esc(f.text)}</div>`).join('')}</div>`:''}
+  </div>`;
+}
+function unitEconomicsHTML(){
+  if(!isCeo() || !costingData || !Array.isArray(costingData.packages) || !costingData.packages.length) return '';
+  const rows = costingData.packages;
+  const util = Math.round(((costingData.assumptions||{}).utilization||0.7)*100);
+  const a = costingData.assumptions || {};
+  return `
+  <div class="section-title"><div><h2>Unit economics</h2><div class="hint">What one conversation costs, and what each package keeps — the business model's tables, at today's prices</div></div></div>
+  <div class="table-wrap">
+    <table style="font-size:12.5px;">
+      <thead><tr><th>Package</th><th>Msgs / session</th><th>Cost / session</th><th>Sessions</th><th>AI at full use</th><th>AI % of price</th><th>Labour / mo</th><th>Margin (full)</th><th>Margin (${util}%)</th><th>Overage</th><th>Setup margin</th><th>Year one</th></tr></thead>
+      <tbody>
+      ${rows.map(r=>`<tr>
+        <td><strong>${esc(r.name)}</strong></td>
+        <td class="mono">${r.msgs_per_session}</td>
+        <td class="mono">${pkr2(r.cost_per_session)}</td>
+        <td class="mono">${fmtNum(r.quota)}</td>
+        <td class="mono">${fmtMoney(r.ai_full)}</td>
+        <td class="mono">${pctText(r.ai_share_of_price)}</td>
+        <td class="mono">${fmtMoney(r.mgmt_labour)}</td>
+        <td class="mono" style="color:${marginTone(r.margin_full)};font-weight:700;">${pctText(r.margin_full)}</td>
+        <td class="mono" style="color:${marginTone(r.margin_util)};font-weight:700;">${pctText(r.margin_util)}</td>
+        <td class="mono" style="white-space:nowrap;${r.overage_cover<2?'color:var(--amber-dark);':''}">PKR ${r.overage_rate} · ${r.overage_cover}×</td>
+        <td class="mono">${pctText(r.setup_margin)}</td>
+        <td class="mono">${pctText(r.year_one_margin)}</td>
+      </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>
+  <p class="footnote">A session is one customer conversation in a rolling 24 hours. Cost per session = the tokens it sends and receives
+    (system prompt and catalogue context of ${fmtNum(Math.min(...rows.map(r=>r.profile.context_tokens)))}–${fmtNum(Math.max(...rows.map(r=>r.profile.context_tokens)))} tokens per turn, the conversation so far,
+    ${a.user_tokens}-token messages and ${a.reply_tokens}-token replies), priced on the rate card and converted at USD/PKR ${a.fx_usd_pkr}. Labour: founder time at
+    ${fmtMoney(a.founder_rate)}/h, contracted time at ${fmtMoney(a.contractor_rate)}/h. Year one includes the setup fee, ${a.sales_hours_per_win} unbilled sales hours to win the client and
+    ${a.adhoc_hours_per_month} h a month of ad-hoc requests. Prompt caching is not assumed — it would only lower these costs.</p>`;
+}
+const ADDON_FAMILIES = [
+  ['capability','Capabilities','Switch on over any package — priced on their own, so a plan never changes when one is added'],
+  ['solution','Department solutions','Whole processes, not just conversations'],
+  ['insight','Insight & platform','What every client gets, and the new modules on top'],
+  ['deployment','Deployment','For the requirements a standard build does not cover'],
+];
+function addonPrice(a){
+  if(a.price_basis==='included') return '<span style="color:var(--teal-dark);font-weight:600;">Included in every plan</span>';
+  if(a.price_basis==='scope') return `<span style="color:var(--muted);white-space:normal;font-family:var(--f-body);font-size:12px;">${esc(a.price_note||'Priced on scope')}</span>`;
+  const from = a.price_basis==='from' ? 'From ' : '';
+  const note = a.price_note && a.price_basis!=='from'
+    ? `<div style="font-family:var(--f-body);font-size:11px;color:var(--muted);white-space:normal;margin-top:2px;">${esc(a.price_note)}</div>` : '';
+  return `${from}${fmtMoney(a.setup_fee)} setup · ${fmtMoney(a.monthly_fee)}/mo${note}`;
+}
+function addonsHTML(){
+  if(addonsData===null) return '';
+  const list = addonsData.filter(a=>a.active!==false);
+  if(!list.length) return '';
+  const admin = isCeo();
+  return `
+  <div class="section-title"><div><h2>Add-ons catalogue</h2><div class="hint">Sold on top of a package and priced separately — the business model's capabilities and solutions, with Vantriq Pulse, Echo and Human Support</div></div></div>
+  ${ADDON_FAMILIES.map(([fam,label,hint])=>{
+    const items = list.filter(a=>a.family===fam);
+    if(!items.length) return '';
+    return `<div class="table-wrap" style="margin-bottom:12px;">
+      <table>
+        <thead><tr><th style="width:30%;">${esc(label)} <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0;">— ${esc(hint)}</span></th><th>Price</th><th>Available</th>${admin?'<th>Our cost / mo</th><th>Monthly margin</th><th>Setup margin</th>':''}</tr></thead>
+        <tbody>
+        ${items.map(a=>`<tr>
+          <td><strong>${esc(a.name)}</strong>${a.is_new?' <span class="pill pill-active" style="font-size:10px;padding:1px 7px;">New</span>':''}
+            <div style="font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.45;">${esc(a.summary)}</div></td>
+          <td class="mono" style="white-space:nowrap;max-width:260px;">${addonPrice(a)}</td>
+          <td style="font-size:12px;">${esc(a.availability||'')}</td>
+          ${admin?`<td class="mono">${a.price_basis==='fixed'||a.price_basis==='from'?fmtMoney(a.est_monthly_cost):'—'}</td>
+          <td class="mono" style="color:${marginTone(a.monthly_margin)};">${pctText(a.monthly_margin)}</td>
+          <td class="mono">${pctText(a.setup_margin)}</td>`:''}
+        </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  }).join('')}
+  ${admin?`<p class="footnote">Our cost is an estimate per add-on (model, voice and telephony usage at a typical volume); setup margin assumes build hours split evenly between founder and contracted time. Vantriq Echo is priced on what it costs to run — it has no AI or messaging cost of its own, only setup time and a short monthly review — so it is a base for the first location and a smaller step for each further one: PKR 6,000 a month for one branch, 12,000 for five, 19,500 for ten, at a monthly margin of 75% or more at every size. Human Support is new since the August model and carries the September proposal. Change any add-on through the API (PUT /api/addons/:id).</p>`:''}`;
+}
+
+/* The CEO's business documents (v9.21): the business model, the client pitch
+   deck and the product portfolio. They live in the CRM's database — never in
+   the code repository, which is public — and only the CEO's own account can
+   list, open or replace them (routes/pricingDocs.js). */
+let ownerDocs = null;
+const DOC_KINDS = [
+  ['business_model','Business Model','Prices, unit economics, margins and the plan'],
+  ['pitch_deck','Client Pitch Deck','What to walk a prospect through'],
+  ['portfolio','Product Portfolio','Every product, capability and add-on, priced'],
+];
+function docFormat(d){
+  const ext = (String(d.filename).split('.').pop()||'').toLowerCase();
+  return {pdf:'PDF',docx:'Word',doc:'Word',pptx:'PowerPoint',ppt:'PowerPoint',xlsx:'Excel',xls:'Excel',png:'Image',jpg:'Image',jpeg:'Image',txt:'Text',md:'Text',csv:'CSV'}[ext] || ext.toUpperCase();
+}
+const isPdfDoc = d => /pdf/i.test(d.content_type||'') || /\.pdf$/i.test(d.filename||'');
+function fmtBytes(n){ n=+n||0; return n>=1048576 ? (n/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(n/1024))+' KB'; }
+function ownerDocRow(d, old){
+  return `<div class="odoc-f">
+    <span class="odoc-fmt">${esc(docFormat(d))}</span>
+    <span class="odoc-meta">${fmtDate(d.uploaded_at)} · ${fmtBytes(d.size_bytes)}</span>
+    <span class="odoc-act">
+      ${isPdfDoc(d)?`<button class="btn btn-ghost btn-sm" onclick="viewOwnerDoc('${d.id}')">View</button>`:''}
+      <button class="btn btn-ghost btn-sm" onclick="downloadOwnerDoc('${d.id}')">${iconDownload(13)} Download</button>
+      ${old?`<button class="btn btn-danger-ghost btn-icon" title="Delete this version" onclick="deleteOwnerDoc('${d.id}')">${iconTrash(13)}</button>`:''}
+    </span>
+  </div>`;
+}
+function ownerDocsHTML(){
+  if(!isCeo()) return '';
+  if(ownerDocs===null) return `<div class="card" style="margin-bottom:16px;color:var(--muted);">Opening your documents…</div>`;
+  if(ownerDocs.error) return `<div class="card" style="margin-bottom:16px;color:var(--red);">${esc(ownerDocs.error)}</div>`;
+  const all = ownerDocs.documents || [];
+  const slot = ([kind,title,hint]) => {
+    const now = all.filter(d=>d.kind===kind && d.current);
+    const prev = all.filter(d=>d.kind===kind && !d.current);
+    return `<div class="odoc">
+      <div class="odoc-t">${esc(title)}</div>
+      <div class="odoc-s">${esc(hint)}</div>
+      ${now.length ? now.map(d=>ownerDocRow(d,false)).join('') : `<div class="odoc-empty">Not uploaded yet</div>`}
+      ${prev.length?`<details class="odoc-prev"><summary>${prev.length} earlier version${prev.length===1?'':'s'}</summary>${prev.map(d=>ownerDocRow(d,true)).join('')}</details>`:''}
+    </div>`;
+  };
+  const others = all.filter(d=>d.kind==='other');
+  return `<div class="card" style="margin-bottom:16px;">
+    <div class="section-title" style="margin-top:0;">
+      <div><h2>Business documents</h2><div class="hint">Yours alone: no other account, admin or key can open Pricing or these files</div></div>
+      <label class="btn btn-primary btn-sm" style="cursor:pointer;">${iconPlus(14)} Upload
+        <input type="file" multiple accept=".pdf,.docx,.pptx,.xlsx,.doc,.ppt,.xls,.png,.jpg,.jpeg,.txt,.md,.csv" style="display:none" onchange="uploadOwnerDocs(this.files);this.value=''">
+      </label>
+    </div>
+    <div class="odoc-grid" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')"
+         ondrop="event.preventDefault();this.classList.remove('drag');uploadOwnerDocs(event.dataTransfer.files)">
+      ${DOC_KINDS.map(slot).join('')}
+      ${others.length?`<div class="odoc"><div class="odoc-t">Other documents</div><div class="odoc-s">Anything else you keep here</div>
+        ${others.map(d=>`<div style="margin-top:8px;font-size:12.5px;font-weight:600;overflow-wrap:anywhere;">${esc(d.title||d.filename)}</div>${ownerDocRow(d,true)}`).join('')}</div>`:''}
+    </div>
+    <p class="footnote" style="margin-bottom:0;">Drop new versions anywhere on this card — they are recognised by name and the old one is kept as history. The files are stored in the CRM's database, not in its code.</p>
+  </div>`;
+}
+function renderCeoOnly(){
+  return `<div class="card" style="max-width:560px;">
+    <h3 style="margin:0 0 6px;">The CEO's area</h3>
+    <p style="margin:0;color:var(--muted);font-size:13px;line-height:1.6;">Pricing, what it costs to serve each package, the margins and the business documents open only for the CEO, signed in to their own account.</p>
+  </div>`;
+}
+async function ownerDocBlob(id){
+  const headers = {};
+  if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
+  const res = await fetch(`${API.base}/api/pricing/documents/${encodeURIComponent(id)}/file`, { headers });
+  if(!res.ok){
+    const err = await res.json().catch(()=>null);
+    throw new Error((err&&err.error) || `Could not open the file (${res.status})`);
+  }
+  return res.blob();
+}
+const ownerDocById = id => ((ownerDocs&&ownerDocs.documents)||[]).find(d=>d.id===id);
+async function downloadOwnerDoc(id){
+  const d = ownerDocById(id); if(!d) return;
+  try{
+    const blob = await ownerDocBlob(id);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = d.filename; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  }catch(e){ showToast(e.message||'Could not download it','warn'); }
+}
+async function viewOwnerDoc(id){
+  const d = ownerDocById(id); if(!d) return;
+  try{
+    const blob = await ownerDocBlob(id);
+    const url = URL.createObjectURL(new Blob([blob], { type:'application/pdf' }));
+    openModal = { type:'ownerDoc', id, url, title: DOC_KINDS.concat([['other',d.title||d.filename]]).find(k=>k[0]===d.kind)[1] };
+    render();
+  }catch(e){ showToast(e.message||'Could not open it','warn'); }
+}
+function ownerDocModalHTML(){
+  const m = openModal;
+  return `<div class="modal" style="max-width:1100px;width:96vw;">
+    <div class="modal-head"><h3>${esc(m.title)}</h3><button class="close-x" onclick="closeOwnerDoc()">${iconX(18)}</button></div>
+    <div class="modal-body" style="padding:10px;"><iframe class="odoc-frame" src="${m.url}" title="${esc(m.title)}"></iframe></div>
+  </div>`;
+}
+function closeOwnerDoc(){
+  const url = openModal && openModal.url;
+  openModal = null; render();
+  if(url) URL.revokeObjectURL(url);
+}
+function fileToBase64(file){
+  return new Promise((resolve, reject)=>{
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1] || '');
+    r.onerror = () => reject(new Error('Could not read '+file.name));
+    r.readAsDataURL(file);
+  });
+}
+async function uploadOwnerDocs(files){
+  const list = Array.from(files||[]);
+  if(!list.length) return;
+  const tooBig = list.find(f=>f.size > 25*1024*1024);
+  if(tooBig){ showToast(`${tooBig.name} is over 25 MB`, 'warn'); return; }
+  let done = 0;
+  for(const f of list){
+    showToast(`Uploading ${f.name}…`);
+    try{
+      const data = await fileToBase64(f);
+      await API.post('/api/pricing/documents', { filename: f.name, content_type: f.type || '', data });
+      done++;
+    }catch(e){ showToast(`${f.name}: ${e.message||'not uploaded'}`, 'warn'); }
+  }
+  try{ ownerDocs = await API.get('/api/pricing/documents'); }catch(e){}
+  render();
+  if(done) showToast(done===1 ? 'Document saved' : `${done} documents saved`);
+}
+async function deleteOwnerDoc(id){
+  const d = ownerDocById(id); if(!d) return;
+  if(!confirm(`Delete this version of ${d.filename}? It cannot be recovered.`)) return;
+  try{
+    await API.del(`/api/pricing/documents/${encodeURIComponent(id)}`);
+    ownerDocs = await API.get('/api/pricing/documents');
+    render();
+  }catch(e){ showToast(e.message||'Could not delete it','warn'); }
+}
+
 function renderProducts(){
   const sorted = state.products.slice().sort((a,b)=>a.order-b.order);
   return `
+  ${ownerDocsHTML()}
+  ${pricingBasisHTML()}
   <div class="prod-grid">
     ${sorted.map(p=>`
       <div class="prod-card">
-        <div class="tier-tag">Tier ${p.order.toString().padStart(2,'0')}</div>
+        <div class="tier-tag">Tier ${p.order.toString().padStart(2,'0')}${p.name==='Scale'?' · most chosen':''}</div>
         <h3>${esc(p.name)}</h3>
         <div class="target">${esc(p.targetTier)}</div>
         <div class="prod-price"><span class="amt">${fmtMoney(p.setupFee)}</span><span class="per">setup</span></div>
         <div class="prod-price" style="margin-top:-8px;"><span class="amt" style="font-size:16px;color:var(--teal-dark)">${fmtMoney(p.retainer)}</span><span class="per">/month retainer</span></div>
+        <div class="prod-stat-row"><span class="k">Sessions / month</span><span class="v">${fmtNum(p.quota)} · ${fmtNum(p.quota/30)} a day</span></div>
+        <div class="prod-stat-row"><span class="k">Messages per session</span><span class="v">${fmtNum(p.msgsPerSession)}</span></div>
+        <div class="prod-stat-row"><span class="k">Overage rate</span><span class="v">${fmtMoney(p.overageRate)}/session</span></div>
+        <div class="prod-stat-row"><span class="k">Channels</span><span class="v" style="font-family:var(--f-body);font-weight:600;">${esc(p.channels)}</span></div>
         <div class="prod-stat-row"><span class="k">Automation</span><span class="v" style="font-family:var(--f-body);font-weight:600;">${esc(p.automation)}</span></div>
         <div class="prod-stat-row"><span class="k">Data layer</span><span class="v" style="font-family:var(--f-body);font-weight:600;">${esc(p.dataLayer)}</span></div>
-        <div class="prod-stat-row"><span class="k">AI model</span><span class="v" style="font-family:var(--f-body);font-weight:600;">${esc(p.aiModel)}</span></div>
-        <div class="prod-stat-row"><span class="k">Channels</span><span class="v" style="font-family:var(--f-body);font-weight:600;">${esc(p.channels)}</span></div>
-        <div class="prod-stat-row"><span class="k">Quota / month</span><span class="v">${fmtNum(p.quota)}</span></div>
-        <div class="prod-stat-row"><span class="k">Overage rate</span><span class="v">${fmtMoney(p.overageRate)}/session</span></div>
-        <div class="prod-stat-row"><span class="k">Est. delivery cost (100% quota)</span><span class="v">${fmtMoney(p.deliveryCostFull)}</span></div>
+        ${isCeo()?'':`<div class="prod-stat-row"><span class="k">AI model</span><span class="v" style="font-family:var(--f-body);font-weight:600;">${esc(p.aiModel)}</span></div>`}
         <div class="prod-stat-row">
           <span class="k">Extra number</span>
           <span class="v">${p.extraAgentPrice>0
             ? `${fmtMoney(p.extraAgentPrice)}/mo after ${p.includedAgents}`
             : `<span style="color:var(--muted);font-weight:400;">Not charged</span>`}</span>
         </div>
+        ${productEconomicsHTML(p)}
         <div class="prod-actions">
           ${p.isStandard===false
             ? `<button class="btn btn-ghost btn-sm" onclick="openModal={type:'product',id:'${p.id}'};render()">${iconEdit(13)} Edit</button>`
@@ -2127,7 +2661,100 @@ function renderProducts(){
       <div style="font-size:11.5px;margin-top:4px;line-height:1.5;">Standard packages carry the resources set by the<br>business model. For anything bespoke, put the client<br>on <strong>Enterprise+</strong> and set custom terms on their record.</div>
     </div>
   </div>
+  ${unitEconomicsHTML()}
+  ${addonsHTML()}
   `;
+}
+
+/* Rates & assumptions — the inputs every cost on the page is computed from. */
+function costingModalHTML(){
+  if(!costingData || !costingData.assumptions) return '';
+  const a = costingData.assumptions;
+  const rates = costingData.rates || [];
+  const opt = (sel) => rates.map(r=>`<option value="${esc(r.key)}" ${r.key===sel?'selected':''}>${esc(r.label)} (${esc(r.vendor)})</option>`).join('');
+  return `
+  <div class="modal" style="max-width:760px;">
+    <div class="modal-head"><h3>Rates &amp; assumptions</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
+    <div class="modal-body">
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;line-height:1.6;">
+        Change a price when a vendor changes theirs, or the exchange rate when it moves. Saving re-costs every package at once —
+        margins here, and the delivery cost Financials uses. Package prices are not touched.
+      </p>
+      <div class="field-row">
+        <div class="field"><label>USD/PKR (costing rate)</label><input id="cs_fx" type="number" step="0.01" value="${a.fx_usd_pkr}"></div>
+        <div class="field"><label>Typical use of the allowance (%)</label><input id="cs_util" type="number" min="10" max="100" step="1" value="${Math.round((a.utilization||0.7)*100)}"><div style="font-size:11px;color:var(--muted);margin-top:3px;">The business model assumes 70%. Separate from the projection setting on Financials.</div></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Bulk model — most turns</label><select id="cs_bulk">${opt(a.bulk_model)}</select></div>
+        <div class="field"><label>Premium model — escalated turns</label><select id="cs_prem">${opt(a.premium_model)}</select></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Founder rate (PKR/h)</label><input id="cs_founder" type="number" value="${a.founder_rate}"></div>
+        <div class="field"><label>Contractor rate (PKR/h)</label><input id="cs_contract" type="number" value="${a.contractor_rate}"></div>
+        <div class="field"><label>Infrastructure (PKR/mo)</label><input id="cs_infra" type="number" value="${a.infra_monthly}"></div>
+      </div>
+      <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin:10px 0 6px;">Model prices — USD per million tokens</label>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Model</th><th>Input</th><th>Output</th><th>Checked</th><th>Note</th></tr></thead>
+        <tbody>
+        ${rates.map(r=>`<tr>
+          <td><strong>${esc(r.label)}</strong><div style="font-size:11px;color:var(--muted);">${esc(r.vendor)} · ${esc(r.source||'')}</div></td>
+          <td style="width:92px;"><input class="cs-rate" data-key="${esc(r.key)}" data-side="input" type="number" step="0.001" min="0" value="${r.input}" style="width:84px;"></td>
+          <td style="width:92px;"><input class="cs-rate" data-key="${esc(r.key)}" data-side="output" type="number" step="0.001" min="0" value="${r.output}" style="width:84px;"></td>
+          <td style="font-size:11.5px;white-space:nowrap;">${r.as_of?fmtDate(r.as_of):'—'}</td>
+          <td style="font-size:11px;color:var(--muted);max-width:220px;">${esc(r.note||'')}</td>
+        </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-danger-ghost" style="margin-right:auto;" onclick="resetCosting()">Reset to the business model</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCosting()">${iconCheck(14)} Save and re-cost</button>
+    </div>
+  </div>`;
+}
+async function afterCostingChange(model){
+  costingData = model;
+  // delivery_cost_full and the routing line moved with it: Financials and the
+  // cards read them from the products list.
+  try{ state.products = (await API.get('/api/products')).map(productFromApi); }catch(e){}
+}
+async function saveCosting(){
+  const v = id => (document.getElementById(id)||{}).value;
+  const rates = {};
+  const current = costingData.rates || [];
+  document.querySelectorAll('.cs-rate').forEach(el=>{
+    const r = current.find(x=>x.key===el.dataset.key);
+    if(!r) return;
+    const val = parseFloat(el.value);
+    if(Number.isFinite(val) && val !== Number(r[el.dataset.side])){
+      rates[r.key] = rates[r.key] || {};
+      rates[r.key][el.dataset.side] = val;
+    }
+  });
+  try{
+    const model = await API.put('/api/costing', {
+      rates,
+      utilization: (parseFloat(v('cs_util'))||70)/100,
+      assumptions: {
+        fx_usd_pkr: parseFloat(v('cs_fx')),
+        bulk_model: v('cs_bulk'), premium_model: v('cs_prem'),
+        founder_rate: parseFloat(v('cs_founder')), contractor_rate: parseFloat(v('cs_contract')),
+        infra_monthly: parseFloat(v('cs_infra')),
+      },
+    });
+    await afterCostingChange(model);
+    closeModal(); showToast('Re-costed at the new rates');
+  }catch(e){ showToast(e.message||'Could not save that','warn'); }
+}
+async function resetCosting(){
+  if(!confirm('Put every rate and assumption back to the business model\'s defaults?')) return;
+  try{
+    const model = await API.post('/api/costing/reset', { scope:'all' });
+    await afterCostingChange(model);
+    closeModal(); showToast('Back to the business model\'s rates');
+  }catch(e){ showToast(e.message||'Could not reset it','warn'); }
 }
 async function deleteProduct(id){
   const inUse = state.clients.some(c=>c.productId===id);
@@ -2982,7 +3609,6 @@ async function downloadContracts(view){
   try{
     const headers = {};
     if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
-    else if(API.key) headers['x-api-key'] = API.key;
     const res = await fetch(`${API.base}/api/export/contracts.xlsx${one?`?view=${encodeURIComponent(view)}`:''}`, { headers });
     if(!res.ok){
       const err = await res.json().catch(()=>null);
@@ -3012,7 +3638,6 @@ async function downloadPipeline(stage){
   try{
     const headers = {};
     if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
-    else if(API.key) headers['x-api-key'] = API.key;
     const res = await fetch(`${API.base}/api/export/pipeline.xlsx${one?`?stage=${encodeURIComponent(stage)}`:''}`, { headers });
     if(!res.ok){
       const err = await res.json().catch(()=>null);
@@ -3034,7 +3659,6 @@ async function downloadWorkbook(){
   try{
     const headers = {};
     if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
-    else if(API.key) headers['x-api-key'] = API.key;
     const res = await fetch(API.base + '/api/export/crm.xlsx', { headers });
     if(!res.ok){
       const err = await res.json().catch(()=>null);
@@ -3091,7 +3715,6 @@ async function downloadArchive(){
   try{
     const headers = {};
     if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
-    else if(API.key) headers['x-api-key'] = API.key;
     const res = await fetch(`${API.base}/api/archive/download?months=${archiveMonths}`, { headers });
     if(!res.ok){
       const err = await res.json().catch(()=>null);
@@ -3344,7 +3967,6 @@ async function downloadClientDoc(clientId, docId){
   try{
     const headers = {};
     if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
-    else if(API.key) headers['x-api-key'] = API.key;
     const res = await fetch(`${API.base}/api/clients/${clientId}/documents/${docId}/download`, { headers });
     if(!res.ok) throw new Error(`Could not fetch it (${res.status})`);
     const blob = await res.blob();
@@ -3888,7 +4510,6 @@ async function downloadProposal(id){
   try{
     const headers = {};
     if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
-    else if(API.key) headers['x-api-key'] = API.key;
     const res = await fetch(`${API.base}/api/quotes/${id}/proposal.pdf`, { headers });
     if(!res.ok){
       const err = await res.json().catch(()=>null);
@@ -5213,10 +5834,8 @@ function exportAllData(){
   a.click();
 }
 function disconnectApi(){
-  if(!confirm('Disconnect from the API? You will need your key again to reconnect.')) return;
-  clearInterval(usagePollTimer);
-  API.clearConfig();
-  boot();
+  if(!confirm('Disconnect from the API? You will need to sign in again.')) return;
+  signOut();
 }
 
 /* ============================== MODALS ============================== */
@@ -5224,10 +5843,13 @@ function renderModal(){
   const root = document.getElementById('modal-root');
   if(!openModal){ root.innerHTML=''; return; }
   let html='';
-  if(openModal.type==='client') html = clientModalHTML(openModal.id);
+  if(openModal.type==='calendar') html = VQCAL.eventModal();
+  else if(openModal.type==='assignment') html = VQCAL.assignmentModal();
+  else if(openModal.type==='client') html = clientModalHTML(openModal.id);
   else if(openModal.type==='teamUser') html = teamUserModalHTML();
   else if(openModal.type==='product') html = productModalHTML(openModal.id);
   else if(openModal.type==='productAddon') html = productAddonModalHTML(openModal.id);
+  else if(openModal.type==='costing') html = costingModalHTML();
   else if(openModal.type==='vendor') html = vendorModalHTML(openModal.id);
   else if(openModal.type==='po') html = poModalHTML();
   else if(openModal.type==='invoice') html = invoiceModalHTML();
@@ -5246,7 +5868,8 @@ function renderModal(){
   else if(openModal.type==='clientDoc') html = clientDocModalHTML();
   else if(openModal.type==='identity') html = identityModalHTML();
   else if(openModal.type==='totpSetup') html = totpSetupModalHTML();
-  root.innerHTML = `<div class="modal-overlay" onmousedown="if(event.target===this){openModal=null;render();}">${html}</div>`;
+  else if(openModal.type==='ownerDoc') html = ownerDocModalHTML();
+  root.innerHTML = `<div class="modal-overlay" onmousedown="if(event.target===this){${openModal.type==='ownerDoc'?'closeOwnerDoc()':'openModal=null;render();'}}">${html}</div>`;
   if(openModal.type==='invoice') requestAnimationFrame(prefillInvoiceAmount);
   if(openModal.type==='bundle') requestAnimationFrame(bundleProductChanged);
 }
@@ -5481,6 +6104,7 @@ async function saveClient(id){
     }
     // Going active bills the setup fee and first retainer, server-side.
     state.invoices.push(...raised.map(invoiceFromApi));
+    if(window.VQCAL) VQCAL.invalidate();
     closeModal(); render();
     showToast(raised.length ? `Client saved — ${raised.length} invoice${raised.length===1?'':'s'} raised` : 'Client saved');
   }catch(e){ showToast(e.message||'Could not save client','warn'); }
@@ -5491,6 +6115,7 @@ async function deleteClient(id){
     await API.del(`/api/clients/${id}`);
     state.clients = state.clients.filter(c=>c.id!==id);
     state.invoices = state.invoices.filter(i=>i.clientId!==id);
+    if(window.VQCAL) VQCAL.invalidate();
     closeModal(); openPanel=null; render(); showToast('Client deleted');
   }catch(e){ showToast(e.message||'Could not delete client','warn'); }
 }
@@ -5568,37 +6193,146 @@ async function revokePortalCredentials(clientId){
 
 // Customer-satisfaction surveys are an add-on: off for every client until an
 // admin switches them on here (PATCH /api/clients/:id/surveys). Staff see
-// the state; only an admin can change it.
+// the state; only an admin can change it. Any staff member can say which
+// industry the client is in (v9.19) — their templates then come first in the
+// Echo library, here and in their portal — and switching Echo on can make
+// their first survey from it, live, so they start with something to share.
+let echoIndustries = null, echoIndustriesBusy = false;
+function loadEchoIndustries(){
+  if(echoIndustries || echoIndustriesBusy) return;
+  echoIndustriesBusy = true;
+  API.get('/api/surveys/templates').then(list => {
+    echoIndustries = (list||[]).filter(t => t.is_industry);
+    echoIndustriesBusy = false;
+    if(openPanel) render();
+  }).catch(() => { echoIndustriesBusy = false; });
+}
+function echoIndustryName(key){
+  const t = (echoIndustries||[]).find(x => x.key === key);
+  return t ? `${t.icon} ${t.industry_label}` : '';
+}
+function clientIndustrySelect(c){
+  if(!echoIndustries){ loadEchoIndustries(); return `<div style="font-size:12px;color:var(--muted);margin-bottom:10px;"><span class="loading-dot"></span> Loading industries…</div>`; }
+  const groups = [];
+  echoIndustries.forEach(t => {
+    let g = groups.find(x => x.label === t.category_label);
+    if(!g){ g = { label: t.category_label, items: [] }; groups.push(g); }
+    g.items.push(t);
+  });
+  return `<label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:10px;">Industry
+      <select id="echo-industry-${c.id}" style="display:block;width:100%;margin-top:4px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:#FCFBF9;"
+        onchange="setClientIndustry('${c.id}',this.value)">
+        <option value="">${c.industry ? 'Not set' : 'Not set — choose their industry…'}</option>
+        ${groups.map(g => `<optgroup label="${esc(g.label)}">${g.items.map(t => `<option value="${esc(t.key)}" ${t.key===c.industry?'selected':''}>${esc(t.icon+' '+t.industry_label)}</option>`).join('')}</optgroup>`).join('')}
+      </select>
+      <span style="display:block;font-weight:400;font-size:11.5px;margin-top:4px;">Their industry’s survey templates come first in Vantriq Echo, here and in their portal.</span>
+    </label>`;
+}
 function clientSurveysCard(c){
   const on = !!c.surveysEnabled;
   const since = on && c.surveysEnabledAt ? ` since ${fmtDate(c.surveysEnabledAt)}${c.surveysEnabledBy?` (${esc(c.surveysEnabledBy)})`:''}` : '';
   const text = on
     ? `<div style="margin-bottom:6px;"><span class="pill pill-active"><span class="pill-dot"></span>On${since}</span></div>
        <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">
-         They have a <strong>Surveys</strong> tab in their portal, you can build surveys for them in
-         <a href="#" style="color:var(--teal);font-weight:600;" onclick="event.preventDefault();openPanel=null;navigate('surveys')">Surveys</a>, and their agents can send after-chat surveys.</div>`
-    : `<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">Off. Surveys are an add-on: switch them on when this customer has signed up for them.
-         Until then their portal has no Surveys tab and no survey can be made or sent for them.</div>`;
-  if(!isAdmin()) return text + (on ? '' : `<div style="font-size:11.5px;color:var(--muted);">Only an admin can switch surveys on.</div>`);
-  return text + `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+         They have an <strong>Echo</strong> tab in their portal, with ready-made surveys for their industry. You can build surveys for them in
+         <a href="#" style="color:var(--teal);font-weight:600;" onclick="event.preventDefault();openEchoFor('${c.id}')">Vantriq Echo</a>, and their agents can send after-chat surveys.</div>`
+    : `<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">Off. Vantriq Echo is an add-on: switch it on when this customer has signed up for it.
+         Until then their portal has no Echo tab and no survey can be made or sent for them.</div>`;
+  const industry = clientEchoSurveys(c) + clientIndustrySelect(c);
+  if(!isAdmin()) return text + industry + (on ? '' : `<div style="font-size:11.5px;color:var(--muted);">Only an admin can switch Vantriq Echo on.</div>`);
+  const starterName = echoIndustryName(c.industry) || '⭐ General satisfaction';
+  return text + industry + `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
       <input type="checkbox" ${on?'checked':''} onchange="setClientSurveys('${c.id}',this.checked)">
-      Surveys switched on for this customer
-    </label>`;
+      Vantriq Echo switched on for this customer
+    </label>
+    ${on ? '' : `<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12.5px;color:var(--muted);margin:8px 0 0 2px;">
+      <input type="checkbox" id="echo-starter-${c.id}" checked style="margin-top:2px;">
+      <span>When switching on, also create their first survey from the <strong>${esc(starterName)}</strong> template — live in English and Urdu, with its QR code and link ready to share. Only if they have no survey yet.</span>
+    </label>`}`;
+}
+
+// v9.19.2 — the client's surveys on their page, each with the ways to share
+// it (link, QR poster, WhatsApp), so nobody has to hunt for them in Echo.
+const echoSurveysByClient = {};
+function loadClientEchoSurveys(clientId, force){
+  const cur = echoSurveysByClient[clientId];
+  if(cur && (cur.busy || (!force && Date.now() - cur.at < 60000))) return;
+  echoSurveysByClient[clientId] = { busy: true, at: Date.now(), list: cur ? cur.list : null };
+  API.get('/api/surveys?client_id=' + encodeURIComponent(clientId)).then(r => {
+    echoSurveysByClient[clientId] = { busy: false, at: Date.now(), list: (r && r.surveys) || [] };
+    if(openPanel && openPanel.type === 'client' && openPanel.id === clientId) render();
+  }).catch(() => { echoSurveysByClient[clientId] = { busy: false, at: Date.now(), list: cur && cur.list ? cur.list : [] }; });
+}
+function clientEchoSurveys(c){
+  if(!c.surveysEnabled) return '';
+  loadClientEchoSurveys(c.id);
+  const cur = echoSurveysByClient[c.id];
+  if(!cur || !cur.list) return `<div style="font-size:12px;color:var(--muted);margin:2px 0 12px;"><span class="loading-dot"></span> Loading their surveys…</div>`;
+  if(!cur.list.length) return `<div style="font-size:12.5px;color:var(--muted);margin:2px 0 12px;">No survey yet.
+      <a href="#" style="color:var(--teal);font-weight:600;" onclick="event.preventDefault();openEchoFor('${c.id}')">Create one in Vantriq Echo</a> — its QR code, link, WhatsApp, kiosk and website options then show here.</div>`;
+  const statusPill = s => s.status === 'live' && !s.closed
+    ? `<span class="pill pill-active"><span class="pill-dot"></span>Live</span>`
+    : `<span class="pill">${esc(s.closed && s.status === 'live' ? 'Closed' : s.status.charAt(0).toUpperCase() + s.status.slice(1))}</span>`;
+  return `<div style="margin:2px 0 12px;">
+    <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;">Their surveys — share by QR code, link, WhatsApp, kiosk or website</div>
+    ${cur.list.slice(0, 5).map(s => `<div class="echo-survey" style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><strong style="font-size:13px;">${esc(s.title)}</strong>${statusPill(s)}</div>
+      <div style="font-size:11.5px;color:var(--muted);margin:2px 0 8px;">${s.responses} answer${s.responses === 1 ? '' : 's'}${s.last_response_at ? ' · last ' + fmtDate(s.last_response_at) : ''}${s.links ? ` · <span style="font-family:var(--f-mono,monospace);">${esc(s.links.url.replace(/^https?:\/\//, ''))}</span>` : ''}</div>
+      ${s.links && s.status === 'live' && !s.closed ? `<div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-sm" data-url="${esc(s.links.url)}" onclick="copyEchoLink(this.dataset.url)">Copy link</button>
+        <a class="btn btn-ghost btn-sm" style="text-decoration:none;" href="${esc(s.links.poster)}" target="_blank" rel="noopener">QR poster</a>
+        <a class="btn btn-ghost btn-sm" style="text-decoration:none;" href="${esc(s.links.whatsapp)}" target="_blank" rel="noopener">WhatsApp</a>
+        <button class="btn btn-ghost btn-sm" onclick="openEchoSurvey('${c.id}','${s.id}')">All sharing options</button>
+      </div>` : `<button class="btn btn-ghost btn-sm" onclick="openEchoSurvey('${c.id}','${s.id}')">Open in Vantriq Echo</button>`}
+    </div>`).join('')}
+    ${cur.list.length > 5 ? `<a href="#" style="color:var(--teal);font-weight:600;font-size:12.5px;" onclick="event.preventDefault();openEchoFor('${c.id}')">All ${cur.list.length} surveys →</a>` : ''}
+  </div>`;
+}
+function copyEchoLink(url){
+  navigator.clipboard.writeText(url).then(() => showToast('Survey link copied'), () => showToast('Could not copy — select the link and copy it', 'warn'));
+}
+/** One of the client's surveys in Vantriq Echo, on its Share tab. */
+function openEchoSurvey(clientId, surveyId){
+  openEchoFor(clientId);
+  if(window.VQS) VQS.open(surveyId, 'share');
+}
+
+/** Vantriq Echo, looking at one client. */
+function openEchoFor(clientId){
+  openPanel = null;
+  if(window.VQS && VQS.showClient) VQS.showClient(clientId);
+  navigate('surveys');
+}
+
+async function setClientIndustry(clientId, industry){
+  const client = state.clients.find(c=>c.id===clientId);
+  try{
+    const r = await API.patch(`/api/clients/${clientId}/industry`, { industry });
+    if(client) client.industry = r.industry || '';
+    if(window.VQS && VQS.setIndustry) VQS.setIndustry(clientId, r.industry || '');
+    render();
+    showToast(r.industry ? `Industry saved — ${echoIndustryName(r.industry) || r.industry}` : 'Industry cleared');
+  }catch(e){ showToast(e.message||'Could not save the industry','warn'); render(); }
 }
 
 async function setClientSurveys(clientId, enabled){
   const client = state.clients.find(c=>c.id===clientId);
-  if(!enabled && !confirm(`Switch surveys off for ${client?client.company:'this customer'}?\n\nEvery survey they have is paused for their customers straight away, the Surveys tab leaves their portal and no after-chat survey is sent. Their surveys and answers are kept, and come back when you switch it on again.`)){
+  if(!enabled && !confirm(`Switch Vantriq Echo off for ${client?client.company:'this customer'}?\n\nEvery survey they have is paused for their customers straight away, the Echo tab leaves their portal and no after-chat survey is sent. Their surveys and answers are kept, and come back when you switch it on again.`)){
     render(); return;
   }
+  const starterBox = document.getElementById(`echo-starter-${clientId}`);
+  const starter = !!(enabled && starterBox && starterBox.checked);
   try{
-    const r = await API.patch(`/api/clients/${clientId}/surveys`, { enabled });
+    const r = await API.patch(`/api/clients/${clientId}/surveys`, starter ? { enabled, starter_survey: true } : { enabled });
     if(client){ client.surveysEnabled = !!r.surveys_enabled; client.surveysEnabledAt = r.surveys_enabled_at; client.surveysEnabledBy = r.surveys_enabled_by||''; }
+    delete echoSurveysByClient[clientId];
     if(window.VQS) VQS.reset();
     render();
-    showToast(enabled
-      ? 'Surveys switched on — they now have a Surveys tab in their portal'
-      : `Surveys switched off${r.live_surveys?` — ${r.live_surveys} live survey${r.live_surveys===1?' is':'s are'} paused for respondents`:''}`);
+    showToast(!enabled
+      ? `Vantriq Echo switched off${r.live_surveys?` — ${r.live_surveys} live survey${r.live_surveys===1?' is':'s are'} paused for respondents`:''}`
+      : r.starter_survey
+        ? `Vantriq Echo switched on — “${r.starter_survey.title}” is live and ready to share`
+        : 'Vantriq Echo switched on — they now have an Echo tab in their portal');
   }catch(e){ showToast(e.message||'Could not change that','warn'); render(); }
 }
 
@@ -5935,7 +6669,7 @@ function repModalHTML(){
     <div class="modal-body">
       <div class="field"><label>Name</label><input id="r_name" placeholder="e.g. Ahmed Raza"></div>
       <div class="field"><label>Email (optional)</label><input id="r_email" placeholder="ahmed@vantriq.ai"></div>
-      <p class="footnote" style="margin-top:0;">A login key is generated on save. The rep uses it to log in at <span class="mono">/rep.html</span> — they'll only ever see leads they create there.</p>
+      <p class="footnote" style="margin-top:0;">A login key is generated on save. The rep uses it to log in at <span class="mono">/rep.html</span> — they'll see leads they create or an admin assigns to them.</p>
     </div>
     <div class="modal-foot">
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
@@ -6173,6 +6907,12 @@ function clientPanelHTML(id){
     </div>
   </div>
   <div class="detail-body">
+    <div class="detail-row"><span class="k">Assigned to</span><span class="v">${esc(repNameOf(c)||(c.ownerRepId?'Assigned rep':'Unassigned'))}</span></div>
+    ${c.assignedAt?`<p class="footnote">Assigned ${esc(fmtDate(c.assignedAt))} by ${esc(c.assignedBy||'—')}</p>`:''}
+    <div style="display:flex;gap:8px;margin:12px 0;">
+      ${isAdmin()?`<button class="btn btn-ghost btn-sm" onclick="VQCAL.assign('${c.id}')">Assign / history</button>`:''}
+      <button class="btn btn-ghost btn-sm" onclick="VQCAL.openEvent(null,'${c.id}')">Book appointment</button>
+    </div>
     ${c.ownerRepId?`<div class="detail-row"><span class="k">Sales stage (rep pipeline)</span><span class="v">${SALES_STAGE_LABEL[c.salesStage]||'—'}${c.closeOutcome?` · <span style="color:${c.closeOutcome==='won'?'var(--teal-dark)':'var(--red)'}">${c.closeOutcome}</span>`:''}</span></div>`:''}
     <div class="detail-row"><span class="k">Phone</span><span class="v">${esc(c.phone||'—')}</span></div>
     <div class="detail-row"><span class="k">Source</span><span class="v">${esc(c.source||'—')}</span></div>
@@ -6259,7 +6999,7 @@ function clientPanelHTML(id){
     </div>
 
     <div class="divider"></div>
-    <h4 style="font-size:13px;margin-bottom:8px;">Customer-satisfaction surveys</h4>
+    <h4 style="font-size:13px;margin-bottom:8px;">Vantriq Echo · customer-satisfaction surveys</h4>
     ${clientSurveysCard(c)}
 
     ${authUser&&authUser.role==='admin'?`
@@ -6503,7 +7243,6 @@ async function downloadInvoice(id){
   try{
     const headers = {};
     if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
-    else if(API.key) headers['x-api-key'] = API.key;
     const res = await fetch(`${API.base}/api/invoices/${id}/pdf`, { headers });
     if(!res.ok){
       const err = await res.json().catch(()=>null);
@@ -7004,6 +7743,7 @@ function attachPostRenderHooks(){
   if(currentView==='analytics') requestAnimationFrame(drawAnalytics);
   else if(window.VQA) VQA.destroyCharts();
   if(currentView==='surveys') mountSurveys();
+  if(currentView==='customers') mountCustomers();
   else if(window.VQS) VQS.destroyCharts();
   // Views whose data is too heavy to pull on every page load fetch on first
   // sight and then keep what they have until something changes it.
@@ -7015,6 +7755,7 @@ function attachPostRenderHooks(){
   }
   if(currentView==='settings'){ refreshInternalAccountCard(); refreshEmailCard(); loadJurisdictions(); }
   if(currentView==='quotes' && quotesData===null) loadQuotes();
+  if(currentView==='products' && (costingData===null || addonsData===null)) loadPricing();
   // The client panel renders contracts too, so they have to be loaded when a
   // panel is open as well as when the tab is — otherwise a client shows
   // "Loading…" forever for want of anything to trigger the fetch.
@@ -7030,9 +7771,10 @@ function attachPostRenderHooks(){
 
 /* ============================== Sign in ============================== */
 /* Employees sign in with their company email and password, then a one-time
-   code emailed to that address. The API-key route still exists but is a
-   deliberate break-glass path, not the everyday way in. */
-let loginStep = 'password';      // 'password' | 'otp' | 'apikey'
+   code emailed to that address. Emergency access is the break-glass path, not
+   the everyday way in: the admin API key, then a code that goes to the CEO
+   (v9.22) — the key alone opens nothing. */
+let loginStep = 'password';      // 'password' | 'otp' | 'emergency'
 let loginChallenge = null;
 let loginBusy = false;
 
@@ -7048,7 +7790,9 @@ function loginMarkSVG(){
 function shell(inner){
   return `
   <div class="auth-screen">
-    <div class="auth-card">
+    <div class="auth-layout">
+      <aside class="auth-story"><div class="workspace-eyebrow">VantriqAI · Revenue console</div><h1>Every lead.<br>Every conversation.<br><em>One workspace.</em></h1><p>A clear view of your sales, customer accounts, and the work ahead.</p><div class="auth-capabilities"><span>Pipeline &amp; calendar</span><span>Agents &amp; customers</span><span>Billing &amp; insights</span></div><div class="auth-story-note"><span class="auth-story-mark">${loginMarkSVG()}</span><div><strong>Built around your business.</strong><p>Your team, your customers, your next opportunity.</p></div></div></aside>
+      <div class="auth-form-wrap"><div class="auth-card">
       <div class="auth-brand">
         ${loginMarkSVG()}
         <div>
@@ -7056,37 +7800,43 @@ function shell(inner){
           <div class="auth-kicker">Revenue Console</div>
         </div>
       </div>
+      ${loginStep==='password'?'<h2 class="auth-title">Welcome back.</h2><p class="auth-description">Sign in to your VantriqAI workspace.</p>':''}
       ${connectError?`<div class="auth-error">${esc(connectError)}</div>`:''}
       ${inner}
     </div>
-    <p class="auth-foot">Signed-in sessions are tied to your company email.</p>
+    <p class="auth-foot">Signed-in sessions are tied to your company email.</p></div>
+    </div>
   </div>`;
 }
 
 function renderConnectScreen(){
   const app = document.getElementById('app');
-  if(loginStep === 'apikey'){
+  if(loginStep === 'emergency'){
     app.innerHTML = shell(`
-      <div style="background:var(--amber-light);color:#63430B;padding:9px 11px;border-radius:8px;font-size:11.5px;margin-bottom:14px;">
-        Emergency access. Use your Vantriq Ops account unless sign-in by email is unavailable.
+      <h3 style="margin:0 0 4px;font-size:15px;">Emergency access</h3>
+      <div style="background:var(--amber-light);color:#63430B;padding:9px 11px;border-radius:8px;font-size:11.5px;margin:8px 0 14px;">
+        For when signing in with your own account is not possible. The admin key alone opens nothing:
+        it sends a 6-digit code to the CEO, and the CEO decides whether to give it to you.
+        The code lets you in for 2 hours, and the CEO can end it at any time.
       </div>
-      <div class="field"><label>API base URL</label><input id="conn_base" value="${esc(API.base||window.location.origin)}"></div>
-      <div class="field"><label>Admin API key</label><input id="conn_key" type="password" placeholder="vq_..."></div>
-      <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:6px;" onclick="attemptConnect()">Connect with key</button>
+      <div class="field"><label>Admin API key</label><input id="conn_key" type="password" autocomplete="off" placeholder="vq_..." onkeydown="if(event.key==='Enter')startEmergency()"></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:6px;" onclick="startEmergency()">Send a code to the CEO</button>
       <p class="footnote" style="text-align:center;"><a href="#" onclick="event.preventDefault();loginStep='password';connectError='';renderConnectScreen()">Back to normal sign-in</a></p>`);
+    const el = document.getElementById('conn_key'); if(el) el.focus();
     return;
   }
   if(loginStep === 'otp'){
     const isTotp = loginChallenge && loginChallenge.method === 'totp';
+    const isCeoCode = loginChallenge && loginChallenge.method === 'ceo';
     app.innerHTML = shell(`
-      <h3 style="margin:0 0 4px;font-size:15px;">${isTotp ? 'Your authenticator app' : 'Check your email'}</h3>
+      <h3 style="margin:0 0 4px;font-size:15px;">${isCeoCode ? 'Ask the CEO for the code' : isTotp ? 'Your authenticator app' : 'Check your email'}</h3>
       <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">${esc((loginChallenge&&loginChallenge.message)||'We sent you a 6-digit code.')}</p>
       <div class="field"><label>6-digit code</label>
         <input id="otp_code" inputmode="numeric" autocomplete="one-time-code" maxlength="6"
                style="letter-spacing:6px;font-size:19px;font-family:var(--f-mono);text-align:center;"
                onkeydown="if(event.key==='Enter')submitOtp()"></div>
-      <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitOtp()">Verify and sign in</button>
-      <p class="footnote" style="text-align:center;"><a href="#" onclick="event.preventDefault();loginStep='password';loginChallenge=null;connectError='';renderConnectScreen()">Start again</a></p>`);
+      <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitOtp()">${isCeoCode ? 'Verify and open emergency access' : 'Verify and sign in'}</button>
+      <p class="footnote" style="text-align:center;"><a href="#" onclick="event.preventDefault();loginStep=${isCeoCode ? "'emergency'" : "'password'"};loginChallenge=null;connectError='';renderConnectScreen()">Start again</a></p>`);
     const el = document.getElementById('otp_code'); if(el) el.focus();
     return;
   }
@@ -7096,7 +7846,7 @@ function renderConnectScreen(){
     <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:6px;" onclick="submitPassword()">Continue</button>
     <p class="footnote" style="text-align:center;margin-top:10px;"><a href="#" onclick="event.preventDefault();forgotPassword()">Forgot your password?</a></p>
     <p class="footnote">You'll get a one-time code by email to finish signing in. Accounts are created by an administrator in the CRM.</p>
-    <p class="footnote" style="text-align:center;margin-top:10px;"><a href="#" onclick="event.preventDefault();loginStep='apikey';connectError='';renderConnectScreen()" style="color:var(--muted);">Emergency access with an API key</a></p>`);
+    <p class="footnote" style="text-align:center;margin-top:10px;"><a href="#" onclick="event.preventDefault();loginStep='emergency';connectError='';renderConnectScreen()" style="color:var(--muted);">Emergency access with an API key</a></p>`);
   const el = document.getElementById('lg_email'); if(el) el.focus();
 }
 
@@ -7143,10 +7893,15 @@ async function submitPassword(){
 async function submitOtp(){
   if(loginBusy) return;
   const code = (document.getElementById('otp_code')||{}).value || '';
-  if(!code.trim()){ connectError = (loginChallenge&&loginChallenge.method==='totp') ? 'Enter the code from your authenticator app.' : 'Enter the code from your email.'; renderConnectScreen(); return; }
+  if(!code.trim()){
+    const m = loginChallenge && loginChallenge.method;
+    connectError = m==='totp' ? 'Enter the code from your authenticator app.' : m==='ceo' ? 'Enter the code the CEO gives you.' : 'Enter the code from your email.';
+    renderConnectScreen(); return;
+  }
   loginBusy = true;
   try{
-    const res = await fetch((API.base||window.location.origin)+'/api/auth/verify', {
+    const isCeoCode = loginChallenge && loginChallenge.method === 'ceo';
+    const res = await fetch((API.base||window.location.origin)+(isCeoCode ? '/api/auth/breakglass/verify' : '/api/auth/verify'), {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ challenge_id: loginChallenge.challenge_id, code: code.trim() }),
     });
@@ -7172,19 +7927,45 @@ function mountSurveys(){
   VQS.mount(el, {
     audience: 'crm',
     clients: () => state.clients
-      .map(c => ({ id: c.id, company: c.company, email: c.email, surveys_enabled: !!c.surveysEnabled }))
+      .map(c => ({ id: c.id, company: c.company, email: c.email, surveys_enabled: !!c.surveysEnabled, industry: c.industry || '' }))
       .sort((a, b) => String(a.company).localeCompare(String(b.company))),
     // What to tell someone who wants a survey for a client that does not have them.
     enableHint: () => isAdmin()
-      ? 'Switch surveys on for a client from their page: Clients → the client → Customer-satisfaction surveys.'
-      : 'Surveys are an add-on an admin switches on per client. Ask an admin to switch them on for this client.',
+      ? 'Switch Vantriq Echo on for a client from their page: Clients → the client → Vantriq Echo.'
+      : 'Vantriq Echo is an add-on an admin switches on per client. Ask an admin to switch it on for this client.',
     api: (method, path, body) => API.req(method, '/api/surveys' + path, body),
     download: async (path, filename) => {
       showToast('Building the spreadsheet…');
       const headers = {};
       if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
-      else if(API.key) headers['x-api-key'] = API.key;
       const res = await fetch(API.base + '/api/surveys' + path, { headers });
+      if(!res.ok){ const err = await res.json().catch(()=>null); throw new Error((err&&err.error) || `Export failed (${res.status})`); }
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    },
+    toast: (msg, warn) => showToast(msg, warn ? 'warn' : undefined),
+    // An industry chosen in the Echo library is the client's, on their page too.
+    industryChanged: (id, industry) => { const c = state.clients.find(x => x.id === id); if(c) c.industry = industry || ''; },
+  });
+}
+
+/** Customers (/contacts-view.js): our clients' customers, the same screens each client has in its portal. */
+function mountCustomers(){
+  const el = document.getElementById('vqc-root');
+  if(!el || !window.VQC) return;
+  VQC.mount(el, {
+    audience: 'crm',
+    clients: () => state.clients.filter(c => c.stage === 'active' || c.isInternal)
+      .map(c => ({ id: c.id, company: c.company + (c.isInternal ? ' (VantriqAI)' : '') }))
+      .sort((a, b) => String(a.company).localeCompare(String(b.company))),
+    api: (method, path, body) => API.req(method, '/api/contacts' + path, body),
+    download: async (path, filename) => {
+      showToast('Building the customer workbook…');
+      const headers = {};
+      if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
+      const res = await fetch(API.base + '/api/contacts' + path, { headers });
       if(!res.ok){ const err = await res.json().catch(()=>null); throw new Error((err&&err.error) || `Export failed (${res.status})`); }
       const blob = await res.blob();
       const a = document.createElement('a');
@@ -7196,30 +7977,67 @@ function mountSurveys(){
 }
 
 async function signOut(){
+  clearInterval(usagePollTimer);
   if(window.VQS) VQS.reset();
+  if(window.VQC) VQC.reset();
+  if(window.VQCAL) VQCAL.reset();
   try{ if(API.session) await fetch(API.base+'/api/auth/logout',{method:'POST',headers:{'Authorization':'Bearer '+API.session}}); }catch(e){}
-  API.clearConfig(); authUser=null; apiConnected=false;
+  API.clearConfig(); authUser=null; apiConnected=false; emergencyData=null;
   API.base = window.location.origin;
   loginStep='password'; connectError='';
   renderConnectScreen();
 }
 
-async function attemptConnect(){
-  const base = document.getElementById('conn_base').value.trim();
-  const key = document.getElementById('conn_key').value.trim();
-  if(!base||!key){ connectError='Both fields are required.'; renderConnectScreen(); return; }
-  API.setConfig(base, key);
-  await boot();
+/** The server says this session is over: back to sign-in, with its reason. */
+function signedOutByServer(msg){
+  clearInterval(usagePollTimer);
+  if(window.VQS) VQS.reset();
+  if(window.VQC) VQC.reset();
+  if(window.VQCAL) VQCAL.reset();
+  API.clearConfig(); authUser=null; apiConnected=false; emergencyData=null;
+  API.base = window.location.origin;
+  openModal=null; openPanel=null;
+  loginStep='password'; loginChallenge=null;
+  connectError = msg || 'You have been signed out. Sign in again.';
+  renderConnectScreen();
+}
+
+/** Emergency access, step 1: the admin key sends a code to the CEO. */
+async function startEmergency(){
+  if(loginBusy) return;
+  const key = ((document.getElementById('conn_key')||{}).value || '').trim();
+  if(!key){ connectError='Paste the admin API key.'; renderConnectScreen(); return; }
+  loginBusy = true;
+  try{
+    const res = await fetch((API.base||window.location.origin)+'/api/auth/breakglass/start', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key }),
+    });
+    const json = await res.json().catch(()=>({}));
+    loginBusy = false;
+    if(!res.ok){ connectError = json.error || 'Could not start emergency access.'; renderConnectScreen(); return; }
+    loginChallenge = json; loginStep = 'otp'; connectError = '';
+    renderConnectScreen();
+  }catch(e){
+    loginBusy = false; connectError = 'Could not reach the server.'; renderConnectScreen();
+  }
 }
 
 /* ============================== Boot ============================== */
 async function boot(){
-  if(!API.configured()){ renderConnectScreen(); return; }
+  if(!API.configured()){
+    if(bootNotice){ connectError = bootNotice; bootNotice = ''; }
+    renderConnectScreen(); return;
+  }
   document.getElementById('app').innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;gap:10px;color:#6C7885;font-family:Inter;"><span class="loading-dot"></span> Connecting to Vantriq API…</div>`;
   try{
     if(API.session){
       const me = await fetch(API.base+'/api/auth/me',{headers:{'Authorization':'Bearer '+API.session}});
-      if(!me.ok){ API.clearConfig(); API.base = window.location.origin; renderConnectScreen(); return; }
+      if(!me.ok){
+        const why = await me.json().catch(()=>({}));
+        API.clearConfig(); API.base = window.location.origin;
+        connectError = (why && why.signed_out && why.error) || '';
+        renderConnectScreen(); return;
+      }
       authUser = await me.json();
     } else { authUser = null; }
     await loadState();
@@ -7228,7 +8046,7 @@ async function boot(){
     startUsagePolling();
   }catch(e){
     apiConnected = false;
-    connectError = e instanceof ApiError ? e.message : 'Could not connect. Check the API URL and key.';
+    connectError = e instanceof ApiError ? e.message : 'Could not connect to the server. Try again.';
     if(e && e.status===401) { API.clearConfig(); }
     renderConnectScreen();
   }

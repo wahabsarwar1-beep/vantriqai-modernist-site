@@ -543,7 +543,7 @@ const details = (region: Region): Record<string, ModuleDetail> => ({
     pairs: ["Vantriq Echo", "Lead Qualifier", "Insights Digest"],
     systems: ["Your customer portal", "Analytics API", "CRM", "Your BI tools"],
     faqs: [
-      { q: "Where do we see Pulse?", a: "In the Analytics tab of your customer portal. If your plan includes API access, the same figures are available to your own systems." },
+      { q: "Where do we see Pulse?", a: "In the Pulse tab of your customer portal. If your plan includes API access, the same figures are available to your own systems." },
       { q: "Can Pulse identify our customers?", a: "No. Customers are counted, never exposed: phone numbers and session ids stay on the server, and only the counts reach the dashboard." },
       { q: "How is Pulse different from the Insights Digest?", a: "The Digest is a short plain-language note each Monday. Pulse is the live dashboard behind it, for whenever you want to look." },
     ],

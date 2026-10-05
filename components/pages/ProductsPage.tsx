@@ -1,3 +1,4 @@
+import ProductDisclosures from "@/components/ProductDisclosures";
 import Link from "next/link";
 import JsonLd from "@/components/JsonLd";
 import { breadcrumbSchema } from "@/lib/schema";
@@ -140,6 +141,8 @@ export default function ProductsPage({ region }: { region: Region }) {
           </div>
         </section>
       </div>
+
+      <ProductDisclosures />
 
       <PosterCTA
         headline="Not sure which modules?"
