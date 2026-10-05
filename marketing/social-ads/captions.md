@@ -1,18 +1,23 @@
 # VantriqAI ad card captions
 
-One write-up per card, in two cuts:
+One write-up per card, in two cuts, plus one set of hashtags:
 
 - **Facebook**: the link is clickable, so it goes in the body.
-- **Instagram**: links in captions aren't clickable, so it points to the link in bio and ends with hashtags.
+- **Instagram**: links in captions aren't clickable, so it points to the link in bio.
+- **Hashtags**: 5 per post (Instagram's limit), added to the end of both captions by
+  `captions_to_json.py`. Always #VantriqAI plus one product tag (#VantriqAgents,
+  #VantriqPulse or #VantriqEcho) so people can tap through to the rest of the brand,
+  then 3 discovery tags for the post's topic or industry.
 
 Every figure is one the site already publishes. The 78% card credits its source, as the site does.
-`captions.json` has the same text in a form the n8n workflow reads. Edit both together.
+`captions.json` is what the n8n workflow reads. Rebuild it with `captions_to_json.py` after any edit here.
 
 ---
 
 ## 01 · Answer every customer in 1.2s
 
 **Headline (ad field):** Answer every customer in 1.2 seconds
+**Hashtags:** #VantriqAI #VantriqAgents #AIagents #WhatsAppBusiness #AIinPakistan
 **Primary text / Facebook:**
 
 > A customer messages you at 11pm. Who answers?
@@ -30,14 +35,13 @@ Every figure is one the site already publishes. The 78% card credits its source,
 > VantriqAI agents reply in about 1.2 seconds on WhatsApp, Instagram and your website. They answer, qualify and book around the clock.
 >
 > Book a free demo, link in bio.
->
-> #AIagents #WhatsAppBusiness #CustomerExperience #SmallBusiness #Automation #VantriqAI
 
 ---
 
 ## 02 · It's 21:40. Your team is off.
 
 **Headline (ad field):** Your team is off. Your agent isn't.
+**Hashtags:** #VantriqAI #VantriqAgents #WhatsAppAutomation #RetailPakistan #AIforBusiness
 **Primary text / Facebook:**
 
 > 21:40: "Is the black leather sofa in stock?"
@@ -56,14 +60,13 @@ Every figure is one the site already publishes. The 78% card credits its source,
 > Your team clocked off. Your VantriqAI agent didn't. It checks live stock, answers and books on WhatsApp, Instagram and your site.
 >
 > Get your agent, link in bio.
->
-> #WhatsAppMarketing #AIforBusiness #RetailTech #SalesAutomation #VantriqAI
 
 ---
 
 ## 03 · 78% buy from whoever answers first
 
 **Headline (ad field):** 78% buy from whoever answers first
+**Hashtags:** #VantriqAI #VantriqAgents #LeadGeneration #SalesTips #CustomerExperience
 **Primary text / Facebook:**
 
 > 78% of customers buy from the business that answers first. Not the cheapest one, and not the biggest.*
@@ -83,14 +86,13 @@ Every figure is one the site already publishes. The 78% card credits its source,
 > Be first every time, link in bio.
 >
 > *MIT / InsideSales.com Lead Response study
->
-> #LeadGeneration #SalesTips #CustomerService #AIagents #VantriqAI
 
 ---
 
 ## 04 · Same message. Two endings.
 
 **Headline (ad field):** Same message. Two endings.
+**Hashtags:** #VantriqAI #VantriqAgents #CustomerExperience #WhatsAppBusiness #AIautomation
 **Primary text / Facebook:**
 
 > One enquiry at 21:40. Two very different mornings.
@@ -112,14 +114,13 @@ Every figure is one the site already publishes. The 78% card credits its source,
 > VantriqAI agents make sure you get the second ending, every night.
 >
 > See how it works, link in bio.
->
-> #BusinessGrowth #CustomerExperience #WhatsAppBusiness #AIautomation #VantriqAI
 
 ---
 
 ## 05 · One agent. Every channel.
 
 **Headline (ad field):** One agent. Every channel.
+**Hashtags:** #VantriqAI #VantriqAgents #Omnichannel #InstagramDM #ConversationalAI
 **Primary text / Facebook:**
 
 > Your customers don't pick one channel, so your replies shouldn't either.
@@ -140,14 +141,13 @@ Every figure is one the site already publishes. The 78% card credits its source,
 > WhatsApp, Instagram DMs, your website and your phone line, all answered by one VantriqAI agent that knows your stock, your calendar and your CRM.
 >
 > Start building, link in bio.
->
-> #Omnichannel #AIagents #InstagramForBusiness #WhatsAppBusiness #VantriqAI
 
 ---
 
 ## 06 · Live in weeks. Not quarters.
 
 **Headline (ad field):** Live in weeks, not quarters
+**Hashtags:** #VantriqAI #VantriqAgents #AIforSmallBusiness #BusinessAutomation #AIinPakistan
 **Primary text / Facebook:**
 
 > An AI agent doesn't have to be a year-long IT project.
@@ -166,14 +166,13 @@ Every figure is one the site already publishes. The 78% card credits its source,
 > 15-minute discovery call → agent built and tested on your real messages → plugged into your tools → answering 24/7.
 >
 > Book a 15-min call, link in bio.
->
-> #AIforSmallBusiness #Automation #StartupTools #CustomerSupport #VantriqAI
 
 ---
 
 ## 07 · 21× more likely to qualify
 
 **Headline (ad field):** Reply in 5 minutes, not 30
+**Hashtags:** #VantriqAI #VantriqAgents #LeadResponse #SalesAutomation #AIagents
 **Primary text / Facebook:**
 
 > Leads are 21× more likely to qualify when you reply within 5 minutes instead of 30.*
@@ -195,14 +194,13 @@ Every figure is one the site already publishes. The 78% card credits its source,
 > Link in bio.
 >
 > *MIT / InsideSales.com Lead Response Management Study
->
-> #LeadResponse #SalesTips #AIagents #WhatsAppBusiness #VantriqAI
 
 ---
 
 ## 08 · Appointments booked. Front desk freed.
 
 **Headline (ad field):** An AI receptionist for your clinic
+**Hashtags:** #VantriqAI #VantriqAgents #HealthcarePakistan #ClinicManagement #AIreceptionist
 **Primary text / Facebook:**
 
 > "Can I see Dr. Sana this week? Morning if possible."
@@ -221,14 +219,13 @@ Every figure is one the site already publishes. The 78% card credits its source,
 > Booking, reminders and reschedules handled on WhatsApp by an AI receptionist. Anything clinical goes straight to your team.
 >
 > Link in bio.
->
-> #HealthcarePakistan #ClinicManagement #WhatsAppBusiness #AIreceptionist #VantriqAI
 
 ---
 
 ## 09 · Every enquiry, qualified by morning
 
 **Headline (ad field):** Every property enquiry, qualified by morning
+**Hashtags:** #VantriqAI #VantriqAgents #RealEstatePakistan #PropertyLeads #AIagents
 **Primary text / Facebook:**
 
 > A listing enquiry at 23:12 usually gets a call back the next afternoon. By then the buyer has spoken to three other agents.
@@ -246,14 +243,13 @@ Every figure is one the site already publishes. The 78% card credits its source,
 > Budget, area and timeline are captured, matching listings sent and the viewing booked, all before your team's first coffee.
 >
 > AI agents for real estate. Link in bio.
->
-> #RealEstatePakistan #PropertyLeads #RealEstateMarketing #AIagents #VantriqAI
 
 ---
 
 ## 10 · Take the order through the rush
 
 **Headline (ad field):** Take reservations through the dinner rush
+**Hashtags:** #VantriqAI #VantriqAgents #RestaurantMarketing #HospitalityPakistan #WhatsAppBusiness
 **Primary text / Facebook:**
 
 > 19:48: "Table for four tonight at 9?"
@@ -270,14 +266,13 @@ Every figure is one the site already publishes. The 78% card credits its source,
 > Reservations, orders and menu questions answered on WhatsApp while your team is busy serving.
 >
 > Link in bio.
->
-> #RestaurantMarketing #HospitalityPakistan #FoodBusiness #WhatsAppBusiness #VantriqAI
 
 ---
 
 ## 11 · They write in Roman Urdu. So does your agent.
 
 **Headline (ad field):** An AI agent that speaks Roman Urdu
+**Hashtags:** #VantriqAI #VantriqAgents #RomanUrdu #PakistaniBusiness #ConversationalAI
 **Primary text / Facebook:**
 
 > "Salam, ye sofa black mein available hai?"
@@ -294,14 +289,13 @@ Every figure is one the site already publishes. The 78% card credits its source,
 > English, Roman Urdu or a mix of both. Your VantriqAI agent replies in the customer's language and still gets the sale booked.
 >
 > Link in bio.
->
-> #RomanUrdu #PakistaniBusiness #WhatsAppBusiness #AIagents #VantriqAI
 
 ---
 
 ## 12 · Every Monday, one page on what customers asked
 
 **Headline (ad field):** One Monday digest on what customers asked
+**Hashtags:** #VantriqAI #VantriqPulse #BusinessInsights #CustomerExperience #AIinPakistan
 **Primary text / Facebook:**
 
 > What did your customers ask most last week? What did they abandon? Which hours cost you sales?
@@ -317,14 +311,13 @@ Every figure is one the site already publishes. The 78% card credits its source,
 > What they asked most, what they abandoned and which hours cost you sales, written in plain language from your own chats.
 >
 > Link in bio.
->
-> #BusinessInsights #CustomerExperience #SmallBusinessTips #AIagents #VantriqAI
 
 ---
 
 ## C01 · Carousel: 5 signs your inbox is costing you sales (7 slides)
 
 **Headline (ad field):** 5 signs your inbox is costing you sales
+**Hashtags:** #VantriqAI #VantriqAgents #SmallBusinessTips #CustomerService #WhatsAppBusiness
 **Primary text / Facebook:**
 
 > 5 signs your inbox is quietly costing you sales 👇
@@ -346,8 +339,6 @@ Every figure is one the site already publishes. The 78% card credits its source,
 > How many did you tick? Two or more means customers are buying somewhere else while your inbox waits.
 >
 > One VantriqAI agent fixes all five. Book a free 15-min call, link in bio.
->
-> #SmallBusinessTips #CustomerService #SalesGrowth #WhatsAppBusiness #VantriqAI
 
 ---
 
@@ -357,6 +348,7 @@ Every figure is one the site already publishes. The 78% card credits its source,
 **Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@159ea47e65e56d6d12f7dd8366298342e6884cd8/marketing/social-ads/vantriqai-video-platform-reels.mp4
 
 **Headline (ad field):** One platform. More possibilities.
+**Hashtags:** #VantriqAI #VantriqPulse #VantriqEcho #AIagents #WhatsAppBusiness
 **Primary text / Facebook:**
 
 > Every conversation is a new possibility, if someone answers it.
@@ -376,8 +368,6 @@ Every figure is one the site already publishes. The 78% card credits its source,
 > AI Agents that answer and book, Pulse to see every conversation live, and Echo to hear every customer, all in one place.
 >
 > Book a free demo, link in bio.
->
-> #AIagents #WhatsAppBusiness #CustomerExperience #BusinessAutomation #VantriqAI
 
 ---
 
@@ -387,6 +377,7 @@ Every figure is one the site already publishes. The 78% card credits its source,
 **Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@159ea47e65e56d6d12f7dd8366298342e6884cd8/marketing/social-ads/vantriqai-video-platform-feed.mp4
 
 **Headline (ad field):** Agents, Pulse and Echo in one platform
+**Hashtags:** #VantriqAI #VantriqEcho #VantriqPulse #CustomerFeedback #AIforBusiness
 **Primary text / Facebook:**
 
 > 20 seconds on how VantriqAI works:
@@ -407,5 +398,3 @@ Every figure is one the site already publishes. The 78% card credits its source,
 > Answer and book with AI Agents. See it all live in Pulse. Hear every customer with Echo.
 >
 > One platform. Book a free demo, link in bio.
->
-> #AIforBusiness #CustomerFeedback #SalesAutomation #WhatsAppBusiness #VantriqAI

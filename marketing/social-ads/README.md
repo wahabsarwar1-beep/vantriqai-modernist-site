@@ -56,6 +56,10 @@ python3 marketing/social-ads/captions_to_json.py
   because GitHub raw serves .mp4 as `application/octet-stream`. Keep files under 20 MB (jsDelivr's limit).
   Instagram gets a Reel shared to the feed, and Facebook gets a Page video.
 - Add `**Post on:** 2026-10-12` under a heading to post it on that day.
+- Every post needs a `**Hashtags:**` line: at most 5 tags (Instagram's limit),
+  starting with `#VantriqAI`, then one product tag (`#VantriqAgents`,
+  `#VantriqPulse` or `#VantriqEcho`) and up to 3 discovery tags for the topic.
+  `captions_to_json.py` adds them to both captions and rejects more than 5.
 
 ## How posting works (n8n)
 

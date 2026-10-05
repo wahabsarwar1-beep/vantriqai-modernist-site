@@ -7,6 +7,10 @@ A section whose heading starts with V (e.g. "## V01 · ...") is a video; its
 "**Video:**" line holds the file name or a full URL. Instagram gets it as a
 Reel (also shown in the feed), Facebook as a Page video.
 
+Every post needs a "**Hashtags:**" line of at most 5 tags (Instagram's limit),
+starting with #VantriqAI. They are appended to both the Facebook and Instagram
+captions, so they are written once.
+
 An optional "**Post on:** YYYY-MM-DD" line schedules a post for that day. Posts
 without one (and dated posts once their day has passed) rotate as evergreen.
 """
@@ -25,7 +29,19 @@ for sec in re.split(r"\n## ", md)[1:]:
     headline = re.search(r"\*\*Headline \(ad field\):\*\* (.*)", sec).group(1).strip()
     fb = sec.split("**Primary text / Facebook:**")[1].split("**Instagram:**")[0]
     ig = sec.split("**Instagram:**")[1].split("\n---")[0]
-    post = {"id": pid, "headline": headline, "facebook": quote(fb), "instagram": quote(ig)}
+    tags_line = re.search(r"\*\*Hashtags:\*\* ([^\n]+)", sec)
+    if not tags_line:
+        raise SystemExit(f"{pid}: missing **Hashtags:** line")
+    tags = tags_line.group(1).split()
+    if not 1 <= len(tags) <= 5 or not all(re.fullmatch(r"#\w+", t) for t in tags):
+        raise SystemExit(f"{pid}: hashtags must be 1-5 #words, got {tags}")
+    if tags[0] != "#VantriqAI":
+        raise SystemExit(f"{pid}: start the hashtags with #VantriqAI")
+    if "#" in quote(fb) + quote(ig):
+        raise SystemExit(f"{pid}: put hashtags on the **Hashtags:** line, not in the caption text")
+    tag_text = " ".join(tags)
+    post = {"id": pid, "headline": headline, "hashtags": tags,
+            "facebook": quote(fb) + "\n\n" + tag_text, "instagram": quote(ig) + "\n\n" + tag_text}
     date = re.search(r"\*\*Post on:\*\* (\d{4}-\d{2}-\d{2})", sec)
     if date:
         post["date"] = date.group(1)
