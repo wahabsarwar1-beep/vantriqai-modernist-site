@@ -308,13 +308,10 @@
 .vq-thinking {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
+  padding: 14px 16px;
   border: 1px solid var(--vq-line);
   border-radius: 4px 18px 18px 18px;
   background: var(--vq-surface);
-  font-size: 13px;
-  color: var(--vq-muted);
 }
 .vq-dots {
   display: inline-flex;
@@ -332,9 +329,6 @@
 }
 .vq-dots i:nth-child(3) {
   animation-delay: 0.3s;
-}
-.vq-stage {
-  animation: vqFade 0.4s ease both;
 }
 
 /* ---------- Blocks ---------- */
@@ -847,9 +841,6 @@ a.vq-card:hover {
 
 @keyframes vqIn {
   from { opacity: 0; transform: translateY(8px); }
-}
-@keyframes vqFade {
-  from { opacity: 0; }
 }
 @keyframes vqDot {
   0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
