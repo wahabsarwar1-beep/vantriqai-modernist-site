@@ -64,28 +64,52 @@ function save(sessionId: string, messages: Message[]) {
   }
 }
 
+/** The reply text out of an n8n chat-trigger response, or null. */
+function outputOf(raw: string): string | null {
+  try {
+    const data = JSON.parse(raw);
+    const item = Array.isArray(data) ? data[0] : data;
+    const output = item?.output ?? item?.text;
+    return typeof output === "string" && output.trim() ? output : null;
+  } catch {
+    // Never render an HTML page as a reply (a misrouted URL returns one).
+    return raw.trim() && !/^\s*</.test(raw) ? raw : null;
+  }
+}
+
+async function post(url: string, body: string, signal: AbortSignal): Promise<Response> {
+  return fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body, signal });
+}
+
+/**
+ * Same-origin first: /api/chat relays to n8n server-side, so no CORS rule can
+ * drop the message. Only when that route does not exist (a static host) does
+ * the browser call the webhook directly, as the old widget did.
+ */
 async function ask(sessionId: string, chatInput: string): Promise<string> {
   const ctrl = new AbortController();
   const timer = window.setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
+  const body = JSON.stringify({ action: "sendMessage", sessionId, chatInput });
   try {
-    const res = await fetch(WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "sendMessage", sessionId, chatInput }),
-      signal: ctrl.signal,
-    });
-    if (!res.ok) return OFFLINE_REPLY;
-    const raw = await res.text();
+    let res: Response | null = null;
     try {
-      const data = JSON.parse(raw);
-      const item = Array.isArray(data) ? data[0] : data;
-      const output = item?.output ?? item?.text;
-      return typeof output === "string" && output.trim() ? output : OFFLINE_REPLY;
-    } catch {
-      // Never render an HTML page as a reply (a misrouted URL returns one).
-      return raw && !/^\s*</.test(raw) ? raw : OFFLINE_REPLY;
+      res = await post("/api/chat", body, ctrl.signal);
+    } catch (err) {
+      if (ctrl.signal.aborted) throw err;
     }
-  } catch {
+    if (!res || res.status === 404 || res.status === 405) {
+      console.warn("[chat] /api/chat unavailable, calling the webhook directly");
+      res = await post(WEBHOOK_URL, body, ctrl.signal);
+    }
+    if (res.status === 429) return "You're sending messages faster than I can answer — give me a minute and try again.";
+    const text = await res.text();
+    if (!res.ok) {
+      console.error(`[chat] assistant request failed: ${res.status} ${text.slice(0, 200)}`);
+      return OFFLINE_REPLY;
+    }
+    return outputOf(text) ?? OFFLINE_REPLY;
+  } catch (err) {
+    console.error("[chat] assistant request failed:", err);
     return OFFLINE_REPLY;
   } finally {
     window.clearTimeout(timer);
