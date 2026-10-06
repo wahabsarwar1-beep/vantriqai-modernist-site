@@ -77,6 +77,7 @@ function columns(region: Region): { title: string; links: FooterLink[] }[] {
         ...SOCIAL_PROFILES.map((url) => ({ href: url, label: socialLabel(url), external: true })),
         { href: "/terms", label: "Terms & service information" },
         { href: "/privacy", label: "Privacy policy" },
+        { href: "/data-deletion", label: "Data deletion" },
         { href: "/cookies", label: "Cookies & storage" },
       ],
     },

@@ -71,5 +71,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     })),
   );
 
-  return [...regions, ...resources, ...["/privacy", "/cookies", "/terms"].map(path => ({ url: SITE_URL + path, lastModified: PAGES_UPDATED, priority: 0.3 }))];
+  return [...regions, ...resources, ...["/privacy", "/data-deletion", "/cookies", "/terms"].map(path => ({ url: SITE_URL + path, lastModified: PAGES_UPDATED, priority: 0.3 }))];
 }
