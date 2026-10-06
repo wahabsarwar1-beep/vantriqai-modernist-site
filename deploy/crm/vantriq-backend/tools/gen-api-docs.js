@@ -324,7 +324,7 @@ md.push('');
 md.push('# what an agent posts after answering a message');
 md.push('curl -X POST https://crm.vantriqai.com/api/webhooks/usage \\');
 md.push('  -H "x-api-key: $WEBHOOK_KEY" -H "Content-Type: application/json" \\');
-md.push('  -d \'{"external_ref":"923411120049","session_id":"…","channel":"whatsapp",');
+md.push('  -d \'{"external_ref":"923195843344","session_id":"…","channel":"whatsapp",');
 md.push('       "ai_model":"gpt-4o-mini","input_tokens":900,"output_tokens":90,"messages_count":1}\'');
 md.push('');
 md.push('# a proposal as a PDF');

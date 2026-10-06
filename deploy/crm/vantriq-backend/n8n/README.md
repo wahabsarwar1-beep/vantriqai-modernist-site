@@ -708,7 +708,7 @@ VantriqAI's own WhatsApp agent:
    WhatsApp agent:
 
    ```
-   external_ref  {{ $('WhatsApp Trigger').item.json.metadata.display_phone_number }}   (falls back to 923411120049)
+   external_ref  {{ $('WhatsApp Trigger').item.json.metadata.display_phone_number }}   (falls back to 923195843344)
    session_id    {{ $('Prepare Sales Context').item.json.phone + '-' + $now.toFormat('yyyy-MM-dd') }}   ← exactly the usage node's
    phone         {{ $('Prepare Sales Context').item.json.phone }}
    language      {{ /[\u0600-\u06FF]/.test(String($('Prepare Sales Context').item.json.message_text || '')) ? 'ur' : 'en' }}

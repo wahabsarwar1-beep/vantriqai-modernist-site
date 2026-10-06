@@ -1425,7 +1425,7 @@
       + '</div>'
       + '<div class="vqs-card" style="margin-top:14px;"><h3>After every WhatsApp conversation</h3>'
       + (isPortal()
-        ? '<div class="sub" style="margin:0;">Your VantriqAI agent can send this survey automatically when each chat ends, so every conversation gets rated. <a class="vqs-link" href="https://wa.me/923006789807?text=' + encodeURIComponent('Please switch on the after-chat survey "' + s.title + '" for ' + biz(s) + '.') + '" target="_blank" rel="noopener">Ask us to switch it on</a> — it takes a few minutes.</div>'
+        ? '<div class="sub" style="margin:0;">Your VantriqAI agent can send this survey automatically when each chat ends, so every conversation gets rated. <a class="vqs-link" href="https://wa.me/923195843344?text=' + encodeURIComponent('Please switch on the after-chat survey "' + s.title + '" for ' + biz(s) + '.') + '" target="_blank" rel="noopener">Ask us to switch it on</a> — it takes a few minutes.</div>'
         : '<div class="sub">The agent’s n8n flow calls this when a conversation closes, then sends <code>message</code> back to the customer. Each answer is tied to the conversation it rates.</div>'
           + '<div class="vqs-code">POST /api/webhooks/survey-invite\nx-api-key: &lt;webhook key&gt;\n\n' + esc(JSON.stringify({ external_ref: '<the client’s or agent’s ref>', session_id: '<the conversation’s session id>', channel: 'whatsapp', survey_slug: s.slug }, null, 2)) + '</div>')
       + '</div>';

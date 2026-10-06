@@ -227,7 +227,7 @@ x-api-key: <the webhook key n8n already uses for /usage>
 Content-Type: application/json
 
 {
-  "external_ref": "923411120049",              // the number the chat arrived on, exactly as for /usage
+  "external_ref": "923195843344",              // the number the chat arrived on, exactly as for /usage
   "session_id":   "923001234567-2026-09-27",   // the same session id the usage post used
   "channel":      "whatsapp",
   "language":     "ur",                        // what the customer wrote in (en | ur)
