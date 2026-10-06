@@ -83,7 +83,7 @@ function contactFields(body) {
  *   "agent_ref": "instagram:@khantraders", // optional — which of the client's agents handled this
  *   "agent_id": "uuid",                  // alternative to agent_ref
  *   "session_id": "923009998888-2026-08-16", // required — one id per 24h conversation window
- *   "channel": "whatsapp",               // whatsapp | web | voice | instagram
+ *   "channel": "whatsapp",               // whatsapp | web | voice | instagram | facebook
  *   "ai_model": "claude-sonnet-4-6",
  *   "input_tokens": 812,
  *   "output_tokens": 340,
@@ -259,7 +259,7 @@ router.get('/service-status', async (req, res) => {
  *   "company": "Khan Textiles",
  *   "email": "ayesha@khantextiles.pk",
  *   "phone": "923001234567",
- *   "channel": "whatsapp",            // whatsapp | website | instagram | voice | email
+ *   "channel": "whatsapp",            // whatsapp | website | instagram | facebook | voice | email
  *   "source": "WhatsApp AI agent",
  *   "notes": "Order tracking on WhatsApp. ~200 msgs/day. Wants it this month."
  * }
@@ -285,7 +285,9 @@ router.post('/lead', async (req, res) => {
     name: text(body.name, 160),
     company: text(body.company, 200),
     email: text(body.email, 200),
-    phone: text(body.phone, 40) || externalRef,
+    // A WhatsApp lead's ref is its number, so it doubles as the phone. An
+    // Instagram or Messenger ref ('ig-…', 'fb-…') is not a phone number.
+    phone: text(body.phone, 40) || (/^\+?\d{7,15}$/.test(externalRef) ? externalRef : ''),
     notes: text(body.notes, 4000),
     source: text(body.source, 120) || 'AI agent',
   };
@@ -441,7 +443,8 @@ router.post('/conversation', async (req, res) => {
   const externalRef = String(body.external_ref || '').trim();
   if (!externalRef) return res.status(400).json({ error: 'external_ref is required' });
 
-  const CHANNELS = ['whatsapp', 'website', 'instagram', 'voice', 'email'];
+  // 'facebook' is Facebook Messenger.
+  const CHANNELS = ['whatsapp', 'website', 'instagram', 'facebook', 'voice', 'email'];
   const channel = CHANNELS.includes(body.channel) ? body.channel : 'whatsapp';
   let sessionId = String(body.session_id || '').trim().slice(0, 200);
   const batchDelivered = !isFalse(body.delivered);
@@ -642,10 +645,15 @@ async function notifyUndelivered({ ref, clientId, agentId, sessionId, channel, s
     '',
     'Until this is fixed, customers who write in are not being answered.',
     phone ? `Reply to this one yourself: https://wa.me/${key}`
-      : channel === 'website' ? 'A website visitor can only be written back to if they left their details in the chat.' : '',
+      : channel === 'website' ? 'A website visitor can only be written back to if they left their details in the chat.'
+      : channel === 'instagram' ? 'Reply to them yourself from the Instagram inbox (Meta Business Suite → Inbox).'
+      : channel === 'facebook' ? 'Reply to them yourself from the Page inbox (Meta Business Suite → Inbox).' : '',
     'The conversation is in the CRM, under Customers.',
     '',
-    !aiFailed && /WhatsApp|Cannot call API|OAuth|token/i.test(error)
+    !aiFailed && (channel === 'instagram' || channel === 'facebook') && /OAuth|token|permission/i.test(error)
+      ? 'This usually means the Page access token in n8n has expired or lost a permission. Generate a new Page token (pages_messaging, and instagram_manage_messages for Instagram) and paste it into n8n → Credentials → "VantriqAI Page Access Token".'
+      : '',
+    !aiFailed && channel !== 'instagram' && channel !== 'facebook' && /WhatsApp|Cannot call API|OAuth|token/i.test(error)
       ? 'This usually means the WhatsApp access token in n8n has expired or lost its access. Create a new one in Meta Business Settings → System users (permissions whatsapp_business_messaging and whatsapp_business_management), and paste it into n8n → Credentials → "WhatsApp account".'
       : '',
     aiFailed

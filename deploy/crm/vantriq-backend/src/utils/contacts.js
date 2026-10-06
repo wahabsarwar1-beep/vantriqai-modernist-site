@@ -96,6 +96,10 @@ function labelOf(key) {
   const k = String(key || '');
   if (/^\d{8,15}$/.test(k)) return `+${k}`;
   if (!k) return 'Unknown';
+  // The Instagram + Messenger agent keys a chat by 'ig-' or 'fb-' plus the
+  // id Meta gives that person on our account; it is not a phone number.
+  if (/^ig-\d+$/.test(k)) return `Instagram user ${k.slice(-6)}`;
+  if (/^fb-\d+$/.test(k)) return `Messenger user ${k.slice(-6)}`;
   return `Web visitor ${k.slice(-6)}`;
 }
 

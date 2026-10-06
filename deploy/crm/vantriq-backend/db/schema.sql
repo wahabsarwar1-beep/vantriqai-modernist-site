@@ -2065,6 +2065,13 @@ alter table conversation_messages add column if not exists delivery_error text n
 create unique index if not exists uq_conv_external_id
   on conversation_messages(external_ref, external_id) where external_id is not null;
 
+-- v9.28 — 'facebook' (Messenger) joins the transcript channels, for the
+-- Instagram + Messenger agent. Dropped and re-added on every migrate, so a
+-- fresh install, whose create table above names the old list, ends the same.
+alter table conversation_messages drop constraint if exists conversation_messages_channel_check;
+alter table conversation_messages add constraint conversation_messages_channel_check
+  check (channel in ('whatsapp','website','instagram','facebook','voice','email'));
+
 -- When the team was last told that an agent's replies are failing, so one
 -- outage is one email an hour rather than one per customer message.
 create table if not exists delivery_alerts (
@@ -2170,6 +2177,10 @@ create table if not exists calendar_events (
 );
 create index if not exists idx_calendar_events_time on calendar_events(starts_at, ends_at);
 create index if not exists idx_calendar_events_client on calendar_events(client_id);
+-- v9.28 — the Instagram and Messenger agents book discovery calls too.
+alter table calendar_events drop constraint if exists calendar_events_channel_check;
+alter table calendar_events add constraint calendar_events_channel_check
+  check (channel in ('manual','website','whatsapp','instagram','facebook'));
 
 -- Pulse measurements are separate from usage/billing. Stable event ids make retries idempotent.
 create table if not exists pulse_events (

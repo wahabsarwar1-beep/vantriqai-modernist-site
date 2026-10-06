@@ -38,6 +38,16 @@ const db = require('../db');
  */
 const WHATSAPP_NUMBER = process.env.VANTRIQ_WHATSAPP_NUMBER || '923411120049';
 
+/**
+ * The Instagram and Messenger agent (one n8n workflow, two channels) posts
+ * the id of the account the message arrived ON, as Meta sends it in
+ * entry[].id: the Instagram professional account for Instagram DMs, the
+ * Facebook Page for Messenger. Both are the live ids the daily-post workflow
+ * already publishes to.
+ */
+const INSTAGRAM_ACCOUNT_ID = process.env.VANTRIQ_INSTAGRAM_ID || '17841414904483393';
+const FACEBOOK_PAGE_ID = process.env.VANTRIQ_FACEBOOK_PAGE_ID || '1291897617346380';
+
 // What the model costs, as OpenAI publishes it. gpt-4o-mini is $0.15 per
 // million input tokens and $0.60 per million output. Both agents run on it.
 // These are a starting point, not a commitment: change them in the CRM when
@@ -50,6 +60,8 @@ const MODEL_RATES = [
 const DEFAULT_AGENTS = [
   { name: 'Website assistant', kind: 'website', external_ref: 'vantriqai.com', notes: 'Live chat on vantriqai.com — the n8n website assistant workflow.' },
   { name: 'WhatsApp agent', kind: 'whatsapp', external_ref: WHATSAPP_NUMBER, notes: `Inbound WhatsApp Business enquiries on ${WHATSAPP_NUMBER}, text and voice.` },
+  { name: 'Instagram agent', kind: 'instagram', external_ref: INSTAGRAM_ACCOUNT_ID, notes: 'Instagram DMs to @vantriq_ai — the n8n Instagram + Messenger agent workflow.' },
+  { name: 'Messenger agent', kind: 'facebook', external_ref: FACEBOOK_PAGE_ID, notes: 'Facebook Messenger chats with the VantriqAI Page — the n8n Instagram + Messenger agent workflow.' },
 ];
 
 async function ensureInternalClient(opts = {}) {

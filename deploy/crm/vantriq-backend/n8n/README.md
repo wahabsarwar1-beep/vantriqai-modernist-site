@@ -448,6 +448,94 @@ IF sees no `allow` field and serves.
 The endpoint is public. CORS stops browsers from other origins; it stops nothing
 else, so anything that finds the URL can spend OpenAI tokens through it.
 
+## Instagram DMs and Facebook Messenger
+
+**VantriqAI - Instagram + Messenger Agent** (n8n `jONOeQWIFpuT2YAb`; source in
+`vantriq-instagram-messenger-agent.workflow.ts`) is the same sales agent as the
+website and WhatsApp ones: the shared knowledge base, `Save_Lead_To_CRM`,
+`Book_CRM_Meeting`, the service gate, usage, transcripts and the lead filed on
+every message. One workflow answers both channels, because Meta delivers both
+through the Facebook Page.
+
+```
+Meta ──POST /webhook/meta-messaging──► Read messages ──► may we answer? ──► typing… ──► name ──► knowledge
+                                                                                        │
+             Send reply ◄── Tidy for DM ◄── Social Sales Agent (gpt-4o-mini + memory + 3 tools)
+                 │
+                 └──► What reached them ──► usage · transcript · lead   (all fail soft)
+```
+
+| | Instagram | Messenger |
+|---|---|---|
+| Meta `object` | `instagram` | `page` |
+| Arrives on (`entry.id`) | 17841414904483393 (@vantriq_ai) | 1291897617346380 (the Page) |
+| CRM channel | `instagram` | `facebook` |
+| Usage / transcript `external_ref` | 17841414904483393 → *Instagram agent* | 1291897617346380 → *Messenger agent* |
+| Customer / lead ref | `ig-<IGSID>` | `fb-<PSID>` |
+| Session id | `ig-<IGSID>-<yyyy-MM-dd>` (Karachi) | `fb-<PSID>-<yyyy-MM-dd>` |
+| Message limit | 1,000 bytes: longer replies are split | 2,000 characters |
+
+Replies go out with `POST /{page-id}/messages` (`messaging_type: RESPONSE`), so
+they are allowed only inside Meta's 24-hour window after the customer's last
+message, which an agent replying in seconds always is.
+
+What the workflow does with the awkward cases:
+
+- **Echoes, reads, deliveries, reactions** are ignored; only customer text,
+  postbacks (ice-breakers, *Get Started*) and attachments go to the agent.
+- **A photo, voice note, sticker or story mention with no text** reaches the
+  agent as `[The customer sent a voice note with no text]`, and it asks them to
+  type.
+- **Meta resending an event** is answered once: the last 300 message ids are
+  kept in the workflow's static data (production runs only).
+- **Markdown** the model slips in is turned into plain text, which is all
+  Instagram and Messenger show.
+- **The AI failing** sends the customer an apology with the WhatsApp link, and
+  the transcript marks the reply not written, so the CRM emails the team.
+- **Meta refusing the send** marks the transcript reply not delivered with
+  Meta's own reason (for example `(#230) Requires pages_messaging permission`),
+  and the CRM's alert says to reply from the Meta Business Suite inbox and
+  which token permission to check.
+
+### Setting it up (once)
+
+1. **CRM v9.28** must be deployed. `seed-internal` (run by `upgrade-v9.sh`)
+   adds the *Instagram agent* and *Messenger agent* to the internal account, and
+   the migration lets transcripts and calendar bookings use the `instagram` and
+   `facebook` channels. Before that, the CRM answers 404 for the two refs; the
+   workflow still replies, but nothing is metered or filed.
+2. **A Page token that can message.** The *VantriqAI Page Access Token*
+   credential in n8n holds a token from Meta app **Vantriq AI (968515449639687)**
+   that can only publish posts. Replace it with a Page token from the same app
+   carrying `pages_show_list`, `pages_manage_metadata`, `pages_messaging`,
+   `pages_read_engagement`, `pages_manage_posts`, `instagram_basic`,
+   `instagram_manage_messages` and `instagram_content_publish` (the daily-post
+   workflow shares this credential and still needs the last three). Paste it only
+   into the n8n credential, never into a chat.
+3. **Instagram:** in the Instagram app, Settings → Messages and story replies →
+   Message controls → Connected tools → turn on *Allow access to messages*.
+4. **Webhooks on the app:** product *Messenger* (page `messages`,
+   `messaging_postbacks`) and *Instagram* (`messages`, `messaging_postbacks`),
+   callback `https://n8n.vantriqai.com/webhook/meta-messaging`, verify token
+   `vq-social-ba8a11ed193458e9c0eadd92c0b42e35`. The workflow must be
+   **published** first, or Meta's verification request gets no answer.
+5. **Subscribe the Page to the app:**
+   `POST /1291897617346380/subscribed_apps?subscribed_fields=messages,messaging_postbacks`
+   with the new Page token.
+6. **Test** by messaging the Page and @vantriq_ai from an account with a role on
+   the app, then check the execution in n8n and the customer under CRM →
+   Customers.
+
+While the app is in **development mode**, only people with a role on it (admin,
+developer, tester; for Instagram, an Instagram tester) get replies. Customers
+get them once the app is **Live** with *Advanced Access* to `pages_messaging`
+and `instagram_manage_messages`, which takes App Review and business
+verification.
+
+The webhook is public, like the website chat's. It drops anything not
+addressed to our two account ids, but it does not yet check Meta's
+`X-Hub-Signature-256`, which needs the app secret stored as an n8n credential.
+
 ---
 
 # Running n8n on the same VPS as the CRM

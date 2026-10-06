@@ -373,6 +373,32 @@ const settle = () => new Promise((r) => setTimeout(r, 20));
   assert.match(sent[0].text, /left their details/);
   console.log('✓ a website chat lands with the agent that metered it, on the day usage counted it');
 
+  // 16. v9.28: Instagram and Messenger. A social lead's ref is not a phone
+  // number, so it is not written into the phone field; a Messenger turn is
+  // filed as 'facebook' rather than falling back to WhatsApp; and the alert
+  // for an unanswered Instagram DM names the person and the inbox to use.
+  r = await post('/api/webhooks/lead', { external_ref: 'ig-17841400000123456', name: 'Sara', channel: 'instagram', source: 'Instagram' });
+  assert.strictEqual(r.status, 201);
+  assert.strictEqual(state.clients.find((c) => c.external_ref === 'ig-17841400000123456').phone, '', 'an Instagram id is not a phone');
+  r = await post('/api/webhooks/conversation', {
+    external_ref: '1291897617346380', session_id: `fb-2400000000000001-${dayOf(0)}`, channel: 'facebook',
+    messages: [{ role: 'customer', content: 'Salam' }, { role: 'agent', content: 'Wa alaikum salam!' }],
+  });
+  assert.strictEqual(state.conversations.at(-1).channel, 'facebook');
+  sent.length = 0;
+  await post('/api/webhooks/conversation', {
+    external_ref: '17841414904483393', session_id: `ig-17841400000123456-${dayOf(0)}`, channel: 'instagram',
+    messages: [{ role: 'customer', content: 'Price?' },
+      { role: 'agent', content: 'It depends on scope.', delivered: false, error: 'Instagram refused the reply: (#200) Invalid OAuth access token' }],
+  });
+  await settle();
+  assert.strictEqual(sent.length, 1);
+  assert.match(sent[0].subject, /not answered: Instagram user 123456/);
+  assert.match(sent[0].text, /Instagram inbox/);
+  assert.match(sent[0].text, /Page access token/);
+  assert.doesNotMatch(sent[0].text, /wa\.me|WhatsApp access token/);
+  console.log('✓ Instagram and Messenger leads, turns and alerts are filed under their own channel');
+
   console.log('\nAll webhook lead/conversation tests passed.');
   server.close();
 })().catch((err) => { console.error(err); server.close(); process.exit(1); });

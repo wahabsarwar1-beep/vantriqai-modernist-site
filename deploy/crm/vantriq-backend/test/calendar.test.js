@@ -41,6 +41,12 @@ const rejected=async(fn,status)=>assert.rejects(fn,e=>e.status===status);
  await cal.assignLead(leadB,repB,'admin','Route to Rep B');
  await cal.createEvent({...slot,external_ref:'wa-b',channel:'whatsapp',external_id:'wa-1'},'agent',true);
  await rejected(()=>cal.assignLead(leadA,repB,'admin','Reassign'),409);
+ // Instagram and Messenger agents book like the website one: by client_id, under their own channel.
+ const later={...slot,starts_at:new Date(+start+3*3600000).toISOString(),ends_at:new Date(+start+3.5*3600000).toISOString()};
+ const ig=await cal.createEvent({...later,client_id:leadC,channel:'instagram',external_id:'confirmed:instagram:c'},'agent',true);assert.equal(ig.event.channel,'instagram');
+ await rejected(()=>cal.createEvent({...later,client_id:leadC,channel:'tiktok',external_id:'x'},'agent',true),400);
+ assert.equal((await cal.listEvents({from:new Date(+start-86400000).toISOString(),to:new Date(+start+86400000).toISOString(),channel:'instagram'})).length,1);
+ await pg.query('delete from calendar_events where id=$1',[ig.event.id]);
  const query={from:new Date(+start-86400000).toISOString(),to:new Date(+start+86400000).toISOString()};
  assert.equal((await cal.listEvents(query,repA)).length,1);
  assert.equal((await cal.listEvents({...query,rep_id:repB},repA))[0].client_id,leadA); // rep cannot override identity

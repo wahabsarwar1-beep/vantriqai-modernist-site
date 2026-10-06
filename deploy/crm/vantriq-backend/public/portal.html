@@ -838,7 +838,7 @@ function fmtDateTime(d){
   return new Date(d).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
 }
 function channelLabel(c){
-  return {whatsapp:'WhatsApp', web:'Web chat', voice:'Voice', instagram:'Instagram'}[c] || c;
+  return {whatsapp:'WhatsApp', web:'Web chat', website:'Website', voice:'Voice', instagram:'Instagram', facebook:'Messenger'}[c] || c;
 }
 
 async function loadActivity(){

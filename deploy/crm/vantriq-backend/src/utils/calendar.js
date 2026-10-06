@@ -1,4 +1,6 @@
 const db = require('../db');
+// The agents that can book a discovery call. 'facebook' is Messenger.
+const AGENT_CHANNELS = ['website', 'whatsapp', 'instagram', 'facebook'];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function fail(status, message) { const e = new Error(message); e.status = status; e.expose = true; throw e; }
 function id(value) { if (!UUID.test(value || '')) fail(400, 'A valid record id is required.'); return value; }
@@ -23,7 +25,7 @@ function eventInput(body, webhook = false) {
   const duration = Date.parse(out.ends_at) - Date.parse(out.starts_at);
   if (duration <= 0 || duration > 86400000) fail(400, 'An appointment must last between 1 millisecond and 24 hours.');
   out.channel = body.channel || 'manual'; out.kind = body.kind || 'meeting'; out.status = body.status || 'scheduled';
-  if (!(webhook ? ['website','whatsapp'] : ['manual','website','whatsapp']).includes(out.channel)) fail(400, 'Choose a valid channel.');
+  if (!(webhook ? AGENT_CHANNELS : ['manual', ...AGENT_CHANNELS]).includes(out.channel)) fail(400, 'Choose a valid channel.');
   if (!['meeting','demo','call','follow_up'].includes(out.kind)) fail(400, 'Choose a valid appointment kind.');
   if (!['scheduled','completed','cancelled','no_show'].includes(out.status)) fail(400, 'Choose a valid status.');
   if (webhook && (!out.external_id || out.status !== 'scheduled')) fail(400, 'Agent bookings need a stable external_id and scheduled status.');
@@ -113,7 +115,7 @@ async function listEvents(query, repId) {
   else if (query.rep_id==='unassigned') where+=' and c.owner_rep_id is null';
   else if (query.rep_id) {params.push(id(query.rep_id)); where+=' and c.owner_rep_id=$3';}
   if (query.channel) {
-    if (!['manual','website','whatsapp'].includes(query.channel)) fail(400,'Choose a valid channel.');
+    if (!['manual', ...AGENT_CHANNELS].includes(query.channel)) fail(400,'Choose a valid channel.');
     params.push(query.channel); where+=` and e.channel=$${params.length}`;
   }
   return (await db.query(`${JOIN} ${where} order by e.starts_at,e.id`,params)).rows;
