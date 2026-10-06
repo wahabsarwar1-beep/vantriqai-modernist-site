@@ -3,6 +3,7 @@ import { breadcrumbSchema } from "@/lib/schema";
 import PageHero from "@/components/PageHero";
 import Magnetic from "@/components/Magnetic";
 import ContactForm from "@/components/ContactForm";
+import SocialLinks from "@/components/SocialLinks";
 import { waLink } from "@/lib/whatsapp";
 import type { Region } from "@/lib/region";
 
@@ -62,6 +63,10 @@ export default function ContactPage({ region }: { region: Region }) {
                   <p>{r.body}</p>
                 </div>
               ))}
+              <div className="contact-info-row">
+                <p style={infoLabel}>Find us on</p>
+                <SocialLinks size={48} />
+              </div>
             </div>
           </div>
           <ContactForm region={region} />

@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import RegionSwitch from "@/components/RegionSwitch";
-import SocialIcon, { socialKey } from "@/components/SocialIcon";
+import { socialLabel } from "@/components/SocialIcon";
+import SocialLinks from "@/components/SocialLinks";
 import VantriqMark from "@/components/VantriqMark";
 import { TIERS } from "@/lib/content";
 import { menuPanels } from "@/lib/menu";
@@ -13,21 +14,6 @@ import { hrefIn, navHref, regionFromPathname, type Region } from "@/lib/region";
 import { RESOURCES } from "@/lib/resources";
 import { SOCIAL_PROFILES } from "@/lib/social";
 import { waLink, WHATSAPP_DISPLAY } from "@/lib/whatsapp";
-
-const SOCIAL_LABELS: Record<string, string> = {
-  "facebook.com": "Facebook",
-  "instagram.com": "Instagram",
-  "linkedin.com": "LinkedIn",
-  "x.com": "X",
-  "twitter.com": "X",
-  "youtube.com": "YouTube",
-  "tiktok.com": "TikTok",
-};
-
-const socialLabel = (url: string) => {
-  const host = new URL(url).hostname.replace(/^www\./, "");
-  return SOCIAL_LABELS[host] ?? host;
-};
 
 type FooterLink = { href: string; label: string; external?: boolean; isNew?: boolean };
 
@@ -106,6 +92,10 @@ export default function Footer() {
             <p className="ft-statement">
               Every customer, <span className="ft-statement-grad">answered.</span>
             </p>
+            <div className="ft-follow">
+              <span className="ft-follow-label">Find us on</span>
+              <SocialLinks size={44} />
+            </div>
           </div>
           <div className="ft-actions">
             <a className="ft-btn ft-btn-primary" href={waLink()} target="_blank" rel="noopener">
@@ -165,15 +155,6 @@ export default function Footer() {
             &copy; {year} VantriqAI · Intelligent automation for business
           </p>
           <div className="ft-bottom-right">
-            {SOCIAL_PROFILES.map((url) => {
-              const key = socialKey(url);
-              const label = socialLabel(url);
-              return (
-                <a key={url} href={url} target="_blank" rel="noopener me" aria-label={label} title={label} className="ft-social">
-                  {key ? <SocialIcon name={key} /> : <span style={{ fontSize: 11 }}>{label}</span>}
-                </a>
-              );
-            })}
             <button className="ft-privacy" onClick={() => window.dispatchEvent(new Event("vantriq:manage-privacy"))}>Privacy preferences</button>
             <span className="ft-region">
               <RegionSwitch />

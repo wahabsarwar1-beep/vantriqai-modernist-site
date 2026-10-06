@@ -13,4 +13,5 @@ export const SOCIAL_PROFILES: string[] = [
   // is a stronger signal and survives a profile being recreated. Worth
   // claiming the username, and swapping this line when it exists.
   "https://www.facebook.com/profile.php?id=61594465987920",
+  "https://www.instagram.com/vantriq_ai/",
 ];
