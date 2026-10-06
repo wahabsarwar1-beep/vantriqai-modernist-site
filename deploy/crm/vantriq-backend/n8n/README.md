@@ -519,6 +519,8 @@ What the workflow does with the awkward cases:
    callback `https://n8n.vantriqai.com/webhook/meta-messaging`, verify token
    `vq-social-ba8a11ed193458e9c0eadd92c0b42e35`. The workflow must be
    **published** first, or Meta's verification request gets no answer.
+   *Done 6 Oct 2026: both topics subscribed and verified on app 968515449639687,
+   next to its existing WhatsApp subscription.*
 5. **Subscribe the Page to the app:**
    `POST /1291897617346380/subscribed_apps?subscribed_fields=messages,messaging_postbacks`
    with the new Page token.
