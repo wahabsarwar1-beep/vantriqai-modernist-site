@@ -460,7 +460,7 @@ through the Facebook Page.
 ```
 Meta ──POST /webhook/meta-messaging──► Read messages ──► may we answer? ──► typing… ──► name ──► knowledge
                                                                                         │
-             Send reply ◄── Tidy for DM ◄── Social Sales Agent (gpt-4o-mini + memory + 3 tools)
+             Send reply ◄── Tidy for DM ◄── Social Sales Agent (gpt-5-mini + memory + 3 tools)
                  │
                  └──► What reached them ──► usage · transcript · lead   (all fail soft)
 ```
@@ -492,6 +492,11 @@ What the workflow does with the awkward cases:
   Instagram and Messenger show.
 - **The AI failing** sends the customer an apology with the WhatsApp link, and
   the transcript marks the reply not written, so the CRM emails the team.
+- **"Delete my data"** (or similar) gets a one-line confirmation, and
+  *Tell the team: delete their data* emails server@vantriqai.com with the
+  customer's CRM ref, as https://vantriqai.com/data-deletion promises.
+  (Added in n8n after the workflow source file was written; the live
+  workflow is the reference.)
 - **Meta refusing the send** marks the transcript reply not delivered with
   Meta's own reason (for example `(#230) Requires pages_messaging permission`),
   and the CRM's alert says to reply from the Meta Business Suite inbox and
