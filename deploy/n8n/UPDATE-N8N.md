@@ -7,7 +7,10 @@ terminal. It takes about 5 minutes; n8n is offline for roughly 30 seconds.
 
 Latest stable n8n at the time of writing: **2.42.3**.
 
-Open a terminal: **hPanel → VPS → Browser terminal** (or `ssh root@76.13.193.8`).
+Open a terminal: from your own PC, `ssh root@76.13.193.8` in PowerShell (recommended —
+the hPanel browser terminal garbles multi-line pastes with `^[[200~`).
+
+Last update: 2.37.10 → 2.42.3 on 2026-10-06.
 
 ---
 
@@ -42,18 +45,12 @@ grep -n 'image:.*n8n' /root/app-stack/docker-compose.yml
 
 ## 3. Pull the new version and restart n8n only
 
-Find the n8n service name (the left-hand name, usually `n8n`):
-
-```bash
-docker compose -f /root/app-stack/docker-compose.yml config --services
-```
-
-Then, substituting it if it isn't `n8n`:
+The compose service is named `n8n_app` (image `docker.n8n.io/n8nio/n8n:latest`):
 
 ```bash
 cd /root/app-stack
-docker compose pull n8n
-docker compose up -d n8n
+docker compose pull n8n_app
+docker compose up -d n8n_app
 ```
 
 **Do not run `docker compose down -v`.** The `-v` deletes volumes and would
@@ -94,7 +91,7 @@ and pin the old version you noted in step 2:
 cd /root/app-stack
 cp docker-compose.yml.bak docker-compose.yml   # only if you edited it
 # or set image: n8nio/n8n:<old version>
-docker compose up -d n8n
+docker compose up -d n8n_app
 ```
 
 If the database was migrated and the old version refuses to start, restore the
