@@ -340,7 +340,7 @@ else
   chk "VantriqAI's internal account exists" 1 \
     "select count(*) from clients where is_internal"
   chk "its two agents carry the live references" 2 \
-    "select count(*) from client_agents where external_ref in ('vantriqai.com','923411120049')"
+    "select count(*) from client_agents where external_ref in ('vantriqai.com','923195843344')"
   # Whether dunning is on is a decision, not a health check. Asserting it is
   # off was right for a first install and wrong forever after: the moment you
   # switch reminders on deliberately, every later deploy fails on it. Report

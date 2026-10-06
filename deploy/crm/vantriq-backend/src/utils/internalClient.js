@@ -30,13 +30,18 @@ const db = require('../db');
  * values, taken from the workflows themselves rather than invented:
  *
  *   vantriqai.com    the website assistant posts this literal.
- *   923411120049     the WhatsApp workflow posts
+ *   923195843344     the WhatsApp workflow posts
  *                    metadata.display_phone_number — the number the message
  *                    arrived ON, not the prospect's. Confirmed from a real
  *                    delivery payload. Override with VANTRIQ_WHATSAPP_NUMBER
  *                    if the business number ever changes.
  */
-const WHATSAPP_NUMBER = process.env.VANTRIQ_WHATSAPP_NUMBER || '923411120049';
+const WHATSAPP_NUMBER = process.env.VANTRIQ_WHATSAPP_NUMBER || '923195843344';
+// Numbers the WhatsApp agent used before. On 6 Oct 2026 WhatsApp moved from
+// 0341 1120049 (on a Meta app VantriqAI did not control) to 0319 5843344 on
+// VantriqAI's own app. The existing agent is re-pointed rather than a second
+// one created, so its history and metering stay in one place.
+const FORMER_WHATSAPP_NUMBERS = ['923411120049'];
 
 /**
  * The Instagram and Messenger agent (one n8n workflow, two channels) posts
@@ -59,7 +64,7 @@ const MODEL_RATES = [
 
 const DEFAULT_AGENTS = [
   { name: 'Website assistant', kind: 'website', external_ref: 'vantriqai.com', notes: 'Live chat on vantriqai.com — the n8n website assistant workflow.' },
-  { name: 'WhatsApp agent', kind: 'whatsapp', external_ref: WHATSAPP_NUMBER, notes: `Inbound WhatsApp Business enquiries on ${WHATSAPP_NUMBER}, text and voice.` },
+  { name: 'WhatsApp agent', kind: 'whatsapp', external_ref: WHATSAPP_NUMBER, former_refs: FORMER_WHATSAPP_NUMBERS, notes: `Inbound WhatsApp Business enquiries on ${WHATSAPP_NUMBER}, text and voice.` },
   { name: 'Instagram agent', kind: 'instagram', external_ref: INSTAGRAM_ACCOUNT_ID, notes: 'Instagram DMs to @vantriq_ai — the n8n Instagram + Messenger agent workflow.' },
   { name: 'Messenger agent', kind: 'facebook', external_ref: FACEBOOK_PAGE_ID, notes: 'Facebook Messenger chats with the VantriqAI Page — the n8n Instagram + Messenger agent workflow.' },
 ];
@@ -167,6 +172,15 @@ async function ensureInternalClient(opts = {}) {
       `select * from client_agents where external_ref = $1`, [a.external_ref]
     );
     if (existing[0]) { agents.push(existing[0]); continue; }
+    if (Array.isArray(a.former_refs) && a.former_refs.length) {
+      const { rows: moved } = await db.query(
+        `update client_agents set external_ref = $1, notes = $2, updated_at = now()
+          where client_id = $3 and kind = $4 and external_ref = any($5::text[])
+          returning *`,
+        [a.external_ref, a.notes || '', client.id, a.kind, a.former_refs]
+      );
+      if (moved[0]) { agents.push(moved[0]); created.push(`agent-moved:${a.name}`); continue; }
+    }
     const { rows: made } = await db.query(
       `insert into client_agents (client_id, name, kind, external_ref, notes)
        values ($1,$2,$3,$4,$5) returning *`,
