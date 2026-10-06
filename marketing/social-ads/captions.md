@@ -574,38 +574,6 @@ Every figure is one the site already publishes. The 78% card credits its source,
 
 ---
 
-## V03 · Video with voiceover (Feed, 4:5): Not just answers. Actions.
-
-**Post on:** 2026-10-14
-**Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@6b68a42a944d38c909d323f55d4579736b58198f/marketing/social-ads/vantriqai-video-actions-vo-feed.mp4
-**Headline (ad field):** Not just answers. Actions.
-**Hashtags:** #VantriqAI #VantriqAgents #AIagents #BusinessAutomation #AIinPakistan
-**Primary text / Facebook:**
-
-> Your next customer is already reaching out: "Hi, can I book?" "Is this available?" "Tell me more."
->
-> A VantriqAI agent doesn't just answer. It acts:
->
-> 01 · Reply across WhatsApp, Instagram and your website
-> 02 · Qualify by understanding what they need
-> 03 · Book it straight into your calendar
->
-> It works inside the tools you already use: your calendar, your CRM and your payments. Vantriq Pulse and Echo then turn every interaction into insight.
->
-> One platform. More possibilities.
->
-> Book a free demo → https://www.vantriqai.com/contact
-
-**Instagram:**
-
-> Not just answers. Actions. ⚡ 🔊 Sound on
->
-> Reply, qualify and book on WhatsApp, Instagram and your website, connected to your calendar, CRM and payments.
->
-> Book a free demo, link in bio.
-
----
-
 ## V04 · Video with voiceover (Reel, 9:16): Conversation to real-world action.
 
 **Post on:** 2026-10-06
@@ -627,5 +595,59 @@ Every figure is one the site already publishes. The 78% card credits its source,
 > Conversation → real-world action. 🎯 🔊 Sound on
 >
 > Bookings confirmed, leads updated and payment links ready, all from the chat. AI agents that reason, then act.
+>
+> Book a free demo, link in bio.
+
+---
+
+## V05 · Refined video with voiceover (Feed, 4:5): From first message to real-world action.
+
+**Post on:** 2026-10-14
+**Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@d93a06d32561d235ea638b9cd58b032804fcc2bb/marketing/social-ads/vantriqai-video-refined-feed.mp4
+**Headline (ad field):** From first message to real-world action
+**Hashtags:** #VantriqAI #VantriqAgents #AIautomation #CustomerExperience #AIinPakistan
+**Primary text / Facebook:**
+
+> Your next customer is already reaching out, on WhatsApp, Instagram or your website.
+>
+> A VantriqAI agent replies, qualifies what they need and books it. The calendar is confirmed, the lead is in your CRM and the payment link is ready to send.
+>
+> Then every interaction makes your business smarter: Vantriq Pulse shows live conversation insights, and Vantriq Echo hears what customers think.
+>
+> One connected platform. More possibilities.
+>
+> Book a free demo → https://www.vantriqai.com/contact
+
+**Instagram:**
+
+> Every interaction. More intelligence. 🧠 🔊 Sound on
+>
+> Reply, qualify, book, then learn from it with Pulse and Echo. One connected platform.
+>
+> Book a free demo, link in bio.
+
+---
+
+## V06 · Refined video with voiceover (Reel, 9:16): AI that reasons, then acts.
+
+**Post on:** 2026-10-18
+**Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@d93a06d32561d235ea638b9cd58b032804fcc2bb/marketing/social-ads/vantriqai-video-refined-reels.mp4
+**Headline (ad field):** AI that reasons, then acts
+**Hashtags:** #VantriqAI #VantriqPulse #AIagents #SmallBusinessGrowth #DigitalPakistan
+**Primary text / Facebook:**
+
+> "Hi, can I book?" "Is this available?" "Tell me more."
+>
+> 20 seconds on what happens next with VantriqAI: the agent replies, qualifies and books, then updates your calendar, CRM and payments on its own.
+>
+> And you don't lose what was said. Pulse turns conversations into live insight, and Echo collects customer feedback in English and Urdu.
+>
+> Book a free demo → https://www.vantriqai.com/contact
+
+**Instagram:**
+
+> AI that reasons, then acts. ⚡ 🔊 Sound on
+>
+> Your customers ask. Your agent books, updates and follows through, and Pulse and Echo show you what it all means.
 >
 > Book a free demo, link in bio.
