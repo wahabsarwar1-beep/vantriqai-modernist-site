@@ -25,6 +25,7 @@
 <script src="/contacts-view.js"></script>
 <script src="/invoice-print.js"></script>
 <script src="/portal-workspace.js?v=9.29.0"></script>
+<script src="/workspace-insights.js?v=9.30.0"></script>
 <style>
 /* The portal is the only part of the CRM a customer ever sees, so it is set
    in the same palette and the same typefaces as vantriqai.com — the page
@@ -275,6 +276,7 @@ td.amt,th.amt{text-align:right;font-variant-numeric:tabular-nums;}
 </style>
 <link rel="stylesheet" href="/workspace-theme.css?v=9.24.0">
 <link rel="stylesheet" href="/portal-workspace.css?v=9.29.0">
+<link rel="stylesheet" href="/workspace-intelligence.css?v=9.30.0">
 </head>
 <body class="portal-shell">
 <div id="app"></div>
@@ -463,6 +465,7 @@ async function boot(){
 /* ----------------------------- Sign in ----------------------------- */
 function renderLogin(msg){
   if(window.VQWORK) VQWORK.reset();
+  if(window.VQINSIGHTS) VQINSIGHTS.reset();
   document.getElementById('app').innerHTML = `
   <div class="auth-screen portal-auth">
     <div class="auth-layout"><aside class="auth-story"><div class="workspace-eyebrow">VantriqAI · Customer portal</div><h1>Your agents.<br>Your account.<br><em>All in one place.</em></h1><p>See how your agents are performing, follow your conversations, and stay on top of your account.</p><div class="auth-capabilities"><span>Usage &amp; activity</span><span>Invoices &amp; statements</span><span>Account &amp; support</span></div><div class="auth-story-note"><span class="auth-story-mark">${portalMark()}</span><div><strong>A clearer view of your service.</strong><p>Everything you need to manage your VantriqAI account.</p></div></div></aside>
@@ -510,6 +513,7 @@ async function doLogin(){
     if(window.VQS) VQS.reset();
     if(window.VQC) VQC.reset();
   if(window.VQWORK) VQWORK.reset();
+  if(window.VQINSIGHTS) VQINSIGHTS.reset();
     boot();
   }catch(e){
     show('Could not reach the server. Check your connection and try again.');
@@ -549,6 +553,7 @@ async function doLogout(){
   if(window.VQS) VQS.reset();
   if(window.VQC) VQC.reset();
   if(window.VQWORK) VQWORK.reset();
+  if(window.VQINSIGHTS) VQINSIGHTS.reset();
   data = { account:null, usage:null, invoices:[], ledger:null, packages:null,
     agents:null, bundles:null, quotes:null, activity:null, apiTokens:null };
   currentTab = 'overview';
@@ -589,6 +594,7 @@ function portalViewHeading(){
 }
 
 function render(){
+  if(window.VQINSIGHTS) VQINSIGHTS.unmount();
   if(window.VQWORK) VQWORK.unmount();
   const { account } = data;
   document.getElementById('app').innerHTML = `
@@ -636,6 +642,11 @@ function render(){
       </div></main>
     </div>
   `;
+  if(currentTab==='overview'&&window.VQINSIGHTS) VQINSIGHTS.mount(document.getElementById('portal-insights'),{
+    audience:'portal',api:q=>api('/workspace-insights?'+q),navigate:setTab,
+    error:e=>{if(e.expired)renderLogin('Your session has ended. Please sign in again.');},
+  });
+  document.querySelector('.portal-navigation .tab.active')?.scrollIntoView({block:'nearest',inline:'nearest'});
   if(currentTab==='usage') requestAnimationFrame(drawUsageChart);
   if(currentTab==='surveys') mountSurveys();
   if(currentTab==='customers') mountCustomers();
@@ -708,6 +719,8 @@ function renderOverview(){
   const p = account.package;
   return `
   ${appCard()}
+  <section class="workspace-hero" aria-label="Business workspace"><div><div class="workspace-eyebrow">Your growth workspace</div><h2>Your pipeline. Your next move.</h2><p>See what is converting, keep meetings moving, and focus on the opportunities that need you.</p></div><div class="workspace-hero-actions"><button type="button" class="btn btn-primary" onclick="setTab('leads')">Explore leads</button><button type="button" class="btn btn-ghost" onclick="setTab('calendar')">Open calendar</button></div></section>
+  <section id="portal-insights" aria-label="Business performance"></section>
   ${ledger.total_outstanding > 0 ? `
   <div class="card" style="background:var(--amber-light);border-color:#F0D9A8;">
     <div style="display:flex;justify-content:space-between;align-items:center;">

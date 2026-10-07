@@ -5,6 +5,7 @@ const P=require('../utils/portalLeads');
 const cal=require('../utils/calendar');
 const router=express.Router();
 const actor=req=>'Customer portal: '+(req.portalClient.portal_username||req.portalClient.company||req.portalClient.id);
+router.get('/workspace-insights',async(req,res)=>res.json(await require('../utils/workspaceInsights').workspaceInsights({client:req.portalClient,days:req.query.days||'30'})));
 router.get('/leads',async(req,res)=>res.json(await P.listLeads(req.portalClient,req.query)));
 router.post('/leads',async(req,res)=>{
   const saved=await P.createLead(req.portalClient.id,req.body||{},actor(req));

@@ -1,8 +1,8 @@
 # Verified customer-workspace release using existing repository deployment secrets.
-name: Release customer Leads and Calendar
+name: Release CRM and Portal intelligence
 
 # Explicit apply release after tests and upgrade dry run.
-run-name: Release customer Leads and Calendar — apply
+run-name: Release CRM and Portal intelligence — apply
 
 on:
   push:
@@ -34,10 +34,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Verify customer isolation and existing calendar
+      - name: Verify workspace insights and customer isolation
         working-directory: deploy/crm/vantriq-backend
         run: |
           npm ci --no-audit --no-fund
+          npm run test:workspace-insights
+          node test/workspace-ui.test.js
           npm run test:portal-workspace
           npm run test:calendar
           npm run test:webhooks
@@ -117,7 +119,15 @@ jobs:
           ssh -p "$PORT" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
             "docker exec crm_app wget -qO- http://127.0.0.1:8080/api/health" | tee health.txt
           grep -q '"ok":true' health.txt || { echo "::error::API did not report healthy."; exit 1; }
-          grep -q '"version":"9.29.0"' health.txt || { echo "::error::Release version did not match."; exit 1; }
+          grep -q '"version":"9.30.0"' health.txt || { echo "::error::Release version did not match."; exit 1; }
+
+      - name: Verify live analytics scopes
+        env:
+          PORT: ${{ secrets.VPS_PORT || 22 }}
+        run: |
+          set -euo pipefail
+          ssh -p "$PORT" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+            "docker exec crm_app node src/utils/verifyWorkspaceInsights.js"
 
       - name: Summary
         if: always()

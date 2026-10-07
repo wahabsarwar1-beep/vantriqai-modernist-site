@@ -10,7 +10,7 @@ let requests=0;
 const ctx=vm.createContext({console,Intl,Date,URLSearchParams,Blob,URL,setTimeout,clearTimeout,
  window:{addEventListener(){}},navigator:{userAgent:'test',platform:'test'},
  localStorage:{getItem(){return null;},setItem(){},removeItem(){}},
- document:{referrer:'',getElementById:id=>nodes[id]||null,querySelectorAll:()=>[]},
+ document:{referrer:'',getElementById:id=>nodes[id]||null,querySelectorAll:()=>[],querySelector:()=>null},
  requestAnimationFrame(){},history:{replaceState(){}},location:{pathname:'/',search:''},
  fetch(){requests++;throw Error('No network in template checks');},confirm:()=>false});
 vm.runInContext(code,ctx);
