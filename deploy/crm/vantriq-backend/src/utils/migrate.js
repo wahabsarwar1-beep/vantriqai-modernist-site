@@ -11,6 +11,10 @@ async function run() {
   await db.query(fs.readFileSync(schemaPath, 'utf8'));
   console.log('Schema applied.');
 
+  console.log('Applying customer workspace migration ...');
+  await db.query(fs.readFileSync(path.join(__dirname, '..', '..', 'db', 'portal-workspace.sql'), 'utf8'));
+  console.log('Customer workspace migration applied.');
+
   const seedFlag = process.argv.includes('--seed');
   if (seedFlag) {
     console.log('Applying seed.sql ...');

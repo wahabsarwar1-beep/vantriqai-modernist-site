@@ -317,7 +317,8 @@
         ['First contact', when(d.first_at)], ['Last contact', when(d.last_at)], ['Last NPS', d.last_nps != null ? d.last_nps : '—']]
         .concat(d.in_crm ? [['In the CRM as', d.in_crm]] : [])
         .map(function(kv){ return '<div class="vqc-kv"><span>' + esc(kv[0]) + '</span><span>' + esc(kv[1]) + '</span></div>'; }).join('') + '</div>';
-    return back + head + kpis + '<div class="vqc-detail"><div>' + timeline + surveyCard + '</div><div>' + profile + facts + '</div></div>';
+    var leadAction = host.promote ? '<div style="margin-bottom:16px"><button type="button" class="vqc-btn primary" data-a="promote">Save as lead</button></div>' : '';
+    return back + head + leadAction + kpis + '<div class="vqc-detail"><div>' + timeline + surveyCard + '</div><div>' + profile + facts + '</div></div>';
   }
 
   /* ------------------------------------------------------------------ */
@@ -338,7 +339,8 @@
     var b = e.target.closest('[data-a]');
     if (!b || !root.contains(b)) return;
     var a = b.getAttribute('data-a');
-    if (a === 'seg') { st.segment = b.getAttribute('data-seg'); st.limit = PAGE; loadList(); render(); }
+    if (a === 'promote' && host.promote && st.detail) { host.promote(st.detail); }
+    else if (a === 'seg') { st.segment = b.getAttribute('data-seg'); st.limit = PAGE; loadList(); render(); }
     else if (a === 'more') { st.limit += PAGE; loadList(); }
     else if (a === 'reload') { st.list = null; render(); loadList(); }
     else if (a === 'open') {

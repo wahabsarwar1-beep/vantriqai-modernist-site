@@ -110,6 +110,7 @@ router.post('/reset-password', async (req, res) => {
 
 /* -------- Everything below requires a signed-in customer session -------- */
 router.use(requirePortalSession);
+router.use(require('./portalWorkspace'));
 
 /* ---------------------------- Surveys ---------------------------- */
 // The customer's own surveys: build from an industry template, share, read

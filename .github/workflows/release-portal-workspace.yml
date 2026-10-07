@@ -1,0 +1,147 @@
+# Verified customer-workspace release using existing repository deployment secrets.
+name: Release CRM and Portal intelligence
+
+# Explicit apply release after tests and upgrade dry run.
+run-name: Release CRM and Portal intelligence — apply
+
+on:
+  push:
+    branches: [main]
+    # A deliberate release commit triggers this once; routine portal edits
+    # continue to use the existing manually dispatched Deploy CRM workflow.
+    paths: ['.github/workflows/release-portal-workspace.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+
+concurrency:
+  # Two deploys racing onto one VPS is how you get a half-applied migration.
+  group: deploy-crm
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify workspace insights and customer isolation
+        working-directory: deploy/crm/vantriq-backend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run test:workspace-insights
+          node test/workspace-ui.test.js
+          npm run test:portal-workspace
+          npm run test:calendar
+          npm run test:webhooks
+
+      - name: Check the secrets are set
+        run: |
+          missing=""
+          [ -n "${{ secrets.VPS_HOST }}" ]    || missing="$missing VPS_HOST"
+          [ -n "${{ secrets.VPS_USER }}" ]    || missing="$missing VPS_USER"
+          [ -n "${{ secrets.VPS_SSH_KEY }}" ] || missing="$missing VPS_SSH_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secrets:$missing — see the comment at the top of this workflow."
+            exit 1
+          fi
+
+      - name: Build the deployment bundle from this commit
+        run: |
+          set -euo pipefail
+          cd deploy/crm/vantriq-backend
+          # Built here rather than trusting the committed zip, so what deploys
+          # is always this commit's source.
+          zip -qr ../vantriq-backend-deploy.zip . \
+            -x 'node_modules/*' '.env' '.git/*' '*.DS_Store'
+          cd ..
+          echo "SHA256=$(sha256sum vantriq-backend-deploy.zip | cut -d' ' -f1)" >> "$GITHUB_ENV"
+          ls -la vantriq-backend-deploy.zip
+
+      - name: Set up the SSH key
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # Pin the host key on first run rather than disabling checking.
+          ssh-keyscan -p "${{ secrets.VPS_PORT || 22 }}" -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Copy the bundle and the upgrade script up
+        env:
+          STACK: ${{ secrets.STACK_DIR || '/root/app-stack' }}
+          PORT: ${{ secrets.VPS_PORT || 22 }}
+        run: |
+          set -euo pipefail
+          scp -P "$PORT" \
+            deploy/crm/vantriq-backend-deploy.zip \
+            deploy/crm/upgrade-v9.sh \
+            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:$STACK/"
+
+      - name: Verify upgrade dry run
+        env:
+          STACK: ${{ secrets.STACK_DIR || '/root/app-stack' }}
+          PORT: ${{ secrets.VPS_PORT || 22 }}
+        run: |
+          set -euo pipefail
+          ssh -p "$PORT" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+            "cd $STACK && chmod +x upgrade-v9.sh && STACK_DIR=$STACK ./upgrade-v9.sh --dry-run vantriq-backend-deploy.zip"
+
+      - name: "Run the upgrade (apply)"
+        env:
+          STACK: ${{ secrets.STACK_DIR || '/root/app-stack' }}
+          PORT: ${{ secrets.VPS_PORT || 22 }}
+          MODE: apply
+        run: |
+          set -euo pipefail
+          FLAG=""
+          [ "$MODE" = "dry-run" ] && FLAG="--dry-run"
+          ssh -p "$PORT" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+            "cd $STACK && chmod +x upgrade-v9.sh && STACK_DIR=$STACK ./upgrade-v9.sh $FLAG vantriq-backend-deploy.zip"
+
+      - name: Confirm the API is answering
+        if: ${{ success() }}
+        env:
+          STACK: ${{ secrets.STACK_DIR || '/root/app-stack' }}
+          PORT: ${{ secrets.VPS_PORT || 22 }}
+        run: |
+          set -euo pipefail
+          ssh -p "$PORT" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+            "docker exec crm_app wget -qO- http://127.0.0.1:8080/api/health" | tee health.txt
+          grep -q '"ok":true' health.txt || { echo "::error::API did not report healthy."; exit 1; }
+          grep -q '"version":"9.30.0"' health.txt || { echo "::error::Release version did not match."; exit 1; }
+
+      - name: Verify live analytics scopes
+        env:
+          PORT: ${{ secrets.VPS_PORT || 22 }}
+        run: |
+          set -euo pipefail
+          ssh -p "$PORT" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+            "docker exec crm_app node src/utils/verifyWorkspaceInsights.js"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### CRM deploy — \`apply\`"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Commit | \`${{ github.sha }}\` |"
+            echo "| Bundle sha256 | \`${SHA256:-n/a}\` |"
+            echo "| Host | \`${{ secrets.VPS_HOST }}\` |"
+            echo ""
+            if [ "apply" = "dry-run" ]; then
+              echo "Nothing was changed. Re-run with **apply** to deploy."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

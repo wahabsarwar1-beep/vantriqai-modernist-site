@@ -1,0 +1,28 @@
+const assert=require('node:assert/strict');const vm=require('node:vm');const fs=require('node:fs');
+const html=fs.readFileSync('public/portal.html','utf8');
+for(const script of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(script[1]);
+assert.match(html,/setTab\('leads'\)/);assert.match(html,/setTab\('calendar'\)/);assert.match(html,/VQWORK.reset\(\)/);
+const lead={id:'lead-a',name:'Ayesha <script>',company:'Acme',status:'qualified',source:'website',assigned_to:'Ali',contact_key:'visitor-a',notes:''};
+const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Karachi',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+const event={id:'event-a',lead_id:lead.id,title:'Demo <script>',lead_name:lead.name,rep_name:'Ali',starts_at:today+'T05:00:00Z',ends_at:today+'T05:30:00Z',status:'confirmed',channel:'website',kind:'demo'};
+let dialog,interval,calls=[];const root={innerHTML:'',listeners:{},addEventListener(k,v){this.listeners[k]=v;},querySelector(){return null;}};
+const document={hidden:false,getElementById:()=>dialog,querySelector:()=>null,body:{appendChild(d){dialog=d;}},createElement(){return {innerHTML:'',listeners:{},addEventListener(k,v){this.listeners[k]=v;},showModal(){this.open=true;},close(){this.open=false;},remove(){dialog=null;}};}};
+const ctx=vm.createContext({window:{matchMedia:()=>({matches:true})},Intl,Date,URLSearchParams,console,document,setInterval:fn=>{interval=fn;return 1;},clearInterval:()=>{},FormData:class{constructor(f){return Object.entries(f.values);}}});
+vm.runInContext(fs.readFileSync('public/portal-workspace.js','utf8'),ctx);const ui=ctx.window.VQWORK;
+const host={api:async(path,opts)=>{calls.push({path,opts});if(opts)return {lead};if(path.startsWith('/leads/'))return {lead,appointments:[event],history:[{action:'meeting_updated',actor:'Admin',created_at:event.starts_at,details:{status:'completed',outcome:'Send quote'}}]};return path.startsWith('/leads')?{leads:[lead],total:1}:[event];},toast:()=>{},error:()=>{},labelTables:()=>{},download:()=>{},conversation:()=>{}};
+const settle=()=>new Promise(r=>setImmediate(r));
+const click=async(action,id)=>{await root.listeners.click({target:{closest:()=>({dataset:{work:action,id}})}});await settle();};
+(async()=>{
+ ui.mount(root,host,'leads');await settle();assert.match(root.innerHTML,/Ayesha &lt;script&gt;/);assert.match(root.innerHTML,/Ali/);assert.match(root.innerHTML,/Search leads/);assert.doesNotMatch(root.innerHTML,/Ayesha <script>/);
+ await click('lead',lead.id);assert.match(root.innerHTML,/Activity history/);assert.match(root.innerHTML,/Send quote/);assert.match(root.innerHTML,/Book meeting/);
+ await click('book',lead.id);assert.match(dialog.innerHTML,/New appointment/);assert.match(dialog.innerHTML,/name="lead_id"/);assert.match(dialog.innerHTML,/Confirmed/);
+ const form={dataset:{form:'event'},values:{id:'',lead_id:lead.id,title:'Discovery',starts_at:today+'T10:00',ends_at:today+'T10:30',kind:'demo',status:'scheduled',location:'',notes:''},querySelector:()=>({disabled:false})};
+ await dialog.listeners.submit({preventDefault(){},target:form});await settle();const posted=calls.find(c=>c.opts?.method==='POST'&&c.path==='/calendar');assert.ok(posted);assert.equal(JSON.parse(posted.opts.body).starts_at,today+'T10:00:00+05:00');
+ ui.mount(root,host,'calendar');await settle();assert.match(root.innerHTML,/work-agenda/);assert.match(root.innerHTML,/10:00–10:30 PKT/);assert.match(root.innerHTML,/Confirmed/);assert.match(root.innerHTML,/Pakistan/);
+ root.listeners.change({target:{dataset:{filter:'mode'},value:'month'}});assert.match(root.innerHTML,/work-calendar/);
+ await click('event',event.id);assert.match(dialog.innerHTML,/Meeting outcome/);assert.match(dialog.innerHTML,/does not change the lead/);assert.match(dialog.innerHTML,/2026-/);
+ let n=calls.length;interval();await settle();assert.ok(calls.length>n,'periodic refresh reads same API records');
+ ui.reset();assert.equal(dialog,null);assert.equal(root.innerHTML.includes('other tenant'),false);
+ ui.mount(root,{...host,api:async p=>p.startsWith('/leads')?{leads:[],total:0}:[]},'leads');await settle();assert.match(root.innerHTML,/No leads yet/);assert.doesNotMatch(root.innerHTML,/Ayesha/,'signed-out account data is not reused');ui.reset();
+ console.log('Portal workspace UI checks passed: portal integration syntax, escaped customer data, lead detail/history, PKT booking payload, responsive agenda/month views, outcomes, refresh and account cache reset.');
+})().catch(e=>{console.error(e);process.exitCode=1;});
