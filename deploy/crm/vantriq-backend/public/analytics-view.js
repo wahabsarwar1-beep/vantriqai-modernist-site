@@ -22,11 +22,11 @@
   // colour-vision deficiency on the white card surface.
   const C = {
     s1: '#2f56d9', s1soft: '#a9bbf7', s2: '#c06b3a',
-    grid: '#efece6', axis: '#8d857a', ink: '#16151a', muted: '#6b645b',
+    grid: '#edf1f7', axis: '#64748b', ink: '#14223b', muted: '#64748b',
     good: '#2f7d5f', bad: '#b4402f',
   };
   // Sequential ramp for the heatmap: one hue, light to dark.
-  const HEAT = ['#f6f4ef', '#e3e9fc', '#c5d2f8', '#9db2f2', '#6f8de8', '#3f63dc', '#2346b8', '#1a3284'];
+  const HEAT = ['#f1f5fb', '#e3e9fc', '#c5d2f8', '#9db2f2', '#6f8de8', '#3f63dc', '#2346b8', '#1a3284'];
   // Diverging for 1–5 scores: red through a neutral grey to blue.
   const SCORE = ['#b4402f', '#d98676', '#bdb7ad', '#7f9bf2', '#2f56d9'];
   // Ordinal ramp for the funnel — lightest step still clears 2:1 on white.
@@ -276,17 +276,17 @@
     </div>`;
   }
 
-  function heatmap(grid, windowLabel){
+  function heatmap(grid, windowLabel, measure = 'conversations'){
     const max = Math.max(...grid.flat(), 0);
     const step = (v) => v === 0 ? HEAT[0] : HEAT[Math.min(HEAT.length - 1, 1 + Math.floor((v / max) * (HEAT.length - 1.001)))];
-    let html = `<div class="vqa-heat" role="img" aria-label="Conversations started by day of week and hour, ${esc(windowLabel)}"><div></div>`;
+    let html = `<div class="vqa-heat-scroll" tabindex="0" role="region" aria-label="Hourly activity heatmap; scroll horizontally for all hours"><div class="vqa-heat" role="img" aria-label="${esc(measure)} by day of week and hour, ${esc(windowLabel)}"><div></div>`;
     for(let h = 0; h < 24; h++) html += `<div class="hl">${h % 6 === 0 ? hourLabel(h) : ''}</div>`;
     grid.forEach((row, d) => {
       html += `<div class="rl">${DAYS[d]}</div>`;
-      row.forEach((v, h) => { html += `<div class="c" style="background:${step(v)}" title="${DAYS[d]} ${hourLabel(h)}–${hourLabel((h + 1) % 24)}: ${n(v)} conversation${v === 1 ? '' : 's'}"></div>`; });
+      row.forEach((v, h) => { html += `<div class="c" style="background:${step(v)}" title="${DAYS[d]} ${hourLabel(h)}–${hourLabel((h + 1) % 24)}: ${n(v)} ${esc(measure)}"></div>`; });
     });
-    html += `</div><div class="vqa-scale">Fewer ${HEAT.map(c => `<i style="background:${c}"></i>`).join('')} More${max ? ` · busiest hour: ${n(max)}` : ''}</div>`;
-    return html;
+    html += `</div></div><div class="vqa-scale">Fewer ${HEAT.map(c => `<i style="background:${c}"></i>`).join('')} More${max ? ` · busiest hour: ${n(max)}` : ''}</div>`;
+    return html + `<details><summary>View hourly figures</summary>${table(['Day', ...Array.from({length:24},(_,h)=>hourLabel(h))], grid.map((row,i)=>[DAYS[i],...row]))}</details>`;
   }
 
   function table(headers, rows){
@@ -316,14 +316,14 @@
 
   function baseOptions(extra){
     return Object.assign({
-      responsive: true, maintainAspectRatio: false, animation: { duration: 250 },
+      responsive: true, maintainAspectRatio: false, animation: { duration: typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 350 },
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
-        tooltip: { backgroundColor: '#16151a', padding: 10, cornerRadius: 8, titleFont: { weight: '600' }, boxPadding: 4 },
+        tooltip: { backgroundColor: C.ink, padding: 13, cornerRadius: 10, displayColors: true, usePointStyle: true, titleFont: { weight: '600' }, boxPadding: 4 },
       },
       scales: {
-        x: { grid: { display: false }, border: { color: '#ddd8cf' }, ticks: { color: C.axis, maxRotation: 0, autoSkipPadding: 12, font: { size: 11 } } },
+        x: { grid: { display: false }, border: { display: false }, ticks: { color: C.axis, maxRotation: 0, autoSkipPadding: 12, font: { size: 11 } } },
         y: { beginAtZero: true, grid: { color: C.grid, drawTicks: false }, border: { display: false },
              ticks: { color: C.axis, padding: 8, precision: 0, font: { size: 11 }, callback: v => compact(v) } },
       },
@@ -347,7 +347,7 @@
       data: { labels, datasets: [{
         label, data: series.map(s => s[key]),
         backgroundColor: series.map((_, i) => i === last ? C.s1soft : C.s1),
-        borderRadius: 4, borderSkipped: 'start', maxBarThickness: 24,
+        borderRadius: 7, borderSkipped: 'start', maxBarThickness: 24,
       }] },
       options: baseOptions({
         plugins: { legend: { display: false }, tooltip: Object.assign(baseOptions().plugins.tooltip, {
@@ -368,7 +368,7 @@
         // The upper segment carries the rounded end, and a 2px white edge
         // along its base is the gap between the two.
         { label: b.label, data: series.map(s => s[b.key]), backgroundColor: b.color,
-          borderRadius: { topLeft: 4, topRight: 4 }, borderSkipped: false,
+          borderRadius: { topLeft: 7, topRight: 7 }, borderSkipped: false,
           borderWidth: { top: 0, left: 0, right: 0, bottom: 2 }, borderColor: '#fff', maxBarThickness: 24, stack: 's' },
       ] },
       options: baseOptions({
@@ -384,7 +384,7 @@
 
   function groupedChart(id, series, a, b, grain){
     const labels = series.map(s => bucketLabel(s.bucket, grain));
-    const ds = (x) => ({ label: x.label, data: series.map(s => s[x.key]), backgroundColor: x.color, borderRadius: 4, borderSkipped: 'start', maxBarThickness: 14, categoryPercentage: .7, barPercentage: .9 });
+    const ds = (x) => ({ label: x.label, data: series.map(s => s[x.key]), backgroundColor: x.color, borderRadius: 7, borderSkipped: 'start', maxBarThickness: 14, categoryPercentage: .7, barPercentage: .9 });
     mount(id, {
       type: 'bar',
       data: { labels, datasets: [ds(a), ds(b)] },
@@ -401,7 +401,7 @@
       type: 'line',
       data: { labels, datasets: [{
         label, data: series.map(s => s[key]), borderColor: C.s1, backgroundColor: 'rgba(47,86,217,.10)', fill: true,
-        borderWidth: 2, tension: .3, spanGaps: true, pointRadius: series.map(s => s[key] == null ? 0 : 3),
+        borderWidth: 2.5, tension: .3, spanGaps: false, pointRadius: series.map(s => s[key] == null ? 0 : 3),
         pointBackgroundColor: C.s1, pointBorderColor: '#fff', pointBorderWidth: 2, pointHoverRadius: 6,
       }] },
       options: baseOptions({
@@ -551,10 +551,14 @@
   }
   function websiteTrafficHTML(d, opts={}){
     const ranges=[['today','Today'],['7d','Last 7 days'],['30d','Last 30 days'],['90d','Last 90 days'],['180d','Last 180 days']];
-    return `<div class="vqa"><div class="vqa-top"><div><h2>Website traffic</h2><div class="vqa-sub">Where vantriqai.com is accessed and what consenting visitors do.</div></div></div>
+    return `<div class="vqa">${productHero('Pulse', 'Website intelligence', 'Understand where visitors come from and how they engage with your website.', (ranges.find(x=>x[0]===d.range)||['','Website traffic'])[1])}
       <div class="vqa-seg" style="flex-wrap:wrap;">${ranges.map(([id,label])=>`<button class="${d.range===id?'on':''}" aria-pressed="${d.range===id}" onclick="${opts.onRange}('${id}')">${label}</button>`).join('')}</div>
       <button class="btn btn-ghost btn-sm" style="margin:12px 0;" onclick="${opts.onReport}()">Download website report (Excel)</button>
       ${websiteHTML(d,'platform')}</div>`;
+  }
+  /** Context remains explicit: CRM scope and portal scope come from the host. */
+  function productHero(product, title, description, period){
+    return `<header class="vqa-hero"><div class="vqa-hero-mark" aria-hidden="true"><svg viewBox="0 0 40 40" fill="none"><path d="M5 21h7l4-11 7 22 4-11h8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="vqa-hero-copy"><div class="vqa-eyebrow">Vantriq ${esc(product)} · Intelligence</div><h2>${esc(title)}</h2><p>${esc(description)}</p></div><span class="vqa-period-badge">${esc(period)}</span></header>`;
   }
   function conversationsHTML(d, opts){
     opts = opts || {};
@@ -577,6 +581,7 @@
     const agentRows = d.agents.map(a => ({ name: a.name, value: a.conversations, share: a.share_pct }));
 
     return `<div class="vqa">
+      ${productHero('Pulse', 'Conversation intelligence', 'Understand your audience, channel performance and customer engagement.', d.period.window_label)}
       ${filters(g, opts.onGrain, compareNote(d), opts)}
       ${insightsCard(d.insights)}
       <div class="vqa-grid vqa-kpis">
@@ -688,6 +693,7 @@
     const top = d.funnel[0] ? d.funnel[0].n : 0;
     const topics = d.topics.filter(t => t.conversations > 0);
     return `<div class="vqa">
+      ${productHero('Pulse', 'Sales intelligence', 'Follow your pipeline, conversion performance and sales momentum.', d.period.window_label)}
       ${filters(g, opts.onGrain, compareNote(d), opts)}
       ${insightsCard(d.insights)}
       <div class="vqa-grid vqa-kpis">
@@ -787,7 +793,7 @@
     const max=Math.max(...shown.map(x=>x.responses),1), height=shown.length*48+38;
     return `<svg class="vqe-graph" viewBox="0 0 480 ${height}" role="img" aria-label="${esc(label)} · ${n(total)} answers"><title>${esc(label)}: ${shown.map(x=>`${esc(x.name)} ${n(x.responses)} (${Math.round(x.responses/total*100)}%)`).join('; ')}</title>
       ${[0,.5,1].map(t=>`<path d="M${18+330*t} 20V${height-28}" stroke="${C.grid}"/>`).join('')}
-      ${shown.map((x,i)=>`<g><text x="18" y="${i*48+15}" fill="currentColor" font-size="12">${esc(x.name)}</text><rect x="18" y="${i*48+22}" width="${330*x.responses/max}" height="12" rx="4" fill="${x.known===false?C.axis:C.s1}"/><text x="465" y="${i*48+33}" text-anchor="end" fill="currentColor" font-size="12">${n(x.responses)} · ${Math.round(x.responses/total*100)}%</text></g>`).join('')}
+      ${shown.map((x,i)=>`<g><text x="18" y="${i*48+15}" fill="currentColor" font-size="12">${esc(x.name)}</text><rect x="18" y="${i*48+22}" width="330" height="12" rx="6" fill="${C.grid}"/><rect x="18" y="${i*48+22}" width="${330*x.responses/max}" height="12" rx="6" fill="${x.known===false?C.axis:C.s1}"/><text x="465" y="${i*48+33}" text-anchor="end" fill="currentColor" font-size="12">${n(x.responses)} · ${Math.round(x.responses/total*100)}%</text></g>`).join('')}
       <text x="18" y="${height-10}" fill="${C.muted}" font-size="11">0</text><text x="348" y="${height-10}" text-anchor="end" fill="${C.muted}" font-size="11">${n(max)} answers</text></svg>`;
   }
 
@@ -857,6 +863,7 @@
     const demo = d.demographics;
     const demoCards = [['By gender', demo.gender, 'Gender'], ['By age group', demo.age, 'Age group'], ['By city', demo.city, 'City']];
     return `<div class="vqa vqe">
+      ${productHero('Echo', 'Customer experience', 'Turn feedback into a clearer view of satisfaction, loyalty and service.', d.period.window_label)}
       ${filters(g, opts.onGrain, note, opts)}
       ${waiting}
       ${insightsCard(d.insights)}
@@ -918,7 +925,7 @@
         <div class="vqa-card"><h3>Closing the loop</h3><div class="vqa-sub">All-time follow-up backlog · every unhappy answer opens a follow-up</div>
           ${barList([{ name: 'Waiting for a reply', value: f.open }, { name: 'Contacted', value: f.contacted }, { name: 'Resolved', value: f.resolved }], { colors: [SCORE[0], '#d9a441', '#2f7d5f'] })}
           <div class="vqa-sub" style="margin:12px 0 0;">${f.median_hours_to_reply != null ? `Typical time to get back to them: <b>${f.median_hours_to_reply < 1 ? 'under an hour' : f.median_hours_to_reply < 48 ? f.median_hours_to_reply + ' hours' : Math.round(f.median_hours_to_reply / 24) + ' days'}</b>` : 'No first-contact timings recorded yet'}${f.overdue ? ` · <b style="color:${SCORE[0]}">${n(f.overdue)} waiting over 48 hours</b>` : ''}</div></div>
-        <div class="vqa-card"><h3>When people answer</h3><div class="vqa-sub">By day and hour (${esc(d.time_zone.replace('Asia/', ''))} time) · ${esc(d.period.window_label)}</div>${heatmap(d.heatmap, d.period.window_label)}</div>
+        <div class="vqa-card"><h3>When people answer</h3><div class="vqa-sub">By day and hour (${esc(d.time_zone.replace('Asia/', ''))} time) · ${esc(d.period.window_label)}</div>${heatmap(d.heatmap, d.period.window_label, 'answers')}</div>
       </div>
 
       ${d.recent_comments.length ? `<div class="vqa-card" style="margin-bottom:14px;"><h3>Latest comments</h3><div class="vqa-sub">What customers wrote, newest first</div><div class="vqa-feedback">
@@ -941,7 +948,7 @@
       mount('vqeNpsDist', {
         type: 'bar',
         data: { labels: d.nps_distribution.map(x => String(x.score)), datasets: [{ label: 'Answers', data: d.nps_distribution.map(x => x.n),
-          backgroundColor: d.nps_distribution.map(x => x.score <= 6 ? SCORE[0] : x.score <= 8 ? SCORE[2] : SCORE[4]), borderRadius: 4, maxBarThickness: 26 }] },
+          backgroundColor: d.nps_distribution.map(x => x.score <= 6 ? SCORE[0] : x.score <= 8 ? SCORE[2] : SCORE[4]), borderRadius: 7, maxBarThickness: 26 }] },
         options: baseOptions({ plugins: { legend: { display: false }, tooltip: Object.assign(baseOptions().plugins.tooltip, {
           callbacks: { title: (items) => `Scored ${items[0].label} of 10`, label: (ctx) => ` ${n(ctx.raw)} answers` } }) } }),
       });

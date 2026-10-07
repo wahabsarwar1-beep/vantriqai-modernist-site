@@ -1034,6 +1034,8 @@
       + '<div class="vqs-card"><h3>Responses</h3><div class="sub">' + esc(a.period.window_label) + '</div><div class="vqs-plot"><canvas id="vqsResp" aria-label="Responses over time"></canvas></div></div>'
       + '<div class="vqs-card"><h3>Satisfaction</h3><div class="sub">Share answering 4 or 5 · ' + esc(a.period.window_label) + '</div><div class="vqs-plot"><canvas id="vqsCsat" aria-label="Satisfaction over time"></canvas></div></div>'
       + '</div>'
+      + '<details class="vqs-chart-table"><summary>View chart figures by period</summary><div class="vqs-tablewrap"><table class="vqs-table"><thead><tr><th>Period starting</th><th>Responses</th><th>Satisfied %</th></tr></thead><tbody>'
+      + a.series.map(function(s){ return '<tr><td>' + esc(s.bucket) + '</td><td>' + n(s.responses) + '</td><td>' + (s.csat == null ? '—' : esc(s.csat) + '%') + '</td></tr>'; }).join('') + '</tbody></table></div></details>'
       + (w.nps_responses ? '<div class="vqs-card" style="margin-top:14px;"><div class="vqs-spread"><div><h3>Net Promoter Score</h3><div class="sub">' + n(w.nps_responses) + ' answers · ' + esc(a.period.window_label) + '</div></div><div class="vqs-big">' + sign(w.nps) + '</div></div>'
         + '<div class="vqs-stack" role="img" aria-label="' + w.detractors + ' detractors, ' + w.passives + ' passives, ' + w.promoters + ' promoters">'
         + (w.detractors ? '<div style="width:' + seg(w.detractors) + '%;background:' + NPS_C.det + '"></div>' : '') + (w.passives ? '<div style="width:' + seg(w.passives) + '%;background:' + NPS_C.pas + '"></div>' : '') + (w.promoters ? '<div style="width:' + seg(w.promoters) + '%;background:' + NPS_C.pro + '"></div>' : '') + '</div>'
@@ -1132,20 +1134,20 @@
     };
     var labels = a.series.map(function(s){ return label(s.bucket); });
     var base = {
-      responsive: true, maintainAspectRatio: false, animation: { duration: 250 },
-      plugins: { legend: { display: false }, tooltip: { backgroundColor: '#16151a', padding: 10, cornerRadius: 8 } },
+      responsive: true, maintainAspectRatio: false, animation: { duration: typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 350 },
+      plugins: { legend: { display: false }, tooltip: { backgroundColor: '#14223b', padding: 13, cornerRadius: 10, usePointStyle: true } },
       scales: {
-        x: { grid: { display: false }, ticks: { color: '#8d857a', maxRotation: 0, autoSkipPadding: 12, font: { size: 11 } } },
-        y: { beginAtZero: true, grid: { color: '#efece6' }, border: { display: false }, ticks: { color: '#8d857a', precision: 0, font: { size: 11 } } },
+        x: { grid: { display: false }, ticks: { color: '#64748b', maxRotation: 0, autoSkipPadding: 12, font: { size: 11 } } },
+        y: { beginAtZero: true, grid: { color: '#edf1f7' }, border: { display: false }, ticks: { color: '#64748b', precision: 0, font: { size: 11 } } },
       },
     };
     var r = document.getElementById('vqsResp');
     if (r) charts.push(new Chart(r, { type: 'bar', data: { labels: labels, datasets: [{ label: 'Responses', data: a.series.map(function(s){ return s.responses; }),
-      backgroundColor: a.series.map(function(s, i){ return i === a.series.length - 1 ? '#a9bbf7' : '#2f56d9'; }), borderRadius: 4, maxBarThickness: 28 }] }, options: base }));
+      backgroundColor: a.series.map(function(s, i){ return i === a.series.length - 1 ? '#a9bbf7' : '#2f56d9'; }), borderRadius: 7, borderSkipped: 'start', maxBarThickness: 28 }] }, options: base }));
     var c = document.getElementById('vqsCsat');
     if (c) charts.push(new Chart(c, { type: 'line', data: { labels: labels, datasets: [{ label: 'Satisfied %', data: a.series.map(function(s){ return s.csat; }),
-      borderColor: '#2f56d9', backgroundColor: 'rgba(47,86,217,.08)', fill: true, tension: .3, spanGaps: true, pointRadius: 3, pointBackgroundColor: '#2f56d9' }] },
-      options: Object.assign({}, base, { scales: { x: base.scales.x, y: { min: 0, max: 100, grid: { color: '#efece6' }, border: { display: false }, ticks: { color: '#8d857a', callback: function(v){ return v + '%'; }, font: { size: 11 } } } } }) }));
+      borderColor: '#2f56d9', backgroundColor: 'rgba(47,86,217,.08)', fill: true, borderWidth: 2.5, tension: .3, spanGaps: false, pointRadius: 3, pointHoverRadius: 6, pointBorderColor: '#fff', pointBorderWidth: 2, pointBackgroundColor: '#2f56d9' }] },
+      options: Object.assign({}, base, { scales: { x: base.scales.x, y: { min: 0, max: 100, grid: { color: '#edf1f7' }, border: { display: false }, ticks: { color: '#64748b', callback: function(v){ return v + '%'; }, font: { size: 11 } } } } }) }));
   }
   function destroyCharts(){ charts.forEach(function(c){ try { c.destroy(); } catch (e) {} }); charts = []; }
 

@@ -1,0 +1,46 @@
+/* Pulse and Echo share one visual system across staff and customer workspaces.
+   Extra class specificity keeps these rules above the kits' injected styles. */
+.vqa.vqa,.vqs.vqs{--vqa-gap:20px;--card:#fff;--text:#14223b;--muted:#64748b;--border:#e2e8f2;--border-2:#f1f5fb;--radius:18px;--shadow-sm:0 3px 16px rgba(24,48,86,.035);color:#14223b;min-width:0}
+.vqa .vqa-hero{display:flex;align-items:center;gap:18px;padding:26px 28px;margin-bottom:20px;border:1px solid #dce5f4;border-radius:20px;background:linear-gradient(115deg,#fff 35%,#edf3ff);box-shadow:0 4px 20px rgba(24,48,86,.04)}
+.vqa .vqa-hero-mark{width:54px;height:54px;flex:0 0 54px;display:grid;place-items:center;color:#fff;background:#2f56d9;border-radius:16px;box-shadow:0 6px 16px #2f56d92b}
+.vqa .vqa-hero-mark svg{width:38px;height:38px}
+.vqa .vqa-hero-copy{flex:1;min-width:0}.vqa .vqa-eyebrow{font-size:10px;letter-spacing:.14em;text-transform:uppercase;font-weight:750;color:#2f56d9;margin-bottom:6px}
+.vqa .vqa-hero h2{font-size:26px;letter-spacing:-.035em;line-height:1.2;margin:0 0 7px;color:#14223b;font-weight:750}.vqa .vqa-hero p{font-size:13px;line-height:1.6;margin:0;color:#64748b}
+.vqa .vqa-period-badge{background:#fff;border:1px solid #dce5f4;border-radius:10px;padding:9px 12px;font-size:11px;font-weight:650;color:#405777;max-width:200px}
+.vqa .vqa-filters{padding:12px 14px;border:1px solid #e2e8f2;border-radius:14px;background:#fff;margin-bottom:20px;gap:10px 16px}
+.vqa .vqa-seg,.vqs .vqs-seg{border:0;border-radius:10px;background:#f1f5fb;padding:4px;gap:3px}
+.vqa .vqa-seg button,.vqs .vqs-seg button{border-radius:7px;padding:8px 13px;font-size:12px;color:#52647d;min-height:34px}
+.vqa .vqa-seg button.on,.vqs .vqs-seg button.on{background:#2f56d9;color:#fff;box-shadow:0 2px 6px #2f56d926}
+.vqa .vqa-btn,.vqs .vqs-btn{border-radius:9px;min-height:36px;padding:9px 13px}.vqa .vqa-note{line-height:1.6}
+.vqa .vqa-card,.vqs .vqs-card{border:1px solid #e2e8f2;border-radius:18px;padding:22px;background:#fff;box-shadow:0 3px 16px rgba(24,48,86,.035);min-width:0}
+.vqa .vqa-card h3,.vqs .vqs-card h3{font-size:15px;letter-spacing:-.015em;font-weight:700;margin-bottom:5px;color:#14223b}
+.vqa .vqa-card .vqa-sub,.vqs .vqs-card .sub{font-size:12px;line-height:1.6;color:#64748b;margin-bottom:18px}
+.vqa .vqa-kpis,.vqs .vqs-kpis{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.vqa .vqa-kpi,.vqs .vqs-kpi{position:relative;overflow:hidden;padding:20px;border-top:3px solid #a9bbf7}
+.vqa .vqa-kpi:first-child,.vqs .vqs-kpi:first-child{border-top-color:#2f56d9;background:linear-gradient(135deg,#fff,#f7f9ff)}
+.vqa .vqa-kpi .l,.vqs .vqs-kpi .l{font-size:12px;font-weight:650;line-height:1.4;color:#52647d;min-height:34px}
+.vqa .vqa-kpi .v,.vqs .vqs-kpi .v{font-size:32px;font-weight:750;letter-spacing:-.045em;color:#14223b;margin:8px 0;line-height:1.12;font-variant-numeric:tabular-nums}
+.vqa .vqa-kpi .d,.vqa .vqa-kpi .p{line-height:1.6}.vqa .vqa-spark{height:36px;margin-top:13px}
+.vqa .vqa-two{grid-template-columns:repeat(2,minmax(0,1fr))}.vqa .vqa-plot,.vqs .vqs-plot{height:270px;margin-top:12px}.vqa .vqa-plot.sm{height:230px}
+.vqa .vqa-section{font-size:16px;font-weight:700;letter-spacing:-.02em;margin:26px 0 12px;color:#14223b}
+.vqa .vqa-bars{gap:15px}.vqa .vqa-bar .tr{background:#edf1f7;height:12px;border-radius:6px}.vqa .vqa-bar .fl{border-radius:6px}.vqa .vqa-bar .vl{font-variant-numeric:tabular-nums}
+.vqa .vqa-insights{gap:12px}.vqa .vqa-insights li{line-height:1.6}.vqa .vqa-ic{border-radius:7px;width:24px;height:24px;flex-basis:24px}
+.vqa .vqa-legend,.vqs .vqs-legend{gap:10px 18px;line-height:1.6}.vqa .vqa-legend i,.vqs .vqs-legend i{border-radius:50%}
+.vqa .vqa-heat-scroll{overflow-x:auto;overscroll-behavior-x:contain;padding-bottom:8px;max-width:100%;border-radius:8px}.vqa .vqa-heat{min-width:600px;gap:4px}.vqa .vqa-heat .c{border-radius:4px;min-height:20px}.vqa .vqa-scale{line-height:1.6;flex-wrap:wrap}
+.vqa .vqa-tablewrap,.vqs .vqs-tablewrap{overflow-x:auto;max-width:100%;border:1px solid #e2e8f2;border-radius:12px}
+.vqa .vqa-table,.vqs .vqs-table{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap}
+.vqa .vqa-table th,.vqs .vqs-table th{background:#f5f8fc;color:#52647d;font-size:11px;font-weight:700;padding:12px;text-align:left}
+.vqa .vqa-table td,.vqs .vqs-table td{padding:12px;border-bottom:1px solid #edf1f7;font-variant-numeric:tabular-nums}.vqa .vqa-table tr:last-child td,.vqs .vqs-table tr:last-child td{border-bottom:0}
+.vqa details>summary,.vqs .vqs-chart-table>summary{cursor:pointer;padding:12px 0;font-size:12px;font-weight:650;color:#405777;line-height:1.6}.vqa details>summary:hover,.vqs .vqs-chart-table>summary:hover{color:#2f56d9}
+.vqa .vqe-disclosure{border-color:#e2e8f2;border-radius:14px;background:#fff}.vqa .vqe-graph{color:#14223b}.vqa .vqa-empty{padding:22px;line-height:1.8;background:#f7f9fd;border-radius:12px}
+.vqs .vqs-top{gap:18px;margin-bottom:22px}.vqs .vqs-top h2{font-size:26px;font-weight:750;letter-spacing:-.035em;color:#14223b}.vqs .vqs-top p{color:#64748b;line-height:1.6;max-width:680px}
+.vqs .vqs-tabs{border-bottom-color:#e2e8f2}.vqs .vqs-tabs button.on{color:#2f56d9;border-bottom-color:#2f56d9}.vqs .vqs-grid{gap:20px}.vqs .vqs-g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.vqs .vqs-chart-table{margin:0 0 18px;padding:0 18px;background:#fff;border:1px solid #e2e8f2;border-radius:12px}.vqs .vqs-chart-table[open]{padding-bottom:18px}
+.vqs .vqs-bar .tr{border-radius:6px;background:#edf1f7}.vqs .vqs-stack{border-radius:8px;overflow:hidden}.vqs .vqs-big{font-weight:750;letter-spacing:-.04em;color:#14223b}
+.vqa button:focus-visible,.vqa summary:focus-visible,.vqa [tabindex]:focus-visible,.vqs button:focus-visible,.vqs summary:focus-visible{outline:3px solid #a9bbf7;outline-offset:3px}
+@media(min-width:1001px){.vqa .vqa-kpis:has(>.vqa-kpi:nth-child(7)){grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:1000px){.vqa .vqa-period-badge{display:none}.vqa .vqa-hero{padding:22px}.vqa .vqa-kpis,.vqs .vqs-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){.vqa.vqa{--vqa-gap:16px}.vqa .vqa-two,.vqa .vqe-three,.vqs .vqs-g2,.vqs .vqs-g3{grid-template-columns:minmax(0,1fr)}.vqa .vqa-hero{padding:20px 18px;gap:12px}.vqa .vqa-hero-mark{width:42px;height:42px;flex-basis:42px;border-radius:12px}.vqa .vqa-hero h2{font-size:22px}.vqa .vqa-hero p{font-size:12px}.vqa .vqa-eyebrow{font-size:9px;letter-spacing:.08em}.vqa .vqa-kpis,.vqs .vqs-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.vqa .vqa-kpi,.vqs .vqs-kpi{padding:16px 13px}.vqa .vqa-kpi .v,.vqs .vqs-kpi .v{font-size:28px}.vqa .vqa-card,.vqs .vqs-card{padding:18px}.vqa .vqa-plot,.vqs .vqs-plot{height:240px}.vqa .vqa-filters{padding:10px}.vqa .vqa-seg{width:100%;justify-content:space-between}.vqa .vqa-seg button{padding:8px 9px}.vqa .vqa-note{flex-basis:100%}.vqa .vqa-btn{width:100%}.vqa .vqa-bar{grid-template-columns:minmax(0,1fr) auto;gap:8px}.vqa .vqa-bar .tr{grid-column:1/-1;order:3}.vqs .vqs-top{flex-wrap:wrap}.vqs .vqs-top h2{font-size:23px}}
+@media(prefers-reduced-motion:reduce){.vqa *,.vqs *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+.crm-shell .vqa-workspace-tabs{background:#fff;border:1px solid #e2e8f2;padding:5px;gap:4px;border-radius:12px}.crm-shell .vqa-workspace-tabs .stage-tab{border-radius:8px;color:#52647d}.crm-shell .vqa-workspace-tabs .stage-tab.active{background:#2f56d9;color:#fff}

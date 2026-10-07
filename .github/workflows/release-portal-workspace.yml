@@ -1,8 +1,8 @@
 # Verified customer-workspace release using existing repository deployment secrets.
-name: Release CRM and Portal intelligence
+name: Release Pulse and Echo visual upgrade
 
 # Explicit apply release after tests and upgrade dry run.
-run-name: Release CRM and Portal intelligence — apply
+run-name: Release Pulse and Echo visual upgrade — apply
 
 on:
   push:
@@ -38,6 +38,9 @@ jobs:
         working-directory: deploy/crm/vantriq-backend
         run: |
           npm ci --no-audit --no-fund
+          npm run test:analytics-design
+          npm run test:pulse-advanced
+          npm run test:echo-advanced
           npm run test:workspace-insights
           node test/workspace-ui.test.js
           npm run test:portal-workspace
@@ -119,7 +122,7 @@ jobs:
           ssh -p "$PORT" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
             "docker exec crm_app wget -qO- http://127.0.0.1:8080/api/health" | tee health.txt
           grep -q '"ok":true' health.txt || { echo "::error::API did not report healthy."; exit 1; }
-          grep -q '"version":"9.30.0"' health.txt || { echo "::error::Release version did not match."; exit 1; }
+          grep -q '"version":"9.31.0"' health.txt || { echo "::error::Release version did not match."; exit 1; }
 
       - name: Verify live analytics scopes
         env:

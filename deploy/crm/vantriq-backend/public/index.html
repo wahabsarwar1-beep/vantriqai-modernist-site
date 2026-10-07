@@ -23,7 +23,7 @@
      ourselves removes the dependency outright. -->
 <script src="/vendor/chart/chart.umd.js"></script>
 <script src="/analytics-view.js?v=9.27.0"></script>
-<script src="/survey-studio.js?v=9.24.2"></script>
+<script src="/survey-studio.js?v=9.31.0"></script>
 <script src="/contacts-view.js"></script>
 <script src="/calendar-view.js"></script>
 <script src="/workspace-insights.js?v=9.30.0"></script>
@@ -656,6 +656,7 @@ td.amt,th.amt,td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
 <link rel="stylesheet" href="/mobile.css?v=9.23.3">
 <link rel="stylesheet" href="/workspace-theme.css?v=9.24.0">
 <link rel="stylesheet" href="/workspace-intelligence.css?v=9.30.0">
+<link rel="stylesheet" href="/analytics-design.css?v=9.31.0">
 </head>
 <body class="crm-shell">
 <div id="app"></div>
@@ -1524,7 +1525,7 @@ function renderAnalytics(){
     const first = analyticsClients().find(c=>!c.isInternal) || analyticsClients()[0];
     analyticsClientId = first ? first.id : null;
   }
-  const tabs = `<div class="stage-tabs" style="margin-bottom:16px;">
+  const tabs = `<div class="stage-tabs vqa-workspace-tabs" style="margin-bottom:16px;">
     ${ANALYTICS_TABS.map(t=>`<button class="stage-tab ${analyticsTab===t.id?'active':''}" onclick="setAnalyticsTab('${t.id}')">${esc(t.label)}</button>`).join('')}
   </div>`;
   const picker = analyticsTab!=='client' ? '' : `

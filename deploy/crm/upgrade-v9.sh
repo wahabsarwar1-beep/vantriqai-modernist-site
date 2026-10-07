@@ -320,7 +320,9 @@ delete from usage_events where session_id in ('920000000017-2026-10-07','9200000
 delete from contacts where contact_key in ('920000000017','920000000018','920000000019','920000000020','920000000021');
 delete from clients where stage = 'lead' and external_ref in ('wa-920000000017','wa-920000000018','wa-920000000019','wa-920000000020','wa-920000000021');
 commit;"
-if [ "$DRY" = 1 ]; then
+if [ "${CLEANUP_AGENT_TEST_RECORDS:-0}" != 1 ]; then
+  echo "  Skipped: set CLEANUP_AGENT_TEST_RECORDS=1 to run this separate cleanup."
+elif [ "$DRY" = 1 ]; then
   echo "  would delete the test records"
 else
   docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -q -c "$TEST_SQL" \

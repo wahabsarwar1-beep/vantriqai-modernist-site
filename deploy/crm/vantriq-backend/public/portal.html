@@ -20,8 +20,8 @@
 <!-- Served from this origin, like the CRM's — a CDN or network policy
      blocking cdnjs should not take the charts with it. -->
 <script src="/vendor/chart/chart.umd.js"></script>
-<script src="/analytics-view.js?v=9.26.1"></script>
-<script src="/survey-studio.js?v=9.24.2"></script>
+<script src="/analytics-view.js?v=9.31.0"></script>
+<script src="/survey-studio.js?v=9.31.0"></script>
 <script src="/contacts-view.js"></script>
 <script src="/invoice-print.js"></script>
 <script src="/portal-workspace.js?v=9.29.0"></script>
@@ -277,6 +277,7 @@ td.amt,th.amt{text-align:right;font-variant-numeric:tabular-nums;}
 <link rel="stylesheet" href="/workspace-theme.css?v=9.24.0">
 <link rel="stylesheet" href="/portal-workspace.css?v=9.29.0">
 <link rel="stylesheet" href="/workspace-intelligence.css?v=9.30.0">
+<link rel="stylesheet" href="/analytics-design.css?v=9.31.0">
 </head>
 <body class="portal-shell">
 <div id="app"></div>
@@ -790,8 +791,7 @@ function renderAnalytics(){
   if(!a) return `<div class="card" style="text-align:center;color:var(--muted);"><span class="loading-dot"></span>&nbsp; Working out your numbers…</div>`;
   if(a.error) return `<div class="card"><div class="empty">${esc(a.error)}</div>
     <button class="btn btn-ghost" style="margin-top:10px;" onclick="data.analytics=null;render()">Try again</button></div>`;
-  return productHead('Vantriq Pulse', 'Live analytics on every conversation — leads, busiest hours, satisfaction and what the AI resolved on its own.')
-    + VQA.conversationsHTML(a, { audience:'portal', onGrain:'setAnalyticsGrain', onReport:'downloadAnalyticsReport', surveysEnabled: surveysOn(),
+  return VQA.conversationsHTML(a, { audience:'portal', onGrain:'setAnalyticsGrain', onReport:'downloadAnalyticsReport', surveysEnabled: surveysOn(),
       reportLabel: 'Download Pulse report (Excel)',
       reportHint: 'Every figure here, plus your customers (new and returning, who and where), each conversation and what was said — a tab for each' });
 }
@@ -842,8 +842,7 @@ function mountWorkspace(){
 /* ---- Surveys: build, share and read customer-satisfaction surveys (/survey-studio.js) ---- */
 function renderSurveys(){
   if(!window.VQS) return `<div class="card"><div class="empty">The Vantriq Echo page could not load in this browser.</div></div>`;
-  return productHead('Vantriq Echo', 'Customer-satisfaction surveys in English and Urdu — by QR code, link, WhatsApp, kiosk or on your site — with every answer flowing into Pulse.')
-    + `<div id="vqs-root"></div>`;
+  return `<div id="vqs-root"></div>`;
 }
 function mountSurveys(){
   const el = document.getElementById('vqs-root');
