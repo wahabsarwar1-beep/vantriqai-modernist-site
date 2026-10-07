@@ -310,6 +310,23 @@ echo "  Meters the site chat and the WhatsApp agent as an internal customer."
 echo "  Idempotent — safe if it has already been done."
 run docker exec "$APP_CONTAINER" npm run seed-internal
 
+bold "6a. Removing the 7 Oct 2026 WhatsApp agent test records"
+echo "  The sales + support agent was tested with five made-up numbers"
+echo "  (920000000017 to 920000000021). Removes their leads, transcripts, customer"
+echo "  profiles and usage rows. Matches those exact numbers only; a no-op once done."
+TEST_SQL="begin;
+delete from conversation_messages where session_id in ('920000000017-2026-10-07','920000000018-2026-10-07','920000000019-2026-10-07','920000000020-2026-10-07','920000000021-2026-10-07');
+delete from usage_events where session_id in ('920000000017-2026-10-07','920000000018-2026-10-07','920000000019-2026-10-07','920000000020-2026-10-07','920000000021-2026-10-07');
+delete from contacts where contact_key in ('920000000017','920000000018','920000000019','920000000020','920000000021');
+delete from clients where stage = 'lead' and external_ref in ('wa-920000000017','wa-920000000018','wa-920000000019','wa-920000000020','wa-920000000021');
+commit;"
+if [ "$DRY" = 1 ]; then
+  echo "  would delete the test records"
+else
+  docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -q -c "$TEST_SQL" \
+    && echo "  test records removed" || echo "  could not remove the test records (left as they were)"
+fi
+
 bold "6b. The protected owner account"
 echo "  Deliberately NOT run automatically here. seed-owner prints a real password"
 echo "  to stdout on first creation, and this script's whole output is captured into"

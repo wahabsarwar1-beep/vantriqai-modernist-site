@@ -6153,7 +6153,7 @@ async function generatePortalCredentials(clientId){
   try{
     const r = await API.post(`/api/clients/${clientId}/portal-credentials`, typed ? { password: typed } : {});
     if(client){ client.portalEnabled = true; client.portalUsername = r.username; client.portalPasswordSetBy='admin'; client.portalPasswordSetAt=new Date().toISOString(); }
-    const loginUrl = API.base + '/portal.html';
+    const loginUrl = /^https?:\/\//.test(r.login_url || '') ? r.login_url : 'https://portal.vantriqai.com';
     if(area) area.innerHTML = `
       <div style="background:var(--teal-light);border:1px solid #BFE3D8;border-radius:10px;padding:12px;">
         <div style="font-weight:600;color:var(--teal-dark);margin-bottom:8px;">Portal login created</div>

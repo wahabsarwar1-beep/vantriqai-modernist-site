@@ -452,7 +452,7 @@ router.post('/:id/portal-credentials', blockAutomation, async (req, res) => {
     // don't already have, so it is only returned when we generated it.
     password: typed ? null : password,
     was_typed: !!typed,
-    login_url: '/portal.html',
+    login_url: (process.env.PORTAL_URL || 'https://portal.vantriqai.com').replace(/\/+$/, ''),
     notice: typed
       ? 'Saved. Give it to the customer over a channel you trust — it is hashed here and cannot be read back.'
       : 'Copy this password now — it is hashed immediately and cannot be shown again.',

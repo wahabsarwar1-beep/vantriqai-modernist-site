@@ -1,6 +1,6 @@
 {
   "name": "vantriq-crm-backend",
-  "version": "9.28.1",
+  "version": "9.28.2",
   "description": "Vantriq AI — CRM, billing, procurement, and usage-ingestion API backed by Postgres/Supabase",
   "main": "src/index.js",
   "type": "commonjs",

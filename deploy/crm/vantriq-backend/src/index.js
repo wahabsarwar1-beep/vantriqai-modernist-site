@@ -187,6 +187,12 @@ const PORTAL_HOSTS = (process.env.PORTAL_HOSTS || 'portal.vantriqai.com')
   .split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
 const isPortalHost = (req) => PORTAL_HOSTS.includes(String(req.hostname || '').toLowerCase());
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+// Customers always use portal.vantriqai.com. A /portal.html link on the CRM's
+// own address (crm.vantriqai.com) is sent there, so a customer never signs in
+// under the staff address. Only on our own domain: local and test hosts still
+// serve the file directly.
+const PORTAL_URL = (process.env.PORTAL_URL || 'https://portal.vantriqai.com').replace(/\/+$/, '');
+const onOurDomain = (req) => /(^|\.)vantriqai\.com$/.test(String(req.hostname || '').toLowerCase());
 
 // The survey app, its QR codes and posters: /s/<survey address>. Ahead of the
 // static files and the catch-all below, on every host.
@@ -211,6 +217,11 @@ app.get('/.well-known/assetlinks.json', async (req, res) => {
 // Play Store listing and the app itself point to.
 app.get('/privacy', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'privacy.html')));
 
+app.get('/portal.html', (req, res, next) => {
+  if (isPortalHost(req) || !onOurDomain(req)) return next();
+  const q = req.originalUrl.indexOf('?');
+  res.redirect(302, PORTAL_URL + '/' + (q >= 0 ? req.originalUrl.slice(q) : ''));
+});
 app.get(['/', '/index.html'], (req, res, next) => {
   if (!isPortalHost(req)) return next();
   res.sendFile(path.join(PUBLIC_DIR, 'portal.html'));

@@ -1,6 +1,7 @@
 /**
  * portal.vantriqai.com opens the customer portal; crm.vantriqai.com (and any
- * other host) opens the staff console. Both reach the same app, told apart by
+ * other host) opens the staff console, and sends /portal.html to the portal's
+ * own address. Both reach the same app, told apart by
  * the Host header the proxy passes through.
  *
  * Needs the API on 8099.
@@ -16,7 +17,7 @@ const get = (path, host) => new Promise((resolve, reject) => {
   const req = http.request({ host: '127.0.0.1', port: 8099, path, headers: { Host: host } }, (res) => {
     let body = '';
     res.on('data', (c) => { body += c; });
-    res.on('end', () => resolve({ status: res.statusCode, body }));
+    res.on('end', () => resolve({ status: res.statusCode, body, location: res.headers.location }));
   });
   req.on('error', reject);
   req.end();
@@ -46,7 +47,11 @@ const title = (b) => (b.match(/<title>([^<]*)/) || [])[1] || '';
   const cDeep = await get('/some/view', 'crm.vantriqai.com');
   ok(title(cDeep.body).includes(CRM), 'and so is its fallback', title(cDeep.body));
   const cPortal = await get('/portal.html', 'crm.vantriqai.com');
-  ok(title(cPortal.body).includes(PORTAL), 'the portal is still reachable at /portal.html on the CRM address', title(cPortal.body));
+  ok(cPortal.status === 302 && cPortal.location === 'https://portal.vantriqai.com/', 'crm.vantriqai.com/portal.html sends customers to portal.vantriqai.com', cPortal.status + ' ' + cPortal.location);
+  const cPortalQ = await get('/portal.html?x=1', 'crm.vantriqai.com');
+  ok(cPortalQ.location === 'https://portal.vantriqai.com/?x=1', 'keeping anything after the ?', cPortalQ.location);
+  const lPortal = await get('/portal.html', '127.0.0.1:8099');
+  ok(lPortal.status === 200 && title(lPortal.body).includes(PORTAL), 'a local or test host still serves the portal file', lPortal.status);
   const local = await get('/', '127.0.0.1:8099');
   ok(title(local.body).includes(CRM), 'any other host gets the staff console, as before', title(local.body));
 
