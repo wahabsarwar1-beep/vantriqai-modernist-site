@@ -24,6 +24,7 @@
 <script src="/survey-studio.js?v=9.24.2"></script>
 <script src="/contacts-view.js"></script>
 <script src="/invoice-print.js"></script>
+<script src="/portal-workspace.js?v=9.29.0"></script>
 <style>
 /* The portal is the only part of the CRM a customer ever sees, so it is set
    in the same palette and the same typefaces as vantriqai.com — the page
@@ -273,6 +274,7 @@ td.amt,th.amt{text-align:right;font-variant-numeric:tabular-nums;}
 }
 </style>
 <link rel="stylesheet" href="/workspace-theme.css?v=9.24.0">
+<link rel="stylesheet" href="/portal-workspace.css?v=9.29.0">
 </head>
 <body class="portal-shell">
 <div id="app"></div>
@@ -450,6 +452,7 @@ async function boot(){
     data = { account, usage, invoices, ledger, packages, agents, bundles, quotes, contracts, activity: null, analytics: null };
     if(/^#surveys\b/.test(location.hash || '') && surveysOn()) currentTab = 'surveys';
     if(/^#customers\b/.test(location.hash || '')) currentTab = 'customers';
+    if(/^#(leads|calendar)$/.test(location.hash || '')) currentTab = location.hash.slice(1);
     render();
   }catch(e){
     if(e.expired){ renderLogin('Your session has ended. Please sign in again.'); return; }
@@ -459,6 +462,7 @@ async function boot(){
 
 /* ----------------------------- Sign in ----------------------------- */
 function renderLogin(msg){
+  if(window.VQWORK) VQWORK.reset();
   document.getElementById('app').innerHTML = `
   <div class="auth-screen portal-auth">
     <div class="auth-layout"><aside class="auth-story"><div class="workspace-eyebrow">VantriqAI · Customer portal</div><h1>Your agents.<br>Your account.<br><em>All in one place.</em></h1><p>See how your agents are performing, follow your conversations, and stay on top of your account.</p><div class="auth-capabilities"><span>Usage &amp; activity</span><span>Invoices &amp; statements</span><span>Account &amp; support</span></div><div class="auth-story-note"><span class="auth-story-mark">${portalMark()}</span><div><strong>A clearer view of your service.</strong><p>Everything you need to manage your VantriqAI account.</p></div></div></aside>
@@ -505,6 +509,7 @@ async function doLogin(){
     loginBusy = false;
     if(window.VQS) VQS.reset();
     if(window.VQC) VQC.reset();
+  if(window.VQWORK) VQWORK.reset();
     boot();
   }catch(e){
     show('Could not reach the server. Check your connection and try again.');
@@ -543,6 +548,7 @@ async function doLogout(){
   // sign in on this browser must not see this account's surveys.
   if(window.VQS) VQS.reset();
   if(window.VQC) VQC.reset();
+  if(window.VQWORK) VQWORK.reset();
   data = { account:null, usage:null, invoices:[], ledger:null, packages:null,
     agents:null, bundles:null, quotes:null, activity:null, apiTokens:null };
   currentTab = 'overview';
@@ -573,16 +579,17 @@ function portalLabelTables(){
   });
 }
 function portalNavIcon(tab){
-  const paths={overview:'M3 10l9-7 9 7v10H3z M9 20v-7h6v7',analytics:'M4 20V10m8 10V4m8 16v-7',customers:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M20 8v6m-3-3h6',surveys:'M4 4h16v12H9l-5 4z',agents:'M5 8h14v12H5z M12 3v5 M8 12h1m6 0h1 M8 16h8',usage:'M3 12h4l3-8 4 16 3-8h4',activity:'M12 8v5l3 2 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0',invoices:'M6 3h12v18l-3-2-3 2-3-2-3 2z M9 8h6m-6 4h6',ledger:'M4 4h16v16H4z M8 4v16m-4-10h16m-16 5h16',contracts:'M6 3h8l4 4v14H6z M14 3v5h4 M9 12h6m-6 4h6',packages:'M3 7l9-4 9 4v10l-9 4-9-4z M3 7l9 4 9-4 M12 11v10',quotes:'M5 4h14v16H5z M8 8h8m-8 4h8m-8 4h4',security:'M12 3l8 4v5c0 5-8 9-8 9s-8-4-8-9V7z M9 12l2 2 4-4'};
+  const paths={leads:'M4 4h16v16H4z M8 8h8m-8 4h8m-8 4h4',calendar:'M4 5h16v16H4z M8 3v4m8-4v4M4 10h16',overview:'M3 10l9-7 9 7v10H3z M9 20v-7h6v7',analytics:'M4 20V10m8 10V4m8 16v-7',customers:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M20 8v6m-3-3h6',surveys:'M4 4h16v12H9l-5 4z',agents:'M5 8h14v12H5z M12 3v5 M8 12h1m6 0h1 M8 16h8',usage:'M3 12h4l3-8 4 16 3-8h4',activity:'M12 8v5l3 2 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0',invoices:'M6 3h12v18l-3-2-3 2-3-2-3 2z M9 8h6m-6 4h6',ledger:'M4 4h16v16H4z M8 4v16m-4-10h16m-16 5h16',contracts:'M6 3h8l4 4v14H6z M14 3v5h4 M9 12h6m-6 4h6',packages:'M3 7l9-4 9 4v10l-9 4-9-4z M3 7l9 4 9-4 M12 11v10',quotes:'M5 4h14v16H5z M8 8h8m-8 4h8m-8 4h4',security:'M12 3l8 4v5c0 5-8 9-8 9s-8-4-8-9V7z M9 12l2 2 4-4'};
   return `<svg class="portal-nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[tab]||paths.overview}"/></svg>`;
 }
 function portalViewHeading(){
-  const titles={overview:['Account overview','Your service, usage, and account at a glance.'],analytics:['Vantriq Pulse','See the impact of your customer conversations.'],customers:['Your customers','Contacts, conversations, and the details that matter.'],surveys:['Vantriq Echo','Hear your customers and follow up on their feedback.'],agents:['Your agents','A clear view of the agents working for your business.'],usage:['Usage & allowance','Track your conversations and available allowance.'],activity:['Conversation activity','Explore the conversations behind your usage.'],invoices:['Invoices','Review your invoices and payment status.'],ledger:['Account statement','Your account movements and running balance.'],contracts:['Contracts','Your agreements and renewal dates.'],packages:['Packages & bundles','Explore your package and available add-ons.'],quotes:['Your quotes','Review the proposals shared with your business.'],security:['Account security','Manage your password and account access.']};
+  const titles={leads:['Your leads','Turn enquiries into opportunities with ownership and a clear next action.'],calendar:['Your calendar','Meetings, demos and follow-ups linked to your own leads.'],overview:['Account overview','Your service, usage, and account at a glance.'],analytics:['Vantriq Pulse','See the impact of your customer conversations.'],customers:['Your customers','Contacts, conversations, and the details that matter.'],surveys:['Vantriq Echo','Hear your customers and follow up on their feedback.'],agents:['Your agents','A clear view of the agents working for your business.'],usage:['Usage & allowance','Track your conversations and available allowance.'],activity:['Conversation activity','Explore the conversations behind your usage.'],invoices:['Invoices','Review your invoices and payment status.'],ledger:['Account statement','Your account movements and running balance.'],contracts:['Contracts','Your agreements and renewal dates.'],packages:['Packages & bundles','Explore your package and available add-ons.'],quotes:['Your quotes','Review the proposals shared with your business.'],security:['Account security','Manage your password and account access.']};
   const [title,description]=titles[currentTab]||titles.overview;
   return `<header class="portal-view-heading"><div class="workspace-eyebrow">Customer workspace</div><h1>${title}</h1><p>${description}</p></header>`;
 }
 
 function render(){
+  if(window.VQWORK) VQWORK.unmount();
   const { account } = data;
   document.getElementById('app').innerHTML = `
     <div class="topbar">
@@ -608,6 +615,8 @@ function render(){
         <button type="button" class="tab ${currentTab==='overview'?'active':''}" onclick="setTab('overview')" aria-current="${currentTab==='overview'?'page':'false'}">${portalNavIcon('overview')}Overview</button>
         <button type="button" class="tab ${currentTab==='analytics'?'active':''}" onclick="setTab('analytics')" title="Vantriq Pulse — analytics" aria-current="${currentTab==='analytics'?'page':'false'}">${portalNavIcon('analytics')}Pulse</button>
         <button type="button" class="tab ${currentTab==='customers'?'active':''}" onclick="setTab('customers')" title="Your customers: who they are, every conversation, what they said" aria-current="${currentTab==='customers'?'page':'false'}">${portalNavIcon('customers')}Customers</button>
+        <button type="button" class="tab ${currentTab==='leads'?'active':''}" onclick="setTab('leads')" aria-current="${currentTab==='leads'?'page':'false'}">${portalNavIcon('leads')}Leads</button>
+        <button type="button" class="tab ${currentTab==='calendar'?'active':''}" onclick="setTab('calendar')" aria-current="${currentTab==='calendar'?'page':'false'}">${portalNavIcon('calendar')}Calendar</button>
         ${surveysOn()?`<button type="button" class="tab ${currentTab==='surveys'?'active':''}" onclick="setTab('surveys')" title="Vantriq Echo — customer-satisfaction surveys" aria-current="${currentTab==='surveys'?'page':'false'}">${portalNavIcon('surveys')}Echo</button>`:''}
         <button type="button" class="tab ${currentTab==='agents'?'active':''}" onclick="setTab('agents')" aria-current="${currentTab==='agents'?'page':'false'}">${portalNavIcon('agents')}My agents${data.agents&&data.agents.length?` <span class="tab-n">${data.agents.length}</span>`:''}</button>
         <button type="button" class="tab ${currentTab==='usage'?'active':''}" onclick="setTab('usage')" aria-current="${currentTab==='usage'?'page':'false'}">${portalNavIcon('usage')}Usage</button>
@@ -630,6 +639,7 @@ function render(){
   if(currentTab==='usage') requestAnimationFrame(drawUsageChart);
   if(currentTab==='surveys') mountSurveys();
   if(currentTab==='customers') mountCustomers();
+  if(currentTab==='leads'||currentTab==='calendar') mountWorkspace();
   if(currentTab==='analytics'){
     if(!data.analytics) loadAnalytics();
     else if(!data.analytics.error) requestAnimationFrame(()=>VQA.drawConversations(data.analytics));
@@ -647,7 +657,7 @@ function setTab(t){
   if(currentTab==='surveys' && t!=='surveys' && window.VQS && VQS.hasUnsaved()
      && !confirm('You have unsaved survey changes. Leave without saving?')) return;
   currentTab=t;
-  try{ history.replaceState(null, '', t==='surveys' ? '#surveys' : t==='customers' ? '#customers' : location.pathname + location.search); }catch(e){}
+  try{ history.replaceState(null, '', ['surveys','customers','leads','calendar'].includes(t) ? '#'+t : location.pathname + location.search); }catch(e){}
   render();
 }
 
@@ -660,6 +670,7 @@ function tabBody(){
   if(currentTab==='overview') return renderOverview();
   if(currentTab==='analytics') return renderAnalytics();
   if(currentTab==='customers') return renderCustomers();
+  if(currentTab==='leads'||currentTab==='calendar') return '<div id="work-root"></div>';
   if(currentTab==='surveys') return surveysOn() ? renderSurveys() : renderOverview();
   if(currentTab==='usage') return renderUsage();
   if(currentTab==='invoices') return renderInvoices();
@@ -798,7 +809,21 @@ function mountCustomers(){
       .catch(e => { if(e.expired){ renderLogin('Your session has ended. Please sign in again.'); } throw e; }),
     download: (path, filename) => portalDownload('/contacts' + path, filename, 'Building your customer workbook…'),
     toast: (msg, warn) => toast(msg, warn),
+    promote: async contact => {
+      try{const id=await VQWORK.promote(contact,api);setTab('leads');await VQWORK.openLead(id);toast('Saved as a lead');}
+      catch(e){if(e.expired)renderLogin('Your session has ended. Please sign in again.');else toast(e.message,true);}
+    },
   });
+}
+
+function mountWorkspace(){
+  const el=document.getElementById('work-root');
+  if(!el||!window.VQWORK)return;
+  VQWORK.mount(el,{api,toast,labelTables:portalLabelTables,
+    error:e=>{if(e.expired)renderLogin('Your session has ended. Please sign in again.');},
+    download:(path,name)=>portalDownload(path,name,'Building your calendar…'),
+    conversation:key=>{setTab('customers');VQC.open(key);}
+  },currentTab);
 }
 
 /* ---- Surveys: build, share and read customer-satisfaction surveys (/survey-studio.js) ---- */

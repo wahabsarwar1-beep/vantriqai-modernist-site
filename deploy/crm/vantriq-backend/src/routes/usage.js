@@ -270,13 +270,27 @@ router.get('/service-status', async (req, res) => {
  */
 // Agent booking is separate from lead capture: a failed booking never loses a lead.
 router.post('/appointment', async(req,res)=>{
-  const {createEvent}=require('../utils/calendar');
-  const saved=await createEvent(req.body||{},'AI agent webhook',true);
+  const b=req.body||{};
+  let saved;
+  if(b.agent_ref||b.agent_id||b.tenant_client_id){
+    const P=require('../utils/portalLeads');
+    const client=await P.resolveTenant(b);
+    saved=await P.createEvent(client,b,'AI agent webhook',true);
+  } else {
+    const {createEvent}=require('../utils/calendar');
+    saved=await createEvent(b,'AI agent webhook',true);
+  }
   res.status(saved.created?201:200).json({ok:true,created:saved.created,event_id:saved.event.id,client_id:saved.event.client_id});
 });
 
 router.post('/lead', async (req, res) => {
   const body = req.body || {};
+  if(body.agent_ref||body.agent_id||body.tenant_client_id){
+    const P=require('../utils/portalLeads');
+    const client=await P.resolveTenant(body);
+    const saved=await P.createLead(client.id,body,'AI agent webhook',true);
+    return res.status(saved.created?201:200).json({ok:true,created:saved.created,lead_id:saved.lead.id,portal_lead_id:saved.lead.id,tenant_client_id:client.id});
+  }
   const externalRef = String(body.external_ref || '').trim();
   if (!externalRef) return res.status(400).json({ error: 'external_ref is required' });
 

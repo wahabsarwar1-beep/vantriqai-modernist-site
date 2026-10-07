@@ -27,25 +27,26 @@ function eventInput(body, webhook = false) {
   out.channel = body.channel || 'manual'; out.kind = body.kind || 'meeting'; out.status = body.status || 'scheduled';
   if (!(webhook ? AGENT_CHANNELS : ['manual', ...AGENT_CHANNELS]).includes(out.channel)) fail(400, 'Choose a valid channel.');
   if (!['meeting','demo','call','follow_up'].includes(out.kind)) fail(400, 'Choose a valid appointment kind.');
-  if (!['scheduled','completed','cancelled','no_show'].includes(out.status)) fail(400, 'Choose a valid status.');
+  if (!['scheduled','confirmed','completed','cancelled','no_show'].includes(out.status)) fail(400, 'Choose a valid status.');
   if (webhook && (!out.external_id || out.status !== 'scheduled')) fail(400, 'Agent bookings need a stable external_id and scheduled status.');
   return out;
 }
-async function transaction(work) {
+async function transaction(work, tenant = null) {
   const conn = await db.pool.connect();
   try {
     await conn.query('begin');
-    // All calendar and ownership writes share a lock, preventing bookings or
-    // reassignments racing past the availability check. Fine for this CRM's scale.
-    await conn.query('select pg_advisory_xact_lock(92323001)');
+    // Customer writes lock only their own workspace, so unrelated businesses
+    // can book concurrently. Legacy Vantriq sales ownership retains its shared lock.
+    if(tenant)await conn.query('select pg_advisory_xact_lock(hashtextextended($1,0))',[tenant]);
+    else await conn.query('select pg_advisory_xact_lock(92323001)');
     const result = await work(conn);
     await conn.query('commit'); return result;
   } catch (e) { await conn.query('rollback'); throw e; } finally { conn.release(); }
 }
 async function conflict(conn, client, e, exclude = null) {
-  if (e.status !== 'scheduled') return;
+  if (!['scheduled','confirmed'].includes(e.status)) return;
   const { rows } = await conn.query(`select e.id from calendar_events e join clients c on c.id=e.client_id
-    where e.status='scheduled' and ($5::uuid is null or e.id<>$5)
+    where e.portal_lead_id is null and e.status in ('scheduled','confirmed') and ($5::uuid is null or e.id<>$5)
     and (e.client_id=$1 or ($2::uuid is not null and c.owner_rep_id=$2))
     and e.starts_at < $4 and e.ends_at > $3 limit 1`,
     [client.id, client.owner_rep_id, e.starts_at, e.ends_at, exclude]);
@@ -90,9 +91,9 @@ async function assignLead(clientId, repId, actor, reason) {
     if (client.owner_rep_id === repId) return client;
     if (repId) {
       const { rows: conflicts } = await conn.query(`select a.id from calendar_events a
-        join calendar_events b on b.status='scheduled' and a.starts_at<b.ends_at and a.ends_at>b.starts_at
+        join calendar_events b on b.portal_lead_id is null and b.status in ('scheduled','confirmed') and a.starts_at<b.ends_at and a.ends_at>b.starts_at
         join clients c on c.id=b.client_id
-        where a.client_id=$1 and a.status='scheduled' and a.ends_at>now()
+        where a.client_id=$1 and a.portal_lead_id is null and a.status in ('scheduled','confirmed') and a.ends_at>now()
         and c.owner_rep_id=$2 and b.client_id<>$1 limit 1`, [clientId,repId]);
       if (conflicts.length) fail(409, 'The new rep has a conflicting appointment. Reschedule before assigning.');
     }
@@ -104,14 +105,15 @@ async function assignLead(clientId, repId, actor, reason) {
     return saved[0];
   });
 }
-const JOIN = `select e.*, c.name as lead_name, c.company, c.source as lead_source,
-  c.owner_rep_id, r.name as rep_name from calendar_events e join clients c on c.id=e.client_id
-  left join sales_reps r on r.id=c.owner_rep_id`;
+const JOIN = `select e.*, coalesce(l.name,c.name) as lead_name, coalesce(l.company,c.company) as company,
+  c.company as customer_company, coalesce(l.source,c.source) as lead_source,
+  c.owner_rep_id, coalesce(nullif(l.assigned_to,''),r.name) as rep_name from calendar_events e join clients c on c.id=e.client_id
+  left join sales_reps r on r.id=c.owner_rep_id left join portal_leads l on l.id=e.portal_lead_id`;
 async function listEvents(query, repId) {
   const from=instant(query.from), to=instant(query.to);
   if (Date.parse(to)<=Date.parse(from) || Date.parse(to)-Date.parse(from)>93*86400000) fail(400, 'Choose a calendar range of up to 93 days.');
   const params=[from,to]; let where='where e.ends_at>$1 and e.starts_at<$2';
-  if (repId) {params.push(id(repId)); where+=' and c.owner_rep_id=$3';}
+  if (repId) {params.push(id(repId)); where+=' and c.owner_rep_id=$3 and e.portal_lead_id is null';}
   else if (query.rep_id==='unassigned') where+=' and c.owner_rep_id is null';
   else if (query.rep_id) {params.push(id(query.rep_id)); where+=' and c.owner_rep_id=$3';}
   if (query.channel) {
@@ -132,4 +134,4 @@ function ics(events) {
   // Fold UTF-8 lines without splitting a multibyte character (RFC 5545).
   return lines.map(line=>{let out='',part='';for(const ch of line){if(Buffer.byteLength(part+ch)>74){out+=part+'\r\n';part=' ';}part+=ch;}return out+part;}).join('\r\n')+'\r\n';
 }
-module.exports={id,instant,eventInput,fail,transaction,conflict,createEvent,assignLead,listEvents,ics};
+module.exports={AGENT_CHANNELS,id,instant,eventInput,fail,transaction,conflict,createEvent,assignLead,listEvents,ics};

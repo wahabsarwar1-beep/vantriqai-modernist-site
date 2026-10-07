@@ -14,6 +14,9 @@ router.post('/',async(req,res)=>{
 });
 router.patch('/:id',async(req,res)=>{
   const eventId=cal.id(req.params.id),body=req.body||{};
+  const {rows: linked}=await db.query(`select e.id from calendar_events e join portal_leads l
+    on (l.id=e.portal_lead_id or (e.portal_lead_id is null and l.crm_client_id=e.client_id)) where e.id=$1`,[eventId]);
+  if(linked.length)return res.json(await require('../utils/portalLeads').updateEvent(eventId,body,actor(req)));
   if (Object.keys(body).some(k=>!['title','starts_at','ends_at','kind','status','location','notes'].includes(k)))
     cal.fail(400,'Only appointment details may be changed.');
   const saved=await cal.transaction(async conn=>{
