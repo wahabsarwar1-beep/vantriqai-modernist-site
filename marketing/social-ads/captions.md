@@ -709,3 +709,61 @@ Every figure is one the site already publishes. The 78% card credits its source,
 > Reply, qualify and book on WhatsApp, Instagram, your website and voice, ready when your customers are.
 >
 > Book a free demo, link in bio.
+
+---
+
+## V09 · Pulse video with voiceover (Feed, 4:5): Every conversation. A business signal.
+
+**Post on:** 2026-10-16
+**Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@f5bc8e32ff91a0928af5eab00ddd8adb52d42d76/marketing/social-ads/vantriqai-video-pulse-feed.mp4
+**Headline (ad field):** Every conversation. A business signal.
+**Hashtags:** #VantriqAI #VantriqPulse #BusinessAnalytics #CustomerInsights #DataDriven
+**Primary text / Facebook:**
+
+> "Can I book a demo?" "Absolutely. What time works?"
+>
+> Every conversation tells you something. Vantriq Pulse shows you what:
+>
+> 📅 Bookings, straight into your calendar and synced to your CRM
+> 📈 Leads made and leads closed, live
+> ⏱️ Time to close, from first message to closed lead
+> 🕒 Your busiest hours
+> 🙂 Customer satisfaction and how much the AI resolved on its own
+>
+> Compared like for like, in plain English. See what moves your business.
+>
+> Explore Pulse → https://www.vantriqai.com/products/vantriq-pulse
+
+**Instagram:**
+
+> Every conversation. A business signal. 📊 🔊 Sound on
+>
+> Leads made and closed, time to close, busiest hours and customer satisfaction, live in Vantriq Pulse.
+>
+> See what moves your business. Link in bio.
+
+---
+
+## V10 · Pulse video with voiceover (Reel, 9:16): See what moves your business.
+
+**Post on:** 2026-10-23
+**Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@f5bc8e32ff91a0928af5eab00ddd8adb52d42d76/marketing/social-ads/vantriqai-video-pulse-reels.mp4
+**Headline (ad field):** See what moves your business
+**Hashtags:** #VantriqAI #VantriqPulse #SalesAnalytics #SmallBusinessGrowth #AIinPakistan
+**Primary text / Facebook:**
+
+> Your customer conversations are full of answers: who's ready to buy, how fast you close, when you're busiest and how happy people are.
+>
+> Vantriq Pulse turns every WhatsApp, Instagram and website conversation into live insight, so you can act with clarity instead of guessing.
+>
+> Included in every VantriqAI plan.
+>
+> Explore Pulse → https://www.vantriqai.com/products/vantriq-pulse
+
+**Instagram:**
+
+> See what moves your business. 📈 🔊 Sound on
+>
+> Bookings, leads, time to close, busiest hours and satisfaction, all from your conversations. That's Vantriq Pulse.
+>
+> Explore Pulse, link in bio.
