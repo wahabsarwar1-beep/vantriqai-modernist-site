@@ -34,12 +34,12 @@ the site's Symphony palette (ink, cream, cobalt) with Sora / Manrope.
 | 12 | Monday Insights Digest |
 | 13 | Different channels, one connected agent (17 Oct) |
 | 14 | Booking Agent: from a message to a booking (7 Oct) |
-| 15 | Catalogue Agent: your catalogue, ready to answer (9 Oct) |
+| 15 | Catalogue Agent: your catalogue, ready to answer (15 Oct) |
 | 16 | Follow-up Agent: the conversation isn't over (10 Oct) |
 | 17 | Payments Agent: from interested to paid (11 Oct) |
 | 18 | Vantriq Pulse: see what conversations reveal (12 Oct) |
 | 19 | Vantriq Echo: hear every customer (13 Oct) |
-| C01 | Carousel: 5 signs your inbox is costing you sales (7 slides) |
+| C01 | Carousel: 5 signs your inbox is costing you sales (7 slides, 9 Oct) |
 | V01 | Video, Reel 9:16: One platform, built to act (posts 5 Oct) |
 | V02 | Video, Feed 4:5: Agents, Pulse and Echo (posts 8 Oct) |
 | V04 | Video with voiceover, Reel 9:16: Conversation to real-world action (posts 6 Oct) |

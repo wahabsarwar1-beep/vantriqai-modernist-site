@@ -316,6 +316,7 @@ Every figure is one the site already publishes. The 78% card credits its source,
 
 ## C01 · Carousel: 5 signs your inbox is costing you sales (7 slides)
 
+**Post on:** 2026-10-09
 **Headline (ad field):** 5 signs your inbox is costing you sales
 **Hashtags:** #VantriqAI #VantriqAgents #SmallBusinessTips #CustomerService #WhatsAppBusiness
 **Primary text / Facebook:**
@@ -454,7 +455,7 @@ Every figure is one the site already publishes. The 78% card credits its source,
 
 ## 15 · Your catalogue. Ready to answer.
 
-**Post on:** 2026-10-09
+**Post on:** 2026-10-15
 **Headline (ad field):** Your catalogue, ready to answer
 **Hashtags:** #VantriqAI #VantriqAgents #EcommercePakistan #ConversationalCommerce #WhatsAppBusiness
 **Primary text / Facebook:**
