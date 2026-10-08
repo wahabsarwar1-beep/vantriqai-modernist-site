@@ -657,7 +657,7 @@ Every figure is one the site already publishes. The 78% card credits its source,
 ## V07 · Video with voiceover (Reel, 9:16): Less chat. More done.
 
 **Post on:** 2026-10-15
-**Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@fabe332fb04dfabbbcc2e7980b40c5f5f9d92549/marketing/social-ads/vantriqai-video-things-done-reels.mp4
+**Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@00de90a689f86481caac4400fa0087a0c631ee59/marketing/social-ads/vantriqai-video-things-done-reels.mp4
 **Headline (ad field):** Less chat. More done.
 **Hashtags:** #VantriqAI #VantriqAgents #AIagents #WorkflowAutomation #SmallBusinessPakistan
 **Primary text / Facebook:**
@@ -687,7 +687,7 @@ Every figure is one the site already publishes. The 78% card credits its source,
 ## V08 · Video with voiceover (Reel, 9:16): Make every moment count.
 
 **Post on:** 2026-10-21
-**Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@fabe332fb04dfabbbcc2e7980b40c5f5f9d92549/marketing/social-ads/vantriqai-video-the-moment-reels.mp4
+**Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@00de90a689f86481caac4400fa0087a0c631ee59/marketing/social-ads/vantriqai-video-the-moment-reels.mp4
 **Headline (ad field):** Make every moment count
 **Hashtags:** #VantriqAI #VantriqEcho #ConversationalAI #CustomerExperience #AIinPakistan
 **Primary text / Facebook:**
