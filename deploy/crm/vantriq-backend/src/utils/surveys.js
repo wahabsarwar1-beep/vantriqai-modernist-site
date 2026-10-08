@@ -674,7 +674,7 @@ function linksFor(survey, base) {
     qr_svg: `${url}/qr.svg`,
     poster: `${url}/poster`,
     kiosk: `${url}?kiosk=1`,
-    preview: `${url}?preview=1`,
+    preview: `${url}?preview=1&preview_token=${require('./surveyPreview').issuePreview(survey.slug)}`,
     embed: `<iframe src="${url}?ch=embed" title="${escapeHtml(survey.display_name || 'Feedback')}" style="width:100%;height:680px;border:0;border-radius:16px;" loading="lazy"></iframe>`,
     whatsapp: `https://wa.me/?text=${encodeURIComponent(inviteMessage(survey, `${url}?ch=whatsapp`).en)}`,
     locations: (survey.locations || []).map((l) => ({

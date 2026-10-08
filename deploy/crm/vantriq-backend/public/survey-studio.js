@@ -1362,7 +1362,7 @@
   function phone(){
     var s = st.survey;
     return '<div class="vqs-phone-wrap">'
-      + device('<iframe id="vqs-preview" title="Live preview" src="/s/' + encodeURIComponent(s.slug) + '?preview=1&device=1"></iframe>', 332, 64)
+      + device('<iframe id="vqs-preview" title="Live preview" src="' + esc(s.links.preview + '&device=1') + '"></iframe>', 332, 64)
       + '<div class="vqs-phone-cap">Live preview, as it looks on a customer’s phone — nothing you do here is recorded</div></div>';
   }
   var previewTimer = null, pendingGoto = null;

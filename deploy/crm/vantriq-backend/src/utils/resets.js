@@ -51,8 +51,12 @@ async function redeemReset(subjectType, token, newPassword) {
   if (String(newPassword || '').length < MIN_PASSWORD) {
     return { ok: false, status: 400, error: `Choose a password of at least ${MIN_PASSWORD} characters.` };
   }
-  const { rows } = await db.query(
-    `select * from password_resets where token_hash = $1 and subject_type = $2`,
+  const conn = await db.pool.connect();
+  try {
+    await conn.query('begin');
+    const result = await (async () => {
+  const { rows } = await conn.query(
+    `select * from password_resets where token_hash = $1 and subject_type = $2 for update`,
     [hashToken(token), subjectType]
   );
   const row = rows[0];
@@ -62,24 +66,33 @@ async function redeemReset(subjectType, token, newPassword) {
 
   const hash = hashPassword(newPassword);
   if (subjectType === 'staff') {
-    const { rows: u } = await db.query(
+    const { rows: u } = await conn.query(
       `update internal_users set password_hash = $2, must_change_password = false, password_set_by = 'self'
         where id = $1 and active = true returning id, email`,
       [row.subject_id, hash]
     );
     if (!u[0]) return dead;
-    await db.query(`delete from staff_sessions where user_id = $1`, [row.subject_id]);
+    await conn.query(`delete from staff_sessions where user_id = $1`, [row.subject_id]);
+    await conn.query(`update login_challenges set consumed = true where user_id = $1`, [row.subject_id]);
+    await conn.query(`update internal_users set pending_totp_secret = null, pending_totp_expires_at = null, pending_totp_session_hash = null where id = $1`, [row.subject_id]);
   } else {
-    const { rows: c } = await db.query(
+    const { rows: c } = await conn.query(
       `update clients set portal_password_hash = $2, portal_password_set_at = now(), portal_password_set_by = 'customer'
         where id = $1 and portal_username is not null returning id, company`,
       [row.subject_id, hash]
     );
     if (!c[0]) return dead;
-    await db.query(`delete from portal_sessions where client_id = $1`, [row.subject_id]);
+    await conn.query(`delete from portal_sessions where client_id = $1`, [row.subject_id]);
   }
-  await db.query(`update password_resets set used_at = now() where id = $1`, [row.id]);
+  await conn.query(`update password_resets set used_at = now() where id = $1`, [row.id]);
   return { ok: true };
+    })();
+    await conn.query('commit');
+    return result;
+  } catch (err) {
+    await conn.query('rollback');
+    throw err;
+  } finally { conn.release(); }
 }
 
 module.exports = { issueReset, redeemReset, RESET_MINUTES, MIN_PASSWORD };

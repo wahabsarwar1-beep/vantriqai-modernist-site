@@ -98,6 +98,12 @@ const FIELDS = [
 ];
 
 function validate(body, { partial = false } = {}) {
+  if (body.document_url) {
+    try {
+      const url = new URL(body.document_url);
+      if (url.protocol !== 'https:' || url.username || url.password) return 'Document links must use HTTPS without embedded credentials.';
+    } catch { return 'Enter a valid HTTPS document link.'; }
+  }
   if (body.kind !== undefined && !KINDS.includes(body.kind)) {
     return `Contract type must be one of: ${KINDS.join(', ')}.`;
   }

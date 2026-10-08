@@ -86,7 +86,7 @@ router.get('/_template/:key', (req, res) => {
 
 router.get('/:slug', async (req, res) => {
   const survey = await S.getSurveyBySlug(req.params.slug);
-  const preview = req.query.preview === '1';
+  const preview = req.query.preview === '1' && require('../utils/surveyPreview').validPreview(req.params.slug, req.query.preview_token);
   const fetcher = LINK_PREVIEW.test(String(req.get('user-agent') || ''));
   let state = 'ok';
   if (!survey) state = 'not_found';

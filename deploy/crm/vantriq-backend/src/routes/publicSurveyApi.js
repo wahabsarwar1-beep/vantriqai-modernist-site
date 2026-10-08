@@ -15,6 +15,7 @@ const { clientIp } = require('../utils/clientIp');
  * The survey page itself, its QR codes and posters are routes/surveyPages.js.
  */
 const router = express.Router();
+const { validPreview } = require('../utils/surveyPreview');
 
 /** A fixed-window counter per key, in memory — one app instance, so memory is the right place. */
 function rateLimit({ windowMs, max, key }) {
@@ -48,7 +49,7 @@ const limitDevice = rateLimit({ windowMs: TEN_MINUTES, max: PER_SURVEY * 4, key:
 /** The survey as a respondent sees it — its public fields only. Drafts only with ?preview=1. */
 router.get('/surveys/:slug', async (req, res) => {
   const survey = await S.getSurveyBySlug(req.params.slug);
-  if (!survey || (survey.status === 'draft' && req.query.preview !== '1')) {
+  if (!survey || (survey.status === 'draft' && !(req.query.preview === '1' && validPreview(req.params.slug, req.query.preview_token)))) {
     return res.status(404).json({ error: 'Survey not found' });
   }
   res.set('Cache-Control', 'no-store');

@@ -19,6 +19,9 @@ const { renderWhtStatement, whtFilename } = require('../utils/whtCertificate');
 const ExcelJS = require('exceljs');
 
 const router = express.Router();
+const { rateLimit } = require('../middleware/security');
+const accountLimit = rateLimit('portal-login', { max: 10, seconds: 900, identity: req => String((req.body || {}).username || '').trim().toLowerCase() });
+const recoveryLimit = rateLimit('portal-recovery', { max: 3, seconds: 900, identity: req => String((req.body || {}).username || (req.body || {}).email || '').trim().toLowerCase() });
 
 const INVOICE_TYPE_LABEL = { setup_fee: 'Setup fee', retainer: 'Retainer', overage: 'Overage', addon: 'Add-on / change request' };
 const SESSION_HOURS = 12;
@@ -35,7 +38,7 @@ const SESSION_HOURS = 12;
  */
 
 /* ---------------------------- Sign in / out (public) ---------------------------- */
-router.post('/login', async (req, res) => {
+router.post('/login', accountLimit, async (req, res) => {
   const username = String((req.body || {}).username || '').trim().toLowerCase();
   const password = String((req.body || {}).password || '');
   // One message for every failure mode, so the form can't be used to discover
@@ -73,7 +76,7 @@ router.post('/logout', async (req, res) => {
  *
  * The reply never varies, so the form cannot be used to test usernames.
  */
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', recoveryLimit, async (req, res) => {
   const id = String((req.body || {}).username || (req.body || {}).email || '').trim().toLowerCase();
   const same = () => res.json({
     ok: true,

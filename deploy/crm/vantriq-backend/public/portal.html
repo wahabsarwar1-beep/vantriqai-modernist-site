@@ -323,6 +323,8 @@ function todayISO(){ return new Date().toISOString().slice(0,10); }
 function fmtDate(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }
 function fmtMonth(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('en-US',{month:'short',year:'numeric'}); }
 function esc(s){ return (s==null?'':s+'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function jsArg(s){ return esc(JSON.stringify(String(s == null ? '' : s))); }
+function safeHttpsUrl(s){ try { const u=new URL(s); return u.protocol==='https:'&&!u.username&&!u.password ? u.href:''; }catch{ return ''; } }
 
 /* Access is by username + password now. The old ?t=<token> links no longer
    open an account on their own — the session below is the only credential. */
@@ -1019,7 +1021,7 @@ function renderPackages(){
         <div class="kv"><span class="k">Overage rate</span><span class="v">${fmtMoney(p.overage_rate)} / session</span></div>
         <div class="kv"><span class="k">Channels</span><span class="v">${esc(p.channels||'—')}</span></div>
         ${current || pending ? '' : `
-        <button class="btn btn-primary" style="margin-top:12px;" onclick="requestPackage('${p.id}','${esc(p.name).replace(/'/g,"\\'")}')">Request this package</button>`}
+        <button class="btn btn-primary" style="margin-top:12px;" onclick="requestPackage('${p.id}',${jsArg(p.name)})">Request this package</button>`}
       </div>`;
     }).join('')}
     <p style="font-size:11.5px;color:var(--muted);margin:6px 0 0;">
@@ -1113,7 +1115,7 @@ function renderBundleSection(){
               ${b.agents.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('')}
             </select>
           </div>` : ''}
-          <button class="btn btn-primary" ${bundleBusy?'disabled':''} onclick="addBundle('${p.id}','${esc(p.name).replace(/'/g,"\\'")}')">
+          <button class="btn btn-primary" ${bundleBusy?'disabled':''} onclick="addBundle('${p.id}',${jsArg(p.name)})">
             ${bundleBusy?'Adding…':'Add this bundle'}
           </button>
         </div>
@@ -1361,7 +1363,7 @@ function renderContracts(){
       ${c.notice_days?`<div class="kv"><span>Notice required</span><span>${c.notice_days} days</span></div>`:''}
       ${c.signed_date?`<div class="kv"><span>Signed</span><span>${fmtDate(c.signed_date)}${c.signed_by_client?` by ${esc(c.signed_by_client)}`:''}</span></div>`:''}
       ${c.scope?`<div class="kv"><span>Covers</span><span>${esc(c.scope)}</span></div>`:''}
-      ${c.document_url?`<div style="margin-top:12px;"><a class="btn btn-ghost btn-sm" href="${esc(c.document_url)}" target="_blank" rel="noopener noreferrer">Open the signed document</a></div>`:''}
+      ${c.document_url?`<div style="margin-top:12px;"><a class="btn btn-ghost btn-sm" href="${esc(safeHttpsUrl(c.document_url))}" target="_blank" rel="noopener noreferrer">Open the signed document</a></div>`:''}
     </div>`).join('')}
   `;
 }

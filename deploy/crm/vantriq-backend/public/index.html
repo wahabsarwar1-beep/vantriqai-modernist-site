@@ -870,6 +870,8 @@ function fmtClock(d){ if(!d) return '—'; return new Date(d).toLocaleTimeString
 function fmtDateTime(d){ if(!d) return '—'; return fmtDate(d)+' '+fmtClock(d); }
 function addMonths(dateStr,n){ const d=new Date(dateStr); d.setMonth(d.getMonth()+n); return d.toISOString().slice(0,10); }
 function esc(s){ return (s+'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function jsArg(s){ return esc(JSON.stringify(String(s == null ? '' : s))); }
+function safeHttpsUrl(s){ try { const u=new URL(s); return u.protocol==='https:'&&!u.username&&!u.password ? u.href:''; }catch{ return ''; } }
 
 function monthLabel(dateStr){ const d=new Date(dateStr); return d.toLocaleDateString('en-US',{month:'short',year:'numeric'}); }
 
@@ -2054,7 +2056,7 @@ function renderTeam(){
           <td>${u.last_login_at?fmtDate(u.last_login_at):'—'}</td>
           <td style="white-space:nowrap;">
             ${isSelf ? (u.totp_enabled
-              ? `<button class="btn btn-ghost btn-sm" onclick="disableTotp()">Two-factor: on (turn off)</button>`
+              ? `<button class="btn btn-ghost btn-sm" onclick="openTotpSetup()">Replace authenticator</button>${u.is_owner ? '' : '<button class="btn btn-ghost btn-sm" onclick="disableTotp()">Turn off</button>'}`
               : `<button class="btn btn-ghost btn-sm" onclick="openTotpSetup()">Set up two-factor</button>`) : ''}
             ${u.is_owner ? `<span class="footnote" style="font-size:11px;">Protected — only this account can change its own password or role.</span>` : `
             <button class="btn btn-ghost btn-sm" onclick="resetUserPassword('${u.id}')">Reset password</button>
@@ -2208,14 +2210,21 @@ let totpSetup = null;   // { secret, otpauth_url } once /totp/setup has answered
 
 function openTotpSetup(){
   totpSetup = null; openModal = {type:'totpSetup'}; render();
-  API.post('/api/auth/totp/setup', {}).then(r=>{ totpSetup = r; if(openModal&&openModal.type==='totpSetup') render(); })
-    .catch(e=>{ showToast(e.message||'Could not start two-factor setup','warn'); closeModal(); });
+}
+async function beginTotpSetup(){
+  const password = document.getElementById('totp_setup_password').value;
+  const current_code = (document.getElementById('totp_existing_code')||{}).value||'';
+  try { totpSetup = await API.post('/api/auth/totp/setup', { password, current_code }); if(openModal&&openModal.type==='totpSetup') render(); }
+  catch(e){ showToast(e.message||'Could not start two-factor setup','warn'); }
 }
 
 function totpSetupModalHTML(){
   if(!totpSetup){
     return `<div class="modal"><div class="modal-head"><h3>Two-factor sign-in</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
-      <div class="modal-body"><div class="empty"><span class="loading-dot"></span> Generating a secret…</div></div></div>`;
+      <div class="modal-body"><p>Confirm your identity to set up or replace an authenticator.</p>
+      <div class="field"><label>Current password</label><input id="totp_setup_password" type="password" autocomplete="current-password"></div>
+      ${authUser && authUser.totp_enabled ? '<div class="field"><label>Existing authenticator code</label><input id="totp_existing_code" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></div>' : ''}</div>
+      <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="beginTotpSetup()">Continue</button></div></div>`;
   }
   return `
   <div class="modal">
@@ -2259,7 +2268,9 @@ async function disableTotp(){
   const password = (prompt('Enter your current password to turn two-factor off:') || '');
   if(!password) return;
   try{
-    await API.post('/api/auth/totp/disable', { password });
+    const current_code = prompt('Enter your current authenticator code:') || '';
+    if(!current_code) return;
+    await API.post('/api/auth/totp/disable', { password, current_code });
     const me = await fetch(API.base+'/api/auth/me',{headers:{'Authorization':'Bearer '+API.session}});
     if(me.ok) authUser = await me.json();
     teamUsers = null; render();
@@ -4232,7 +4243,7 @@ function contractCard(c, {compact=false}={}){
     ${c.notes?`<div class="detail-row"><span class="k">Notes</span><span class="v">${esc(c.notes)}</span></div>`:''}
 
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
-      ${c.document_url?`<a class="btn btn-ghost btn-sm" href="${esc(c.document_url)}" target="_blank" rel="noopener noreferrer">${iconDownload(13)} Open the document</a>`:''}
+      ${c.document_url?`<a class="btn btn-ghost btn-sm" href="${esc(safeHttpsUrl(c.document_url))}" target="_blank" rel="noopener noreferrer">${iconDownload(13)} Open the document</a>`:''}
       <button class="btn btn-ghost btn-sm" onclick="openContractModal('${c.id}')">${iconEdit(13)} Edit</button>
       ${c.superseded_by||['superseded','terminated'].includes(c.status)?'':
         `<button class="btn btn-ghost btn-sm" onclick="supersedeContract('${c.id}')">Renew / replace</button>`}
@@ -6169,7 +6180,7 @@ async function generatePortalCredentials(clientId){
         <div style="margin-bottom:4px;">Username: <strong style="font-family:var(--f-mono);">${esc(r.username)}</strong></div>
         ${r.password
           ? `<div style="margin-bottom:8px;">Password: <strong style="font-family:var(--f-mono);font-size:14px;">${esc(r.password)}</strong></div>
-             <button class="btn btn-ghost btn-sm" onclick="copyPortalCreds('${esc(r.username)}','${esc(r.password)}','${esc(loginUrl)}')">Copy all three</button>
+             <button class="btn btn-ghost btn-sm" onclick="copyPortalCreds(${jsArg(r.username)},${jsArg(r.password)},${jsArg(loginUrl)})">Copy all three</button>
              <div style="margin-top:8px;color:#8A5F17;background:var(--amber-light);padding:8px 10px;border-radius:8px;font-size:11.5px;">
                Copy this password now — it is stored hashed and can never be shown again. Send it to the
                customer over a channel you trust, separately from the link.
@@ -7995,6 +8006,7 @@ async function signOut(){
   if(window.VQC) VQC.reset();
   if(window.VQCAL) VQCAL.reset();
   try{ if(API.session) await fetch(API.base+'/api/auth/logout',{method:'POST',headers:{'Authorization':'Bearer '+API.session}}); }catch(e){}
+  requiredTotp=null;totpSetup=null;setupError='';
   API.clearConfig(); authUser=null; apiConnected=false; emergencyData=null;
   API.base = window.location.origin;
   loginStep='password'; connectError='';
@@ -8008,6 +8020,7 @@ function signedOutByServer(msg){
   if(window.VQS) VQS.reset();
   if(window.VQC) VQC.reset();
   if(window.VQCAL) VQCAL.reset();
+  requiredTotp=null;totpSetup=null;setupError='';
   API.clearConfig(); authUser=null; apiConnected=false; emergencyData=null;
   API.base = window.location.origin;
   openModal=null; openPanel=null;
@@ -8036,6 +8049,39 @@ async function startEmergency(){
   }
 }
 
+/* Required security setup is completed before loading business data. */
+let requiredTotp = null;
+let setupError = '';
+function renderSecuritySetup(){
+  clearInterval(usagePollTimer);
+  const passwordStep = !!authUser.must_change_password;
+  document.getElementById('app').innerHTML = `<div class="center-screen"><div class="card" style="max-width:480px;margin:8vh auto;padding:28px;">
+    <h2>Secure your account</h2><p>${passwordStep ? 'Choose a new password before opening your workspace.' : 'Set up your authenticator before opening your workspace.'}</p>
+    ${setupError ? '<p role="alert">'+esc(setupError)+'</p>' : ''}
+    ${passwordStep ? `<div class="field"><label>Current password</label><input id="security_current" type="password" autocomplete="current-password"></div>
+      <div class="field"><label>New password (at least 10 characters)</label><input id="security_new" type="password" autocomplete="new-password" minlength="10"></div>
+      <button class="btn btn-primary" onclick="completeRequiredPassword()">Save password</button>` : requiredTotp ?
+      `<p>Add this secret to your authenticator app:</p><code style="word-break:break-all">${esc(requiredTotp.secret)}</code>
+       <div class="field"><label>Authenticator code</label><input id="security_code" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></div>
+       <button class="btn btn-primary" onclick="completeRequiredTotp()">Confirm authenticator</button>` :
+      `<div class="field"><label>Current password</label><input id="security_current" type="password" autocomplete="current-password"></div>
+       <button class="btn btn-primary" onclick="startRequiredTotp()">Set up authenticator</button>`}
+    <button class="btn btn-ghost" onclick="signOut()">Sign out</button>
+  </div></div>`;
+}
+async function completeRequiredPassword(){
+  try { await API.post('/api/auth/change-password', { current_password: document.getElementById('security_current').value, new_password: document.getElementById('security_new').value }); setupError=''; await boot(); }
+  catch(e){setupError=e.message;renderSecuritySetup();}
+}
+async function startRequiredTotp(){
+  try { requiredTotp=await API.post('/api/auth/totp/setup', {password:document.getElementById('security_current').value}); setupError='';renderSecuritySetup(); }
+  catch(e){setupError=e.message;renderSecuritySetup();}
+}
+async function completeRequiredTotp(){
+  try { await API.post('/api/auth/totp/confirm',{code:document.getElementById('security_code').value}); requiredTotp=null;setupError='';await boot(); }
+  catch(e){setupError=e.message;renderSecuritySetup();}
+}
+
 /* ============================== Boot ============================== */
 async function boot(){
   if(!API.configured()){
@@ -8054,6 +8100,7 @@ async function boot(){
       }
       authUser = await me.json();
     } else { authUser = null; }
+    if(authUser && !authUser.breakglass && (authUser.must_change_password || authUser.must_setup_totp || (authUser.is_owner && !authUser.totp_enabled))){ renderSecuritySetup(); return; }
     await loadState();
     apiConnected = true; connectError='';
     render();

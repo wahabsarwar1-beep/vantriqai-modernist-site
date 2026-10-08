@@ -12,6 +12,10 @@ const {
 const { clientIp } = require('../utils/clientIp');
 
 const router = express.Router();
+const { rateLimit } = require('../middleware/security');
+const accountLimit = rateLimit('staff-login', { max: 10, seconds: 900, identity: req => String((req.body || {}).email || '').trim().toLowerCase() });
+const recoveryLimit = rateLimit('staff-recovery', { max: 3, seconds: 900, identity: req => String((req.body || {}).email || '').trim().toLowerCase() });
+const factorLimit = rateLimit('staff-factor', { max: 10, seconds: 900, identity: req => req.header('authorization') || '' });
 
 const COMPANY_DOMAIN = (process.env.COMPANY_EMAIL_DOMAIN || 'vantriqai.com').toLowerCase();
 const OTP_MINUTES = 10;
@@ -39,7 +43,7 @@ function maskEmail(email) {
 }
 
 /* ---------------------------- Step 1: password ---------------------------- */
-router.post('/login', async (req, res) => {
+router.post('/login', accountLimit, async (req, res) => {
   const email = String((req.body || {}).email || '').trim().toLowerCase();
   const password = String((req.body || {}).password || '');
   const fail = () => res.status(401).json({ error: 'Incorrect email or password.' });
@@ -109,7 +113,7 @@ router.post('/verify', async (req, res) => {
   let ch;
   try {
     const { rows } = await db.query(
-      `select c.*, u.email, u.name, u.role, u.active, u.must_change_password, u.must_setup_totp, u.totp_secret
+      `select c.*, u.email, u.name, u.role, u.active, u.must_change_password, u.must_setup_totp, u.totp_secret, u.totp_enabled
          from login_challenges c join internal_users u on u.id = c.user_id
         where c.id = $1`,
       [challengeId]
@@ -128,19 +132,21 @@ router.post('/verify', async (req, res) => {
   // an emailed code, or a live computation off a shared secret — so the
   // challenge's own method decides which check runs, never the shape of the
   // code typed in.
+  if (ch.method !== 'totp' && ch.totp_enabled) return res.status(401).json({ error: 'Your sign-in protection changed. Please sign in again.' });
   const correct = ch.method === 'totp'
     ? verifyTotp(ch.totp_secret, code)
     : hashCode(code) === ch.code_hash;
 
   if (!correct) {
-    await db.query(`update login_challenges set attempts = attempts + 1 where id = $1`, [challengeId]);
+    await db.query(`update login_challenges set attempts = attempts + 1 where id = $1 and not consumed and attempts < 5`, [challengeId]);
     const left = OTP_MAX_ATTEMPTS - (ch.attempts + 1);
     return res.status(401).json({
       error: left > 0 ? `Incorrect code. ${left} attempt${left === 1 ? '' : 's'} left.` : 'Too many incorrect codes. Sign in again to get a new one.',
     });
   }
 
-  await db.query(`update login_challenges set consumed = true where id = $1`, [challengeId]);
+  const claimed = await db.query(`update login_challenges set consumed = true where id = $1 and not consumed and attempts < $2 and expires_at > now() returning id`, [challengeId, OTP_MAX_ATTEMPTS]);
+  if (!claimed.rowCount) return res.status(400).json({ error: 'That sign-in attempt has ended. Sign in again.' });
   const token = 'ss_' + crypto.randomBytes(24).toString('hex');
   const expires = new Date(Date.now() + SESSION_HOURS * 3600 * 1000);
   await db.query(`insert into staff_sessions (token, user_id, expires_at) values ($1,$2,$3)`, [token, ch.user_id, expires]);
@@ -200,7 +206,7 @@ router.post('/change-password', async (req, res) => {
 
   const { rows } = await db.query(
     `select u.* from staff_sessions s join internal_users u on u.id = s.user_id
-      where s.token = $1 and s.expires_at > now()`,
+      where s.token = $1 and s.expires_at > now() and u.active = true`,
     [token]
   );
   const user = rows[0];
@@ -208,10 +214,11 @@ router.post('/change-password', async (req, res) => {
   if (!verifyPassword(current, user.password_hash)) return res.status(401).json({ error: 'Your current password is not correct.' });
 
   await db.query(
-    `update internal_users set password_hash = $2, must_change_password = false where id = $1`,
+    `update internal_users set password_hash = $2, must_change_password = false, pending_totp_secret = null, pending_totp_expires_at = null, pending_totp_session_hash = null where id = $1`,
     [user.id, hashPassword(next)]
   );
   await db.query(`delete from staff_sessions where user_id = $1 and token <> $2`, [user.id, token]);
+  await db.query(`update login_challenges set consumed = true where user_id = $1`, [user.id]);
   if (user.is_owner) {
     alertOwner('Your password was just changed', [
       `Account: ${user.email}`, `Time: ${new Date().toISOString()}`,
@@ -244,59 +251,64 @@ async function currentUser(req) {
 // Step 1: generate a secret and hand back the otpauth:// URI to scan or
 // type in. Not yet enabled — a secret nobody has confirmed they can
 // generate codes from must not be able to lock the account.
-router.post('/totp/setup', async (req, res) => {
-  const user = await currentUser(req);
-  if (!user) return res.status(401).json({ error: 'Not signed in' });
-
-  const secret = randomSecret();
-  await db.query(`update internal_users set totp_secret = $2, totp_enabled = false where id = $1`, [user.id, secret]);
-  res.json({
-    secret,
-    otpauth_url: otpauthUri(secret, { account: user.email }),
-    message: 'Add this to an authenticator app (Google Authenticator, Authy, 1Password, ...), either by scanning the URL as a QR code or entering the secret manually, then confirm with the 6-digit code it shows.',
-  });
-});
-
-// Step 2: prove the app actually has the secret before it becomes the
-// thing standing between an attacker and this account.
-router.post('/totp/confirm', async (req, res) => {
-  const user = await currentUser(req);
-  if (!user) return res.status(401).json({ error: 'Not signed in' });
-  if (!user.totp_secret) return res.status(400).json({ error: 'Start with POST /api/auth/totp/setup first.' });
-
-  const code = String((req.body || {}).code || '').trim();
-  if (!verifyTotp(user.totp_secret, code)) return res.status(401).json({ error: 'Incorrect code. Check the time on your phone and try again.' });
-
-  await db.query(
-    `update internal_users set totp_enabled = true, must_setup_totp = false where id = $1`,
-    [user.id]
-  );
-  if (user.is_owner) {
-    alertOwner('Two-factor via authenticator app was enabled on your account', [
-      `Account: ${user.email}`, `Time: ${new Date().toISOString()}`,
-      'If this was not you, someone signed in as you — end every session from Settings and change your password now.',
-    ]);
-  }
-  res.json({ ok: true, message: 'Authenticator app sign-in is now on for this account. Email codes will no longer be used for it.' });
-});
-
-// Turning it back off. Requires the current password, same friction as
-// changing it, so a session left open on someone's desk cannot downgrade
-// their own second factor.
-router.post('/totp/disable', async (req, res) => {
+router.post('/totp/setup', factorLimit, async (req, res) => {
   const user = await currentUser(req);
   if (!user) return res.status(401).json({ error: 'Not signed in' });
   const password = String((req.body || {}).password || '');
-  if (!verifyPassword(password, user.password_hash)) return res.status(401).json({ error: 'Your current password is not correct.' });
-
-  await db.query(`update internal_users set totp_enabled = false, totp_secret = null where id = $1`, [user.id]);
-  if (user.is_owner) {
-    alertOwner('Two-factor was just turned off on your account', [
-      `Account: ${user.email}`, `Time: ${new Date().toISOString()}`,
-      'If this was not you, someone had your password — change it now and set an authenticator app back up.',
-    ]);
+  if (!verifyPassword(password, user.password_hash)) return res.status(401).json({ error: 'Enter your current password to set up an authenticator.' });
+  if (user.must_change_password) return res.status(403).json({ error: 'Change your initial password before setting up an authenticator.' });
+  if (user.totp_enabled && !verifyTotp(user.totp_secret, String((req.body || {}).current_code || ''))) {
+    return res.status(401).json({ error: 'Enter the code from your existing authenticator to replace it.' });
   }
-  res.json({ ok: true, message: 'Authenticator app sign-in is off. Email codes will be used again.' });
+  const secret = randomSecret();
+  const token = (req.header('authorization') || '').slice(7).trim();
+  // Keep the existing factor active until the pending one is confirmed.
+  await db.query(`update internal_users set pending_totp_secret = $2,
+    pending_totp_expires_at = now() + interval '15 minutes', pending_totp_session_hash = $3
+    where id = $1`, [user.id, secret, hashKey(token)]);
+  res.set('Cache-Control', 'no-store').json({ secret, otpauth_url: otpauthUri(secret, { account: user.email }),
+    message: 'Add this secret to your authenticator and confirm its code within 15 minutes.' });
+});
+
+router.post('/totp/confirm', factorLimit, async (req, res) => {
+  const user = await currentUser(req);
+  if (!user) return res.status(401).json({ error: 'Not signed in' });
+  const token = (req.header('authorization') || '').slice(7).trim();
+  if (user.must_change_password || !user.pending_totp_secret ||
+      !user.pending_totp_expires_at || new Date(user.pending_totp_expires_at) <= new Date() ||
+      user.pending_totp_session_hash !== hashKey(token)) {
+    return res.status(400).json({ error: 'Start authenticator setup again in this session.' });
+  }
+  if (!verifyTotp(user.pending_totp_secret, String((req.body || {}).code || ''))) {
+    return res.status(401).json({ error: 'Incorrect authenticator code.' });
+  }
+  const saved = await db.query(`update internal_users set totp_secret = pending_totp_secret,
+    totp_enabled = true, must_setup_totp = false, pending_totp_secret = null,
+    pending_totp_expires_at = null, pending_totp_session_hash = null
+    where id = $1 and pending_totp_secret = $2 and pending_totp_session_hash = $3
+      and pending_totp_expires_at > now() returning id`, [user.id, user.pending_totp_secret, hashKey(token)]);
+  if (!saved.rowCount) return res.status(409).json({ error: 'Authenticator setup changed. Please start again.' });
+  await db.query(`delete from staff_sessions where user_id = $1 and token <> $2`, [user.id, token]);
+  await db.query(`update login_challenges set consumed = true where user_id = $1`, [user.id]);
+  if (user.is_owner) alertOwner('Your authenticator was enabled or replaced', [`Account: ${user.email}`, `Time: ${new Date().toISOString()}`, 'Other sessions were ended. If this was not you, secure your account immediately.']);
+  res.json({ ok: true, message: 'Authenticator sign-in is enabled. Other sessions have been ended.' });
+});
+
+router.post('/totp/disable', factorLimit, async (req, res) => {
+  const user = await currentUser(req);
+  if (!user) return res.status(401).json({ error: 'Not signed in' });
+  if (user.is_owner || user.must_setup_totp) return res.status(403).json({ error: 'Authenticator protection is required for this account. Replace the factor instead.' });
+  const password = String((req.body || {}).password || '');
+  const code = String((req.body || {}).current_code || '');
+  if (!verifyPassword(password, user.password_hash) || !user.totp_enabled || !verifyTotp(user.totp_secret, code)) {
+    return res.status(401).json({ error: 'Your current password and authenticator code are required.' });
+  }
+  const token = (req.header('authorization') || '').slice(7).trim();
+  await db.query(`update internal_users set totp_enabled = false, totp_secret = null,
+    pending_totp_secret = null, pending_totp_expires_at = null, pending_totp_session_hash = null where id = $1`, [user.id]);
+  await db.query(`delete from staff_sessions where user_id = $1 and token <> $2`, [user.id, token]);
+  await db.query(`update login_challenges set consumed = true where user_id = $1`, [user.id]);
+  res.json({ ok: true, message: 'Authenticator sign-in is off. Email codes will be required.' });
 });
 
 /* ------------------------- Emergency access (v9.22) ------------------------- */
@@ -426,14 +438,14 @@ router.post('/breakglass/verify', async (req, res) => {
   if (ch.attempts >= BG_MAX_ATTEMPTS) return res.status(429).json({ error: 'Too many incorrect codes. Start again to send a new one.' });
 
   if (hashCode(code) !== ch.code_hash) {
-    await db.query(`update breakglass_challenges set attempts = attempts + 1 where id = $1`, [ch.id]);
+    await db.query(`update breakglass_challenges set attempts = attempts + 1 where id = $1 and not consumed and attempts < 5`, [ch.id]);
     const left = BG_MAX_ATTEMPTS - (ch.attempts + 1);
     return res.status(401).json({
       error: left > 0 ? `Incorrect code. ${left} attempt${left === 1 ? '' : 's'} left.` : 'Too many incorrect codes. Start again to send a new one.',
     });
   }
   // Spent exactly once, even if two tabs race to redeem it.
-  const spent = await db.query(`update breakglass_challenges set consumed = true where id = $1 and not consumed`, [ch.id]);
+  const spent = await db.query(`update breakglass_challenges set consumed = true where id = $1 and not consumed and attempts < 5 and expires_at > now()`, [ch.id]);
   if (!spent.rowCount) return res.status(400).json({ error: 'That code has already been used. Start again.' });
 
   const token = BREAKGLASS_PREFIX + crypto.randomBytes(24).toString('hex');
@@ -521,7 +533,7 @@ router.post('/breakglass/end-all', ...ceoOnly, async (req, res) => {
  * whether or not the address belongs to anyone — this form must not become a
  * way to find out who works here.
  */
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', recoveryLimit, async (req, res) => {
   const email = String((req.body || {}).email || '').trim().toLowerCase();
   const same = () => res.json({
     ok: true,
