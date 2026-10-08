@@ -44,11 +44,11 @@ the site's Symphony palette (ink, cream, cobalt) with Sora / Manrope.
 | V02 | Video, Feed 4:5: Agents, Pulse and Echo (posts 8 Oct) |
 | V04 | Video with voiceover, Reel 9:16: Conversation to real-world action (posts 6 Oct) |
 | V05 | Refined video with voiceover, Feed 4:5: From first message to real-world action (posts 14 Oct) |
-| V06 | Refined video with voiceover, Reel 9:16: AI that reasons, then acts (posts 18 Oct) |
-| V07 | Video with voiceover, Reel 9:16: Less chat. More done. (posts 15 Oct) |
-| V08 | Video with voiceover, Reel 9:16: Make every moment count (posts 21 Oct) |
+| V06 | Refined video with voiceover, Reel 9:16: AI that reasons, then acts (posts 14 Oct, Reels slot) |
+| V07 | Video with voiceover, Reel 9:16: Less chat. More done. (posts 15 Oct, Reels slot) |
+| V08 | Video with voiceover, Reel 9:16: Make every moment count (posts 21 Oct, Reels slot) |
 | V09 | Pulse video with voiceover, Feed 4:5: Every conversation. A business signal. (posts 16 Oct) |
-| V10 | Pulse video with voiceover, Reel 9:16: See what moves your business (posts 23 Oct) |
+| V10 | Pulse video with voiceover, Reel 9:16: See what moves your business (posts 16 Oct, Reels slot) |
 
 ## Making or changing a post
 
@@ -69,6 +69,11 @@ python3 marketing/social-ads/captions_to_json.py
   (`https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@<sha>/marketing/social-ads/<file>.mp4`),
   because GitHub raw serves .mp4 as `application/octet-stream`. Keep files under 20 MB (jsDelivr's limit).
   Instagram gets a Reel shared to the feed, and Facebook gets a Page video.
+- A 9:16 video gets `**Placement:** reels`. It posts in the 18:00 Reels slot as
+  a Facebook Reel and an Instagram Reel. A Feed video and its Reels version
+  share one `**Post on:**` date: the Feed version posts at 10:00, the Reels
+  version at 18:00, and on Instagram the Reel then stays in the Reels tab so the
+  feed doesn't show the same video twice.
 - Add `**Post on:** 2026-10-12` under a heading to post it on that day.
 - Every post needs a `**Hashtags:**` line: at most 5 tags (Instagram's limit),
   starting with `#VantriqAI`, then one product tag (`#VantriqAgents`,
@@ -88,6 +93,10 @@ Every day at 10:00 PKT it:
    today** buttons (skipped if nobody answers in 6 hours);
 4. posts it to the Facebook Page (ID 1291897617346380) and to Instagram @vantriq_ai,
    as a single photo, a multi-photo/carousel post, or a video (Instagram Reel).
+
+At 18:00 PKT it runs again for the Reels slot: if a `placement: reels` video is
+dated today, it goes through the same approval email and posts as a Facebook
+Reel and an Instagram Reel. Otherwise the evening run does nothing.
 
 Before it can run, three things need doing in n8n and Meta (see the sticky note
 on the workflow):

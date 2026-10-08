@@ -345,6 +345,7 @@ Every figure is one the site already publishes. The 78% card credits its source,
 ## V01 · Video (Reel, 9:16): One platform. Built to act.
 
 **Post on:** 2026-10-05
+**Placement:** reels
 **Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@159ea47e65e56d6d12f7dd8366298342e6884cd8/marketing/social-ads/vantriqai-video-platform-reels.mp4
 
 **Headline (ad field):** One platform. More possibilities.
@@ -577,6 +578,7 @@ Every figure is one the site already publishes. The 78% card credits its source,
 ## V04 · Video with voiceover (Reel, 9:16): Conversation to real-world action.
 
 **Post on:** 2026-10-06
+**Placement:** reels
 **Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@6b68a42a944d38c909d323f55d4579736b58198f/marketing/social-ads/vantriqai-video-actions-vo-reels.mp4
 **Headline (ad field):** Conversation to real-world action
 **Hashtags:** #VantriqAI #VantriqAgents #ConversationalAI #WhatsAppAutomation #SmallBusinessPakistan
@@ -630,7 +632,8 @@ Every figure is one the site already publishes. The 78% card credits its source,
 
 ## V06 · Refined video with voiceover (Reel, 9:16): AI that reasons, then acts.
 
-**Post on:** 2026-10-18
+**Post on:** 2026-10-14
+**Placement:** reels
 **Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@d93a06d32561d235ea638b9cd58b032804fcc2bb/marketing/social-ads/vantriqai-video-refined-reels.mp4
 **Headline (ad field):** AI that reasons, then acts
 **Hashtags:** #VantriqAI #VantriqPulse #AIagents #SmallBusinessGrowth #DigitalPakistan
@@ -657,6 +660,7 @@ Every figure is one the site already publishes. The 78% card credits its source,
 ## V07 · Video with voiceover (Reel, 9:16): Less chat. More done.
 
 **Post on:** 2026-10-15
+**Placement:** reels
 **Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@00de90a689f86481caac4400fa0087a0c631ee59/marketing/social-ads/vantriqai-video-things-done-reels.mp4
 **Headline (ad field):** Less chat. More done.
 **Hashtags:** #VantriqAI #VantriqAgents #AIagents #WorkflowAutomation #SmallBusinessPakistan
@@ -687,6 +691,7 @@ Every figure is one the site already publishes. The 78% card credits its source,
 ## V08 · Video with voiceover (Reel, 9:16): Make every moment count.
 
 **Post on:** 2026-10-21
+**Placement:** reels
 **Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@00de90a689f86481caac4400fa0087a0c631ee59/marketing/social-ads/vantriqai-video-the-moment-reels.mp4
 **Headline (ad field):** Make every moment count
 **Hashtags:** #VantriqAI #VantriqEcho #ConversationalAI #CustomerExperience #AIinPakistan
@@ -746,7 +751,8 @@ Every figure is one the site already publishes. The 78% card credits its source,
 
 ## V10 · Pulse video with voiceover (Reel, 9:16): See what moves your business.
 
-**Post on:** 2026-10-23
+**Post on:** 2026-10-16
+**Placement:** reels
 **Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@f5bc8e32ff91a0928af5eab00ddd8adb52d42d76/marketing/social-ads/vantriqai-video-pulse-reels.mp4
 **Headline (ad field):** See what moves your business
 **Hashtags:** #VantriqAI #VantriqPulse #SalesAnalytics #SmallBusinessGrowth #AIinPakistan

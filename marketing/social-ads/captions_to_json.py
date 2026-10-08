@@ -7,6 +7,13 @@ A section whose heading starts with V (e.g. "## V01 · ...") is a video; its
 "**Video:**" line holds the file name or a full URL. Instagram gets it as a
 Reel (also shown in the feed), Facebook as a Page video.
 
+"**Placement:** reels" marks a 9:16 video for Reels: Facebook gets it as a
+Facebook Reel, and n8n posts it in the evening Reels slot (18:00 PKT) instead of
+the morning slot (10:00 PKT). A Feed video and its Reels version can share a
+Post on date: the Feed version goes to the feed in the morning, the Reels
+version to Reels in the evening (on Instagram, Reels tab only, so the feed
+doesn't show the same video twice).
+
 Every post needs a "**Hashtags:**" line of at most 5 tags (Instagram's limit),
 starting with #VantriqAI. They are appended to both the Facebook and Instagram
 captions, so they are written once.
@@ -53,6 +60,11 @@ for sec in re.split(r"\n## ", md)[1:]:
         if not (here / name).exists():
             raise SystemExit(f"{pid}: {name} is missing")
         post.update(type="video", video=video.group(1))
+        placement = re.search(r"\*\*Placement:\*\* (\w+)", sec)
+        if placement:
+            if placement.group(1) not in ("feed", "reels"):
+                raise SystemExit(f"{pid}: Placement must be feed or reels")
+            post["placement"] = placement.group(1)
     elif pid.startswith("C"):
         n = pid[1:]
         slides = sorted(here.glob(f"vantriqai-carousel-{n}-*.png"), key=lambda p: int(p.stem.rsplit("-", 1)[1]))
@@ -66,9 +78,14 @@ for sec in re.split(r"\n## ", md)[1:]:
         post.update(type="image", image=image)
     posts.append(post)
 
-dates = [p["date"] for p in posts if "date" in p]
-if len(dates) != len(set(dates)):
-    raise SystemExit("Two posts share a Post on date; one would never be posted.")
+slots = [(p["date"], p.get("placement", "feed")) for p in posts if "date" in p]
+if len(slots) != len(set(slots)):
+    raise SystemExit("Two posts share a Post on date and slot; one would never be posted.")
+feed_dates = {d for d, slot in slots if slot == "feed"}
+for p in posts:
+    if p.get("placement") == "reels":
+        # With a Feed version the same day, keep the Reel out of the Instagram feed.
+        p["shareToFeed"] = p.get("date") not in feed_dates
 
 (here / "captions.json").write_text(json.dumps(posts, ensure_ascii=False, indent=2) + "\n")
 kinds = {k: sum(p["type"] == k for p in posts) for k in ("image", "carousel", "video")}
