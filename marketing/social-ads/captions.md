@@ -651,3 +651,61 @@ Every figure is one the site already publishes. The 78% card credits its source,
 > Your customers ask. Your agent books, updates and follows through, and Pulse and Echo show you what it all means.
 >
 > Book a free demo, link in bio.
+
+---
+
+## V07 · Video with voiceover (Reel, 9:16): Less chat. More done.
+
+**Post on:** 2026-10-15
+**Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@fabe332fb04dfabbbcc2e7980b40c5f5f9d92549/marketing/social-ads/vantriqai-video-things-done-reels.mp4
+**Headline (ad field):** Less chat. More done.
+**Hashtags:** #VantriqAI #VantriqAgents #AIagents #WorkflowAutomation #SmallBusinessPakistan
+**Primary text / Facebook:**
+
+> Less chat. More done.
+>
+> A VantriqAI agent reasons, then acts:
+>
+> Conversation → a booking on your calendar
+> Interest → a lead in your CRM
+> Feedback → insight you can use
+>
+> One connected platform, so every message moves your business forward.
+>
+> Book a free demo → https://www.vantriqai.com/contact
+
+**Instagram:**
+
+> Less chat. More done. ✅ 🔊 Sound on
+>
+> Conversation to calendar. Interest to CRM. Feedback to insight. An agent that reasons, then acts.
+>
+> Book a free demo, link in bio.
+
+---
+
+## V08 · Video with voiceover (Reel, 9:16): Make every moment count.
+
+**Post on:** 2026-10-21
+**Video:** https://cdn.jsdelivr.net/gh/wahabsarwar1-beep/vantriqai-modernist-site@fabe332fb04dfabbbcc2e7980b40c5f5f9d92549/marketing/social-ads/vantriqai-video-the-moment-reels.mp4
+**Headline (ad field):** Make every moment count
+**Hashtags:** #VantriqAI #VantriqEcho #ConversationalAI #CustomerExperience #AIinPakistan
+**Primary text / Facebook:**
+
+> One message: "Can I book today?"
+>
+> That's the moment a customer is ready to move. Miss it and they ask someone else.
+>
+> VantriqAI is ready when they are, on WhatsApp, Instagram, your website and the phone. It replies, qualifies and books. Then Pulse finds the signal in every conversation, and Echo hears what your customers think.
+>
+> Make every moment count.
+>
+> Book a free demo → https://www.vantriqai.com/contact
+
+**Instagram:**
+
+> One message. One moment. Now. ⏱️ 🔊 Sound on
+>
+> Reply, qualify and book on WhatsApp, Instagram, your website and voice, ready when your customers are.
+>
+> Book a free demo, link in bio.

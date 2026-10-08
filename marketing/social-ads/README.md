@@ -10,7 +10,7 @@ the site's Symphony palette (ink, cream, cobalt) with Sora / Manrope.
 | `ads.html` | Source for every card and carousel slide. Open it in a browser to see them all. |
 | `vantriqai-ad-NN.png` | Single-image posts. 01–12 are rendered from `ads.html`; 13–19 were supplied as finished PNGs and resized to 1080×1350 (don't re-render them) |
 | `vantriqai-carousel-NN-K.png` | Carousel slides (C01 = slides 1–7) |
-| `vantriqai-video-*.mp4` | Video posts (V01, V04 and V06 are Reels at 9:16; V02 and V05 are Feed videos at 4:5). V05/V06 use the `refined` files. The silent `actions-*` files and `actions-vo-feed` (replaced by V05) are kept but not scheduled |
+| `vantriqai-video-*.mp4` | Video posts (V01, V04, V06, V07 and V08 are Reels at 9:16; V02 and V05 are Feed videos at 4:5). V05/V06 use the `refined` files. The silent `actions-*` files and `actions-vo-feed` (replaced by V05) are kept but not scheduled |
 | `captions.md` | Ad headline, Facebook caption and Instagram caption for each post. **This is the file people edit.** |
 | `captions.json` | The same copy in the form the n8n workflow reads. Built from `captions.md`; don't edit it by hand. |
 | `briefs.md` | Ideas for upcoming posts. The weekly content routine works through them. |
@@ -45,6 +45,8 @@ the site's Symphony palette (ink, cream, cobalt) with Sora / Manrope.
 | V04 | Video with voiceover, Reel 9:16: Conversation to real-world action (posts 6 Oct) |
 | V05 | Refined video with voiceover, Feed 4:5: From first message to real-world action (posts 14 Oct) |
 | V06 | Refined video with voiceover, Reel 9:16: AI that reasons, then acts (posts 18 Oct) |
+| V07 | Video with voiceover, Reel 9:16: Less chat. More done. (posts 15 Oct) |
+| V08 | Video with voiceover, Reel 9:16: Make every moment count (posts 21 Oct) |
 
 ## Making or changing a post
 
