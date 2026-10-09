@@ -60,17 +60,41 @@ const LADDER = [
   ok(ss.infra === 20016, 'infrastructure PKR 20,016 a year', ss.infra);
   ok(ss.mgmt_hours_month === 42, '42 management hours a month', ss.mgmt_hours_month);
 
-  console.log('\n== at today\'s prices ==');
+  console.log('\n== the August model\'s own inputs still reproduce its figures ==');
+  // gpt-4o-mini, 1,200–3,000 context tokens, 80-token replies, one call a turn.
+  const AUG_CTX = { Starter: 1200, Growth: 1500, Scale: 1800, Pro: 2200, Enterprise: 2600, 'Enterprise+': 3000 };
+  const aug = V.model(LADDER.map((p) => ({ ...p, context_tokens: AUG_CTX[p.name] })), {},
+    { utilization: 0.7, bulk_model: 'gpt-4o-mini', reply_tokens: 80, calls_per_turn: 1 }, '2026-09-29');
+  const augBy = Object.fromEntries(aug.packages.map((r) => [r.name, r]));
   // Starter: 6 turns; input = 6*1200 + 6*30 + 110*15 = 9,030; output = 480.
-  ok(by.Starter.tokens.input === 9030 && by.Starter.tokens.output === 480, 'Starter session is 9,030 tokens in, 480 out',
+  ok(augBy.Starter.tokens.input === 9030 && augBy.Starter.tokens.output === 480, 'Starter session is 9,030 tokens in, 480 out',
+    JSON.stringify(augBy.Starter.tokens));
+  const augUsd = 0.98 * (9030 * 0.15 + 480 * 0.60) / 1e6 + 0.02 * (9030 * 2 + 480 * 10) / 1e6;
+  ok(Math.abs(augBy.Starter.cost_per_session - augUsd * 277.05) < 0.0001, 'Starter cost per session is the blend at USD/PKR 277.05',
+    `${augBy.Starter.cost_per_session} vs ${augUsd * 277.05}`);
+  ok(augBy.Starter.margin_full === 0.807 && augBy['Enterprise+'].margin_full === 0.483, 'margin at full use 80.7% (Starter) to 48.3% (Enterprise+)',
+    `${augBy.Starter.margin_full} … ${augBy['Enterprise+'].margin_full}`);
+  ok(aug.steady_state.margin === 0.714, 'steady-state contribution 71.4%', aug.steady_state.margin);
+  ok(aug.flags.some((f) => /Enterprise\+: overage covers only 1\.8/.test(f.text)), 'flags Enterprise+ overage at 1.8x cost');
+
+  console.log('\n== at what the live agents measured (v9.33) ==');
+  // gpt-5-mini, 4,000 context tokens on Starter, 220-token replies with
+  // reasoning, 1.2 model calls a turn: input = 1.2*(6*4000 + 6*30 + 250*15)
+  // = 33,516; output = 1.2*6*220 = 1,584.
+  ok(by.Starter.tokens.input === 33516 && by.Starter.tokens.output === 1584, 'Starter session is 33,516 tokens in, 1,584 out',
     JSON.stringify(by.Starter.tokens));
-  const usd = 0.98 * (9030 * 0.15 + 480 * 0.60) / 1e6 + 0.02 * (9030 * 2 + 480 * 10) / 1e6;
-  ok(Math.abs(by.Starter.cost_per_session - usd * 277.05) < 0.0001, 'Starter cost per session is the blend at USD/PKR 277.05',
+  const usd = 0.98 * (33516 * 0.25 + 1584 * 2.00) / 1e6 + 0.02 * (33516 * 2 + 1584 * 10) / 1e6;
+  ok(Math.abs(by.Starter.cost_per_session - usd * 277.05) < 0.0001, 'and costs the GPT-5 mini blend: about PKR 3.59',
     `${by.Starter.cost_per_session} vs ${usd * 277.05}`);
-  ok(by.Starter.margin_full === 0.807 && by['Enterprise+'].margin_full === 0.483, 'margin at full use 80.7% (Starter) to 48.3% (Enterprise+)',
-    `${by.Starter.margin_full} … ${by['Enterprise+'].margin_full}`);
-  ok(ss.margin === 0.714, 'steady-state contribution 71.4%', ss.margin);
-  ok(m.flags.some((f) => /Enterprise\+: overage covers only 1\.8/.test(f.text)), 'flags Enterprise+ overage at 1.8x cost');
+  ok(m.flags.filter((f) => f.level === 'bad' && /overage rate/.test(f.text)).length === 6,
+    'every tier\'s overage rate is flagged as below the cost of a session', JSON.stringify(m.flags.map((f) => f.text)));
+  ok(by.Pro.margin_full < 0, 'Pro loses money at full use without prompt caching', by.Pro.margin_full);
+  const cached = V.model(LADDER, {}, { utilization: 0.7, cache_share: 0.7 }, '2026-09-29');
+  const cachedStarter = cached.packages.find((r) => r.name === 'Starter');
+  // 70% of 28,800 context tokens at $0.025 instead of $0.25.
+  const cachedUsd = 0.98 * ((33516 - 20160) * 0.25 + 20160 * 0.025 + 1584 * 2.00) / 1e6 + 0.02 * (33516 * 2 + 1584 * 10) / 1e6;
+  ok(Math.abs(cachedStarter.cost_per_session - cachedUsd * 277.05) < 0.0001,
+    'a cached share of the prompt is billed at the cached-input price', `${cachedStarter.cost_per_session} vs ${cachedUsd * 277.05}`);
 
   const gem = m.what_if.find((w) => w.bulk_model === 'gemini-3-flash');
   ok(gem && gem.packages.find((p) => p.name === 'Enterprise+').margin_full < 0,
@@ -80,6 +104,8 @@ const LADDER = [
 
   console.log('\n== validation ==');
   const bad = (fn, re, label) => { try { fn(); ok(false, label, 'accepted'); } catch (e) { ok(e.status === 400 && re.test(e.message), label, e.message); } };
+  bad(() => C.applyChange({}, { assumptions: { cache_share: 1.5 } }), /cached share/, 'a cached share over 100% is refused');
+  bad(() => C.applyChange({}, { assumptions: { calls_per_turn: 0 } }), /Model calls/, 'fewer than one model call a turn is refused');
   bad(() => C.applyChange({}, { assumptions: { fx_usd_pkr: 5 } }), /exchange rate/, 'an absurd exchange rate is refused');
   bad(() => C.applyChange({}, { assumptions: { bulk_model: 'gpt-99' } }), /not on the rate card/, 'an unknown bulk model is refused');
   bad(() => C.applyChange({}, { rates: { 'gpt-4o-mini': { input: -1 } } }), /input price/, 'a negative price is refused');
@@ -159,7 +185,7 @@ const LADDER = [
   const { rows: prod } = await db.query(`select delivery_cost_full, ai_model from products where id = $1`, [starter.id]);
   ok(Number(prod[0].delivery_cost_full) === moved.ai_full, 'and writes the delivery cost Financials reads',
     `${prod[0].delivery_cost_full} vs ${moved.ai_full}`);
-  ok(/GPT-4o mini; 2% escalated to Claude Sonnet 5\.5/.test(prod[0].ai_model), 'the routing line on the package is the model\'s', prod[0].ai_model);
+  ok(/GPT-5 mini; 2% escalated to Claude Sonnet 5\.5/.test(prod[0].ai_model), 'the routing line on the package is the model\'s', prod[0].ai_model);
 
   // Financials' projection setting must not leak into the business model's
   // typical-use margin (production runs Financials at a cautious 100%).

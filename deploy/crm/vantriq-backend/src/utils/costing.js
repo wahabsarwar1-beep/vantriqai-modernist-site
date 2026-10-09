@@ -107,6 +107,8 @@ const LIMITS = {
   adhoc_hours_per_month: [0, 200, 'Ad-hoc hours a month'],
   hours_per_fte: [1, 400, 'Hours in a full-time month'],
   voice_note_minutes: [0.05, 15, 'The length of a typical voice note, in minutes'],
+  calls_per_turn: [1, 10, 'Model calls per customer turn'],
+  cache_share: [0, 1, 'The cached share of the prompt'],
 };
 
 function numberIn(value, [min, max, label]) {
@@ -136,7 +138,7 @@ function applyChange(stored, body) {
       if (r === null) { delete next.rates[key]; continue; }
       const known = engine.RATES.find((x) => x.key === key);
       const entry = { ...(next.rates[key] || {}) };
-      for (const side of ['input', 'output']) {
+      for (const side of ['input', 'output', 'cached_input']) {
         if (r[side] !== undefined) entry[side] = numberIn(r[side], [0, 1000, `The ${side} price for ${known ? known.label : key}`]);
       }
       for (const f of ['label', 'vendor', 'source', 'note']) {

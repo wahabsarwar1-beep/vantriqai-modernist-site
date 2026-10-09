@@ -2450,9 +2450,9 @@ function unitEconomicsHTML(){
   </div>
   <p class="footnote">A session is one customer conversation in a rolling 24 hours. Cost per session = the tokens it sends and receives
     (system prompt and catalogue context of ${fmtNum(Math.min(...rows.map(r=>r.profile.context_tokens)))}–${fmtNum(Math.max(...rows.map(r=>r.profile.context_tokens)))} tokens per turn, the conversation so far,
-    ${a.user_tokens}-token messages and ${a.reply_tokens}-token replies), priced on the rate card and converted at USD/PKR ${a.fx_usd_pkr}. Labour: founder time at
+    ${a.user_tokens}-token messages and ${a.reply_tokens}-token replies including the model's reasoning, ${a.calls_per_turn} model calls a turn), priced on the rate card and converted at USD/PKR ${a.fx_usd_pkr}. These are what the live agents measured with OpenAI's real token counts in October 2026. Labour: founder time at
     ${fmtMoney(a.founder_rate)}/h, contracted time at ${fmtMoney(a.contractor_rate)}/h. Year one includes the setup fee, ${a.sales_hours_per_win} unbilled sales hours to win the client and
-    ${a.adhoc_hours_per_month} h a month of ad-hoc requests. Prompt caching is not assumed — it would only lower these costs.</p>`;
+    ${a.adhoc_hours_per_month} h a month of ad-hoc requests. ${a.cache_share?`${Math.round(a.cache_share*100)}% of the prompt is billed at the cached-input price.`:'Prompt caching is not assumed — it would only lower these costs.'}</p>`;
 }
 const ADDON_FAMILIES = [
   ['capability','Capabilities','Switch on over any package — priced on their own, so a plan never changes when one is added'],
@@ -2709,6 +2709,11 @@ function costingModalHTML(){
         <div class="field"><label>Premium model — escalated turns</label><select id="cs_prem">${opt(a.premium_model)}</select></div>
       </div>
       <div class="field-row">
+        <div class="field"><label>Reply tokens (with reasoning)</label><input id="cs_reply" type="number" min="1" max="5000" step="1" value="${a.reply_tokens}"></div>
+        <div class="field"><label>Model calls per turn</label><input id="cs_calls" type="number" min="1" max="10" step="0.05" value="${a.calls_per_turn}"><div style="font-size:11px;color:var(--muted);margin-top:3px;">A tool call (knowledge base, CRM) is a second call.</div></div>
+        <div class="field"><label>Prompt billed as cached (%)</label><input id="cs_cache" type="number" min="0" max="100" step="1" value="${Math.round((a.cache_share||0)*100)}"><div style="font-size:11px;color:var(--muted);margin-top:3px;">0 until the cache hit rate is measured.</div></div>
+      </div>
+      <div class="field-row">
         <div class="field"><label>Founder rate (PKR/h)</label><input id="cs_founder" type="number" value="${a.founder_rate}"></div>
         <div class="field"><label>Contractor rate (PKR/h)</label><input id="cs_contract" type="number" value="${a.contractor_rate}"></div>
         <div class="field"><label>Infrastructure (PKR/mo)</label><input id="cs_infra" type="number" value="${a.infra_monthly}"></div>
@@ -2731,11 +2736,12 @@ function costingModalHTML(){
       </table></div>
       <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin:10px 0 6px;">Model prices — USD per million tokens</label>
       <div class="table-wrap"><table>
-        <thead><tr><th>Model</th><th>Input</th><th>Output</th><th>Checked</th><th>Note</th></tr></thead>
+        <thead><tr><th>Model</th><th>Input</th><th>Cached input</th><th>Output</th><th>Checked</th><th>Note</th></tr></thead>
         <tbody>
         ${rates.map(r=>`<tr>
           <td><strong>${esc(r.label)}</strong><div style="font-size:11px;color:var(--muted);">${esc(r.vendor)} · ${esc(r.source||'')}</div></td>
           <td style="width:92px;"><input class="cs-rate" data-key="${esc(r.key)}" data-side="input" type="number" step="0.001" min="0" value="${r.input}" style="width:84px;"></td>
+          <td style="width:92px;"><input class="cs-rate" data-key="${esc(r.key)}" data-side="cached_input" type="number" step="0.001" min="0" value="${r.cached_input!=null?r.cached_input:''}" placeholder="—" style="width:84px;"></td>
           <td style="width:92px;"><input class="cs-rate" data-key="${esc(r.key)}" data-side="output" type="number" step="0.001" min="0" value="${r.output}" style="width:84px;"></td>
           <td style="font-size:11.5px;white-space:nowrap;">${r.as_of?fmtDate(r.as_of):'—'}</td>
           <td style="font-size:11px;color:var(--muted);max-width:220px;">${esc(r.note||'')}</td>
@@ -2764,7 +2770,7 @@ async function saveCosting(){
     const r = current.find(x=>x.key===el.dataset.key);
     if(!r) return;
     const val = parseFloat(el.value);
-    if(Number.isFinite(val) && val !== Number(r[el.dataset.side])){
+    if(Number.isFinite(val) && val !== Number(r[el.dataset.side]) && !(el.value==='' && r[el.dataset.side]==null)){
       rates[r.key] = rates[r.key] || {};
       rates[r.key][el.dataset.side] = val;
     }
@@ -2786,6 +2792,8 @@ async function saveCosting(){
         founder_rate: parseFloat(v('cs_founder')), contractor_rate: parseFloat(v('cs_contract')),
         infra_monthly: parseFloat(v('cs_infra')),
         stt_model: v('cs_stt'), voice_note_minutes: parseFloat(v('cs_vnm')),
+        reply_tokens: parseFloat(v('cs_reply')), calls_per_turn: parseFloat(v('cs_calls')),
+        cache_share: (parseFloat(v('cs_cache'))||0)/100,
       },
     });
     await afterCostingChange(model);

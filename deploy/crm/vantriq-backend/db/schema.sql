@@ -2306,3 +2306,31 @@ select c.id, 'voice_minute', 0.006, 0, 1, 'Voice-note transcription minutes (gpt
  where c.is_internal
    and not exists (select 1 from usage_rates r
                     where r.client_id = c.id and r.metric = 'voice_minute' and r.effective_to is null);
+
+-- v9.33 — our own account's token rates follow the agents to gpt-5-mini
+-- ($0.25 / $2.00 per million). The agents moved off gpt-4o-mini on 7 Oct
+-- 2026 and now report OpenAI's real counts, so pricing those counts at
+-- gpt-4o-mini's rates would understate what OpenAI bills us. Once, and only
+-- for the rates the CRM itself put there: a rate an admin changed is theirs.
+do $$
+begin
+  if exists (select 1 from applied_migrations where name = 'v9_33_internal_gpt5mini') then
+    return;
+  end if;
+  update usage_rates r set effective_to = current_date - 1
+    from clients c
+   where c.id = r.client_id and c.is_internal and r.effective_to is null
+     and r.effective_from < current_date
+     and ((r.metric = 'input_token' and r.unit_rate = 0.15) or (r.metric = 'output_token' and r.unit_rate = 0.60))
+     and r.label like '%gpt-4o-mini%';
+  insert into usage_rates (client_id, metric, unit_rate, included_units, unit_size, label, effective_from)
+  select c.id, v.metric, v.rate, 0, 1000000, v.label, current_date
+    from clients c,
+         (values ('input_token', 0.25, 'Model input tokens (gpt-5-mini)'),
+                 ('output_token', 2.00, 'Model output tokens (gpt-5-mini)')) as v(metric, rate, label)
+   where c.is_internal
+     and not exists (select 1 from usage_rates r
+                      where r.client_id = c.id and r.metric = v.metric and r.effective_to is null);
+  insert into applied_migrations (name, note)
+  values ('v9_33_internal_gpt5mini', 'Internal account token rates moved from gpt-4o-mini to gpt-5-mini.');
+end $$;

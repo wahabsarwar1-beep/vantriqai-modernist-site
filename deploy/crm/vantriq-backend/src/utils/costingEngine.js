@@ -26,9 +26,22 @@
  *   where U is a customer message and R a reply, in tokens. The history term
  *   is why cost grows faster than message count.
  *
+ *   An agent that calls a tool (the knowledge base, the CRM) makes more than
+ *   one model call for that turn, so both sides are multiplied by
+ *   calls_per_turn. The system prompt is the same on every call, and the
+ *   provider bills a cached repeat of it at a fraction of the price:
+ *   cache_share is the part of the context tokens billed at the cached rate.
+ *
  *   Most turns run on the bulk model; a thin premium_share is escalated to a
  *   premium model. Cost per session = the blend, in dollars, converted at
  *   the costing exchange rate.
+ *
+ *   v9.33: the defaults are what the live agents measured in October 2026
+ *   with real OpenAI token counts — gpt-5-mini, about 4,500–5,600 context
+ *   tokens a call, about 200–270 output tokens with its reasoning, and a
+ *   second model call on roughly one turn in five. The August business model
+ *   assumed gpt-4o-mini, 1,200–3,000 context tokens and 80-token replies,
+ *   which priced a session at about a fifth of what it really costs.
  *
  *   Labour is costed by the hour — founder time at an opportunity cost,
  *   contracted time at its cash cost — split by each package's founder
@@ -44,20 +57,21 @@ module.exports = (function () {
   const AS_OF = '2026-09-29';
 
   /**
-   * Model prices, US dollars per million tokens, standard (non-batch,
-   * uncached) rates. Checked against each vendor's published price list on
-   * AS_OF. Prompt caching is NOT assumed anywhere: it would lower the input
-   * cost of the repeated system prompt, and is left as upside rather than
-   * booked as a saving nobody has measured.
+   * Model prices, US dollars per million tokens, standard (non-batch)
+   * rates. Checked against each vendor's published price list on AS_OF.
+   * cached_input is the price of a cached repeat of the prompt, where the
+   * vendor publishes one. It is used only as far as cache_share says, which
+   * is 0 until the real cache hit rate has been measured: the saving is
+   * upside, not booked.
    */
   const RATES = [
-    { key: 'gpt-4o-mini', label: 'GPT-4o mini', vendor: 'OpenAI', input: 0.15, output: 0.60,
-      as_of: AS_OF, source: 'openai.com/api/pricing', note: 'What the live WhatsApp and website agents run on today.' },
-    { key: 'gpt-5-nano', label: 'GPT-5 nano', vendor: 'OpenAI', input: 0.05, output: 0.40,
+    { key: 'gpt-4o-mini', label: 'GPT-4o mini', vendor: 'OpenAI', input: 0.15, output: 0.60, cached_input: 0.075,
+      as_of: AS_OF, source: 'openai.com/api/pricing', note: 'What the August business model costed. The live agents moved off it on 7 Oct 2026.' },
+    { key: 'gpt-5-nano', label: 'GPT-5 nano', vendor: 'OpenAI', input: 0.05, output: 0.40, cached_input: 0.005,
       as_of: AS_OF, source: 'openai.com/api/pricing', note: 'Cheapest capable option; test on Roman Urdu before routing to it.' },
-    { key: 'gpt-5-mini', label: 'GPT-5 mini', vendor: 'OpenAI', input: 0.25, output: 2.00,
-      as_of: AS_OF, source: 'openai.com/api/pricing', note: '' },
-    { key: 'gpt-4o', label: 'GPT-4o', vendor: 'OpenAI', input: 2.50, output: 10.00,
+    { key: 'gpt-5-mini', label: 'GPT-5 mini', vendor: 'OpenAI', input: 0.25, output: 2.00, cached_input: 0.025,
+      as_of: AS_OF, source: 'openai.com/api/pricing', note: 'What the live WhatsApp and website agents run on (since 7 Oct 2026). Its reasoning tokens bill as output.' },
+    { key: 'gpt-4o', label: 'GPT-4o', vendor: 'OpenAI', input: 2.50, output: 10.00, cached_input: 1.25,
       as_of: AS_OF, source: 'openai.com/api/pricing', note: '' },
     { key: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite', vendor: 'Google', input: 0.10, output: 0.40,
       as_of: AS_OF, source: 'ai.google.dev/pricing', note: 'Google retires it on 16 Oct 2026 — do not build on it.', retiring: '2026-10-16' },
@@ -102,10 +116,12 @@ module.exports = (function () {
     as_of: AS_OF,
     fx_usd_pkr: 277.05,
     fx_source: 'Interbank rate, late September 2026',
-    bulk_model: 'gpt-4o-mini',
+    bulk_model: 'gpt-5-mini',
     premium_model: 'claude-sonnet-5-5',
     user_tokens: 30,              // a customer's message
-    reply_tokens: 80,             // the agent's reply
+    reply_tokens: 220,            // the agent's reply, with the model's reasoning (measured Oct 2026)
+    calls_per_turn: 1.2,          // model calls per customer turn: a tool call adds one
+    cache_share: 0,               // share of the context billed at the cached-prompt price
     founder_rate: 3000,           // PKR per hour — an opportunity cost, not cash
     contractor_rate: 1500,        // PKR per hour — contracted build and support
     utilization: 0.70,            // share of the allowance a typical client uses (the business model's figure)
@@ -125,15 +141,18 @@ module.exports = (function () {
    * 105,000, at founder shares of 100 / 70 / 60 / 50 / 40 / 40%.
    */
   const PROFILES = {
-    Starter:       { context_tokens: 1200, premium_share: 0.02, mgmt_hours: 1,   build_hours: 4,  founder_share: 1.0, typical_min: 300,   typical_max: 600 },
-    Growth:        { context_tokens: 1500, premium_share: 0.03, mgmt_hours: 2,   build_hours: 10, founder_share: 0.7, typical_min: 800,   typical_max: 1500 },
-    Scale:         { context_tokens: 1800, premium_share: 0.04, mgmt_hours: 3,   build_hours: 16, founder_share: 0.6, typical_min: 2000,  typical_max: 4000 },
-    Pro:           { context_tokens: 2200, premium_share: 0.05, mgmt_hours: 4.5, build_hours: 24, founder_share: 0.5, typical_min: 4000,  typical_max: 8000 },
-    Enterprise:    { context_tokens: 2600, premium_share: 0.06, mgmt_hours: 6,   build_hours: 36, founder_share: 0.4, typical_min: 8000,  typical_max: 15000 },
-    'Enterprise+': { context_tokens: 3000, premium_share: 0.08, mgmt_hours: 9,   build_hours: 50, founder_share: 0.4, typical_min: 15000, typical_max: null },
+    // context_tokens (v9.33): the live agents send 4,500–5,600 tokens of system
+    // prompt and knowledge-base extract a call; bigger tiers carry bigger
+    // catalogues and more rules. The August model had 1,200–3,000.
+    Starter:       { context_tokens: 4000, premium_share: 0.02, mgmt_hours: 1,   build_hours: 4,  founder_share: 1.0, typical_min: 300,   typical_max: 600 },
+    Growth:        { context_tokens: 4500, premium_share: 0.03, mgmt_hours: 2,   build_hours: 10, founder_share: 0.7, typical_min: 800,   typical_max: 1500 },
+    Scale:         { context_tokens: 5000, premium_share: 0.04, mgmt_hours: 3,   build_hours: 16, founder_share: 0.6, typical_min: 2000,  typical_max: 4000 },
+    Pro:           { context_tokens: 5500, premium_share: 0.05, mgmt_hours: 4.5, build_hours: 24, founder_share: 0.5, typical_min: 4000,  typical_max: 8000 },
+    Enterprise:    { context_tokens: 6000, premium_share: 0.06, mgmt_hours: 6,   build_hours: 36, founder_share: 0.4, typical_min: 8000,  typical_max: 15000 },
+    'Enterprise+': { context_tokens: 6500, premium_share: 0.08, mgmt_hours: 9,   build_hours: 50, founder_share: 0.4, typical_min: 15000, typical_max: null },
   };
   const DEFAULT_PROFILE = {
-    context_tokens: 1800, premium_share: 0.05, mgmt_hours: 3, build_hours: 16, founder_share: 0.6,
+    context_tokens: 5000, premium_share: 0.05, mgmt_hours: 3, build_hours: 16, founder_share: 0.6,
     typical_min: null, typical_max: null,
   };
   const PROFILE_FIELDS = ['context_tokens', 'premium_share', 'mgmt_hours', 'build_hours', 'founder_share',
@@ -167,8 +186,8 @@ module.exports = (function () {
   }
   function clean(r) {
     const c = {};
-    for (const k of ['label', 'vendor', 'input', 'output', 'as_of', 'source', 'note']) {
-      if (r[k] !== undefined) c[k] = k === 'input' || k === 'output' ? num(r[k]) : String(r[k]);
+    for (const k of ['label', 'vendor', 'input', 'output', 'cached_input', 'as_of', 'source', 'note']) {
+      if (r[k] !== undefined) c[k] = ['input', 'output', 'cached_input'].includes(k) ? num(r[k]) : String(r[k]);
     }
     return c;
   }
@@ -271,18 +290,30 @@ module.exports = (function () {
 
   const rateFor = (rates, key) => rates.find((r) => r.key === key) || null;
 
-  /** Tokens one session sends and receives. */
+  /**
+   * Tokens one session sends and receives. `cacheable` is the context part
+   * of the input — the system prompt repeated on every call — which is all a
+   * provider's prompt cache can discount.
+   */
   function sessionTokens(messages, contextTokens, a) {
     const turns = Math.max(1, Math.floor(num(messages) / 2));
     const U = num(a.user_tokens), R = num(a.reply_tokens), ctx = num(contextTokens);
+    const calls = Math.max(1, num(a.calls_per_turn, 1));
     return {
       turns,
-      input: turns * ctx + turns * U + (U + R) * turns * (turns - 1) / 2,
-      output: turns * R,
+      input: calls * (turns * ctx + turns * U + (U + R) * turns * (turns - 1) / 2),
+      output: calls * turns * R,
+      cacheable: calls * turns * ctx,
     };
   }
 
-  const usdFor = (rate, t) => (rate ? (t.input * rate.input + t.output * rate.output) / 1e6 : 0);
+  /** A session's cost in dollars on one model; `share` of the context is billed as a cached repeat. */
+  const usdFor = (rate, t, share = 0) => {
+    if (!rate) return 0;
+    const cachedPrice = isSet(rate.cached_input) ? num(rate.cached_input) : num(rate.input);
+    const cached = (t.cacheable || 0) * Math.min(1, Math.max(0, num(share)));
+    return ((t.input - cached) * rate.input + cached * cachedPrice + t.output * rate.output) / 1e6;
+  };
 
   /** Money, rounded the way the documents print it. */
   const r2 = (n) => Math.round(n * 100) / 100;
@@ -302,7 +333,8 @@ module.exports = (function () {
     const msgs = num(product.msgs_per_session);
     const t = sessionTokens(msgs, prof.context_tokens, a);
     const share = Math.min(1, Math.max(0, num(prof.premium_share)));
-    const usd = (1 - share) * usdFor(bulk, t) + share * usdFor(prem, t);
+    const cache = num(a.cache_share);
+    const usd = (1 - share) * usdFor(bulk, t, cache) + share * usdFor(prem, t, cache);
     const perSession = usd * num(a.fx_usd_pkr);
 
     const quota = num(product.quota);
