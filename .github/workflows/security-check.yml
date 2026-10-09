@@ -1,7 +1,6 @@
 name: Security regression checks
 on:
   pull_request:
-    paths: ['app/api/**', 'lib/request-guard.ts', 'next.config.ts', 'package*.json', 'test/**', 'deploy/crm/vantriq-backend/**', '.github/workflows/security-check.yml']
   workflow_dispatch:
 permissions:
   contents: read
