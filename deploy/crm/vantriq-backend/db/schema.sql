@@ -2234,74 +2234,72 @@ create table if not exists website_location_activity (
   primary key (day,region,section,event,country,subdivision,city)
 );
 
--- v9.33 — voice notes are costed and billed, not absorbed.
+-- v9.33 — voice notes are included in every package, up to an allowance.
 --
 -- Every WhatsApp voice note is sent to a speech-to-text model billed per
 -- minute of audio. Until now nothing recorded those minutes and no package
--- or add-on priced them, so a client sending voice notes cost us money no
--- invoice recovered.
+-- priced them. The CEO approved (9 Oct 2026) including voice in every package
+-- rather than selling it separately:
 --
---   1. usage_rates gains a 'voice_minute' metric. A client's rate card can
---      include an allowance of voice minutes and a price for each minute past
---      it, exactly as token rates already work. Having a voice-minute rate is
---      also what switches voice notes on for a client's agents: the
---      service-status check reports voice:true only then.
---   2. Add-ons can carry a metered allowance (meter, included_units,
---      overage_rate), so the catalogue — and every quote built from it — says
---      what the monthly fee includes and what happens past it.
---   3. A transcription-only add-on, "Voice-note transcription", for clients
---      who want voice notes understood and answered in text. "Voice
---      understanding" stays the fuller one, with spoken replies.
+--   * Each package includes voice-note minutes equal to 10% of its monthly
+--     conversation allowance — 0.1 minute per included conversation, about
+--     five times the rate measured on the live WhatsApp line — so voice can
+--     never cost more than about 3% of any package's fee.
+--   * Past that, PKR 5 a minute: three times what a minute costs at
+--     gpt-4o-transcribe's ~$0.006, the business model's own overage rule.
+--   * No setup fee and no monthly fee of its own: the voice path is part of
+--     the standard agent, and Pakistani competitors bundle voice notes too.
 --
--- est_monthly_cost on a metered voice add-on now means everything EXCEPT the
--- speech-to-text minutes: the costing engine prices the included minutes at
--- the live speech-to-text rate, so a vendor price change reaches the margin
--- without anybody retyping a cost.
+-- Mechanically that is a voice_minute rate card on each package
+-- (usage_rates with product_id), which the monthly bill already applies to
+-- every client on the package, and which makes the service-status check
+-- report voice:true for them. "Voice understanding" stays an add-on, but for
+-- what it adds — spoken replies — since transcription is now in the package.
 alter table usage_rates drop constraint if exists usage_rates_metric_check;
 alter table usage_rates add constraint usage_rates_metric_check
   check (metric in ('session','message','input_token','output_token','automation_run','voice_minute'));
 
+-- Add-ons can carry a metered allowance (meter, included_units,
+-- overage_rate), so a future metered add-on says what its fee includes.
 alter table catalog_addons add column if not exists meter text
   check (meter is null or meter in ('voice_minute'));
 alter table catalog_addons add column if not exists included_units numeric not null default 0;
 alter table catalog_addons add column if not exists overage_rate numeric;
 
-insert into catalog_addons
-  (key, name, family, summary, setup_fee, monthly_fee, price_basis, price_note, availability,
-   est_monthly_cost, est_build_hours, cost_note, is_new, sort_order, meter, included_units, overage_rate)
-values
-  ('voice-transcription', 'Voice-note transcription', 'capability',
-   'Customers can send WhatsApp voice notes instead of typing — in Urdu, Punjabi, English or a mix. Each one is transcribed and answered in text, and the transcript is kept with the conversation.',
-   7500, 3500, 'fixed', 'Includes 500 voice-note minutes a month (about 1,000 thirty-second notes) · PKR 5 per minute after',
-   'Any package', 250, 1.5,
-   'Speech-to-text (gpt-4o-transcribe, about $0.006 a minute) is priced live by the costing engine on the included minutes. This figure is the rest: a few minutes a month of checking transcripts in the client''s languages, and a share of the server. Setup is switching voice on for the client''s number and testing it in their languages.',
-   true, 15, 'voice_minute', 500, 5)
-on conflict (key) do nothing;
-
 do $$
 begin
-  if exists (select 1 from applied_migrations where name = 'v9_33_voice_metering') then
+  if exists (select 1 from applied_migrations where name = 'v9_33_voice_included') then
     return;
   end if;
-  -- Voice understanding: about 1,500 voice notes a month is about 750
-  -- minutes. Its old cost of 2,500 covered transcription and spoken replies
-  -- together; transcription is now priced live, so the stored cost keeps only
-  -- the spoken replies. Only where an admin has not already changed it.
+  insert into usage_rates (product_id, metric, unit_rate, included_units, unit_size, label)
+  select p.id, 'voice_minute', 5, round(p.quota * 0.1), 1, 'Voice-note minutes'
+    from products p
+   where p.name in ('Starter','Growth','Scale','Pro','Enterprise','Enterprise+')
+     and not exists (select 1 from usage_rates r
+                      where r.product_id = p.id and r.client_id is null and r.agent_id is null
+                        and r.metric = 'voice_minute' and r.effective_to is null);
+  -- Voice understanding: transcription is in the package now, so the add-on
+  -- is the spoken replies alone. Its old cost of 2,500 covered both; half of
+  -- it was transcription at about 1,500 notes a month. Only where an admin
+  -- has not already changed it.
   update catalog_addons set
-      meter = 'voice_minute', included_units = 750, overage_rate = 5,
-      price_note = 'Includes 750 voice-note minutes a month (about 1,500 notes) · PKR 5 per minute after',
+      summary = 'Spoken replies: when a customer sends a voice note, the agent can answer back in natural speech in their language. (Understanding voice notes is included in every package.)',
+      price_note = 'Spoken replies to voice notes. Voice-note transcription is included in every package.',
       est_monthly_cost = 1250,
-      cost_note = 'Spoken replies at about 1,500 voice notes a month. Speech-to-text on the included 750 minutes is priced live by the costing engine.'
-   where key = 'voice-understanding' and est_monthly_cost = 2500 and meter is null;
+      cost_note = 'Spoken replies at about 1,500 voice notes a month. Transcription is costed in the packages, not here. The text-to-speech price has not been re-checked since August 2026.'
+   where key = 'voice-understanding' and est_monthly_cost = 2500;
+  -- A separate transcription add-on existed only on unreleased builds; it is
+  -- withdrawn, never deleted, so any quote that named it still resolves.
+  update catalog_addons set active = false where key = 'voice-transcription';
   insert into applied_migrations (name, note)
-  values ('v9_33_voice_metering', 'Voice-note minutes metered on usage_events; voice_minute rate metric; Voice-note transcription add-on; Voice understanding carries a 750-minute allowance.');
+  values ('v9_33_voice_included', 'Voice notes included in every package: 10% of the conversation allowance in minutes, then PKR 5 a minute.');
 end $$;
 
 -- Our own account records what OpenAI charges us, so its voice notes are
--- priced at gpt-4o-transcribe's $0.006 a minute (it bills in USD). Added
--- once; an admin's later change to the rate is never overwritten.
+-- priced at Whisper's $0.006 a minute (it bills in USD). Added once; an
+-- admin's later change to the rate is never overwritten.
 insert into usage_rates (client_id, metric, unit_rate, included_units, unit_size, label)
-select c.id, 'voice_minute', 0.006, 0, 1, 'Voice-note transcription minutes (gpt-4o-transcribe)'
+select c.id, 'voice_minute', 0.006, 0, 1, 'Voice-note transcription minutes (whisper-1)'
   from clients c
  where c.is_internal
    and not exists (select 1 from usage_rates r
@@ -2356,6 +2354,7 @@ declare
   common text[] := array[
     'An AI agent configured to your catalogue, prices, FAQs, policies and tone of voice',
     'Replies around the clock, in English, Urdu and Roman Urdu',
+    'Voice notes understood and answered in text: voice-note minutes up to 10% of your conversation allowance each month, then PKR 5 a minute',
     'Handover to your team, with the conversation so far, whenever a person is needed',
     'Leads captured with the full conversation transcript',
     'Vantriq Pulse analytics, the customer directory, and the client portal and Android app',
@@ -2363,7 +2362,8 @@ declare
     'Monthly tuning with our team, and support for the agent we set up'];
   excl text[] := array[
     'Meta / WhatsApp Business Platform conversation and template fees — charged by Meta or your provider to your own account',
-    'Voice notes, website chat and voice calls — available as priced add-ons',
+    'Website chat, voice calls and spoken replies to voice notes — available as priced add-ons',
+    'Voice-note minutes beyond the included allowance — billed at PKR 5 a minute',
     'Your own third-party subscriptions (CRM, booking, e-commerce, payment or other software the agent connects to)',
     'Taxes, bank and payment-processing charges',
     'Conversations beyond the monthly allowance — billed at the overage rate',
@@ -2405,6 +2405,16 @@ begin
   insert into applied_migrations (name, note)
   values ('v9_33_package_scope', 'Packages carry written inclusions and exclusions, printed on every quote and proposal.');
 end $$;
+
+-- Each package's own voice-minute allowance, in figures, on its Included
+-- list (10% of its conversation allowance). Replaces only the generic line,
+-- so it is safe on every migrate and never touches a list an admin rewrote.
+update products
+   set includes = array_replace(includes,
+         'Voice notes understood and answered in text: voice-note minutes up to 10% of your conversation allowance each month, then PKR 5 a minute',
+         format('Voice notes understood and answered in text — %s voice-note minutes a month included, then PKR 5 a minute',
+                to_char(round(quota * 0.1), 'FM999,999')))
+ where 'Voice notes understood and answered in text: voice-note minutes up to 10% of your conversation allowance each month, then PKR 5 a minute' = any(includes);
 
 -- v9.33 — scope sign-off: the document a client signs before work starts.
 --

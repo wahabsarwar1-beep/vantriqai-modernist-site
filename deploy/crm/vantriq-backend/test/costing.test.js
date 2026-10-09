@@ -64,7 +64,7 @@ const LADDER = [
   // gpt-4o-mini, 1,200–3,000 context tokens, 80-token replies, one call a turn.
   const AUG_CTX = { Starter: 1200, Growth: 1500, Scale: 1800, Pro: 2200, Enterprise: 2600, 'Enterprise+': 3000 };
   const aug = V.model(LADDER.map((p) => ({ ...p, context_tokens: AUG_CTX[p.name] })), {},
-    { utilization: 0.7, bulk_model: 'gpt-4o-mini', reply_tokens: 80, calls_per_turn: 1 }, '2026-09-29');
+    { utilization: 0.7, bulk_model: 'gpt-4o-mini', reply_tokens: 80, calls_per_turn: 1, voice_allowance_share: 0 }, '2026-09-29');
   const augBy = Object.fromEntries(aug.packages.map((r) => [r.name, r]));
   // Starter: 6 turns; input = 6*1200 + 6*30 + 110*15 = 9,030; output = 480.
   ok(augBy.Starter.tokens.input === 9030 && augBy.Starter.tokens.output === 480, 'Starter session is 9,030 tokens in, 480 out',
@@ -119,8 +119,21 @@ const LADDER = [
   ok(vm.stt_rates.some((r) => r.key === 'whisper-1' && r.per_minute === 0.006)
     && vm.stt_rates.some((r) => r.key === 'gpt-4o-mini-transcribe' && r.per_minute === 0.003),
     'the speech-to-text price list carries Whisper and GPT-4o mini Transcribe', JSON.stringify(vm.stt_rates.map((r) => r.key)));
-  ok(vm.voice.stt_model === 'gpt-4o-transcribe' && vm.voice.per_minute_pkr === 1.6623 && vm.voice.per_note_pkr === 0.8312,
-    'voice notes are costed on GPT-4o Transcribe: PKR 1.66 a minute, PKR 0.83 a 30-second note', JSON.stringify(vm.voice));
+  ok(vm.voice.stt_model === 'whisper-1' && vm.voice.per_minute_pkr === 1.6623 && vm.voice.per_note_pkr === 0.8312,
+    'voice notes are costed on Whisper: PKR 1.66 a minute, PKR 0.83 a 30-second note', JSON.stringify(vm.voice));
+  const vby = Object.fromEntries(vm.packages.map((r) => [r.name, r]));
+  ok([['Starter', 150, 249], ['Growth', 400, 665], ['Scale', 900, 1496], ['Pro', 1500, 2493], ['Enterprise', 2500, 4156], ['Enterprise+', 4000, 6649]]
+    .every(([n, min, cost]) => vby[n].voice_minutes === min && vby[n].voice_full === cost),
+    'every package includes voice minutes at 10% of its conversations, costed at full use',
+    JSON.stringify(vm.packages.map((r) => [r.name, r.voice_minutes, r.voice_full])));
+  ok(vm.packages.every((r) => r.voice_share_of_price <= 0.031), 'and voice never costs more than about 3% of a package\'s fee',
+    JSON.stringify(vm.packages.map((r) => r.voice_share_of_price)));
+  const noVoice = V.model(LADDER, {}, { voice_allowance_share: 0 }, '2026-10-09');
+  ok(noVoice.packages[0].margin_full - vby.Starter.margin_full > 0.01 && noVoice.packages[0].voice_full === 0,
+    'the allowance comes out of the package margin');
+  ok(V.voiceFlags([], vm.voice, vm.stt_rates, '2026-10-09').some((f) => f.level === 'warn' && /retired/.test(f.text) && /2027-02-26/.test(f.text)),
+    'Whisper\'s retirement on 26 Feb 2027 is flagged', JSON.stringify(V.voiceFlags([], vm.voice, vm.stt_rates, '2026-10-09')));
+  ok(V.voiceFlags([], vm.voice, vm.stt_rates, '2027-01-10').some((f) => f.level === 'bad'), 'and turns red in its last sixty days');
   const cheaper = V.model(LADDER, {}, { stt_model: 'gpt-4o-mini-transcribe' }, '2026-10-09');
   ok(cheaper.voice.per_minute_pkr === 0.8312, 'moving to GPT-4o mini Transcribe halves it', cheaper.voice.per_minute_pkr);
   const tx = { name: 'Voice-note transcription', meter: 'voice_minute', included_units: 500, overage_rate: 5, active: true };
@@ -183,8 +196,8 @@ const LADDER = [
   const moved = r.body.packages.find((p) => p.name === 'Starter');
   ok(r.status === 200 && moved.cost_per_session > starter.cost_per_session, 'a new exchange rate re-costs every package', r.status);
   const { rows: prod } = await db.query(`select delivery_cost_full, ai_model from products where id = $1`, [starter.id]);
-  ok(Number(prod[0].delivery_cost_full) === moved.ai_full, 'and writes the delivery cost Financials reads',
-    `${prod[0].delivery_cost_full} vs ${moved.ai_full}`);
+  ok(Number(prod[0].delivery_cost_full) === moved.delivery_full && moved.delivery_full === moved.ai_full + moved.voice_full,
+    'and writes the delivery cost Financials reads — conversations and voice', `${prod[0].delivery_cost_full} vs ${moved.delivery_full}`);
   ok(/GPT-5 mini; 2% escalated to Claude Sonnet 5\.5/.test(prod[0].ai_model), 'the routing line on the package is the model\'s', prod[0].ai_model);
 
   // Financials' projection setting must not leak into the business model's
@@ -218,31 +231,27 @@ const LADDER = [
   ok(r.status === 200 && back.cost_per_session === starter.cost_per_session && back.mgmt_labour === 3000,
     'reset puts the business model\'s rates and profiles back', JSON.stringify({ c: back.cost_per_session, l: back.mgmt_labour }));
 
-  // Voice notes as an add-on (v9.33).
+  // Voice notes included in every package (v9.33, approved 9 Oct 2026).
   r = await call('GET', '/api/costing');
   const vt = r.body.addons.find((a) => a.key === 'voice-transcription');
   const vu = r.body.addons.find((a) => a.key === 'voice-understanding');
-  ok(vt && Number(vt.monthly_fee) === 3500 && Number(vt.included_units) === 500 && Number(vt.overage_rate) === 5 && vt.meter === 'voice_minute',
-    'Voice-note transcription is an add-on: PKR 3,500 a month with 500 minutes, PKR 5 a minute after', vt && JSON.stringify(vt));
-  ok(vt && vt.stt_cost === 831 && vt.total_monthly_cost === 1081 && vt.monthly_margin >= 0.65,
-    'its margin counts the included minutes at the live speech-to-text rate', vt && `${vt.stt_cost} ${vt.total_monthly_cost} ${vt.monthly_margin}`);
-  ok(vu && vu.meter === 'voice_minute' && Number(vu.included_units) === 750 && vu.stt_cost === 1247,
-    'Voice understanding includes 750 minutes, costed the same way', vu && `${vu.included_units} ${vu.stt_cost}`);
-  ok(r.body.voice && r.body.voice.stt_model === 'gpt-4o-transcribe', 'the model says what transcribes voice notes', JSON.stringify(r.body.voice));
+  ok(!vt || vt.active === false, 'there is no separate voice-transcription add-on for sale', vt && JSON.stringify(vt));
+  ok(vu && vu.active !== false && !vu.meter && Number(vu.est_monthly_cost) === 1250 && /included in every package/.test(vu.price_note),
+    'Voice understanding is sold for its spoken replies; transcription is in the package', vu && JSON.stringify(vu));
+  const st = r.body.packages.find((p) => p.name === 'Starter');
+  ok(st.voice_minutes === 150 && st.voice_full === 249 && r.body.voice.stt_model === 'whisper-1',
+    'the model costs Starter\'s 150 included minutes on Whisper', JSON.stringify({ m: st.voice_minutes, c: st.voice_full, s: r.body.voice.stt_model }));
+  const { rows: vr } = await db.query(
+    `select p.name, r.included_units, r.unit_rate from usage_rates r join products p on p.id = r.product_id
+      where r.metric = 'voice_minute' and r.client_id is null and r.effective_to is null order by p.sort_order`);
+  ok(vr.length === 6 && vr.every((x) => Number(x.unit_rate) === 5) && Number(vr[0].included_units) === 150 && Number(vr[5].included_units) === 4000,
+    'each package carries a voice-minute rate card: 10% of its conversations, then PKR 5 a minute', JSON.stringify(vr));
   r = await call('PUT', '/api/costing', { assumptions: { stt_model: 'gpt-4o-mini-transcribe' } });
-  const vt2 = r.body.addons.find((a) => a.key === 'voice-transcription');
-  ok(r.status === 200 && vt2.stt_cost === 416 && vt2.monthly_margin > vt.monthly_margin,
-    'a cheaper speech-to-text model lifts the add-on\'s margin', `${r.status} ${vt2 && vt2.stt_cost}`);
+  ok(r.status === 200 && r.body.packages.find((p) => p.name === 'Starter').voice_full === 125,
+    'a cheaper speech-to-text model halves what the allowance costs', r.status);
   await call('POST', '/api/costing/reset', { scope: 'rates' });
-  r = await call('PUT', '/api/addons/' + vt.id, { overage_rate: 1 });
-  ok(r.status === 200, 'the CEO can change the per-minute price', r.status);
-  r = await call('GET', '/api/costing');
-  ok(r.body.flags.some((f) => /Voice-note transcription/.test(f.text) && /below what a minute/.test(f.text)),
-    'a per-minute price below cost is flagged on Products & Pricing', JSON.stringify(r.body.flags.map((f) => f.text)));
-  r = await call('PUT', '/api/addons/' + vt.id, { meter: 'tokens' });
+  r = await call('PUT', '/api/addons/' + vu.id, { meter: 'tokens' });
   ok(r.status === 400, 'an unknown meter is refused', r.status);
-  await call('PUT', '/api/addons/' + vt.id, { overage_rate: 5 });
-  await call('POST', '/api/costing/reset', { scope: 'rates' });
 
   r = await call('POST', '/api/addons', { name: 'Test add-on', family: 'capability', price_basis: 'fixed', setup_fee: 1000 });
   ok(r.status === 400, 'a priced add-on needs both fees', r.status);

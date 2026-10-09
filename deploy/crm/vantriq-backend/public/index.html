@@ -2431,7 +2431,7 @@ function unitEconomicsHTML(){
   <div class="section-title"><div><h2>Unit economics</h2><div class="hint">What one conversation costs, and what each package keeps — the business model's tables, at today's prices</div></div></div>
   <div class="table-wrap">
     <table style="font-size:12.5px;">
-      <thead><tr><th>Package</th><th>Msgs / session</th><th>Cost / session</th><th>Sessions</th><th>AI at full use</th><th>AI % of price</th><th>Labour / mo</th><th>Margin (full)</th><th>Margin (${util}%)</th><th>Overage</th><th>Setup margin</th><th>Year one</th></tr></thead>
+      <thead><tr><th>Package</th><th>Msgs / session</th><th>Cost / session</th><th>Sessions</th><th>AI at full use</th><th>AI % of price</th><th>Voice incl.</th><th>Labour / mo</th><th>Margin (full)</th><th>Margin (${util}%)</th><th>Overage</th><th>Setup margin</th><th>Year one</th></tr></thead>
       <tbody>
       ${rows.map(r=>`<tr>
         <td><strong>${esc(r.name)}</strong></td>
@@ -2440,6 +2440,7 @@ function unitEconomicsHTML(){
         <td class="mono">${fmtNum(r.quota)}</td>
         <td class="mono">${fmtMoney(r.ai_full)}</td>
         <td class="mono">${pctText(r.ai_share_of_price)}</td>
+        <td class="mono" style="white-space:nowrap;">${fmtNum(r.voice_minutes||0)} min · ${fmtMoney(r.voice_full||0)}</td>
         <td class="mono">${fmtMoney(r.mgmt_labour)}</td>
         <td class="mono" style="color:${marginTone(r.margin_full)};font-weight:700;">${pctText(r.margin_full)}</td>
         <td class="mono" style="color:${marginTone(r.margin_util)};font-weight:700;">${pctText(r.margin_util)}</td>
@@ -2452,7 +2453,7 @@ function unitEconomicsHTML(){
   </div>
   <p class="footnote">A session is one customer conversation in a rolling 24 hours. Cost per session = the tokens it sends and receives
     (system prompt and catalogue context of ${fmtNum(Math.min(...rows.map(r=>r.profile.context_tokens)))}–${fmtNum(Math.max(...rows.map(r=>r.profile.context_tokens)))} tokens per turn, the conversation so far,
-    ${a.user_tokens}-token messages and ${a.reply_tokens}-token replies including the model's reasoning, ${a.calls_per_turn} model calls a turn), priced on the rate card and converted at USD/PKR ${a.fx_usd_pkr}. These are what the live agents measured with OpenAI's real token counts in October 2026. Labour: founder time at
+    ${a.user_tokens}-token messages and ${a.reply_tokens}-token replies including the model's reasoning, ${a.calls_per_turn} model calls a turn), priced on the rate card and converted at USD/PKR ${a.fx_usd_pkr}. These are what the live agents measured with OpenAI's real token counts in October 2026. Voice notes are included in every package up to ${Math.round((a.voice_allowance_share||0)*100)}% of its conversations in minutes, costed at full use on ${esc(((costingData.voice||{}).label)||'')}; minutes past that are billed at PKR 5. Labour: founder time at
     ${fmtMoney(a.founder_rate)}/h, contracted time at ${fmtMoney(a.contractor_rate)}/h. Year one includes the setup fee, ${a.sales_hours_per_win} unbilled sales hours to win the client and
     ${a.adhoc_hours_per_month} h a month of ad-hoc requests. ${a.cache_share?`${Math.round(a.cache_share*100)}% of the prompt is billed at the cached-input price.`:'Prompt caching is not assumed — it would only lower these costs.'}</p>`;
 }

@@ -121,26 +121,31 @@ flow):
 
 ### Voice notes (v9.33)
 
-Voice notes are an add-on (**Voice-note transcription**, or **Voice
-understanding** with spoken replies). For a turn that started as a voice note,
-add the length of the audio and the speech-to-text model:
+Voice notes are included in every package: voice-note minutes up to 10% of
+the package's conversation allowance, then PKR 5 a minute (a **Voice-note
+minutes** rate card on each package). **Voice understanding** is the add-on
+for spoken replies. For a turn that started as a voice note, add the length of
+the audio and the speech-to-text model:
 
 ```json
   "voice_seconds": {{ $('Voice note length').item.json.voice_seconds }},
-  "stt_model": "gpt-4o-transcribe"
+  "stt_model": "whisper-1"
 ```
 
 The live WhatsApp agent measures the length in a Code node (**Voice note
 length**) that reads the Ogg file's last granule position, then transcribes with
-**gpt-4o-transcribe** through an HTTP Request node. Do not use
-gpt-4o-mini-transcribe for Pakistani customers: in testing it wrote Urdu in
-Hindi script.
+**whisper-1** through an HTTP Request node. In testing (9 Oct 2026) only
+whisper-1 kept Urdu in Urdu script every time: gpt-4o-transcribe slipped into
+Hindi (Devanagari) once in three runs, and gpt-4o-mini-transcribe and
+gpt-transcribe — OpenAI's replacement — wrote Hindi even told the language.
+OpenAI retires whisper-1 on 26 Feb 2027; choose and test a replacement that
+handles Urdu before then.
 
-Before transcribing, check the client has bought voice:
-`GET /api/webhooks/service-status` now returns `"voice": true` only when a
-**Voice-note minutes** rate card applies to the client (their own, an agent's,
-or their package's). On `voice: false`, reply asking the customer to type
-instead of transcribing. Minutes past the rate card's included minutes are
+Before transcribing, check voice is on for the client:
+`GET /api/webhooks/service-status` returns `"voice": true` when a **Voice-note
+minutes** rate card applies to them — every standard package carries one, so
+that is every client on a package. On `voice: false` (a client with no package
+or a custom one without voice), reply asking the customer to type instead. Minutes past the rate card's included minutes are
 billed on the monthly invoice like any other metered usage.
 
 ## 5. Import the billing workflow

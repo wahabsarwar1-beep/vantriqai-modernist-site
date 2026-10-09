@@ -101,14 +101,16 @@ module.exports = (function () {
    * read from where this was checked, so confirm them before a client quote.
    */
   const STT_RATES = [
-    { key: 'whisper-1', label: 'OpenAI Whisper', vendor: 'OpenAI', per_minute: 0.006,
-      as_of: STT_AS_OF, source: 'openai.com/api/pricing', note: 'What the WhatsApp agent used until 9 Oct 2026 (n8n\'s OpenAI node is fixed to it).' },
-    { key: 'gpt-4o-transcribe', label: 'GPT-4o Transcribe', vendor: 'OpenAI', per_minute: 0.006,
-      as_of: STT_AS_OF, source: 'openai.com/api/pricing', note: 'What the WhatsApp agent transcribes with. Same price as Whisper; as good or better on Urdu, Urdu-English and English in the 9 Oct 2026 test.' },
-    { key: 'gpt-4o-mini-transcribe', label: 'GPT-4o mini Transcribe', vendor: 'OpenAI', per_minute: 0.003,
-      as_of: STT_AS_OF, source: 'openai.com/api/pricing', note: 'Half the price, but NOT usable for Urdu: in the 9 Oct 2026 test it wrote Urdu in Hindi (Devanagari) script, even told the language.' },
+    { key: 'whisper-1', label: 'OpenAI Whisper', vendor: 'OpenAI', per_minute: 0.006, retiring: '2027-02-26',
+      as_of: STT_AS_OF, source: 'openai.com/api/pricing', note: 'What the WhatsApp agent transcribes with: the only model that kept Urdu in Urdu script in all three runs of the 9 Oct 2026 test. Retires 26 Feb 2027.' },
+    { key: 'gpt-4o-transcribe', label: 'GPT-4o Transcribe', vendor: 'OpenAI', per_minute: 0.006, retiring: '2027-02-26',
+      as_of: STT_AS_OF, source: 'openai.com/api/pricing', note: 'Wrote a mixed Urdu-English note in Hindi script in one of three runs. Retires 26 Feb 2027.' },
+    { key: 'gpt-4o-mini-transcribe', label: 'GPT-4o mini Transcribe', vendor: 'OpenAI', per_minute: 0.003, retiring: '2027-02-26',
+      as_of: STT_AS_OF, source: 'openai.com/api/pricing', note: 'NOT usable for Urdu: wrote it in Hindi script even told the language. Retires 26 Feb 2027.' },
+    { key: 'gpt-transcribe', label: 'GPT Transcribe', vendor: 'OpenAI', per_minute: 0.0045,
+      as_of: STT_AS_OF, source: 'openai.com/api/pricing', note: 'OpenAI\'s named replacement from Feb 2027. NOT usable for Urdu as tested: Hindi script even with language=ur and a prompt.' },
     { key: 'elevenlabs-scribe', label: 'ElevenLabs Scribe', vendor: 'ElevenLabs', per_minute: 0.22 / 60,
-      as_of: STT_AS_OF, source: 'elevenlabs.io/pricing/api', note: 'About $0.22 an hour. A second vendor and a second bill.' },
+      as_of: STT_AS_OF, source: 'elevenlabs.io/pricing/api', note: 'About $0.22 an hour. Untested on Urdu here; the candidate to test before Feb 2027.' },
   ];
 
   /** Everything else the model assumes. Editable in Products & Pricing. */
@@ -129,7 +131,8 @@ module.exports = (function () {
     sales_hours_per_win: 5,       // unbilled selling to win one client
     adhoc_hours_per_month: 0.5,   // unplanned requests beyond the management budget
     hours_per_fte: 160,           // one full-time person, per month
-    stt_model: 'gpt-4o-transcribe', // what transcribes voice notes
+    stt_model: 'whisper-1',       // what transcribes voice notes
+    voice_allowance_share: 0.1,   // voice minutes each package includes, per included conversation (approved 9 Oct 2026)
     voice_note_minutes: 0.5,      // the length of a typical voice note
     mix: { Starter: 6, Growth: 6, Scale: 3, Pro: 2, Enterprise: 1, 'Enterprise+': 0 },
   };
@@ -245,10 +248,16 @@ module.exports = (function () {
   }
 
   /** Warnings about voice pricing, for the same list as the package flags. */
-  function voiceFlags(addons, voice, sttRates) {
+  function voiceFlags(addons, voice, sttRates, today) {
     const out = [];
-    if (!(sttRates || []).some((r) => r.key === voice.stt_model)) {
+    const current = (sttRates || []).find((r) => r.key === voice.stt_model);
+    if (!current) {
       out.push({ level: 'bad', text: `The speech-to-text model "${voice.stt_model}" is not on the price list, so voice notes cost nothing in the model.` });
+    } else if (current.retiring) {
+      const days = Math.round((new Date(current.retiring) - (today ? new Date(today) : new Date())) / 86400000);
+      if (days <= 180) {
+        out.push({ level: days <= 60 ? 'bad' : 'warn', text: `${current.label} is retired by ${current.vendor} on ${current.retiring}${days >= 0 ? ` (${days} days)` : ''}. Choose and test a replacement that keeps Urdu in Urdu script before then.` });
+      }
     }
     for (const ad of addons || []) {
       const v = voiceAddonCost(ad, voice);
@@ -344,14 +353,19 @@ module.exports = (function () {
     const u = num(a.utilization, ASSUMPTIONS.utilization);
 
     const aiFull = perSession * quota;
+    // Voice notes are included in every package (v9.33): minutes up to a
+    // share of the conversation allowance, transcribed at the live
+    // speech-to-text rate. Costed at full use like the conversations.
+    const voiceMinutes = Math.round(quota * num(a.voice_allowance_share));
+    const voiceFull = voiceMinutes * num(opts.voice ? opts.voice.per_minute_pkr : 0);
     const hourly = prof.founder_share * num(a.founder_rate) + (1 - prof.founder_share) * num(a.contractor_rate);
     const mgmt = prof.mgmt_hours * hourly;
     const build = prof.build_hours * hourly;
-    const grossFull = retainer - aiFull - mgmt;
-    const grossUtil = retainer - u * aiFull - mgmt;
+    const grossFull = retainer - aiFull - voiceFull - mgmt;
+    const grossUtil = retainer - u * (aiFull + voiceFull) - mgmt;
 
     const yearRevenue = setup + 12 * retainer;
-    const yearCost = 12 * u * aiFull + build + 12 * mgmt
+    const yearCost = 12 * u * (aiFull + voiceFull) + build + 12 * mgmt
       + num(a.sales_hours_per_win) * num(a.founder_rate)
       + 12 * num(a.adhoc_hours_per_month) * num(a.founder_rate);
 
@@ -379,6 +393,11 @@ module.exports = (function () {
       cost_per_session_usd: r4(usd),
       cost_per_session: r4(perSession),
       ai_full: Math.round(aiFull),
+      voice_minutes: voiceMinutes,
+      voice_full: Math.round(voiceFull),
+      voice_share_of_price: retainer ? pct(voiceFull / retainer) : null,
+      // What serving the package costs at full use: conversations and voice.
+      delivery_full: Math.round(aiFull + voiceFull),
       ai_at_util: Math.round(aiFull * u),
       ai_share_of_price: retainer ? pct(aiFull / retainer) : null,
       ai_at_typical: typicalMid ? Math.round(perSession * typicalMid) : null,
@@ -410,7 +429,7 @@ module.exports = (function () {
   /** The business at a given client mix, over a year. */
   function steadyState(rows, a) {
     const mix = a.mix || {};
-    let clients = 0, setupRev = 0, retainerRev = 0, ai = 0, build = 0, mgmt = 0, mgmtHours = 0;
+    let clients = 0, setupRev = 0, retainerRev = 0, ai = 0, voice = 0, build = 0, mgmt = 0, mgmtHours = 0;
     const lines = [];
     for (const r of rows) {
       const n = Math.max(0, Math.round(num(mix[r.name])));
@@ -418,7 +437,8 @@ module.exports = (function () {
       clients += n;
       setupRev += n * r.setup_fee;
       retainerRev += n * 12 * r.retainer;
-      ai += n * 12 * num(a.utilization) * r.ai_full;
+      ai += n * 12 * num(a.utilization) * (r.ai_full + (r.voice_full || 0));
+      voice += n * 12 * num(a.utilization) * (r.voice_full || 0);
       build += n * r.build_labour;
       mgmt += n * 12 * r.mgmt_labour;
       mgmtHours += n * r.mgmt_hours;
@@ -440,6 +460,7 @@ module.exports = (function () {
       setup_revenue: Math.round(setupRev),
       retainer_revenue: Math.round(retainerRev),
       ai: Math.round(ai),
+      voice: Math.round(voice),
       labour: Math.round(labour),
       build_labour: Math.round(build),
       mgmt_labour: Math.round(mgmt),
@@ -495,9 +516,9 @@ module.exports = (function () {
     const a = mergeAssumptions(s.assumptions, extra);
     const voice = voiceCost(a, sttRates);
     const live = (products || []).filter((p) => !p.archived);
-    const rows = live.map((p) => packageEconomics(p, a, rates));
+    const rows = live.map((p) => packageEconomics(p, a, rates, { voice }));
     const whatIf = WHAT_IF_MODELS.filter((k) => rateFor(rates, k)).map((key) => {
-      const alt = live.map((p) => packageEconomics(p, a, rates, { bulk_model: key }));
+      const alt = live.map((p) => packageEconomics(p, a, rates, { bulk_model: key, voice }));
       const st = steadyState(alt, a);
       return {
         bulk_model: key,

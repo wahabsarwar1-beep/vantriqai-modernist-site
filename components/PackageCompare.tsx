@@ -69,6 +69,8 @@ export default function PackageCompare({ region }: { region: Region }) {
         { label: "Sessions a day, on average", cells: pkgs.map((k) => ({ text: k.usage.perday })) },
         { label: "Headroom over typical use", cells: pkgs.map((k) => ({ text: k.usage.head })) },
         { label: "Overage beyond the allowance", cells: pkgs.map((k) => ({ text: k.usage[region.overageKey] })) },
+        { label: "Voice-note minutes included a month", cells: pkgs.map((k) => ({ text: k.usage.voice })) },
+        { label: "Voice-note minutes beyond the allowance", cells: pkgs.map((k) => ({ text: k.usage[region.voiceOverKey] })) },
       ],
     },
   ];

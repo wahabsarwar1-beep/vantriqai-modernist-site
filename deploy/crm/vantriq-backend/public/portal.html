@@ -1022,7 +1022,12 @@ function renderPackages(){
         </div>
         <div class="kv"><span class="k">Included sessions / month</span><span class="v">${fmtNum(p.quota)}</span></div>
         <div class="kv"><span class="k">Overage rate</span><span class="v">${fmtMoney(p.overage_rate)} / session</span></div>
+        ${p.voice_minutes!=null?`<div class="kv"><span class="k">Voice-note minutes / month</span><span class="v">${fmtNum(p.voice_minutes)} included · then ${fmtMoney(p.voice_rate)} / min</span></div>`:''}
         <div class="kv"><span class="k">Channels</span><span class="v">${esc(p.channels||'—')}</span></div>
+        ${(p.includes||[]).length?`<details style="margin-top:8px;font-size:12.5px;"><summary style="cursor:pointer;font-weight:600;">What ${esc(p.name)} includes</summary>
+          <ul style="margin:8px 0 0 18px;padding:0;line-height:1.55;">${p.includes.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
+          ${(p.excludes||[]).length?`<div style="font-weight:600;margin-top:8px;">Not included</div><ul style="margin:6px 0 0 18px;padding:0;line-height:1.55;color:var(--muted);">${p.excludes.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}
+        </details>`:''}
         ${current || pending ? '' : `
         <button class="btn btn-primary" style="margin-top:12px;" onclick="requestPackage('${p.id}',${jsArg(p.name)})">Request this package</button>`}
       </div>`;
@@ -1216,6 +1221,17 @@ function renderUsage(){
     <div class="stat-card"><div class="label">Messages this month</div><div class="value">${fmtNum(u.messages)}</div></div>
     <div class="stat-card"><div class="label">Sessions this month</div><div class="value">${fmtNum(u.sessions_used)}</div></div>
   </div>
+
+  ${u.voice && u.voice.minutes_included!=null ? `
+  <div class="card">
+    <h3>Voice notes</h3>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;">
+      <span style="font-family:var(--f-head);font-size:22px;font-weight:600;">${fmtNum(u.voice.minutes_used)} min</span>
+      <span style="font-size:13px;color:var(--muted);">of ${fmtNum(u.voice.minutes_included)} minutes included</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill ${u.voice.minutes_used>=u.voice.minutes_included?'danger':u.voice.minutes_used>=u.voice.minutes_included*0.8?'warn':''}" style="width:${Math.min(100, Math.round(u.voice.minutes_used / Math.max(1,u.voice.minutes_included) * 100))}%"></div></div>
+    <div style="margin-top:10px;font-size:12.5px;color:var(--muted);">Customers' voice notes are transcribed and answered in text. Minutes past the allowance are ${fmtMoney(u.voice.rate_per_minute)} each${u.voice.minutes_over?` — <strong>${fmtNum(u.voice.minutes_over)} so far this month</strong>`:''}.</div>
+  </div>` : ''}
 
   <div class="card">
     <h3>Last 6 months</h3>

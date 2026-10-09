@@ -62,9 +62,9 @@ const FACEBOOK_PAGE_ID = process.env.VANTRIQ_FACEBOOK_PAGE_ID || '12918976173463
 const MODEL_RATES = [
   { metric: 'input_token',  unit_rate: 0.25, unit_size: 1000000, label: 'Model input tokens (gpt-5-mini)' },
   { metric: 'output_token', unit_rate: 2.00, unit_size: 1000000, label: 'Model output tokens (gpt-5-mini)' },
-  // v9.33: voice notes the WhatsApp agent transcribes, at gpt-4o-transcribe's
-  // $0.006 a minute.
-  { metric: 'voice_minute', unit_rate: 0.006, unit_size: 1, label: 'Voice-note transcription minutes (gpt-4o-transcribe)' },
+  // v9.33: voice notes the WhatsApp agent transcribes, at Whisper's $0.006 a
+  // minute.
+  { metric: 'voice_minute', unit_rate: 0.006, unit_size: 1, label: 'Voice-note transcription minutes (whisper-1)' },
 ];
 
 const DEFAULT_AGENTS = [

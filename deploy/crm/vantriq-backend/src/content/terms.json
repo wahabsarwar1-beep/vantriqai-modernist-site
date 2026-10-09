@@ -21,7 +21,7 @@
         "Agent: an AI assistant VantriqAI configures to answer your customers on a channel such as WhatsApp, Instagram, Facebook Messenger, your website or a phone line.",
         "Conversation (also session): one of your customers talking to an agent within a rolling 24-hour window, however many messages it takes.",
         "Allowance: the number of conversations, voice-note minutes or other units your package or add-on includes each billing month.",
-        "Add-on: a capability priced separately from your package, such as voice-note transcription, website chat or a voice call agent.",
+        "Add-on: a capability priced separately from your package, such as spoken replies to voice notes, website chat or a voice call agent.",
         "Platform: a third-party service the agent runs on or connects to, including Meta (WhatsApp, Instagram, Facebook), AI model providers, telecommunications carriers, payment providers and your own software.",
         "Scope sign-off: the document in your client portal that sets out exactly what will be delivered, which you sign before configuration begins."
       ]
@@ -55,7 +55,7 @@
         "Allowances are monthly. Unused conversations, minutes or credits do not roll over to the next month, cannot be transferred and are not refunded or exchanged for cash, except where the law requires otherwise.",
         "Usage is measured from the AI provider's own counts where the provider reports them, and from our systems otherwise. Your client portal shows conversations and other metered usage for the month as it happens. If you believe a figure is wrong, tell us within 30 days of the invoice and we will review the records with you.",
         "Each action an agent or tool takes consumes AI processing, which varies with the complexity of the request and the tools used and is not quoted in advance. Session counts and capacity figures describe expected capacity, not a guaranteed entitlement.",
-        "Voice notes are an add-on. When your package includes voice-note transcription, voice-note minutes are measured from the length of each recording and billed beyond the add-on's allowance at the stated per-minute rate. Where voice is not part of your package, the agent may ask your customer to type instead.",
+        "Voice notes are included in every package, up to the voice-note minutes stated for it: 10% of its monthly conversation allowance (for example 150 minutes a month on Starter and 4,000 on Enterprise+). Minutes are measured from the length of each recording. Minutes beyond the allowance are billed at PKR 5 a minute, or at the rate in your quotation or agreement. Spoken replies to voice notes and voice calls are add-ons. Where a deployment does not include voice, the agent may ask your customer to type instead.",
         "We may limit, queue or pause automated replies to protect the service from abuse, floods of messages, spam or attacks, including messages that try to make the agent act outside its instructions. Such traffic may still count towards usage where it reached the AI provider."
       ]
     },

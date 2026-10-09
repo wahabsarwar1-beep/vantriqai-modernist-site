@@ -66,6 +66,8 @@ async function costingModel({ withAddons = true } = {}) {
     const { rows } = await db.query(`select * from catalog_addons order by sort_order, name`);
     model.addons = rows.map((r) => ({ ...r, ...addonEconomics(r, model.assumptions, model.voice) }));
     model.flags = model.flags.concat(engine.voiceFlags(rows, model.voice, model.stt_rates));
+  } else {
+    model.flags = model.flags.concat(engine.voiceFlags([], model.voice, model.stt_rates));
   }
   return model;
 }
@@ -84,7 +86,7 @@ async function syncDeliveryCosts() {
     const { rowCount } = await db.query(
       `update products set delivery_cost_full = $2, ai_model = $3
         where id = $1 and (delivery_cost_full is distinct from $2::numeric or ai_model is distinct from $3)`,
-      [r.id, r.ai_full, r.routing]
+      [r.id, r.delivery_full, r.routing]
     );
     changed += rowCount;
   }
@@ -109,6 +111,7 @@ const LIMITS = {
   voice_note_minutes: [0.05, 15, 'The length of a typical voice note, in minutes'],
   calls_per_turn: [1, 10, 'Model calls per customer turn'],
   cache_share: [0, 1, 'The cached share of the prompt'],
+  voice_allowance_share: [0, 2, 'Voice minutes included per conversation'],
 };
 
 function numberIn(value, [min, max, label]) {

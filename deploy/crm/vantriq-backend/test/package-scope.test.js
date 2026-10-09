@@ -37,8 +37,12 @@ const call = (method, p, body, headers = K) => fetch(B + p, { method, headers, b
     before = { includes: growth.includes, excludes: growth.excludes };
     ok(growth.includes.some((x) => /CRM sync/.test(x)) && !std.find((p) => p.name === 'Starter').includes.some((x) => /CRM sync/.test(x)),
       'Growth includes CRM sync and Starter does not');
-    ok(std.every((p) => p.excludes.some((x) => /Meta/.test(x)) && p.excludes.some((x) => /Voice notes/.test(x))),
-      'every package says Meta fees and voice notes are not included');
+    ok(std.every((p) => p.excludes.some((x) => /Meta/.test(x)) && p.excludes.some((x) => /Voice-note minutes beyond/.test(x))),
+      'every package says Meta fees and voice minutes past the allowance are not included');
+    ok(std.every((p) => p.includes.some((x) => /voice-note minutes a month included, then PKR 5 a minute/.test(x)))
+      && std.find((p) => p.name === 'Starter').includes.some((x) => /— 150 voice-note minutes/.test(x))
+      && std.find((p) => p.name === 'Enterprise+').includes.some((x) => /— 4,000 voice-note minutes/.test(x)),
+      'and every package states its own voice-minute allowance', JSON.stringify(std.map((p) => p.includes.find((x) => /voice/i.test(x)))));
 
     console.log('\n== only the CEO edits them ==');
     let r = await call('PATCH', `/api/products/${growth.id}/scope`, { includes: ['x'] });

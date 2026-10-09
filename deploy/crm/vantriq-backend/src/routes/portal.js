@@ -193,6 +193,19 @@ router.get('/usage', async (req, res) => {
   }
   const current = currentRes.rows[0] || { sessions: 0, messages: 0, input_tokens: 0, output_tokens: 0 };
   const sessionsUsed = +current.sessions || 0;
+
+  // Voice notes (v9.33): included up to the voice-minute allowance on the
+  // rate card that applies to this client — their package's, unless one was
+  // agreed for them — then billed per minute.
+  const { ratesFor } = require('../utils/subscriptions');
+  const voiceRate = (await ratesFor(client, null, new Date())).find((r) => r.metric === 'voice_minute') || null;
+  const voiceUsed = Math.round((+current.voice_minutes || 0) * 10) / 10;
+  const voice = voiceRate ? {
+    minutes_used: voiceUsed,
+    minutes_included: +voiceRate.included_units,
+    rate_per_minute: +voiceRate.unit_rate,
+    minutes_over: Math.max(0, Math.round((voiceUsed - +voiceRate.included_units) * 10) / 10),
+  } : (voiceUsed ? { minutes_used: voiceUsed, minutes_included: null, rate_per_minute: null, minutes_over: 0 } : null);
   const overSessions = quota != null ? Math.max(0, sessionsUsed - quota) : 0;
 
   // Service does not stop at the quota line, so say plainly what is happening
@@ -219,6 +232,7 @@ router.get('/usage', async (req, res) => {
     estimated_overage_cost: overageRate != null ? overSessions * overageRate : null,
     state,
     notice: NOTICE[state],
+    voice,
     history: historyRes.rows.map((r) => ({
       period_month: r.period_month, sessions: +r.sessions || 0, messages: +r.messages || 0,
     })),
@@ -715,7 +729,13 @@ router.get('/activity', async (req, res) => {
 router.get('/packages', async (req, res) => {
   const { rows } = await db.query(
     `select id, name, target_tier, setup_fee, retainer, quota, overage_rate,
-            msgs_per_session, automation, data_layer, channels
+            msgs_per_session, automation, data_layer, channels, includes, excludes,
+            (select r.included_units from usage_rates r
+              where r.product_id = products.id and r.client_id is null and r.agent_id is null
+                and r.metric = 'voice_minute' and r.effective_to is null limit 1) as voice_minutes,
+            (select r.unit_rate from usage_rates r
+              where r.product_id = products.id and r.client_id is null and r.agent_id is null
+                and r.metric = 'voice_minute' and r.effective_to is null limit 1) as voice_rate
        from products
       where archived = false and is_standard = true
       order by sort_order asc, created_at asc`
@@ -734,6 +754,9 @@ router.get('/packages', async (req, res) => {
       setup_fee: +r.setup_fee, retainer: +r.retainer, quota: +r.quota,
       overage_rate: +r.overage_rate, msgs_per_session: +r.msgs_per_session,
       automation: r.automation, data_layer: r.data_layer, channels: r.channels,
+      includes: r.includes || [], excludes: r.excludes || [],
+      voice_minutes: r.voice_minutes == null ? null : +r.voice_minutes,
+      voice_rate: r.voice_rate == null ? null : +r.voice_rate,
     })),
     pending_request: pending.rows[0] || null,
   });
