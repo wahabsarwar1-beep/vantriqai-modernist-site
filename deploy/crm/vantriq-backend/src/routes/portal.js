@@ -1142,5 +1142,147 @@ router.post('/quotes/:id/decline', async (req, res) => {
   res.json({ ...rows[0], message: 'Thanks for letting us know.' });
 });
 
+/* ---------------------------- Scope sign-off (v9.33) ---------------------------- */
+/**
+ * The scope of work the team has sent this customer to sign, and the ones
+ * they have signed. A draft is ours until it is sent and never shows here.
+ *
+ * Signing is the customer confirming three things in their own words — the
+ * scope, the terms version printed in it, and their authority to sign for
+ * the business — against the exact document they were shown: the content
+ * hash they send back must be the one stored, which is itself re-computed
+ * from the stored document, so neither a revision sent meanwhile nor a row
+ * edited behind the scenes can be signed by mistake.
+ */
+const SCOPE = require('../utils/scopeSignoff');
+const { clientIp } = require('../utils/clientIp');
+
+router.get('/scope-signoffs', async (req, res) => {
+  const { rows } = await db.query(
+    `select * from scope_signoffs where client_id = $1 and status <> 'draft' order by created_at desc`,
+    [req.portalClient.id]
+  );
+  res.json(rows.map(SCOPE.publicShape));
+});
+
+async function portalScope(req) {
+  const { rows } = await db.query(
+    `select * from scope_signoffs where id = $1 and client_id = $2 and status <> 'draft'`,
+    [req.params.id, req.portalClient.id]
+  );
+  return rows[0] || null;
+}
+
+router.get('/scope-signoffs/:id/pdf', async (req, res) => {
+  const s = await portalScope(req);
+  if (!s) return res.status(404).json({ error: 'Scope not found' });
+  const pdf = await SCOPE.renderPdf(s);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${SCOPE.pdfFilename(s)}"`);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.send(pdf);
+});
+
+async function tellTeam(subject, text) {
+  try {
+    if (!mailConfigured()) return;
+    const to = process.env.TEAM_NOTIFY_EMAIL || 'support@vantriqai.com';
+    await sendMail({ to, subject, text });
+  } catch (err) {
+    console.error('[scope sign-off] team email not sent:', err.message);
+  }
+}
+
+router.post('/scope-signoffs/:id/sign', async (req, res) => {
+  const s = await portalScope(req);
+  if (!s) return res.status(404).json({ error: 'Scope not found' });
+  if (!['sent', 'changes_requested'].includes(s.status)) {
+    return res.status(409).json({ error: s.status === 'signed' ? 'This scope is already signed.' : 'This version is no longer open for signature.' });
+  }
+  const b = req.body || {};
+  const name = String(b.signer_name || '').trim();
+  const title = String(b.signer_title || '').trim();
+  const email = String(b.signer_email || '').trim();
+  if (name.length < 3 || name.length > 120) return res.status(400).json({ error: 'Type your full name to sign.' });
+  if (!title || title.length > 120) return res.status(400).json({ error: 'Give your position at the business.' });
+  if (email && (email.length > 200 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))) return res.status(400).json({ error: 'That email address does not look right.' });
+  if (b.accept_scope !== true || b.accept_terms !== true || b.authorised !== true) {
+    return res.status(400).json({ error: 'Tick all three confirmations to sign.' });
+  }
+  if (!s.content_hash || SCOPE.hashOf(s) !== s.content_hash) {
+    console.error('[scope sign-off] stored hash does not match the stored document', s.id);
+    return res.status(409).json({ error: 'This document cannot be signed as it stands. Please contact the team.' });
+  }
+  if (String(b.content_hash || '') !== s.content_hash) {
+    return res.status(409).json({ error: 'The scope has changed since you opened it. Reload and read the current version before signing.' });
+  }
+
+  const settings = await getSettings();
+  const ack = { scope: true, terms: true, authority: true, terms_version: s.terms_version, content_hash: s.content_hash };
+  const c = s.content || {};
+  const com = c.commercial || {};
+  const cl = s.client_snapshot || {};
+  const conn = await db.pool.connect();
+  let signed;
+  try {
+    await conn.query('begin');
+    const { rows } = await conn.query(
+      `update scope_signoffs set status = 'signed', signed_at = now(), signer_name = $2, signer_title = $3,
+              signer_email = $4, signer_ip = $5, signer_user_agent = $6, acknowledgements = $7::jsonb
+        where id = $1 and status in ('sent','changes_requested') returning *`,
+      [s.id, name, title, email, clientIp(req) || '', String(req.get('user-agent') || '').slice(0, 300), JSON.stringify(ack)]
+    );
+    if (!rows[0]) throw Object.assign(new Error('This scope was just changed. Reload and try again.'), { status: 409, expose: true });
+    signed = rows[0];
+    // The scope in force is the newest one signed: an earlier signed version
+    // of the same document stands down now, not before.
+    await conn.query(
+      `update scope_signoffs set status = 'superseded' where number = $1 and version < $2 and status in ('signed','sent','changes_requested')`,
+      [s.number, s.version]
+    );
+    // Filed under Contracts as a signed statement of work, so it sits with
+    // the client's other agreements in the CRM and the portal.
+    const { allocateNumber } = require('./contracts');
+    const contractNumber = await allocateNumber(settings, new Date());
+    const { rows: ct } = await conn.query(
+      `insert into contracts (client_id, contract_number, title, kind, status, start_date, value, currency, billing_frequency,
+                              signed_date, signed_by_client, client_legal_name, client_ntn, client_strn, client_address, scope, notes)
+       values ($1, $2, $3, 'sow', 'signed', current_date, $4, $5, 'monthly', current_date, $6, $7, $8, $9, $10, $11, $12)
+       returning id`,
+      [s.client_id, contractNumber, `${s.title} (${s.number} v${s.version})`, Number(com.monthly_fee || 0), com.currency || 'PKR',
+        `${name}, ${title}`, cl.legal_name || cl.company || '', cl.ntn || '', cl.strn || '', cl.address || '',
+        (c.deliverables || []).join('\n').slice(0, 4000),
+        `Signed in the client portal. Terms version ${s.terms_version}. Fingerprint ${s.content_hash}.`]
+    );
+    await conn.query(`update scope_signoffs set contract_id = $2 where id = $1`, [s.id, ct[0].id]);
+    await conn.query('commit');
+  } catch (e) {
+    await conn.query('rollback').catch(() => {});
+    throw e;
+  } finally {
+    conn.release();
+  }
+  await tellTeam(`Scope signed: ${s.number} v${s.version} — ${req.portalClient.company || ''}`,
+    `${name} (${title}) signed ${s.title} (${s.number} v${s.version}) for ${req.portalClient.company || 'the client'} in the portal.\n`
+    + `Terms version ${s.terms_version}. Fingerprint ${s.content_hash}.\nConfiguration can be scheduled.`);
+  res.json(SCOPE.publicShape(signed));
+});
+
+router.post('/scope-signoffs/:id/request-changes', async (req, res) => {
+  const s = await portalScope(req);
+  if (!s) return res.status(404).json({ error: 'Scope not found' });
+  if (!['sent', 'changes_requested'].includes(s.status)) return res.status(409).json({ error: 'This version is not open for changes.' });
+  const message = String((req.body || {}).message || '').trim();
+  if (message.length < 5) return res.status(400).json({ error: 'Tell us what should change.' });
+  const { rows } = await db.query(
+    `update scope_signoffs set status = 'changes_requested', client_feedback = $2, feedback_at = now()
+      where id = $1 returning *`,
+    [s.id, message.slice(0, 4000)]
+  );
+  await tellTeam(`Scope changes requested: ${s.number} v${s.version} — ${req.portalClient.company || ''}`,
+    `${req.portalClient.company || 'The client'} asked for changes to ${s.title} (${s.number} v${s.version}):\n\n${message.slice(0, 4000)}\n\nRevise it in the CRM and send the new version.`);
+  res.json(SCOPE.publicShape(rows[0]));
+});
+
 module.exports = router;
 module.exports.formatInvoice = formatInvoice;

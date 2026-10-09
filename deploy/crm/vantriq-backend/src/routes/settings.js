@@ -25,6 +25,8 @@ const FIELDS = [
   // v9.15: the Play Store app — its package name and signing-key fingerprints,
   // which /.well-known/assetlinks.json publishes (see index.js).
   'android_package', 'android_sha256',
+  // v9.33: how long conversation text is kept (Terms, section 10).
+  'conversation_retention_months',
 ];
 
 // A SHA-256 certificate fingerprint as Play Console shows it: 32 bytes in hex, colon-separated.

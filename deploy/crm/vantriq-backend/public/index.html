@@ -947,6 +947,7 @@ async function loadState(){
       overagePolicy:settings.overage_policy||'serve',
       overageGracePct:settings.overage_grace_pct!=null?+settings.overage_grace_pct:120,
       paymentTermsDays:settings.payment_terms_days!=null?+settings.payment_terms_days:7,
+      conversationRetentionMonths:settings.conversation_retention_months!=null?+settings.conversation_retention_months:12,
       currency:settings.currency||'PKR' },
     packageRequests: packageRequests || [],
     products: products.map(productFromApi),
@@ -4016,6 +4017,151 @@ function clientIdentitySection(c){
 }
 
 /** Downloads one document, carrying the auth header the browser will not. */
+/* Scope sign-off (v9.33): prepared here from the client's package and quote,
+   sent to their portal, signed there. A sent or signed one is frozen;
+   changing it is a revision (the next version). */
+let scopeData = {};   // clientId -> array
+const SCOPE_STATUS = { draft:['pill-pending','Draft'], sent:['pill-pending','Awaiting signature'],
+  changes_requested:['pill-overdue','Changes requested'], signed:['pill-active','Signed'],
+  superseded:['pill-pending','Superseded'], withdrawn:['pill-pending','Withdrawn'] };
+const SCOPE_LISTS = [
+  ['deliverables','What we will deliver'], ['channels','Channels and numbers'], ['package_includes','Included in the package'],
+  ['addons','Add-ons'], ['integrations','Integrations'], ['knowledge_sources','Knowledge the agent answers from'],
+  ['languages','Languages'], ['handover','Handover to their team'], ['access_required','Account access we need'],
+  ['client_responsibilities','Their responsibilities'], ['vantriq_responsibilities','Our responsibilities'],
+  ['milestones','Milestones (add target dates)'], ['acceptance_criteria','How the work is accepted'], ['out_of_scope','Not included / out of scope'],
+];
+async function loadScopes(clientId){
+  scopeData[clientId] = scopeData[clientId] || null;
+  try{ scopeData[clientId] = await API.get(`/api/scope-signoffs?client_id=${encodeURIComponent(clientId)}`); }
+  catch(e){ scopeData[clientId] = { error: e.message||'Could not load scope sign-offs' }; }
+  render();
+}
+function clientScopeSection(c){
+  const list = scopeData[c.id];
+  const rows = Array.isArray(list) ? list : [];
+  return `
+    <div class="divider"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+      <h4 style="font-size:13px;margin:0;">Scope sign-off (${rows.length})</h4>
+      <button class="btn btn-ghost btn-sm" onclick="newScope('${c.id}')">${iconPlus(13)} New scope</button>
+    </div>
+    <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">
+      What the client signs in their portal before configuration starts: deliverables, access, responsibilities, acceptance and the full terms. Sending freezes it; a change is a new version.
+    </div>
+    ${list===undefined||list===null ? `<div style="font-size:12px;color:var(--muted);">Loading…</div>`
+      : list.error ? `<div style="font-size:12px;color:var(--red);">${esc(list.error)}</div>`
+      : !rows.length ? `<div style="font-size:12px;color:var(--muted);">No scope prepared yet.</div>`
+      : rows.map(s=>{
+        const [cls,label] = SCOPE_STATUS[s.status]||['pill-pending',s.status];
+        return `<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;">
+            <div><div style="font-weight:600;font-size:12.5px;">${esc(s.title)}</div>
+              <div class="mono" style="font-size:11px;color:var(--muted);">${esc(s.number)} · v${s.version}${s.sent_at?` · sent ${fmtDate(s.sent_at)}`:''}${s.signed_at?` · signed ${fmtDate(s.signed_at)} by ${esc(s.signer_name)}${s.signer_title?`, ${esc(s.signer_title)}`:''}`:''}</div></div>
+            <span class="pill ${cls}"><span class="pill-dot"></span>${label}</span>
+          </div>
+          ${s.client_feedback && s.status==='changes_requested'?`<div style="font-size:12px;background:var(--amber-light,#FFF4E0);border-radius:6px;padding:8px 10px;margin-top:8px;"><strong>They asked:</strong> ${esc(s.client_feedback)}</div>`:''}
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+            ${s.status==='draft'?`<button class="btn btn-ghost btn-sm" onclick="openModal={type:'scopeEdit',id:'${s.id}',clientId:'${c.id}'};render()">${iconEdit(13)} Edit</button>
+              <button class="btn btn-primary btn-sm" onclick="sendScope('${s.id}','${c.id}')">Send to portal</button>
+              <button class="btn btn-danger-ghost btn-sm" onclick="deleteScope('${s.id}','${c.id}')">Delete</button>`:''}
+            ${['sent','changes_requested','signed'].includes(s.status)?`<button class="btn btn-ghost btn-sm" onclick="reviseScope('${s.id}','${c.id}')">Revise</button>`:''}
+            ${['sent','changes_requested'].includes(s.status)?`<button class="btn btn-ghost btn-sm" onclick="withdrawScope('${s.id}','${c.id}')">Withdraw</button>`:''}
+            <button class="btn btn-ghost btn-sm" onclick="downloadScopePdf('${s.id}','${esc(s.number)}-v${s.version}')">${iconDownload(13)} PDF</button>
+          </div>
+        </div>`;
+      }).join('')}`;
+}
+async function newScope(clientId){
+  let quotes = [];
+  try{ quotes = (await API.get(`/api/quotes?client_id=${encodeURIComponent(clientId)}`)).filter(q=>q.status!=='cancelled'); }catch(e){}
+  openModal = { type:'scopeNew', clientId, quotes }; render();
+}
+function scopeNewModalHTML(){
+  const q = openModal.quotes || [];
+  return `<div class="modal">
+    <div class="modal-head"><h3>New scope sign-off</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
+    <div class="modal-body">
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;line-height:1.6;">Prefilled from the client's package, their agents and — if you pick one — a quote's lines. You edit it before sending.</p>
+      <div class="field"><label>Based on quote</label><select id="sc_quote"><option value="">No quote — from their package</option>
+        ${q.map(x=>`<option value="${x.id}">${esc(x.quote_number||'')} · ${esc(x.title||'Quotation')} · ${esc(x.status)}</option>`).join('')}</select></div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="createScope()">${iconCheck(14)} Prepare draft</button></div>
+  </div>`;
+}
+async function createScope(){
+  const clientId = openModal.clientId;
+  try{
+    const s = await API.post('/api/scope-signoffs', { client_id: clientId, quote_id: (document.getElementById('sc_quote')||{}).value || null });
+    await loadScopes(clientId);
+    openModal = { type:'scopeEdit', id:s.id, clientId }; render();
+  }catch(e){ showToast(e.message||'Could not prepare it','warn'); }
+}
+function scopeEditModalHTML(){
+  const s = (scopeData[openModal.clientId]||[]).find(x=>x.id===openModal.id);
+  if(!s) return '';
+  if(!openModal.full){
+    if(!openModal.loading){ openModal.loading = true; const m = openModal;
+      API.get(`/api/scope-signoffs/${s.id}`).then(f=>{ if(openModal===m){ m.full=f; render(); } }).catch(e=>showToast(e.message,'warn')); }
+    return '';
+  }
+  const f = openModal.full, c = f.content||{};
+  return `<div class="modal" style="max-width:820px;">
+    <div class="modal-head"><h3>Scope — ${esc(f.number)} v${f.version}</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
+    <div class="modal-body">
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;line-height:1.6;">One line per item. The client signs exactly this, with the full Terms printed after it. Package and commercials come from the CRM's records and cannot be edited here.</p>
+      <div class="field"><label>Title</label><input id="sc_title" value="${esc(f.title)}"></div>
+      ${c.package?`<div style="font-size:12px;background:#F7F5F0;border-radius:8px;padding:8px 10px;margin-bottom:10px;"><strong>${esc(c.package.name)}</strong> · ${fmtNum(c.package.quota)} conversations a month · overage ${esc(String(c.package.overage_rate))} per conversation${c.commercial&&c.commercial.quote_number?` · quote ${esc(c.commercial.quote_number)}`:''}</div>`:''}
+      ${SCOPE_LISTS.map(([k,label])=>`<div class="field"><label>${esc(label)}</label><textarea class="sc-list" data-key="${k}" rows="${Math.min(8,Math.max(3,(c[k]||[]).length+1))}" style="width:100%;font-size:12.5px;line-height:1.5;">${esc((c[k]||[]).join('\n'))}</textarea></div>`).join('')}
+      <div class="field"><label>Notes</label><textarea id="sc_notes" rows="3" style="width:100%;font-size:12.5px;">${esc(c.notes||'')}</textarea></div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveScope()">${iconCheck(14)} Save draft</button></div>
+  </div>`;
+}
+async function saveScope(){
+  const content = { notes: (document.getElementById('sc_notes')||{}).value||'' };
+  document.querySelectorAll('.sc-list').forEach(el=>{ content[el.dataset.key] = el.value.split('\n').map(x=>x.trim()).filter(Boolean); });
+  try{
+    await API.patch(`/api/scope-signoffs/${openModal.id}`, { title: (document.getElementById('sc_title')||{}).value, content });
+    const clientId = openModal.clientId; closeModal(); await loadScopes(clientId); showToast('Scope saved');
+  }catch(e){ showToast(e.message||'Could not save it','warn'); }
+}
+async function sendScope(id, clientId){
+  if(!confirm('Send this scope to the client\'s portal for signature?\n\nIt is frozen once sent — any change after this is a new version.')) return;
+  try{ await API.post(`/api/scope-signoffs/${id}/send`, {}); await loadScopes(clientId); showToast('Sent to their portal'); }
+  catch(e){ showToast(e.message||'Could not send it','warn'); }
+}
+async function reviseScope(id, clientId){
+  try{ const s = await API.post(`/api/scope-signoffs/${id}/revise`, {}); await loadScopes(clientId); openModal={type:'scopeEdit',id:s.id,clientId}; render(); }
+  catch(e){ showToast(e.message||'Could not revise it','warn'); }
+}
+async function withdrawScope(id, clientId){
+  const reason = prompt('Withdraw this scope from the client\'s portal? Give a short reason (kept on the record).');
+  if(reason===null) return;
+  try{ await API.post(`/api/scope-signoffs/${id}/withdraw`, { reason }); await loadScopes(clientId); showToast('Withdrawn'); }
+  catch(e){ showToast(e.message||'Could not withdraw it','warn'); }
+}
+async function deleteScope(id, clientId){
+  if(!confirm('Delete this draft?')) return;
+  try{ await API.del(`/api/scope-signoffs/${id}`); await loadScopes(clientId); showToast('Draft deleted'); }
+  catch(e){ showToast(e.message||'Could not delete it','warn'); }
+}
+async function downloadScopePdf(id, name){
+  try{
+    const headers = {};
+    if(API.session) headers['Authorization'] = 'Bearer ' + API.session;
+    const res = await fetch(`${API.base}/api/scope-signoffs/${id}/pdf`, { headers });
+    if(!res.ok) throw new Error(`Could not fetch it (${res.status})`);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(await res.blob());
+    a.download = `${name}-scope.pdf`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  }catch(e){ showToast(e.message||'Could not download it','warn'); }
+}
+
 async function downloadClientDoc(clientId, docId){
   const d = (clientDocs[clientId]||[]).find(x=>x.id===docId);
   try{
@@ -5442,6 +5588,8 @@ function renderSettings(){
     </div>
     <div class="field"><label>Payment terms (days)</label><input id="setTerms" type="number" value="${state.company.paymentTermsDays!=null?state.company.paymentTermsDays:7}">
       <div style="font-size:11px;color:var(--muted);margin-top:4px;">Sets the due date stamped on each invoice.</div></div>
+    <div class="field"><label>Keep conversation history for (months)</label><input id="setRetention" type="number" min="1" max="120" value="${state.company.conversationRetentionMonths||12}">
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">Message text older than this is deleted automatically. The Terms promise 12 months — change both together. A client agreed a longer period in writing can be given it on their record (<code>conversation_retention_months</code>). Usage, invoices and Pulse are kept regardless.</div></div>
     <div class="field"><label>Billing email shown on the invoice</label><input id="setSellerEmail" value="${esc(state.company.sellerEmail||'')}" placeholder="billing@vantriqai.com"></div>
     <div style="background:#F7F5F0;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:11.5px;color:var(--muted);margin-bottom:12px;">
       An invoice reads: <strong>Subtotal → + GST → Total → less advance tax withheld → Net payable</strong>.
@@ -5629,6 +5777,7 @@ function applySettings(updated){
     overagePolicy:updated.overage_policy||'serve',
     overageGracePct:updated.overage_grace_pct!=null?+updated.overage_grace_pct:120,
     paymentTermsDays:updated.payment_terms_days!=null?+updated.payment_terms_days:7,
+    conversationRetentionMonths:updated.conversation_retention_months!=null?+updated.conversation_retention_months:12,
     currency:updated.currency||'PKR' };
 }
 
@@ -5871,6 +6020,7 @@ async function saveTaxSettings(){
       default_tax_rate: rate,
       default_ait_rate: ait,
       payment_terms_days: parseInt(v('setTerms'),10) || 0,
+      conversation_retention_months: parseInt(v('setRetention'),10) || 12,
       invoice_prefix: v('setPrefix') || 'VAI',
       usd_pkr_rate: usdRate,
       internal_invoice_email: v('setInternalEmail'),
@@ -5907,6 +6057,8 @@ function renderModal(){
   else if(openModal.type==='product') html = productModalHTML(openModal.id);
   else if(openModal.type==='productAddon') html = productAddonModalHTML(openModal.id);
   else if(openModal.type==='productScope') html = productScopeModalHTML(openModal.id);
+  else if(openModal.type==='scopeNew') html = scopeNewModalHTML();
+  else if(openModal.type==='scopeEdit') html = scopeEditModalHTML();
   else if(openModal.type==='costing') html = costingModalHTML();
   else if(openModal.type==='vendor') html = vendorModalHTML(openModal.id);
   else if(openModal.type==='po') html = poModalHTML();
@@ -7064,6 +7216,7 @@ function clientPanelHTML(id){
       : (contractsFor(c.id).length
           ? contractsFor(c.id).map(k=>contractCard(k,{compact:true})).join('')
           : `<div style="font-size:12px;color:var(--muted);">Nothing signed with them yet.</div>`)}
+    ${clientScopeSection(c)}
 
     <div class="divider"></div>
     <h4 style="font-size:13px;margin-bottom:4px;">Service</h4>
@@ -7863,6 +8016,7 @@ function attachPostRenderHooks(){
   // panel opens rather than up front — there is no point pulling every
   // account's paperwork to render a list of company names.
   if(openPanel && openPanel.type==='client' && clientDocs[openPanel.id] === undefined) loadClientDocs(openPanel.id);
+  if(openPanel && openPanel.type==='client' && scopeData[openPanel.id] === undefined) loadScopes(openPanel.id);
   if(currentView==='settings' && archiveData===null) loadArchive();
   if(serverVersion === null){ serverVersion = ''; loadServerVersion(); }
   if(currentView==='ops' && opsData===null) loadOps();

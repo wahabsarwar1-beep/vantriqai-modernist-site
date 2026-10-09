@@ -2405,3 +2405,76 @@ begin
   insert into applied_migrations (name, note)
   values ('v9_33_package_scope', 'Packages carry written inclusions and exclusions, printed on every quote and proposal.');
 end $$;
+
+-- v9.33 — scope sign-off: the document a client signs before work starts.
+--
+-- Prepared in the CRM from the client's package and quote, sent to the
+-- client portal, and signed there. What it locks is everything the work is
+-- measured against: package inclusions and exclusions, channels, the account
+-- access each platform needs, responsibilities on both sides, deliverables,
+-- acceptance criteria, milestones, what is out of scope, the commercials —
+-- and the full Terms & service information in force (src/content/terms.json),
+-- snapshotted with its version.
+--
+-- Sending freezes it. content, client snapshot and terms are hashed
+-- (content_hash, SHA-256) when it is sent; the client signs that hash, and a
+-- signature is refused if what they saw is not what is stored. A sent or
+-- signed sign-off is never edited: a change is a new version that supersedes
+-- the old one only once the new one is signed.
+create sequence if not exists scope_signoff_number_seq start 1;
+create table if not exists scope_signoffs (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  quote_id uuid references quotes(id) on delete set null,
+  number text not null,
+  version int not null default 1 check (version >= 1),
+  supersedes_id uuid references scope_signoffs(id) on delete set null,
+  title text not null default '',
+  status text not null default 'draft'
+    check (status in ('draft','sent','changes_requested','signed','superseded','withdrawn')),
+  content jsonb not null default '{}'::jsonb,
+  client_snapshot jsonb not null default '{}'::jsonb,
+  terms_version text not null default '',
+  terms jsonb,
+  content_hash text not null default '',
+  created_by text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  sent_at timestamptz,
+  sent_by text not null default '',
+  client_feedback text not null default '',
+  feedback_at timestamptz,
+  signed_at timestamptz,
+  signer_name text not null default '',
+  signer_title text not null default '',
+  signer_email text not null default '',
+  signer_ip text not null default '',
+  signer_user_agent text not null default '',
+  acknowledgements jsonb not null default '{}'::jsonb,
+  contract_id uuid references contracts(id) on delete set null,
+  withdrawn_at timestamptz,
+  withdraw_reason text not null default '',
+  unique (number, version)
+);
+create index if not exists idx_scope_signoffs_client on scope_signoffs(client_id, created_at desc);
+drop trigger if exists trg_scope_signoffs_updated on scope_signoffs;
+create trigger trg_scope_signoffs_updated before update on scope_signoffs
+  for each row execute function touch_updated_at();
+
+-- v9.33 — conversation history is kept for a set time, then deleted.
+--
+-- The Terms (section 10) promise 12 months of conversation history in the
+-- portal, then deletion of the message text. Usage, invoices and Pulse are
+-- counted from usage_events and pulse_events, which are kept, so past bills
+-- and reports still add up. A client can be given a longer period in
+-- writing (conversation_retention_months on their record); null means the
+-- company default. utils/conversationRetention.js does the deleting.
+alter table settings add column if not exists conversation_retention_months int not null default 12;
+alter table settings drop constraint if exists settings_conversation_retention_check;
+alter table settings add constraint settings_conversation_retention_check
+  check (conversation_retention_months between 1 and 120);
+alter table clients add column if not exists conversation_retention_months int;
+alter table clients drop constraint if exists clients_conversation_retention_check;
+alter table clients add constraint clients_conversation_retention_check
+  check (conversation_retention_months is null or conversation_retention_months between 1 and 120);
+create index if not exists idx_conv_created on conversation_messages(created_at);

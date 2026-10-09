@@ -131,6 +131,9 @@ app.use('/api/quotes', requireScope('staff'), quotesRoutes);
 // Contracts carry the counterparty's legal identity, so they sit behind the
 // same gate as quotes: staff who work accounts, not automation keys.
 app.use('/api/contracts', requireScope('staff'), contractsRoutes);
+// Scope sign-offs: prepared and sent by staff, signed by the client in the
+// portal (routes/portal.js). Same gate as quotes and contracts.
+app.use('/api/scope-signoffs', requireScope('staff'), require('./routes/scopeSignoffs'));
 app.use('/api/calendar', requireScope('staff'), require('./routes/calendar'));
 app.use('/api/reps', requireScope('admin'), repsRoutes);
 app.use('/api/package-requests', requireScope('staff'), packageRequestsRoutes);
@@ -248,6 +251,11 @@ purgeSecurityCounters();
 setInterval(purgeSecurityCounters, 60 * 60 * 1000).unref();
 purgeWebsiteActivity();
 setInterval(purgeWebsiteActivity, 60 * 60 * 1000).unref();
+// Conversation text past its retention period (Terms, section 10). Every six
+// hours is plenty for a period measured in months.
+const purgeConversations = () => require('./utils/conversationRetention').purgeConversations().catch(err => console.error('[conversation retention]', err.message));
+purgeConversations();
+setInterval(purgeConversations, 6 * 60 * 60 * 1000).unref();
 
 const port = process.env.PORT || 8080;
 app.listen(port, () => {
