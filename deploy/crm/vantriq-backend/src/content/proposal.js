@@ -361,6 +361,18 @@ const TERMS = [
     + 'written agreement states otherwise, the service is provided without service-level '
     + 'guarantees and our aggregate liability is limited to the fees paid in the three months '
     + 'preceding a claim.'],
+  ['Account access',
+    'Every account the agent uses — your Meta Business portfolio, WhatsApp Business Account and '
+    + 'number, Facebook Pages, Instagram account, website, CRM and calendars — stays owned by and '
+    + 'registered to your business. VantriqAI asks only for partner or role-based access limited to '
+    + 'what the signed scope needs, never for passwords or one-time codes by email or chat, and '
+    + 'removes its access and revokes its tokens when the service ends.'],
+  ['Payment',
+    'The setup fee is invoiced on acceptance and configuration is scheduled once it is paid. The '
+    + 'monthly fee and any usage beyond the allowance are invoiced for each billing month and are '
+    + 'payable by the due date shown. An account left unpaid after a written reminder may be '
+    + 'suspended until it is brought up to date. Platform charges, such as Meta\'s WhatsApp '
+    + 'conversation fees, are paid by you directly to the platform.'],
   ['Indemnity and professional advice',
     'You indemnify VantriqAI against any third-party claim, penalty or loss arising from your '
     + 'own content, data or instructions, or from your non-compliance with applicable law or a '

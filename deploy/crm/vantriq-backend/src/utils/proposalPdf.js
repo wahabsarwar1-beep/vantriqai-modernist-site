@@ -596,12 +596,14 @@ function onboardingPage(doc) {
  * the line somebody signs are terms they signed without reading, which is
  * both unfair and, in a dispute, useless to us.
  */
+const TERMS_VERSION = require('../content/terms.json').version;
 function termsPage(doc) {
   let y = sectionHead(
     doc, 'Terms', 'The conditions this price is given under',
     PAGE.margin + 6,
-    'Consistent with the terms published on the Packages page at vantriqai.com. Where a '
-    + 'signed agreement follows, that agreement prevails over anything here.'
+    `A summary. The full Terms & service information, version ${TERMS_VERSION} (vantriqai.com/terms), `
+    + 'apply to this proposal and are printed in full in the scope sign-off you sign before work begins. '
+    + 'Where a signed agreement follows, that agreement prevails over anything here.'
   );
 
   C.TERMS.forEach(([title, body]) => {
