@@ -178,6 +178,14 @@
   <div class="r due"><span>Amount due</span><span>${money(outstanding)}</span></div>
 </div>
 
+${d.package_scope && ((d.package_scope.includes || []).length || (d.package_scope.excludes || []).length) ? `
+<div class="note scope">
+  <div style="font-weight:700;margin-bottom:6px;">What the ${esc(d.package_scope.name)} package includes</div>
+  ${d.package_scope.quota ? `<div style="margin-bottom:4px;">${Number(d.package_scope.quota).toLocaleString('en-US')} conversations a month (one conversation is one customer over a rolling 24 hours); beyond that, ${money(d.package_scope.overage_rate)} per conversation.</div>` : ''}
+  <ul style="margin:4px 0 10px 18px;padding:0;">${(d.package_scope.includes || []).map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
+  ${(d.package_scope.excludes || []).length ? `<div style="font-weight:700;margin-bottom:6px;">Not included</div>
+  <ul style="margin:4px 0 0 18px;padding:0;">${d.package_scope.excludes.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+</div>` : ''}
 ${d.ait_note ? `<div class="note">${esc(d.ait_note)}</div>` : ''}
 ${d.notes ? `<div class="note">${esc(d.notes)}</div>` : ''}
 <div class="foot">This is a computer-generated ${esc(String(d.document_title || 'invoice').toLowerCase())} and is valid without a signature.</div>

@@ -110,6 +110,10 @@ export default function PricingPage({ region }: { region: Region }) {
                     <dt>Included</dt>
                     <dd>{p.usage.sessions} sessions</dd>
                   </div>
+                  <div>
+                    <dt>Voice notes</dt>
+                    <dd>{p.usage.voice} min</dd>
+                  </div>
                 </dl>
                 <span className="tier-view">
                   View {p.name} <span aria-hidden="true">→</span>

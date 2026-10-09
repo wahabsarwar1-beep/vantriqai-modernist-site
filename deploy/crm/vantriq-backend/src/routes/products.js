@@ -120,6 +120,45 @@ router.patch('/:id/addon-pricing', adminOnly, async (req, res) => {
   res.json(rows[0]);
 });
 
+/**
+ * PATCH /:id/scope  { includes: [...], excludes: [...] }
+ *
+ * What a package includes and what it does not, as printed on every
+ * quotation, proposal and scope sign-off (v9.33). Its own route, like
+ * addon-pricing above, because it is wording rather than one of the figures
+ * the lock protects — so it edits on any package, standard or custom.
+ */
+const SCOPE_MAX_ITEMS = 40;
+const SCOPE_MAX_LEN = 300;
+function scopeList(v, label) {
+  if (!Array.isArray(v)) throw Object.assign(new Error(`${label} must be a list of lines.`), { status: 400 });
+  const out = v.map((s) => String(s == null ? '' : s).trim()).filter(Boolean);
+  if (out.length > SCOPE_MAX_ITEMS) throw Object.assign(new Error(`${label} can have at most ${SCOPE_MAX_ITEMS} lines.`), { status: 400 });
+  if (out.some((s) => s.length > SCOPE_MAX_LEN)) {
+    throw Object.assign(new Error(`Each line in ${label.toLowerCase()} must be ${SCOPE_MAX_LEN} characters or fewer.`), { status: 400 });
+  }
+  return out;
+}
+router.patch('/:id/scope', adminOnly, async (req, res) => {
+  const existing = await loadProduct(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Product not found' });
+  const b = req.body || {};
+  const sets = [];
+  const values = [];
+  try {
+    if (b.includes !== undefined) { values.push(scopeList(b.includes, 'Included')); sets.push(`includes = $${values.length}`); }
+    if (b.excludes !== undefined) { values.push(scopeList(b.excludes, 'Not included')); sets.push(`excludes = $${values.length}`); }
+  } catch (e) {
+    return res.status(e.status || 400).json({ error: e.message });
+  }
+  if (!sets.length) return res.status(400).json({ error: 'Nothing to update' });
+  values.push(req.params.id);
+  const { rows } = await db.query(
+    `update products set ${sets.join(', ')} where id = $${values.length} returning *`, values
+  );
+  res.json(rows[0]);
+});
+
 router.delete('/:id', adminOnly, async (req, res) => {
   const existing = await loadProduct(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Product not found' });

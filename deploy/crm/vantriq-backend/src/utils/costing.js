@@ -36,17 +36,25 @@ function addonHourly(a) {
   return 0.5 * Number(a.founder_rate) + 0.5 * Number(a.contractor_rate);
 }
 
-/** What each add-on earns, for the admin's view of the catalogue. */
-function addonEconomics(addon, a) {
+/**
+ * What each add-on earns, for the admin's view of the catalogue.
+ *
+ * A metered voice add-on (v9.33) also pays for the speech-to-text minutes it
+ * includes, priced at the live rate in `voice`: its stored est_monthly_cost is
+ * everything else, so the transcription cost moves with the vendor's price.
+ */
+function addonEconomics(addon, a, voice) {
   const monthly = addon.monthly_fee === null ? null : Number(addon.monthly_fee);
   const setup = addon.setup_fee === null ? null : Number(addon.setup_fee);
-  const cost = Number(addon.est_monthly_cost || 0);
+  const v = voice ? engine.voiceAddonCost(addon, voice) : null;
+  const cost = Number(addon.est_monthly_cost || 0) + (v ? v.stt_cost : 0);
   const build = Number(addon.est_build_hours || 0) * addonHourly(a);
   return {
     monthly_margin: monthly ? Math.round(((monthly - cost) / monthly) * 1000) / 1000 : null,
     monthly_profit: monthly !== null ? Math.round(monthly - cost) : null,
     build_labour: Math.round(build),
     setup_margin: setup ? Math.round(((setup - build) / setup) * 1000) / 1000 : null,
+    ...(v ? { stt_cost: v.stt_cost, total_monthly_cost: Math.round(cost), overage_cover: v.overage_cover } : {}),
   };
 }
 
@@ -56,7 +64,10 @@ async function costingModel({ withAddons = true } = {}) {
   const model = engine.model(products, stored);
   if (withAddons) {
     const { rows } = await db.query(`select * from catalog_addons order by sort_order, name`);
-    model.addons = rows.map((r) => ({ ...r, ...addonEconomics(r, model.assumptions) }));
+    model.addons = rows.map((r) => ({ ...r, ...addonEconomics(r, model.assumptions, model.voice) }));
+    model.flags = model.flags.concat(engine.voiceFlags(rows, model.voice, model.stt_rates));
+  } else {
+    model.flags = model.flags.concat(engine.voiceFlags([], model.voice, model.stt_rates));
   }
   return model;
 }
@@ -75,7 +86,7 @@ async function syncDeliveryCosts() {
     const { rowCount } = await db.query(
       `update products set delivery_cost_full = $2, ai_model = $3
         where id = $1 and (delivery_cost_full is distinct from $2::numeric or ai_model is distinct from $3)`,
-      [r.id, r.ai_full, r.routing]
+      [r.id, r.delivery_full, r.routing]
     );
     changed += rowCount;
   }
@@ -97,6 +108,10 @@ const LIMITS = {
   sales_hours_per_win: [0, 500, 'Sales hours to win a client'],
   adhoc_hours_per_month: [0, 200, 'Ad-hoc hours a month'],
   hours_per_fte: [1, 400, 'Hours in a full-time month'],
+  voice_note_minutes: [0.05, 15, 'The length of a typical voice note, in minutes'],
+  calls_per_turn: [1, 10, 'Model calls per customer turn'],
+  cache_share: [0, 1, 'The cached share of the prompt'],
+  voice_allowance_share: [0, 2, 'Voice minutes included per conversation'],
 };
 
 function numberIn(value, [min, max, label]) {
@@ -126,7 +141,7 @@ function applyChange(stored, body) {
       if (r === null) { delete next.rates[key]; continue; }
       const known = engine.RATES.find((x) => x.key === key);
       const entry = { ...(next.rates[key] || {}) };
-      for (const side of ['input', 'output']) {
+      for (const side of ['input', 'output', 'cached_input']) {
         if (r[side] !== undefined) entry[side] = numberIn(r[side], [0, 1000, `The ${side} price for ${known ? known.label : key}`]);
       }
       for (const f of ['label', 'vendor', 'source', 'note']) {
@@ -139,6 +154,30 @@ function applyChange(stored, body) {
       next.rates[key] = entry;
     }
   }
+
+  // Speech-to-text prices are per minute of audio, not per million tokens,
+  // so they are a list of their own (v9.33).
+  const stt = { ...((stored && stored.stt_rates) || {}) };
+  if (b.stt_rates && typeof b.stt_rates === 'object') {
+    for (const [key, r] of Object.entries(b.stt_rates)) {
+      if (!/^[a-z0-9][a-z0-9.\-]{1,60}$/i.test(key)) throw new CostingError(400, `"${key}" is not a usable model key.`);
+      if (r === null) { delete stt[key]; continue; }
+      const known = engine.STT_RATES.find((x) => x.key === key);
+      const entry = { ...(stt[key] || {}) };
+      if (r.per_minute !== undefined) {
+        entry.per_minute = numberIn(r.per_minute, [0, 10, `The per-minute price for ${known ? known.label : key}`]);
+      }
+      for (const f of ['label', 'vendor', 'source', 'note']) {
+        if (r[f] !== undefined) entry[f] = String(r[f]).slice(0, 200);
+      }
+      if (!known && entry.per_minute === undefined) {
+        throw new CostingError(400, 'A new speech-to-text model needs a per-minute price.');
+      }
+      entry.as_of = r.as_of && /^\d{4}-\d{2}-\d{2}$/.test(r.as_of) ? r.as_of : today();
+      stt[key] = entry;
+    }
+  }
+  if (Object.keys(stt).length) next.stt_rates = stt;
 
   const a = b.assumptions && typeof b.assumptions === 'object' ? b.assumptions : {};
   let fxChanged = false;
@@ -161,6 +200,13 @@ function applyChange(stored, body) {
     if (a[k] === undefined) continue;
     if (!rates.some((r) => r.key === a[k])) throw new CostingError(400, `"${a[k]}" is not on the rate card.`);
     next.assumptions[k] = String(a[k]);
+  }
+
+  if (a.stt_model !== undefined) {
+    if (!engine.mergeSttRates(next.stt_rates).some((r) => r.key === a.stt_model)) {
+      throw new CostingError(400, `"${a.stt_model}" is not on the speech-to-text price list.`);
+    }
+    next.assumptions.stt_model = String(a.stt_model);
   }
 
   if (a.mix !== undefined) {

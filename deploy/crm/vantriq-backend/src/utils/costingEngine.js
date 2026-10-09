@@ -14,7 +14,8 @@
  *
  *   A session is one customer conversation inside a rolling 24-hour window,
  *   however many messages it takes. Each package budgets a number of
- *   messages per session (12–18). Half are the customer's, half the agent's.
+ *   messages per session (12 for every standard package, from 9 Oct 2026).
+ *   Half are the customer's, half the agent's.
  *
  *   Every customer turn sends the model: the system prompt and retrieved
  *   catalogue context (context_tokens), the conversation so far, and the new
@@ -26,9 +27,22 @@
  *   where U is a customer message and R a reply, in tokens. The history term
  *   is why cost grows faster than message count.
  *
+ *   An agent that calls a tool (the knowledge base, the CRM) makes more than
+ *   one model call for that turn, so both sides are multiplied by
+ *   calls_per_turn. The system prompt is the same on every call, and the
+ *   provider bills a cached repeat of it at a fraction of the price:
+ *   cache_share is the part of the context tokens billed at the cached rate.
+ *
  *   Most turns run on the bulk model; a thin premium_share is escalated to a
  *   premium model. Cost per session = the blend, in dollars, converted at
  *   the costing exchange rate.
+ *
+ *   v9.33: the defaults are the business model's basis for client agents,
+ *   approved 9 Oct 2026 — gpt-4o-mini, 1,200–3,000 context tokens by
+ *   package, 80-token replies, 12 messages a session and 80% of the context
+ *   billed at the cached-prompt price (OpenAI caches automatically, at no
+ *   extra fee). VantriqAI's own showcase agent runs gpt-5-mini; that is
+ *   priced on our internal account (internalClient.js), not here.
  *
  *   Labour is costed by the hour — founder time at an opportunity cost,
  *   contracted time at its cash cost — split by each package's founder
@@ -44,20 +58,21 @@ module.exports = (function () {
   const AS_OF = '2026-09-29';
 
   /**
-   * Model prices, US dollars per million tokens, standard (non-batch,
-   * uncached) rates. Checked against each vendor's published price list on
-   * AS_OF. Prompt caching is NOT assumed anywhere: it would lower the input
-   * cost of the repeated system prompt, and is left as upside rather than
-   * booked as a saving nobody has measured.
+   * Model prices, US dollars per million tokens, standard (non-batch)
+   * rates. Checked against each vendor's published price list on AS_OF.
+   * cached_input is the price of a cached repeat of the prompt, where the
+   * vendor publishes one. It is used only as far as cache_share says, which
+   * is 0 until the real cache hit rate has been measured: the saving is
+   * upside, not booked.
    */
   const RATES = [
-    { key: 'gpt-4o-mini', label: 'GPT-4o mini', vendor: 'OpenAI', input: 0.15, output: 0.60,
-      as_of: AS_OF, source: 'openai.com/api/pricing', note: 'What the live WhatsApp and website agents run on today.' },
-    { key: 'gpt-5-nano', label: 'GPT-5 nano', vendor: 'OpenAI', input: 0.05, output: 0.40,
+    { key: 'gpt-4o-mini', label: 'GPT-4o mini', vendor: 'OpenAI', input: 0.15, output: 0.60, cached_input: 0.075,
+      as_of: AS_OF, source: 'openai.com/api/pricing', note: 'The bulk model for client agents, as the business model costs them.' },
+    { key: 'gpt-5-nano', label: 'GPT-5 nano', vendor: 'OpenAI', input: 0.05, output: 0.40, cached_input: 0.005,
       as_of: AS_OF, source: 'openai.com/api/pricing', note: 'Cheapest capable option; test on Roman Urdu before routing to it.' },
-    { key: 'gpt-5-mini', label: 'GPT-5 mini', vendor: 'OpenAI', input: 0.25, output: 2.00,
-      as_of: AS_OF, source: 'openai.com/api/pricing', note: '' },
-    { key: 'gpt-4o', label: 'GPT-4o', vendor: 'OpenAI', input: 2.50, output: 10.00,
+    { key: 'gpt-5-mini', label: 'GPT-5 mini', vendor: 'OpenAI', input: 0.25, output: 2.00, cached_input: 0.025,
+      as_of: AS_OF, source: 'openai.com/api/pricing', note: 'VantriqAI\'s own showcase agent runs on it (since 7 Oct 2026). Its reasoning tokens bill as output.' },
+    { key: 'gpt-4o', label: 'GPT-4o', vendor: 'OpenAI', input: 2.50, output: 10.00, cached_input: 1.25,
       as_of: AS_OF, source: 'openai.com/api/pricing', note: '' },
     { key: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite', vendor: 'Google', input: 0.10, output: 0.40,
       as_of: AS_OF, source: 'ai.google.dev/pricing', note: 'Google retires it on 16 Oct 2026 — do not build on it.', retiring: '2026-10-16' },
@@ -76,6 +91,29 @@ module.exports = (function () {
       as_of: AS_OF, source: 'anthropic.com/pricing', note: '' },
   ];
 
+  /** The day the speech-to-text prices were last checked. */
+  const STT_AS_OF = '2026-10-09';
+
+  /**
+   * Speech-to-text prices, US dollars per minute of audio. A WhatsApp voice
+   * note is transcribed before the agent reads it, and this is billed by the
+   * minute, not by the token, so it needs its own list. Checked on STT_AS_OF
+   * against published price trackers; the vendors' own pages could not be
+   * read from where this was checked, so confirm them before a client quote.
+   */
+  const STT_RATES = [
+    { key: 'whisper-1', label: 'OpenAI Whisper', vendor: 'OpenAI', per_minute: 0.006, retiring: '2027-02-26',
+      as_of: STT_AS_OF, source: 'openai.com/api/pricing', note: 'What the WhatsApp agent transcribes with: the only model that kept Urdu in Urdu script in all three runs of the 9 Oct 2026 test. Retires 26 Feb 2027.' },
+    { key: 'gpt-4o-transcribe', label: 'GPT-4o Transcribe', vendor: 'OpenAI', per_minute: 0.006, retiring: '2027-02-26',
+      as_of: STT_AS_OF, source: 'openai.com/api/pricing', note: 'Wrote a mixed Urdu-English note in Hindi script in one of three runs. Retires 26 Feb 2027.' },
+    { key: 'gpt-4o-mini-transcribe', label: 'GPT-4o mini Transcribe', vendor: 'OpenAI', per_minute: 0.003, retiring: '2027-02-26',
+      as_of: STT_AS_OF, source: 'openai.com/api/pricing', note: 'NOT usable for Urdu: wrote it in Hindi script even told the language. Retires 26 Feb 2027.' },
+    { key: 'gpt-transcribe', label: 'GPT Transcribe', vendor: 'OpenAI', per_minute: 0.0045,
+      as_of: STT_AS_OF, source: 'openai.com/api/pricing', note: 'OpenAI\'s named replacement from Feb 2027. NOT usable for Urdu as tested: Hindi script even with language=ur and a prompt.' },
+    { key: 'elevenlabs-scribe', label: 'ElevenLabs Scribe', vendor: 'ElevenLabs', per_minute: 0.22 / 60,
+      as_of: STT_AS_OF, source: 'elevenlabs.io/pricing/api', note: 'About $0.22 an hour. Untested on Urdu here; the candidate to test before Feb 2027.' },
+  ];
+
   /** Everything else the model assumes. Editable in Products & Pricing. */
   const ASSUMPTIONS = {
     as_of: AS_OF,
@@ -85,6 +123,8 @@ module.exports = (function () {
     premium_model: 'claude-sonnet-5-5',
     user_tokens: 30,              // a customer's message
     reply_tokens: 80,             // the agent's reply
+    calls_per_turn: 1,            // model calls per customer turn: a tool call adds one
+    cache_share: 0.8,             // share of the context billed at the cached-prompt price (approved 9 Oct 2026)
     founder_rate: 3000,           // PKR per hour — an opportunity cost, not cash
     contractor_rate: 1500,        // PKR per hour — contracted build and support
     utilization: 0.70,            // share of the allowance a typical client uses (the business model's figure)
@@ -92,6 +132,9 @@ module.exports = (function () {
     sales_hours_per_win: 5,       // unbilled selling to win one client
     adhoc_hours_per_month: 0.5,   // unplanned requests beyond the management budget
     hours_per_fte: 160,           // one full-time person, per month
+    stt_model: 'whisper-1',       // what transcribes voice notes
+    voice_allowance_share: 0.1,   // voice minutes each package includes, per included conversation (approved 9 Oct 2026)
+    voice_note_minutes: 0.5,      // the length of a typical voice note
     mix: { Starter: 6, Growth: 6, Scale: 3, Pro: 2, Enterprise: 1, 'Enterprise+': 0 },
   };
 
@@ -102,6 +145,8 @@ module.exports = (function () {
    * 105,000, at founder shares of 100 / 70 / 60 / 50 / 40 / 40%.
    */
   const PROFILES = {
+    // context_tokens: system prompt and retrieved catalogue context a call,
+    // as the business model costs client agents.
     Starter:       { context_tokens: 1200, premium_share: 0.02, mgmt_hours: 1,   build_hours: 4,  founder_share: 1.0, typical_min: 300,   typical_max: 600 },
     Growth:        { context_tokens: 1500, premium_share: 0.03, mgmt_hours: 2,   build_hours: 10, founder_share: 0.7, typical_min: 800,   typical_max: 1500 },
     Scale:         { context_tokens: 1800, premium_share: 0.04, mgmt_hours: 3,   build_hours: 16, founder_share: 0.6, typical_min: 2000,  typical_max: 4000 },
@@ -144,10 +189,88 @@ module.exports = (function () {
   }
   function clean(r) {
     const c = {};
-    for (const k of ['label', 'vendor', 'input', 'output', 'as_of', 'source', 'note']) {
-      if (r[k] !== undefined) c[k] = k === 'input' || k === 'output' ? num(r[k]) : String(r[k]);
+    for (const k of ['label', 'vendor', 'input', 'output', 'cached_input', 'as_of', 'source', 'note']) {
+      if (r[k] !== undefined) c[k] = ['input', 'output', 'cached_input'].includes(k) ? num(r[k]) : String(r[k]);
     }
     return c;
+  }
+
+  /** The speech-to-text price list in force, built-in with stored overrides on top. */
+  function mergeSttRates(overrides) {
+    const o = overrides && typeof overrides === 'object' ? overrides : {};
+    const pick = (r) => {
+      const c = {};
+      for (const k of ['label', 'vendor', 'per_minute', 'as_of', 'source', 'note']) {
+        if (r[k] !== undefined) c[k] = k === 'per_minute' ? num(r[k]) : String(r[k]);
+      }
+      return c;
+    };
+    const out = STT_RATES.map((r) => (o[r.key] ? { ...r, ...pick(o[r.key]), key: r.key, overridden: true } : { ...r }));
+    for (const [key, r] of Object.entries(o)) {
+      if (!STT_RATES.some((x) => x.key === key) && r && isSet(r.per_minute)) {
+        out.push({ key, label: r.label || key, vendor: r.vendor || '', note: '', source: '', as_of: '', ...pick(r), custom: true, overridden: true });
+      }
+    }
+    return out;
+  }
+
+  /** What a minute, and a typical voice note, of transcription costs us. */
+  function voiceCost(a, sttRates) {
+    const rate = (sttRates || []).find((r) => r.key === a.stt_model) || null;
+    const usd = rate ? num(rate.per_minute) : 0;
+    const pkr = usd * num(a.fx_usd_pkr);
+    return {
+      stt_model: a.stt_model,
+      label: rate ? rate.label : a.stt_model,
+      per_minute_usd: Math.round(usd * 1e6) / 1e6,
+      per_minute_pkr: Math.round(pkr * 10000) / 10000,
+      voice_note_minutes: num(a.voice_note_minutes),
+      per_note_pkr: Math.round(pkr * num(a.voice_note_minutes) * 10000) / 10000,
+    };
+  }
+
+  /**
+   * A metered voice add-on's speech-to-text cost: the included minutes at the
+   * live rate, and how far its per-minute price covers a minute's cost.
+   * Null for an add-on that meters nothing.
+   */
+  function voiceAddonCost(addon, voice) {
+    if (!addon || addon.meter !== 'voice_minute') return null;
+    const included = num(addon.included_units);
+    const over = addon.overage_rate === null || addon.overage_rate === undefined ? null : num(addon.overage_rate);
+    const perMin = num(voice.per_minute_pkr);
+    return {
+      included_minutes: included,
+      stt_cost: Math.round(included * perMin),
+      overage_rate: over,
+      overage_cover: over !== null && perMin ? Math.round((over / perMin) * 10) / 10 : null,
+    };
+  }
+
+  /** Warnings about voice pricing, for the same list as the package flags. */
+  function voiceFlags(addons, voice, sttRates, today) {
+    const out = [];
+    const current = (sttRates || []).find((r) => r.key === voice.stt_model);
+    if (!current) {
+      out.push({ level: 'bad', text: `The speech-to-text model "${voice.stt_model}" is not on the price list, so voice notes cost nothing in the model.` });
+    } else if (current.retiring) {
+      const days = Math.round((new Date(current.retiring) - (today ? new Date(today) : new Date())) / 86400000);
+      if (days <= 180) {
+        out.push({ level: days <= 60 ? 'bad' : 'warn', text: `${current.label} is retired by ${current.vendor} on ${current.retiring}${days >= 0 ? ` (${days} days)` : ''}. Choose and test a replacement that keeps Urdu in Urdu script before then.` });
+      }
+    }
+    for (const ad of addons || []) {
+      const v = voiceAddonCost(ad, voice);
+      if (!v || ad.active === false) continue;
+      if (v.overage_rate === null || v.overage_rate === 0) {
+        out.push({ level: 'warn', text: `${ad.name}: voice minutes past the ${v.included_minutes} included have no price, so heavy use is free to the client.` });
+      } else if (v.overage_cover !== null && v.overage_cover < 1) {
+        out.push({ level: 'bad', text: `${ad.name}: PKR ${v.overage_rate} a minute is below what a minute of transcription costs (PKR ${voice.per_minute_pkr.toFixed(2)}).` });
+      } else if (v.overage_cover !== null && v.overage_cover < 2) {
+        out.push({ level: 'warn', text: `${ad.name}: the per-minute price covers only ${v.overage_cover}× a minute of transcription.` });
+      }
+    }
+    return out;
   }
 
   function mergeAssumptions(overrides, extra) {
@@ -176,18 +299,30 @@ module.exports = (function () {
 
   const rateFor = (rates, key) => rates.find((r) => r.key === key) || null;
 
-  /** Tokens one session sends and receives. */
+  /**
+   * Tokens one session sends and receives. `cacheable` is the context part
+   * of the input — the system prompt repeated on every call — which is all a
+   * provider's prompt cache can discount.
+   */
   function sessionTokens(messages, contextTokens, a) {
     const turns = Math.max(1, Math.floor(num(messages) / 2));
     const U = num(a.user_tokens), R = num(a.reply_tokens), ctx = num(contextTokens);
+    const calls = Math.max(1, num(a.calls_per_turn, 1));
     return {
       turns,
-      input: turns * ctx + turns * U + (U + R) * turns * (turns - 1) / 2,
-      output: turns * R,
+      input: calls * (turns * ctx + turns * U + (U + R) * turns * (turns - 1) / 2),
+      output: calls * turns * R,
+      cacheable: calls * turns * ctx,
     };
   }
 
-  const usdFor = (rate, t) => (rate ? (t.input * rate.input + t.output * rate.output) / 1e6 : 0);
+  /** A session's cost in dollars on one model; `share` of the context is billed as a cached repeat. */
+  const usdFor = (rate, t, share = 0) => {
+    if (!rate) return 0;
+    const cachedPrice = isSet(rate.cached_input) ? num(rate.cached_input) : num(rate.input);
+    const cached = (t.cacheable || 0) * Math.min(1, Math.max(0, num(share)));
+    return ((t.input - cached) * rate.input + cached * cachedPrice + t.output * rate.output) / 1e6;
+  };
 
   /** Money, rounded the way the documents print it. */
   const r2 = (n) => Math.round(n * 100) / 100;
@@ -207,7 +342,8 @@ module.exports = (function () {
     const msgs = num(product.msgs_per_session);
     const t = sessionTokens(msgs, prof.context_tokens, a);
     const share = Math.min(1, Math.max(0, num(prof.premium_share)));
-    const usd = (1 - share) * usdFor(bulk, t) + share * usdFor(prem, t);
+    const cache = num(a.cache_share);
+    const usd = (1 - share) * usdFor(bulk, t, cache) + share * usdFor(prem, t, cache);
     const perSession = usd * num(a.fx_usd_pkr);
 
     const quota = num(product.quota);
@@ -217,14 +353,19 @@ module.exports = (function () {
     const u = num(a.utilization, ASSUMPTIONS.utilization);
 
     const aiFull = perSession * quota;
+    // Voice notes are included in every package (v9.33): minutes up to a
+    // share of the conversation allowance, transcribed at the live
+    // speech-to-text rate. Costed at full use like the conversations.
+    const voiceMinutes = Math.round(quota * num(a.voice_allowance_share));
+    const voiceFull = voiceMinutes * num(opts.voice ? opts.voice.per_minute_pkr : 0);
     const hourly = prof.founder_share * num(a.founder_rate) + (1 - prof.founder_share) * num(a.contractor_rate);
     const mgmt = prof.mgmt_hours * hourly;
     const build = prof.build_hours * hourly;
-    const grossFull = retainer - aiFull - mgmt;
-    const grossUtil = retainer - u * aiFull - mgmt;
+    const grossFull = retainer - aiFull - voiceFull - mgmt;
+    const grossUtil = retainer - u * (aiFull + voiceFull) - mgmt;
 
     const yearRevenue = setup + 12 * retainer;
-    const yearCost = 12 * u * aiFull + build + 12 * mgmt
+    const yearCost = 12 * u * (aiFull + voiceFull) + build + 12 * mgmt
       + num(a.sales_hours_per_win) * num(a.founder_rate)
       + 12 * num(a.adhoc_hours_per_month) * num(a.founder_rate);
 
@@ -252,6 +393,11 @@ module.exports = (function () {
       cost_per_session_usd: r4(usd),
       cost_per_session: r4(perSession),
       ai_full: Math.round(aiFull),
+      voice_minutes: voiceMinutes,
+      voice_full: Math.round(voiceFull),
+      voice_share_of_price: retainer ? pct(voiceFull / retainer) : null,
+      // What serving the package costs at full use: conversations and voice.
+      delivery_full: Math.round(aiFull + voiceFull),
       ai_at_util: Math.round(aiFull * u),
       ai_share_of_price: retainer ? pct(aiFull / retainer) : null,
       ai_at_typical: typicalMid ? Math.round(perSession * typicalMid) : null,
@@ -283,7 +429,7 @@ module.exports = (function () {
   /** The business at a given client mix, over a year. */
   function steadyState(rows, a) {
     const mix = a.mix || {};
-    let clients = 0, setupRev = 0, retainerRev = 0, ai = 0, build = 0, mgmt = 0, mgmtHours = 0;
+    let clients = 0, setupRev = 0, retainerRev = 0, ai = 0, voice = 0, build = 0, mgmt = 0, mgmtHours = 0;
     const lines = [];
     for (const r of rows) {
       const n = Math.max(0, Math.round(num(mix[r.name])));
@@ -291,7 +437,8 @@ module.exports = (function () {
       clients += n;
       setupRev += n * r.setup_fee;
       retainerRev += n * 12 * r.retainer;
-      ai += n * 12 * num(a.utilization) * r.ai_full;
+      ai += n * 12 * num(a.utilization) * (r.ai_full + (r.voice_full || 0));
+      voice += n * 12 * num(a.utilization) * (r.voice_full || 0);
       build += n * r.build_labour;
       mgmt += n * 12 * r.mgmt_labour;
       mgmtHours += n * r.mgmt_hours;
@@ -313,6 +460,7 @@ module.exports = (function () {
       setup_revenue: Math.round(setupRev),
       retainer_revenue: Math.round(retainerRev),
       ai: Math.round(ai),
+      voice: Math.round(voice),
       labour: Math.round(labour),
       build_labour: Math.round(build),
       mgmt_labour: Math.round(mgmt),
@@ -364,11 +512,13 @@ module.exports = (function () {
   function model(products, stored, extra, today) {
     const s = stored && typeof stored === 'object' ? stored : {};
     const rates = mergeRates(s.rates);
+    const sttRates = mergeSttRates(s.stt_rates);
     const a = mergeAssumptions(s.assumptions, extra);
+    const voice = voiceCost(a, sttRates);
     const live = (products || []).filter((p) => !p.archived);
-    const rows = live.map((p) => packageEconomics(p, a, rates));
+    const rows = live.map((p) => packageEconomics(p, a, rates, { voice }));
     const whatIf = WHAT_IF_MODELS.filter((k) => rateFor(rates, k)).map((key) => {
-      const alt = live.map((p) => packageEconomics(p, a, rates, { bulk_model: key }));
+      const alt = live.map((p) => packageEconomics(p, a, rates, { bulk_model: key, voice }));
       const st = steadyState(alt, a);
       return {
         bulk_model: key,
@@ -385,6 +535,8 @@ module.exports = (function () {
       as_of: a.as_of,
       assumptions: a,
       rates,
+      stt_rates: sttRates,
+      voice,
       packages: rows,
       steady_state: steadyState(rows, a),
       what_if: whatIf,
@@ -396,8 +548,8 @@ module.exports = (function () {
   const routingText = (row) => row.routing;
 
   return {
-    AS_OF, RATES, ASSUMPTIONS, PROFILES, DEFAULT_PROFILE, PROFILE_FIELDS, WHAT_IF_MODELS,
-    mergeRates, mergeAssumptions, profileFor, sessionTokens, packageEconomics, steadyState, flags, model,
+    AS_OF, RATES, STT_AS_OF, STT_RATES, ASSUMPTIONS, PROFILES, DEFAULT_PROFILE, PROFILE_FIELDS, WHAT_IF_MODELS,
+    mergeRates, mergeSttRates, voiceCost, voiceAddonCost, voiceFlags, mergeAssumptions, profileFor, sessionTokens, packageEconomics, steadyState, flags, model,
     routingText,
   };
 }());

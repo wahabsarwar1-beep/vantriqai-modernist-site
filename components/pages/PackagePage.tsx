@@ -35,6 +35,7 @@ export default function PackagePage({ region, pkg }: { region: Region; pkg: Pack
   const channels = mods.included.filter((m) => m.kicker === "Channel");
   const features = PLATFORM_FEATURES.filter((f) => pkg.index >= f.from);
   const overage = pkg.usage[region.overageKey];
+  const voiceOver = pkg.usage[region.voiceOverKey];
   const path = `/pricing/${pkg.slug}`;
   const url = `${SITE_URL}${hrefIn(region, path)}`;
 
@@ -43,6 +44,10 @@ export default function PackagePage({ region, pkg }: { region: Region; pkg: Pack
     {
       q: "What happens if we go over the included sessions?",
       a: `${pkg.name} includes ${pkg.usage.sessions} sessions a month — about ${pkg.usage.head} the volume a business this size normally handles, so an ordinary month does not reach it. Anything beyond is billed at ${overage}, stated in writing in your quote.`,
+    },
+    {
+      q: "Are voice notes included?",
+      a: `Yes. ${pkg.name} includes ${pkg.usage.voice} minutes of customers' voice notes a month — understood and answered in text, like any other message. Minutes beyond that are ${voiceOver}, stated in writing in your quote. Spoken replies are a separate add-on.`,
     },
     { q: "Can we change package later?", a: FAQS[5].a },
     { q: "How long until it is live?", a: FAQS[1].a },
@@ -140,6 +145,10 @@ export default function PackagePage({ region, pkg }: { region: Region; pkg: Pack
               <div>
                 <dt>Headroom</dt>
                 <dd>{pkg.usage.head}</dd>
+              </div>
+              <div>
+                <dt>Voice notes</dt>
+                <dd>{pkg.usage.voice} min / mo</dd>
               </div>
               <div>
                 <dt>Overage</dt>
@@ -285,6 +294,10 @@ export default function PackagePage({ region, pkg }: { region: Region; pkg: Pack
             <div>
               <span className="pkg-cap-fig pkg-cap-fig-sm">{overage}</span>
               <span className="pkg-cap-label">beyond the allowance, stated in your quote</span>
+            </div>
+            <div>
+              <span className="pkg-cap-fig">{pkg.usage.voice}</span>
+              <span className="pkg-cap-label">minutes of voice notes included every month, then {voiceOver}</span>
             </div>
           </div>
           <p style={{ margin: "26px 0 0", maxWidth: "70ch", fontSize: 14.5, lineHeight: "24px", color: "rgba(255,255,255,.6)" }}>

@@ -1,7 +1,7 @@
 name: CRM calendar checks
 on:
   pull_request:
-    paths: ['deploy/crm/vantriq-backend/**', '.github/workflows/crm-calendar-check.yml']
+    paths: ['deploy/crm/vantriq-backend/**', 'lib/terms.json', '.github/workflows/crm-calendar-check.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -21,3 +21,4 @@ jobs:
       - run: npm ci
       - run: npm run test:calendar
       - run: npm run test:webhooks
+      - run: node test/terms-sync.test.js

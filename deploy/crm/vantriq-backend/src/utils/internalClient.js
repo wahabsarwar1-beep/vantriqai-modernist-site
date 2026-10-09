@@ -53,13 +53,18 @@ const FORMER_WHATSAPP_NUMBERS = ['923411120049'];
 const INSTAGRAM_ACCOUNT_ID = process.env.VANTRIQ_INSTAGRAM_ID || '17841414904483393';
 const FACEBOOK_PAGE_ID = process.env.VANTRIQ_FACEBOOK_PAGE_ID || '1291897617346380';
 
-// What the model costs, as OpenAI publishes it. gpt-4o-mini is $0.15 per
-// million input tokens and $0.60 per million output. Both agents run on it.
-// These are a starting point, not a commitment: change them in the CRM when
-// OpenAI's prices change or the agents move to a different model.
+// What the model costs, as OpenAI publishes it. gpt-5-mini is $0.25 per
+// million input tokens and $2.00 per million output (its reasoning bills as
+// output). The agents have run on it since 7 Oct 2026, and since v9.33 they
+// report OpenAI's real token counts. These are a starting point, not a
+// commitment: change them in the CRM when OpenAI's prices change or the
+// agents move to a different model.
 const MODEL_RATES = [
-  { metric: 'input_token',  unit_rate: 0.15, unit_size: 1000000, label: 'Model input tokens (gpt-4o-mini)' },
-  { metric: 'output_token', unit_rate: 0.60, unit_size: 1000000, label: 'Model output tokens (gpt-4o-mini)' },
+  { metric: 'input_token',  unit_rate: 0.25, unit_size: 1000000, label: 'Model input tokens (gpt-5-mini)' },
+  { metric: 'output_token', unit_rate: 2.00, unit_size: 1000000, label: 'Model output tokens (gpt-5-mini)' },
+  // v9.33: voice notes the WhatsApp agent transcribes, at Whisper's $0.006 a
+  // minute.
+  { metric: 'voice_minute', unit_rate: 0.006, unit_size: 1, label: 'Voice-note transcription minutes (whisper-1)' },
 ];
 
 const DEFAULT_AGENTS = [

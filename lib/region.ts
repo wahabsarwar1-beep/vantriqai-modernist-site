@@ -26,6 +26,8 @@ export type Region = {
   hreflang: string;
   /** Which column of USAGE carries this region's overage rate. */
   overageKey: "over" | "overUsd";
+  /** Which column of USAGE carries this region's per-minute voice-note rate. */
+  voiceOverKey: "voiceOver" | "voiceOverUsd";
   /** The one sentence on Packages that names the currency. */
   pricingBody: string;
   /** Hero card outcomes and asks that would otherwise name PKR or a PK city. */
@@ -50,6 +52,7 @@ export const REGIONS: Record<RegionKey, Region> = {
     currency: "PKR",
     hreflang: "en-PK",
     overageKey: "over",
+    voiceOverKey: "voiceOver",
     pricingBody:
       "A one-time setup fee plus a simple monthly plan, quoted in PKR after we scope your workflow. No hidden surprises, and no charge for normal business volume.",
     quoteOutcome: "Quote accepted · PKR value logged",
@@ -66,6 +69,7 @@ export const REGIONS: Record<RegionKey, Region> = {
     currency: "US$",
     hreflang: "en",
     overageKey: "overUsd",
+    voiceOverKey: "voiceOverUsd",
     pricingBody:
       "A one-time setup fee plus a simple monthly plan, quoted in US dollars after we scope your workflow. No hidden surprises, and no charge for normal business volume.",
     quoteOutcome: "Quote accepted · US$ value logged",

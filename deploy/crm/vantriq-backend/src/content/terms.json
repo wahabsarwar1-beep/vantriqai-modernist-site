@@ -1,0 +1,164 @@
+{
+  "version": "2026-10-09",
+  "updated": "9 October 2026",
+  "title": "Terms & service information",
+  "intro": "The terms that apply to every VantriqAI quotation, scope sign-off and service. A signed agreement or scope sign-off can add to them or change them for your deployment; where it does, the signed document prevails.",
+  "sections": [
+    {
+      "id": "scope",
+      "heading": "1. How these terms apply",
+      "paragraphs": [
+        "These terms apply to the services VantriqAI provides: AI agents on messaging channels, websites and phone lines, the integrations they use, the client portal and Android app, analytics, and the onboarding, tuning and support around them.",
+        "Browsing this website, requesting a demo, sending a brief or chatting with our assistant does not create a subscription, an order or a commitment to buy. Prices and package descriptions on this website are information, not an offer. A contract exists only once you accept a written quotation, sign a scope sign-off or sign a service agreement.",
+        "Where documents disagree, this order applies: a signed service agreement, then the signed scope sign-off, then the accepted quotation, then these terms. Mandatory law applies in every case."
+      ]
+    },
+    {
+      "id": "definitions",
+      "heading": "2. Words used in these terms",
+      "bullets": [
+        "Client, you: the business that accepts a quotation or signs a scope sign-off or agreement.",
+        "Agent: an AI assistant VantriqAI configures to answer your customers on a channel such as WhatsApp, Instagram, Facebook Messenger, your website or a phone line.",
+        "Conversation (also session): one of your customers talking to an agent within a rolling 24-hour window, however many messages it takes.",
+        "Allowance: the number of conversations, voice-note minutes or other units your package or add-on includes each billing month.",
+        "Add-on: a capability priced separately from your package, such as spoken replies to voice notes, website chat or a voice call agent.",
+        "Platform: a third-party service the agent runs on or connects to, including Meta (WhatsApp, Instagram, Facebook), AI model providers, telecommunications carriers, payment providers and your own software.",
+        "Scope sign-off: the document in your client portal that sets out exactly what will be delivered, which you sign before configuration begins."
+      ]
+    },
+    {
+      "id": "quotes-scope",
+      "heading": "3. Quotations, scope and changes",
+      "paragraphs": [
+        "A quotation is valid until the date shown on it. It states the package, any add-ons, the setup fee, the monthly fee, the allowance and the overage rate, and lists what the package includes and what it does not. Anything not listed as included is not included.",
+        "Before configuration begins you will be asked to sign a scope sign-off in your client portal. It records the channels, accounts, integrations, knowledge sources, languages, handover rules, deliverables, acceptance tests and responsibilities for your deployment. Work starts from the signed scope; it is what both sides deliver against.",
+        "A change to signed scope — a new channel, integration, branch, language, workflow, report or a materially larger knowledge base — is a change request. We will tell you in writing whether it changes the fees or the timeline before we do it, and it takes effect only once you approve it. Routine knowledge updates during monthly tuning are not change requests.",
+        "Timelines are estimates. They depend on you providing information, access and approvals on time, and on platform reviews and verifications that neither party controls."
+      ]
+    },
+    {
+      "id": "fees",
+      "heading": "4. Fees, invoices and payment",
+      "paragraphs": [
+        "The setup fee is invoiced when you accept the quotation. Configuration is scheduled once it has been paid, unless we agree otherwise in writing.",
+        "The monthly fee is invoiced for each billing month, together with any usage beyond the allowance for that month. Usage beyond the allowance is measured by our systems and shown in your client portal; it is billed at the overage rate in your quotation or agreement.",
+        "Invoices are payable by the due date shown on them, in the currency shown on them. Bank, transfer and payment-processing charges are paid by the party making the payment. If you pay in a currency other than the invoice currency, any shortfall caused by exchange or bank deductions remains payable.",
+        "All prices exclude taxes unless an invoice states otherwise. Sales tax, withholding tax and other government levies are applied at the rates in force on the invoice date. If you are required by law to withhold tax from a payment, you must provide the official withholding certificate; until you do, the withheld amount is treated as unpaid.",
+        "If an invoice is unpaid after its due date we will remind you. If it remains unpaid after a written notice period stated in that reminder, we may suspend the service until the account is brought up to date. Suspension does not stop fees accruing for the period, and a suspended agent may not answer your customers. Service resumes once overdue amounts are paid.",
+        "We may change prices, allowances or overage rates for future billing periods by giving you written notice at least 30 days before the change takes effect, unless your agreement fixes them for a longer term. A change never applies to a period already invoiced."
+      ]
+    },
+    {
+      "id": "usage",
+      "heading": "5. Usage, allowances and measurement",
+      "paragraphs": [
+        "Allowances are monthly. Unused conversations, minutes or credits do not roll over to the next month, cannot be transferred and are not refunded or exchanged for cash, except where the law requires otherwise.",
+        "Usage is measured from the AI provider's own counts where the provider reports them, and from our systems otherwise. Your client portal shows conversations and other metered usage for the month as it happens. If you believe a figure is wrong, tell us within 30 days of the invoice and we will review the records with you.",
+        "Each action an agent or tool takes consumes AI processing, which varies with the complexity of the request and the tools used and is not quoted in advance. Session counts and capacity figures describe expected capacity, not a guaranteed entitlement.",
+        "Voice notes are included in every package, up to the voice-note minutes stated for it: 10% of its monthly conversation allowance (for example 150 minutes a month on Starter and 4,000 on Enterprise+). Minutes are measured from the length of each recording. Minutes beyond the allowance are billed at PKR 5 a minute, or at the rate in your quotation or agreement. Spoken replies to voice notes and voice calls are add-ons. Where a deployment does not include voice, the agent may ask your customer to type instead.",
+        "We may limit, queue or pause automated replies to protect the service from abuse, floods of messages, spam or attacks, including messages that try to make the agent act outside its instructions. Such traffic may still count towards usage where it reached the AI provider."
+      ]
+    },
+    {
+      "id": "third-party-fees",
+      "heading": "6. Platform and third-party charges",
+      "paragraphs": [
+        "Unless your quotation lists them as included, the following are not part of our fees and are paid by you directly to the provider: Meta or WhatsApp Business Platform conversation, template and messaging charges; telephone numbers and call charges; SMS charges; your own subscriptions to CRM, booking, e-commerce, payment, email or other software the agent connects to; domain and hosting charges for your own website.",
+        "Platforms set and change their own prices, rules and availability. Where a platform price change affects a charge we pass through to you, we will tell you before it applies. A platform's own charges, suspensions or outages do not reduce the fees owed to us, except as your agreement states."
+      ]
+    },
+    {
+      "id": "accounts",
+      "heading": "7. Your accounts, social media and the access we need",
+      "paragraphs": [
+        "Every business account the agent uses must be owned by and registered in the name of your business — never VantriqAI's, and never an individual employee's personal account. This includes your Meta Business portfolio (Business Manager), WhatsApp Business Account and phone number, Facebook Pages, Instagram professional accounts, website and domain, Google Business Profile, CRM, calendars and payment accounts. You remain the owner and administrator of each of them throughout and after the service.",
+        "We ask for access in the most limited way each platform allows, and only for what the signed scope needs:"
+      ],
+      "bullets": [
+        "Meta (WhatsApp, Instagram, Facebook): you add VantriqAI to your Meta Business portfolio as a partner, or give our named team members a role, with only the assets and permissions the deployment needs — for example managing the WhatsApp Business Account, messaging on a Page or Instagram account, and managing the webhook and app connection.",
+        "WhatsApp: a phone number in your business's name that can receive the verification code by SMS or call; completion of Meta's business verification and display-name review in your name; and a valid payment method on your WhatsApp Business Account for Meta's own charges.",
+        "Instagram: a professional (business or creator) account linked to your Facebook Page, with message access allowed for connected tools in the Instagram settings.",
+        "Website: the ability to add our chat script to your site, or someone on your side who can.",
+        "CRM, calendar, e-commerce and other systems: an API key, app connection or integration user created for VantriqAI with the narrowest permissions the integration needs, never a personal staff login.",
+        "Phone lines: a number you own or rent in your business's name, and authority to route its calls to the voice agent."
+      ],
+      "after": [
+        "We will not ask you to send passwords, one-time verification codes or recovery codes by email, chat or WhatsApp. Where a platform requires a code during setup, it is entered by you, or by you on a call you have arranged, and is never stored by us. Access keys and tokens we hold are stored encrypted, used only for your deployment, and never shared with other clients.",
+        "You must keep two-factor authentication switched on for your accounts, keep at least two administrators from your own business on each account, keep your contact details, verification and payment methods current with each platform, and tell us before you change a phone number, Page, account name, website or integration the agent depends on.",
+        "Content the agent publishes or sends is sent in your business's name, from your accounts, using the knowledge, prices, policies, templates and instructions you approve. You are responsible for that material being accurate, lawful and yours to use, and for approving message templates and any outbound or broadcast message before it is sent.",
+        "You may remove our access at any time. Removing it will stop the affected agent from working, and fees continue under your agreement unless you also cancel. When the service ends we remove our own access, revoke the tokens we hold and confirm this to you in writing; you should also remove VantriqAI from your accounts.",
+        "A platform may restrict, suspend, rate-limit or reject an account, number, Page, template or message under its own policies. That decision is the platform's, not ours. We will help you understand the cause and prepare an appeal where we reasonably can, but we are not liable for a platform's decision, its timing or its consequences, including lost messages, sales or verification status.",
+        "Tell us immediately if you suspect an account the agent uses has been compromised, and we will pause the agent while you secure it."
+      ]
+    },
+    {
+      "id": "your-responsibilities",
+      "heading": "8. Your other responsibilities",
+      "bullets": [
+        "Name a decision-maker who can approve scope, content, tests and go-live, and respond to our requests within a reasonable time. Delays on your side move the timeline.",
+        "Provide accurate and current catalogues, prices, stock rules, policies, opening hours and FAQs, and tell us when they change.",
+        "Test the agent with us before go-live and confirm acceptance as the scope sign-off describes. If you put the agent live, it is treated as accepted.",
+        "Obtain and record your customers' consent where the law or a platform requires it, including for marketing, outbound messages, call recording and voice-note transcription, honour opt-outs, and give customers a way to reach a person.",
+        "Use the service only for lawful purposes. Do not use it for unsolicited bulk messaging, impersonation, fraud, harassment, or to get around a platform's restrictions.",
+        "Review the agent's handovers and the conversations it escalates, and keep a person available for matters it is instructed not to handle."
+      ]
+    },
+    {
+      "id": "ai",
+      "heading": "9. AI limitations and human review",
+      "paragraphs": [
+        "AI can produce inaccurate, incomplete or inappropriate responses. The agent answers from the information and instructions you provide, and it can still be wrong. Check important facts and actions, especially prices, availability, appointments, payments and regulated matters.",
+        "The agent is not a substitute for qualified medical, legal, financial or other professional advice, and must not be used for emergencies or safety-critical decisions. Consequential actions — refunds, cancellations, account changes, payments — need human approval unless the signed scope says otherwise.",
+        "Demonstrations, example conversations, benchmarks, response times and charts illustrate what the service can do. They are not a promise of sales, revenue, accuracy or uninterrupted service for your business."
+      ]
+    },
+    {
+      "id": "data",
+      "heading": "10. Your data and privacy",
+      "paragraphs": [
+        "Your business data and your customers' data remain yours. We process them only to deliver, secure, measure, bill and improve the service for you, as described in our Privacy policy and your agreement. We do not sell them and do not use them to serve another client.",
+        "Conversation transcripts, leads and analytics are stored in our systems so you can see them in your client portal. Voice notes are transcribed by an AI provider; the transcript is kept with the conversation. Our AI and infrastructure providers process data on our instructions and may be located outside Pakistan.",
+        "You are responsible for having a lawful basis and giving the notices your customers need for this processing. Deployments that handle health, financial or other sensitive information need a separate assessment and agreed safeguards before go-live.",
+        "Conversation history is kept in your client portal for 12 months from the date of each message. After that the message text is deleted; the counts behind your usage, invoices and Vantriq Pulse analytics are kept, so past invoices and reports still add up. Invoices, payments and the usage records they were billed from are kept for as long as tax and accounting law requires. You can ask us for an export of your conversations at any time while they are held. A longer retention period can be agreed in writing — for example where your sector requires it — and may be charged for. Voice-note recordings are not kept in the portal, only their transcripts; temporary copies made while a recording is processed are deleted automatically within 30 days.",
+        "When the service ends you may request an export of your conversation, lead and customer records within 30 days. After that we delete or anonymise them, except records we must keep for tax, accounting, legal or dispute purposes, which are kept only as long as required."
+      ]
+    },
+    {
+      "id": "ip",
+      "heading": "11. Intellectual property and confidentiality",
+      "paragraphs": [
+        "VantriqAI's platform, workflows, prompts, configurations, tools, methods, templates and documentation remain our property. During the service you have the right to use them for your business. No source code, internal configuration or proprietary method is transferred unless a signed agreement says so.",
+        "Your content, trademarks, catalogues and data remain yours, and you give us the right to use them only to provide the service. Each party keeps the other's non-public business information confidential and uses it only for the service, during and after it."
+      ]
+    },
+    {
+      "id": "term",
+      "heading": "12. Term, cancellation and refunds",
+      "paragraphs": [
+        "The service runs month to month from go-live unless your agreement sets a minimum term. Either party may end it by giving written notice of at least one full billing month, or the notice period in your agreement if different. Fees are due up to the end of the notice period.",
+        "The setup fee pays for discovery, configuration and onboarding work. It is not refundable once that work has started, except where we fail to deliver the signed scope for reasons within our control, or where the law requires a refund. Monthly fees already invoiced for a period that has started are not refundable.",
+        "We may end or suspend the service with immediate effect if you seriously or repeatedly breach these terms, use the service unlawfully or abusively, or if a platform or the law requires it. Where we can, we will tell you first and give you a chance to put things right.",
+        "Your statutory rights that cannot be excluded by contract are not affected."
+      ]
+    },
+    {
+      "id": "liability",
+      "heading": "13. Liability and indemnity",
+      "paragraphs": [
+        "We provide the service with reasonable skill and care. Unless a signed agreement includes a service level, the service is provided without guaranteed availability or response times, because it depends on platforms, networks and providers we do not control.",
+        "To the extent the law allows, neither party is liable for indirect or consequential loss, or for lost profits, revenue, data or goodwill, and our total liability for all claims in any twelve months is limited to the fees you paid us in the three months before the claim arose. Nothing in these terms limits liability that cannot lawfully be limited, including for fraud.",
+        "You indemnify VantriqAI against third-party claims, penalties and losses arising from the content, data and instructions you supply, from messages sent from your accounts at your direction, or from your breach of the law or a platform's policies."
+      ]
+    },
+    {
+      "id": "general",
+      "heading": "14. General",
+      "paragraphs": [
+        "Neither party is responsible for a delay or failure caused by events outside its reasonable control, such as platform outages, network failures, power cuts, government action or natural events, provided it tells the other and resumes as soon as it can.",
+        "Notices under these terms are given in writing by email to the addresses on your account and ours, or through the client portal. Governing law, jurisdiction and dispute resolution are set out in your signed agreement; before starting any formal dispute, both parties will first try in good faith to resolve it by discussion.",
+        "We may update these terms. The version and date at the top of this page identify which terms apply; the version in force when you signed your scope sign-off or agreement applies to it, and a later version applies only once you accept it or from the next renewal after written notice, as your agreement allows.",
+        "Questions about these terms, your scope, billing, privacy or the service can be sent through our contact page or published WhatsApp number."
+      ]
+    }
+  ]
+}

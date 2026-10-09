@@ -107,6 +107,7 @@ export const PLATFORM_FEATURES: { label: string; from: number; only?: boolean }[
   { label: "Natural language, in your customers' language", from: 0 },
   { label: "Configured to your workflow, catalogue and tone", from: 0 },
   { label: "Monthly tuning with our team", from: 0 },
+  { label: "Voice notes understood and answered, up to the voice-minute allowance", from: 0 },
   { label: "CRM sync", from: 1 },
   { label: "Location-aware routing and availability", from: 2 },
   { label: "Top-tier AI models across every channel", from: 3 },

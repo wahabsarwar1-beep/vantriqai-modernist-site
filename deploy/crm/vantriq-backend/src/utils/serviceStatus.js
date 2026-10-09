@@ -43,12 +43,36 @@ async function serviceStatusFor({ external_ref, client_id, agent_ref }) {
     return {
       allow: true,
       reason: 'unknown_client',
+      voice: true,
       detail: `No client matches ${client_id ? 'that id' : `external_ref "${external_ref}"`}. Serving anyway — set the reference on the client record so usage is billed.`,
       client_id: null,
     };
   }
 
-  const base = { client_id: client.id, company: client.company };
+  // Voice notes are an add-on (v9.33). A client has bought them when a
+  // voice-minute rate applies to them, however it got there — their own, an
+  // agent's, or their package's. Our own account always has voice. A failed
+  // lookup leaves voice on, as every other doubt here leaves service on.
+  let voice = true;
+  if (!client.is_internal) {
+    try {
+      const { rows: vr } = await db.query(
+        `select 1 from usage_rates
+          where metric = 'voice_minute'
+            and effective_from <= current_date and (effective_to is null or effective_to >= current_date)
+            and (client_id = $1
+                 or agent_id in (select id from client_agents where client_id = $1)
+                 or (client_id is null and agent_id is null and product_id = $2))
+          limit 1`,
+        [client.id, client.product_id || null]
+      );
+      voice = !!vr[0];
+    } catch (err) {
+      console.error('voice add-on lookup failed, leaving voice on', err.message);
+    }
+  }
+
+  const base = { client_id: client.id, company: client.company, voice };
 
   if (client.service_status === 'suspended') {
     return {

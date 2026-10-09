@@ -157,7 +157,8 @@ async function meteredCharges(client, month) {
     `select count(distinct session_id)::numeric as session,
             coalesce(sum(messages_count),0)::numeric as message,
             coalesce(sum(input_tokens),0)::numeric  as input_token,
-            coalesce(sum(output_tokens),0)::numeric as output_token
+            coalesce(sum(output_tokens),0)::numeric as output_token,
+            (coalesce(sum(voice_seconds),0) / 60.0)::numeric as voice_minute
        from usage_events
       where client_id = $1 and occurred_at >= $2::date and occurred_at < ($3::date + 1)`,
     [client.id, from, to]
@@ -197,6 +198,7 @@ const METRIC_LABEL = {
   input_token: 'Input tokens',
   output_token: 'Output tokens',
   automation_run: 'Automation runs',
+  voice_minute: 'Voice-note minutes',
 };
 
 /**

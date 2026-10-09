@@ -23,6 +23,9 @@ const FIELDS = [
   // v9 — which tax authority this client is billed under. Null falls back to
   // the company default rate, so leaving it unset changes nothing.
   'tax_jurisdiction',
+  // v9.33 — a longer conversation-history period agreed with this client in
+  // writing. Null means the company default (Terms, section 10).
+  'conversation_retention_months',
 ];
 
 // Per-client package overrides. Only accepted when the client's package is

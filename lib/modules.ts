@@ -73,7 +73,7 @@ const details = (region: Region): Record<string, ModuleDetail> => ({
     faqs: [
       { q: "Do we need a new number?", a: "No. We connect your existing business number to the WhatsApp Business Platform during onboarding, or set up a new one if you prefer to keep them separate." },
       { q: "Can our team still reply themselves?", a: "Yes. Your team can take over any conversation at any time, and the agent steps back until they hand it back." },
-      { q: "What if a customer sends a voice note?", a: "The agent transcribes it and answers the question in it, in the same thread, like any other message." },
+      { q: "What if a customer sends a voice note?", a: "The agent transcribes it and answers the question in it, in the same thread, like any other message. Every package includes voice-note minutes — 10% of its monthly session allowance — and minutes beyond that are billed at a per-minute rate stated in your quote." },
     ],
   },
   "Social Agent": {

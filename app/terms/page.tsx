@@ -1,36 +1,32 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import LegalPage from "@/components/LegalPage";
+import terms from "@/lib/terms.json";
 
 export const metadata: Metadata = { title: "Terms & service information", alternates: { canonical: "/terms" } };
 
+/**
+ * The terms live in lib/terms.json, not in this file, because the CRM prints
+ * the same text into every scope sign-off a client signs: the CRM carries a
+ * byte-identical copy (deploy/crm/vantriq-backend/src/content/terms.json) and
+ * its tests fail if the two differ. Change the JSON, bump `version`, and copy
+ * it across — never edit the wording here.
+ */
+type Section = { id: string; heading: string; paragraphs?: string[]; bullets?: string[]; after?: string[] };
+
 export default function Page() {
-  return <LegalPage title="Terms & service information" intro="Important information about our website, products and customer responsibilities. Your signed service agreement defines the binding commercial terms.">
-    <h2>Scope and written agreements</h2>
-    <p>VantriqAI provides information about business agents, integrations and support services on this website. Browsing, requesting a demo or sending a brief does not create a paid subscription or a commitment to purchase. Product descriptions and prices are informational. An authorised written quote, order or service agreement defines the contracting parties, scope, fees, duration, deliverables and support. That agreement prevails over general website information, subject to mandatory law.</p>
-    <h2>Pricing, taxes and third-party charges</h2>
-    <p>Pakistan and Global pages display different currencies. Confirm the applicable currency, setup charges, recurring fees, taxes, payment costs, usage allowances and overage rates before ordering. Messaging platforms, AI providers, telecommunications services and payment providers may charge separately unless expressly included in your written quote. Exchange rates and provider prices can change. A future price or package change is subject to your agreement and any legally required notice; a website edit alone does not amend an existing contract.</p>
-    <h2>Usage, credits and capacity</h2>
-    <p>Agent and tool actions consume AI credits according to their complexity and the tool used. Credit consumption is determined after the action completes and is not individually quoted in advance. Monthly credits expire at the end of the billing period and do not roll over or convert to cash. Refund restrictions apply only to the extent permitted by law and your agreement. Session counts and headroom figures indicate expected capacity rather than a guaranteed entitlement. Confirm how usage is measured, how it is reported and how overages are billed in your order.</p>
-    <h2>Setup, approvals and account ownership</h2>
-    <p>You must supply accurate business information and authorised access to the accounts, phone numbers, calendars, catalogues and systems needed for delivery. Keep credentials secure and give users only the access they need. Timelines depend on complete requirements, testing and third-party approvals. Eligibility, verification badges, account migration and activation dates are not guaranteed. Ownership and handover of customer accounts, custom deliverables and access credentials must be recorded in the service agreement.</p>
-    <h2>WhatsApp and other messaging channels</h2>
-    <p>WhatsApp automation is subject to the WhatsApp Business Platform policies, account eligibility, approved templates, messaging windows, quality ratings and applicable fees. Obtain required recipient permission, honour opt-outs and offer a route to human support. Do not use the service for unsolicited bulk messaging, impersonation, fraud, harassment or attempts to bypass provider restrictions. Meta or another provider may reject a template, restrict an account or interrupt delivery. See the detailed disclosures on our product pages and the provider’s current policies.</p>
-    <h2>AI limitations and human review</h2>
-    <p>AI can produce inaccurate, incomplete or inappropriate responses. Check important facts and actions, especially prices, availability, appointments, payments and regulated matters. Demonstrations, conversation examples, charts and response times illustrate capabilities; they do not guarantee sales, revenue, accuracy or uninterrupted service. Agents do not replace qualified medical, legal or financial professionals and should not be used as emergency services. Human oversight and approvals for consequential actions must be agreed for the deployment.</p>
-    <h2>Customer data and permitted use</h2>
-    <p>You are responsible for the legality, accuracy and permissions for material supplied to your deployment, including customer lists, messages, recordings and knowledge content. Provide appropriate notices and permissions for messaging, recording or transcription where required. Do not submit passwords, complete payment-card details or sensitive personal information through the public assistant. A deployment handling regulated or sensitive information requires a separate assessment and agreed safeguards. Do not probe for secrets, access another customer’s records or misuse the website or integrations.</p>
-    <h2>Privacy and data-processing arrangements</h2>
-    <p>Our <Link href="/privacy">Privacy policy</Link> and <Link href="/cookies">Cookies & storage notice</Link> explain the public website’s data use and optional analytics choices. For customer deployments, the agreement should identify the parties’ data-protection roles, authorised processing, recipients, retention, security responsibilities, international-transfer arrangements, incident cooperation and deletion or return of data. A general website notice does not replace a required data-processing agreement or a customer’s own privacy notice.</p>
-    <h2>Confidentiality and intellectual property</h2>
-    <p>VantriqAI’s branding, website materials and proprietary designs remain protected by applicable intellectual-property law. Customer material and third-party materials remain subject to their owners’ rights. Product names do not imply endorsement by a third-party platform. Rights to use customer content, custom work, licences and confidential business information are governed by the service agreement. No website publication grants access to source code, internal configurations or proprietary methods.</p>
-    <h2>Availability, support and security</h2>
-    <p>Delivery depends on third-party platforms, networks and authorised integrations. Outages, maintenance, API changes, rate limits and policy enforcement may affect service. No SLA or security certification is implied by a marketing page. Availability commitments, support hours, escalation, backups and incident handling must be set out in the agreement. Internet services cannot be guaranteed free from every error or security risk; notify us promptly of suspected misuse through our contact channels.</p>
-    <h2>Renewal, cancellation, refunds and handover</h2>
-    <p>The accepted order or agreement must state the billing cycle, renewal arrangements, cancellation notice, setup milestones, refund eligibility and treatment of unused allowances. Do not assume a trial, refund or automatic renewal unless expressly offered. Cancellation, account transfer and export or deletion of records depend on the agreed process and provider capabilities. Statutory cancellation, refund and other non-excludable rights remain unaffected.</p>
-    <h2>Liability, mandatory rights and disputes</h2>
-    <p>Any warranty exclusions and limitation of liability apply only to the extent permitted by applicable law and the valid agreement between the parties. The website’s general commercial information describes a three-month-fees liability cap unless a separate agreement states otherwise; its application and any exceptions must be assessed under that agreement and applicable law. Nothing here excludes liability or rights that cannot lawfully be excluded. Governing law, jurisdiction and dispute-resolution procedures belong in the signed agreement; no universal jurisdiction is imposed by this page.</p>
-    <h2>Questions, concerns and changes</h2>
-    <p>Contact the VantriqAI team through our <Link href="/contact">contact page</Link> or published WhatsApp number for scope, billing, privacy or service concerns. We may update this information as products or practices change. Changes do not retrospectively rewrite a signed agreement or remove mandatory rights.</p>
+  const sections = terms.sections as Section[];
+  return <LegalPage title={terms.title} intro={terms.intro}>
+    <p><strong>Version {terms.version}</strong> · updated {terms.updated}</p>
+    {sections.map((s) => (
+      <section key={s.id} id={s.id}>
+        <h2>{s.heading}</h2>
+        {(s.paragraphs || []).map((p, i) => <p key={i}>{p}</p>)}
+        {s.bullets && <ul>{s.bullets.map((b, i) => <li key={i}>{b}</li>)}</ul>}
+        {(s.after || []).map((p, i) => <p key={i}>{p}</p>)}
+      </section>
+    ))}
+    <h2>Related</h2>
+    <p>Our <Link href="/privacy">Privacy policy</Link> and <Link href="/cookies">Cookies & storage notice</Link> explain how the public website uses data. To ask about these terms, your scope, billing or privacy, use our <Link href="/contact">contact page</Link>.</p>
   </LegalPage>;
 }

@@ -53,7 +53,7 @@ router.get('/rates', async (req, res) => {
   res.json(rows);
 });
 
-const METRICS = ['session', 'message', 'input_token', 'output_token', 'automation_run'];
+const METRICS = ['session', 'message', 'input_token', 'output_token', 'automation_run', 'voice_minute'];
 
 router.post('/rates', async (req, res) => {
   const b = req.body || {};

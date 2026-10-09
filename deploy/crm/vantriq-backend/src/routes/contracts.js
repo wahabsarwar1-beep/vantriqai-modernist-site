@@ -285,3 +285,4 @@ module.exports = router;
 module.exports.KINDS = KINDS;
 module.exports.STATUSES = STATUSES;
 module.exports.FREQUENCIES = FREQUENCIES;
+module.exports.allocateNumber = allocateNumber;

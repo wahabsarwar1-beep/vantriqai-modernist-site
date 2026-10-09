@@ -193,6 +193,19 @@ router.get('/usage', async (req, res) => {
   }
   const current = currentRes.rows[0] || { sessions: 0, messages: 0, input_tokens: 0, output_tokens: 0 };
   const sessionsUsed = +current.sessions || 0;
+
+  // Voice notes (v9.33): included up to the voice-minute allowance on the
+  // rate card that applies to this client — their package's, unless one was
+  // agreed for them — then billed per minute.
+  const { ratesFor } = require('../utils/subscriptions');
+  const voiceRate = (await ratesFor(client, null, new Date())).find((r) => r.metric === 'voice_minute') || null;
+  const voiceUsed = Math.round((+current.voice_minutes || 0) * 10) / 10;
+  const voice = voiceRate ? {
+    minutes_used: voiceUsed,
+    minutes_included: +voiceRate.included_units,
+    rate_per_minute: +voiceRate.unit_rate,
+    minutes_over: Math.max(0, Math.round((voiceUsed - +voiceRate.included_units) * 10) / 10),
+  } : (voiceUsed ? { minutes_used: voiceUsed, minutes_included: null, rate_per_minute: null, minutes_over: 0 } : null);
   const overSessions = quota != null ? Math.max(0, sessionsUsed - quota) : 0;
 
   // Service does not stop at the quota line, so say plainly what is happening
@@ -219,6 +232,7 @@ router.get('/usage', async (req, res) => {
     estimated_overage_cost: overageRate != null ? overSessions * overageRate : null,
     state,
     notice: NOTICE[state],
+    voice,
     history: historyRes.rows.map((r) => ({
       period_month: r.period_month, sessions: +r.sessions || 0, messages: +r.messages || 0,
     })),
@@ -715,7 +729,13 @@ router.get('/activity', async (req, res) => {
 router.get('/packages', async (req, res) => {
   const { rows } = await db.query(
     `select id, name, target_tier, setup_fee, retainer, quota, overage_rate,
-            msgs_per_session, automation, data_layer, channels
+            msgs_per_session, automation, data_layer, channels, includes, excludes,
+            (select r.included_units from usage_rates r
+              where r.product_id = products.id and r.client_id is null and r.agent_id is null
+                and r.metric = 'voice_minute' and r.effective_to is null limit 1) as voice_minutes,
+            (select r.unit_rate from usage_rates r
+              where r.product_id = products.id and r.client_id is null and r.agent_id is null
+                and r.metric = 'voice_minute' and r.effective_to is null limit 1) as voice_rate
        from products
       where archived = false and is_standard = true
       order by sort_order asc, created_at asc`
@@ -734,6 +754,9 @@ router.get('/packages', async (req, res) => {
       setup_fee: +r.setup_fee, retainer: +r.retainer, quota: +r.quota,
       overage_rate: +r.overage_rate, msgs_per_session: +r.msgs_per_session,
       automation: r.automation, data_layer: r.data_layer, channels: r.channels,
+      includes: r.includes || [], excludes: r.excludes || [],
+      voice_minutes: r.voice_minutes == null ? null : +r.voice_minutes,
+      voice_rate: r.voice_rate == null ? null : +r.voice_rate,
     })),
     pending_request: pending.rows[0] || null,
   });
@@ -1083,7 +1106,8 @@ router.get('/quotes', async (req, res) => {
   const { rows } = await db.query(
     `select q.id, q.quote_number, q.title, q.status, q.valid_until, q.subtotal,
             q.tax_rate, q.tax_amount, q.total, q.notes, q.terms, q.sent_at, q.decided_at,
-            q.invoice_id, p.name as product_name, bp.name as bundle_product_name
+            q.invoice_id, p.name as product_name, bp.name as bundle_product_name,
+            p.includes as package_includes, p.excludes as package_excludes
        from quotes q
        left join products p on p.id = q.product_id
        left join products bp on bp.id = q.bundle_product_id
@@ -1139,6 +1163,148 @@ router.post('/quotes/:id/decline', async (req, res) => {
   );
   if (!rows[0]) return res.status(404).json({ error: 'That quote is not open.' });
   res.json({ ...rows[0], message: 'Thanks for letting us know.' });
+});
+
+/* ---------------------------- Scope sign-off (v9.33) ---------------------------- */
+/**
+ * The scope of work the team has sent this customer to sign, and the ones
+ * they have signed. A draft is ours until it is sent and never shows here.
+ *
+ * Signing is the customer confirming three things in their own words — the
+ * scope, the terms version printed in it, and their authority to sign for
+ * the business — against the exact document they were shown: the content
+ * hash they send back must be the one stored, which is itself re-computed
+ * from the stored document, so neither a revision sent meanwhile nor a row
+ * edited behind the scenes can be signed by mistake.
+ */
+const SCOPE = require('../utils/scopeSignoff');
+const { clientIp } = require('../utils/clientIp');
+
+router.get('/scope-signoffs', async (req, res) => {
+  const { rows } = await db.query(
+    `select * from scope_signoffs where client_id = $1 and status <> 'draft' order by created_at desc`,
+    [req.portalClient.id]
+  );
+  res.json(rows.map(SCOPE.publicShape));
+});
+
+async function portalScope(req) {
+  const { rows } = await db.query(
+    `select * from scope_signoffs where id = $1 and client_id = $2 and status <> 'draft'`,
+    [req.params.id, req.portalClient.id]
+  );
+  return rows[0] || null;
+}
+
+router.get('/scope-signoffs/:id/pdf', async (req, res) => {
+  const s = await portalScope(req);
+  if (!s) return res.status(404).json({ error: 'Scope not found' });
+  const pdf = await SCOPE.renderPdf(s);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${SCOPE.pdfFilename(s)}"`);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.send(pdf);
+});
+
+async function tellTeam(subject, text) {
+  try {
+    if (!mailConfigured()) return;
+    const to = process.env.TEAM_NOTIFY_EMAIL || 'support@vantriqai.com';
+    await sendMail({ to, subject, text });
+  } catch (err) {
+    console.error('[scope sign-off] team email not sent:', err.message);
+  }
+}
+
+router.post('/scope-signoffs/:id/sign', async (req, res) => {
+  const s = await portalScope(req);
+  if (!s) return res.status(404).json({ error: 'Scope not found' });
+  if (!['sent', 'changes_requested'].includes(s.status)) {
+    return res.status(409).json({ error: s.status === 'signed' ? 'This scope is already signed.' : 'This version is no longer open for signature.' });
+  }
+  const b = req.body || {};
+  const name = String(b.signer_name || '').trim();
+  const title = String(b.signer_title || '').trim();
+  const email = String(b.signer_email || '').trim();
+  if (name.length < 3 || name.length > 120) return res.status(400).json({ error: 'Type your full name to sign.' });
+  if (!title || title.length > 120) return res.status(400).json({ error: 'Give your position at the business.' });
+  if (email && (email.length > 200 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))) return res.status(400).json({ error: 'That email address does not look right.' });
+  if (b.accept_scope !== true || b.accept_terms !== true || b.authorised !== true) {
+    return res.status(400).json({ error: 'Tick all three confirmations to sign.' });
+  }
+  if (!s.content_hash || SCOPE.hashOf(s) !== s.content_hash) {
+    console.error('[scope sign-off] stored hash does not match the stored document', s.id);
+    return res.status(409).json({ error: 'This document cannot be signed as it stands. Please contact the team.' });
+  }
+  if (String(b.content_hash || '') !== s.content_hash) {
+    return res.status(409).json({ error: 'The scope has changed since you opened it. Reload and read the current version before signing.' });
+  }
+
+  const settings = await getSettings();
+  const ack = { scope: true, terms: true, authority: true, terms_version: s.terms_version, content_hash: s.content_hash };
+  const c = s.content || {};
+  const com = c.commercial || {};
+  const cl = s.client_snapshot || {};
+  const conn = await db.pool.connect();
+  let signed;
+  try {
+    await conn.query('begin');
+    const { rows } = await conn.query(
+      `update scope_signoffs set status = 'signed', signed_at = now(), signer_name = $2, signer_title = $3,
+              signer_email = $4, signer_ip = $5, signer_user_agent = $6, acknowledgements = $7::jsonb
+        where id = $1 and status in ('sent','changes_requested') returning *`,
+      [s.id, name, title, email, clientIp(req) || '', String(req.get('user-agent') || '').slice(0, 300), JSON.stringify(ack)]
+    );
+    if (!rows[0]) throw Object.assign(new Error('This scope was just changed. Reload and try again.'), { status: 409, expose: true });
+    signed = rows[0];
+    // The scope in force is the newest one signed: an earlier signed version
+    // of the same document stands down now, not before.
+    await conn.query(
+      `update scope_signoffs set status = 'superseded' where number = $1 and version < $2 and status in ('signed','sent','changes_requested')`,
+      [s.number, s.version]
+    );
+    // Filed under Contracts as a signed statement of work, so it sits with
+    // the client's other agreements in the CRM and the portal.
+    const { allocateNumber } = require('./contracts');
+    const contractNumber = await allocateNumber(settings, new Date());
+    const { rows: ct } = await conn.query(
+      `insert into contracts (client_id, contract_number, title, kind, status, start_date, value, currency, billing_frequency,
+                              signed_date, signed_by_client, client_legal_name, client_ntn, client_strn, client_address, scope, notes)
+       values ($1, $2, $3, 'sow', 'signed', current_date, $4, $5, 'monthly', current_date, $6, $7, $8, $9, $10, $11, $12)
+       returning id`,
+      [s.client_id, contractNumber, `${s.title} (${s.number} v${s.version})`, Number(com.monthly_fee || 0), com.currency || 'PKR',
+        `${name}, ${title}`, cl.legal_name || cl.company || '', cl.ntn || '', cl.strn || '', cl.address || '',
+        (c.deliverables || []).join('\n').slice(0, 4000),
+        `Signed in the client portal. Terms version ${s.terms_version}. Fingerprint ${s.content_hash}.`]
+    );
+    await conn.query(`update scope_signoffs set contract_id = $2 where id = $1`, [s.id, ct[0].id]);
+    await conn.query('commit');
+  } catch (e) {
+    await conn.query('rollback').catch(() => {});
+    throw e;
+  } finally {
+    conn.release();
+  }
+  await tellTeam(`Scope signed: ${s.number} v${s.version} — ${req.portalClient.company || ''}`,
+    `${name} (${title}) signed ${s.title} (${s.number} v${s.version}) for ${req.portalClient.company || 'the client'} in the portal.\n`
+    + `Terms version ${s.terms_version}. Fingerprint ${s.content_hash}.\nConfiguration can be scheduled.`);
+  res.json(SCOPE.publicShape(signed));
+});
+
+router.post('/scope-signoffs/:id/request-changes', async (req, res) => {
+  const s = await portalScope(req);
+  if (!s) return res.status(404).json({ error: 'Scope not found' });
+  if (!['sent', 'changes_requested'].includes(s.status)) return res.status(409).json({ error: 'This version is not open for changes.' });
+  const message = String((req.body || {}).message || '').trim();
+  if (message.length < 5) return res.status(400).json({ error: 'Tell us what should change.' });
+  const { rows } = await db.query(
+    `update scope_signoffs set status = 'changes_requested', client_feedback = $2, feedback_at = now()
+      where id = $1 returning *`,
+    [s.id, message.slice(0, 4000)]
+  );
+  await tellTeam(`Scope changes requested: ${s.number} v${s.version} — ${req.portalClient.company || ''}`,
+    `${req.portalClient.company || 'The client'} asked for changes to ${s.title} (${s.number} v${s.version}):\n\n${message.slice(0, 4000)}\n\nRevise it in the CRM and send the new version.`);
+  res.json(SCOPE.publicShape(rows[0]));
 });
 
 module.exports = router;

@@ -349,8 +349,26 @@ async function buildQuoteDocument(quoteId) {
   const { rows: lines } = await db.query(
     `select * from quote_lines where quote_id = $1 order by position`, [q.id]
   );
+  // What the quoted package includes and does not (v9.33), read live from
+  // the package so the quotation cannot promise something the package does
+  // not carry. A quote for add-ons only names no package and prints none.
+  let packageScope = null;
+  if (q.product_id) {
+    const { rows: pr } = await db.query(
+      `select name, quota, overage_rate, includes, excludes from products where id = $1`, [q.product_id]);
+    if (pr[0]) {
+      packageScope = {
+        name: pr[0].name,
+        quota: Number(pr[0].quota),
+        overage_rate: Number(pr[0].overage_rate),
+        includes: pr[0].includes || [],
+        excludes: pr[0].excludes || [],
+      };
+    }
+  }
   return {
     document_title: 'Quotation',
+    package_scope: packageScope,
     invoice_number: q.quote_number,
     // isoDay, not String(...).slice(0, 10): pg hands this back as a Date
     // in-process, and slicing one yields 'Fri Sep 25' — which reaches the
@@ -478,6 +496,8 @@ async function buildProposalDocument(quoteId) {
       quota: Number(p.quota),
       overage_rate: Number(p.overage_rate),
       channels: p.channels || '',
+      includes: p.includes || [],
+      excludes: p.excludes || [],
       included_agents: Number(p.included_agents),
       extra_agent_price: Number(p.extra_agent_price),
       recommended: !!q.recommended_product_id && p.id === q.recommended_product_id,

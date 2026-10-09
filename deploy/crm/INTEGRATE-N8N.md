@@ -102,6 +102,52 @@ Set the node's **Settings → Always Output Data** off and **On Error →
 Continue**, so a hiccup recording usage can never stop a customer getting their
 reply.
 
+### Real token counts, not estimates
+
+Send the provider's own counts. With an n8n **AI Agent** node the counts are
+not on its output, so the live VantriqAI agents do this (copy it for a client
+flow):
+
+1. On the **OpenAI Chat Model** node, turn **Use Responses API** off. With it
+   on, n8n never receives OpenAI's usage and stores only its own estimate.
+2. In the workflow's settings, turn on **Save execution progress**.
+3. Before the usage node, add an **n8n** node (Execution → Get, execution ID
+   `{{ $execution.id }}`, *Include execution details* on) using the
+   `n8n API (token metering)` credential. It reads this run back, and the usage
+   node sums `tokenUsage` over every run of the chat-model node — a tool call
+   means more than one model call per reply.
+4. Add `"estimated": false` when the counts came from the provider, `true`
+   when you had to fall back to an estimate.
+
+### Voice notes (v9.33)
+
+Voice notes are included in every package: voice-note minutes up to 10% of
+the package's conversation allowance, then PKR 5 a minute (a **Voice-note
+minutes** rate card on each package). **Voice understanding** is the add-on
+for spoken replies. For a turn that started as a voice note, add the length of
+the audio and the speech-to-text model:
+
+```json
+  "voice_seconds": {{ $('Voice note length').item.json.voice_seconds }},
+  "stt_model": "whisper-1"
+```
+
+The live WhatsApp agent measures the length in a Code node (**Voice note
+length**) that reads the Ogg file's last granule position, then transcribes with
+**whisper-1** through an HTTP Request node. In testing (9 Oct 2026) only
+whisper-1 kept Urdu in Urdu script every time: gpt-4o-transcribe slipped into
+Hindi (Devanagari) once in three runs, and gpt-4o-mini-transcribe and
+gpt-transcribe — OpenAI's replacement — wrote Hindi even told the language.
+OpenAI retires whisper-1 on 26 Feb 2027; choose and test a replacement that
+handles Urdu before then.
+
+Before transcribing, check voice is on for the client:
+`GET /api/webhooks/service-status` returns `"voice": true` when a **Voice-note
+minutes** rate card applies to them — every standard package carries one, so
+that is every client on a package. On `voice: false` (a client with no package
+or a custom one without voice), reply asking the customer to type instead. Minutes past the rate card's included minutes are
+billed on the monthly invoice like any other metered usage.
+
 ## 5. Import the billing workflow
 
 In n8n: **Workflows → ⋯ → Import from File** → pick

@@ -145,6 +145,17 @@ create table if not exists usage_events (
 create index if not exists idx_usage_client_time on usage_events(client_id, occurred_at);
 create index if not exists idx_usage_session on usage_events(session_id);
 
+-- v9.33 — voice notes are metered beside tokens. A WhatsApp voice note is
+-- transcribed by a speech-to-text model billed per minute of audio, which no
+-- token count shows, so the turn carries the length of the audio it
+-- transcribed and the model that did it. tokens_estimated is true when the
+-- flow could not read the provider's real token counts and sent an estimate,
+-- null when an older flow did not say.
+-- Here, ahead of the view below, so the view can sum them on a fresh install.
+alter table usage_events add column if not exists voice_seconds numeric not null default 0;
+alter table usage_events add column if not exists stt_model text not null default '';
+alter table usage_events add column if not exists tokens_estimated boolean;
+
 
 -- Rolled-up monthly usage per client, derived from usage_events.
 -- Used by the dashboard/billing to show "sessions used this month"
@@ -156,7 +167,10 @@ select
   count(distinct session_id) as sessions,
   sum(messages_count) as messages,
   sum(input_tokens) as input_tokens,
-  sum(output_tokens) as output_tokens
+  sum(output_tokens) as output_tokens,
+  -- v9.33: appended, never reordered, so `create or replace` keeps working
+  -- on a database that already has the earlier columns.
+  round(coalesce(sum(voice_seconds), 0) / 60.0, 2) as voice_minutes
 from usage_events
 group by client_id, date_trunc('month', occurred_at);
 
@@ -2219,3 +2233,280 @@ create table if not exists website_location_activity (
   total bigint not null default 0 check (total >= 0),
   primary key (day,region,section,event,country,subdivision,city)
 );
+
+-- v9.33 — voice notes are included in every package, up to an allowance.
+--
+-- Every WhatsApp voice note is sent to a speech-to-text model billed per
+-- minute of audio. Until now nothing recorded those minutes and no package
+-- priced them. The CEO approved (9 Oct 2026) including voice in every package
+-- rather than selling it separately:
+--
+--   * Each package includes voice-note minutes equal to 10% of its monthly
+--     conversation allowance — 0.1 minute per included conversation, about
+--     five times the rate measured on the live WhatsApp line — so voice can
+--     never cost more than about 3% of any package's fee.
+--   * Past that, PKR 5 a minute: three times what a minute costs at
+--     gpt-4o-transcribe's ~$0.006, the business model's own overage rule.
+--   * No setup fee and no monthly fee of its own: the voice path is part of
+--     the standard agent, and Pakistani competitors bundle voice notes too.
+--
+-- Mechanically that is a voice_minute rate card on each package
+-- (usage_rates with product_id), which the monthly bill already applies to
+-- every client on the package, and which makes the service-status check
+-- report voice:true for them. "Voice understanding" stays an add-on, but for
+-- what it adds — spoken replies — since transcription is now in the package.
+alter table usage_rates drop constraint if exists usage_rates_metric_check;
+alter table usage_rates add constraint usage_rates_metric_check
+  check (metric in ('session','message','input_token','output_token','automation_run','voice_minute'));
+
+-- Add-ons can carry a metered allowance (meter, included_units,
+-- overage_rate), so a future metered add-on says what its fee includes.
+alter table catalog_addons add column if not exists meter text
+  check (meter is null or meter in ('voice_minute'));
+alter table catalog_addons add column if not exists included_units numeric not null default 0;
+alter table catalog_addons add column if not exists overage_rate numeric;
+
+do $$
+begin
+  if exists (select 1 from applied_migrations where name = 'v9_33_voice_included') then
+    return;
+  end if;
+  insert into usage_rates (product_id, metric, unit_rate, included_units, unit_size, label)
+  select p.id, 'voice_minute', 5, round(p.quota * 0.1), 1, 'Voice-note minutes'
+    from products p
+   where p.name in ('Starter','Growth','Scale','Pro','Enterprise','Enterprise+')
+     and not exists (select 1 from usage_rates r
+                      where r.product_id = p.id and r.client_id is null and r.agent_id is null
+                        and r.metric = 'voice_minute' and r.effective_to is null);
+  -- Voice understanding: transcription is in the package now, so the add-on
+  -- is the spoken replies alone. Its old cost of 2,500 covered both; half of
+  -- it was transcription at about 1,500 notes a month. Only where an admin
+  -- has not already changed it.
+  update catalog_addons set
+      summary = 'Spoken replies: when a customer sends a voice note, the agent can answer back in natural speech in their language. (Understanding voice notes is included in every package.)',
+      price_note = 'Spoken replies to voice notes. Voice-note transcription is included in every package.',
+      est_monthly_cost = 1250,
+      cost_note = 'Spoken replies at about 1,500 voice notes a month. Transcription is costed in the packages, not here. The text-to-speech price has not been re-checked since August 2026.'
+   where key = 'voice-understanding' and est_monthly_cost = 2500;
+  -- A separate transcription add-on existed only on unreleased builds; it is
+  -- withdrawn, never deleted, so any quote that named it still resolves.
+  update catalog_addons set active = false where key = 'voice-transcription';
+  insert into applied_migrations (name, note)
+  values ('v9_33_voice_included', 'Voice notes included in every package: 10% of the conversation allowance in minutes, then PKR 5 a minute.');
+end $$;
+
+-- Our own account records what OpenAI charges us, so its voice notes are
+-- priced at Whisper's $0.006 a minute (it bills in USD). Added once; an
+-- admin's later change to the rate is never overwritten.
+insert into usage_rates (client_id, metric, unit_rate, included_units, unit_size, label)
+select c.id, 'voice_minute', 0.006, 0, 1, 'Voice-note transcription minutes (whisper-1)'
+  from clients c
+ where c.is_internal
+   and not exists (select 1 from usage_rates r
+                    where r.client_id = c.id and r.metric = 'voice_minute' and r.effective_to is null);
+
+-- v9.33 — our own account's token rates follow the agents to gpt-5-mini
+-- ($0.25 / $2.00 per million). The agents moved off gpt-4o-mini on 7 Oct
+-- 2026 and now report OpenAI's real counts, so pricing those counts at
+-- gpt-4o-mini's rates would understate what OpenAI bills us. Once, and only
+-- for the rates the CRM itself put there: a rate an admin changed is theirs.
+do $$
+begin
+  if exists (select 1 from applied_migrations where name = 'v9_33_internal_gpt5mini') then
+    return;
+  end if;
+  update usage_rates r set effective_to = current_date - 1
+    from clients c
+   where c.id = r.client_id and c.is_internal and r.effective_to is null
+     and r.effective_from < current_date
+     and ((r.metric = 'input_token' and r.unit_rate = 0.15) or (r.metric = 'output_token' and r.unit_rate = 0.60))
+     and r.label like '%gpt-4o-mini%';
+  insert into usage_rates (client_id, metric, unit_rate, included_units, unit_size, label, effective_from)
+  select c.id, v.metric, v.rate, 0, 1000000, v.label, current_date
+    from clients c,
+         (values ('input_token', 0.25, 'Model input tokens (gpt-5-mini)'),
+                 ('output_token', 2.00, 'Model output tokens (gpt-5-mini)')) as v(metric, rate, label)
+   where c.is_internal
+     and not exists (select 1 from usage_rates r
+                      where r.client_id = c.id and r.metric = v.metric and r.effective_to is null);
+  insert into applied_migrations (name, note)
+  values ('v9_33_internal_gpt5mini', 'Internal account token rates moved from gpt-4o-mini to gpt-5-mini.');
+end $$;
+
+-- v9.33 — what each package includes, and what it does not, in writing.
+--
+-- A quotation listed prices and an allowance and left the reader to guess
+-- what the monthly fee actually buys. Every quotation, proposal, portal quote
+-- and scope sign-off now prints these two lists, read live from the package,
+-- so the document a client accepts says exactly what they are getting and
+-- what is extra. Wording, not price: the CEO can edit it on any package
+-- (PATCH /api/products/:id/scope) without unlocking the business model's
+-- figures.
+--
+-- Seeded once from what the CRM actually sells: channels per tier as the
+-- products table has them, and web chat and voice as the priced add-ons they
+-- are. Never overwrites a list an admin has written.
+alter table products add column if not exists includes text[] not null default '{}';
+alter table products add column if not exists excludes text[] not null default '{}';
+
+do $$
+declare
+  common text[] := array[
+    'An AI agent configured to your catalogue, prices, FAQs, policies and tone of voice',
+    'Replies around the clock, in English, Urdu and Roman Urdu',
+    'Voice notes understood and answered in text: voice-note minutes up to 10% of your conversation allowance each month, then PKR 5 a minute',
+    'Handover to your team, with the conversation so far, whenever a person is needed',
+    'Leads captured with the full conversation transcript',
+    'Vantriq Pulse analytics, the customer directory, and the client portal and Android app',
+    'Onboarding: discovery call, configuration, testing with you, and go-live',
+    'Monthly tuning with our team, and support for the agent we set up'];
+  excl text[] := array[
+    'Meta / WhatsApp Business Platform conversation and template fees — charged by Meta or your provider to your own account',
+    'Website chat, voice calls and spoken replies to voice notes — available as priced add-ons',
+    'Voice-note minutes beyond the included allowance — billed at PKR 5 a minute',
+    'Your own third-party subscriptions (CRM, booking, e-commerce, payment or other software the agent connects to)',
+    'Taxes, bank and payment-processing charges',
+    'Conversations beyond the monthly allowance — billed at the overage rate',
+    'Work beyond the signed scope — quoted separately as a change request',
+    'Professional advice: the agent answers only from information you provide and is not a substitute for medical, legal or financial advice'];
+begin
+  if exists (select 1 from applied_migrations where name = 'v9_33_package_scope') then
+    return;
+  end if;
+  update products set includes = array['Channel: WhatsApp — one WhatsApp Business number in your business''s name'] || common
+   where name = 'Starter' and includes = '{}';
+  update products set includes = array['Channels: WhatsApp and Instagram',
+      'CRM sync — every lead lands in your pipeline'] || common
+   where name = 'Growth' and includes = '{}';
+  update products set includes = array['Channels: WhatsApp and Instagram',
+      'CRM sync — every lead lands in your pipeline',
+      'Location-aware routing and availability across your branches'] || common
+   where name = 'Scale' and includes = '{}';
+  update products set includes = array['Channels: WhatsApp and Instagram',
+      'CRM sync — every lead lands in your pipeline',
+      'Location-aware routing and availability across your branches',
+      'Top-tier AI models for complex or detailed questions'] || common
+   where name = 'Pro' and includes = '{}';
+  update products set includes = array['Channels: WhatsApp and Instagram',
+      'CRM sync — every lead lands in your pipeline',
+      'Location-aware routing and availability across your branches',
+      'Top-tier AI models for complex or detailed questions',
+      'The option of a private on-premise deployment, priced separately after an infrastructure review'] || common
+   where name = 'Enterprise' and includes = '{}';
+  update products set includes = array['Channels: WhatsApp and Instagram',
+      'CRM sync — every lead lands in your pipeline',
+      'Location-aware routing and availability across your branches',
+      'Top-tier AI models for complex or detailed questions',
+      'The option of a private on-premise deployment, priced separately after an infrastructure review',
+      'A custom service level and custom integrations, as agreed in writing'] || common
+   where name = 'Enterprise+' and includes = '{}';
+  update products set excludes = excl
+   where name in ('Starter','Growth','Scale','Pro','Enterprise','Enterprise+') and excludes = '{}';
+  insert into applied_migrations (name, note)
+  values ('v9_33_package_scope', 'Packages carry written inclusions and exclusions, printed on every quote and proposal.');
+end $$;
+
+-- Each package's own voice-minute allowance, in figures, on its Included
+-- list (10% of its conversation allowance). Replaces only the generic line,
+-- so it is safe on every migrate and never touches a list an admin rewrote.
+update products
+   set includes = array_replace(includes,
+         'Voice notes understood and answered in text: voice-note minutes up to 10% of your conversation allowance each month, then PKR 5 a minute',
+         format('Voice notes understood and answered in text — %s voice-note minutes a month included, then PKR 5 a minute',
+                to_char(round(quota * 0.1), 'FM999,999')))
+ where 'Voice notes understood and answered in text: voice-note minutes up to 10% of your conversation allowance each month, then PKR 5 a minute' = any(includes);
+
+-- v9.33 — scope sign-off: the document a client signs before work starts.
+--
+-- Prepared in the CRM from the client's package and quote, sent to the
+-- client portal, and signed there. What it locks is everything the work is
+-- measured against: package inclusions and exclusions, channels, the account
+-- access each platform needs, responsibilities on both sides, deliverables,
+-- acceptance criteria, milestones, what is out of scope, the commercials —
+-- and the full Terms & service information in force (src/content/terms.json),
+-- snapshotted with its version.
+--
+-- Sending freezes it. content, client snapshot and terms are hashed
+-- (content_hash, SHA-256) when it is sent; the client signs that hash, and a
+-- signature is refused if what they saw is not what is stored. A sent or
+-- signed sign-off is never edited: a change is a new version that supersedes
+-- the old one only once the new one is signed.
+create sequence if not exists scope_signoff_number_seq start 1;
+create table if not exists scope_signoffs (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  quote_id uuid references quotes(id) on delete set null,
+  number text not null,
+  version int not null default 1 check (version >= 1),
+  supersedes_id uuid references scope_signoffs(id) on delete set null,
+  title text not null default '',
+  status text not null default 'draft'
+    check (status in ('draft','sent','changes_requested','signed','superseded','withdrawn')),
+  content jsonb not null default '{}'::jsonb,
+  client_snapshot jsonb not null default '{}'::jsonb,
+  terms_version text not null default '',
+  terms jsonb,
+  content_hash text not null default '',
+  created_by text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  sent_at timestamptz,
+  sent_by text not null default '',
+  client_feedback text not null default '',
+  feedback_at timestamptz,
+  signed_at timestamptz,
+  signer_name text not null default '',
+  signer_title text not null default '',
+  signer_email text not null default '',
+  signer_ip text not null default '',
+  signer_user_agent text not null default '',
+  acknowledgements jsonb not null default '{}'::jsonb,
+  contract_id uuid references contracts(id) on delete set null,
+  withdrawn_at timestamptz,
+  withdraw_reason text not null default '',
+  unique (number, version)
+);
+create index if not exists idx_scope_signoffs_client on scope_signoffs(client_id, created_at desc);
+drop trigger if exists trg_scope_signoffs_updated on scope_signoffs;
+create trigger trg_scope_signoffs_updated before update on scope_signoffs
+  for each row execute function touch_updated_at();
+
+-- v9.33 — conversation history is kept for a set time, then deleted.
+--
+-- The Terms (section 10) promise 12 months of conversation history in the
+-- portal, then deletion of the message text. Usage, invoices and Pulse are
+-- counted from usage_events and pulse_events, which are kept, so past bills
+-- and reports still add up. A client can be given a longer period in
+-- writing (conversation_retention_months on their record); null means the
+-- company default. utils/conversationRetention.js does the deleting.
+alter table settings add column if not exists conversation_retention_months int not null default 12;
+alter table settings drop constraint if exists settings_conversation_retention_check;
+alter table settings add constraint settings_conversation_retention_check
+  check (conversation_retention_months between 1 and 120);
+alter table clients add column if not exists conversation_retention_months int;
+alter table clients drop constraint if exists clients_conversation_retention_check;
+alter table clients add constraint clients_conversation_retention_check
+  check (conversation_retention_months is null or conversation_retention_months between 1 and 120);
+create index if not exists idx_conv_created on conversation_messages(created_at);
+
+-- v9.33 — client agents are costed on the business model's basis (approved
+-- 9 Oct 2026): gpt-4o-mini, 12 messages a session for every standard
+-- package, prompt caching on. Once, and only where the values are still the
+-- CRM's own defaults: a figure an admin changed is theirs to keep.
+do $$
+begin
+  if exists (select 1 from applied_migrations where name = 'v9_33_twelve_messages_cached') then
+    return;
+  end if;
+  update products p set msgs_per_session = 12
+    from (values ('Starter', 12), ('Growth', 14), ('Scale', 14), ('Pro', 16), ('Enterprise', 16), ('Enterprise+', 18)) as d(name, msgs)
+   where p.name = d.name and p.msgs_per_session = d.msgs;
+  -- The costing settings take the new defaults unless an admin saved
+  -- something other than the measured gpt-5-mini basis that preceded them.
+  update settings set costing = costing - 'bulk_model' where id = 1 and costing->>'bulk_model' = 'gpt-5-mini';
+  update settings set costing = costing - 'reply_tokens' where id = 1 and (costing->>'reply_tokens')::numeric = 220;
+  update settings set costing = costing - 'calls_per_turn' where id = 1 and (costing->>'calls_per_turn')::numeric = 1.2;
+  update settings set costing = costing - 'cache_share' where id = 1 and (costing->>'cache_share')::numeric = 0;
+  insert into applied_migrations (name, note)
+  values ('v9_33_twelve_messages_cached', 'Standard packages costed at 12 messages a session; costing defaults back to gpt-4o-mini with prompt caching.');
+end $$;

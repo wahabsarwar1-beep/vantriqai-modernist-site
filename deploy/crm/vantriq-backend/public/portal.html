@@ -454,7 +454,8 @@ async function boot(){
     // no agreements on file should still see the rest of its portal rather
     // than an error page.
     const contracts = await api('/contracts').catch(()=>[]);
-    data = { account, usage, invoices, ledger, packages, agents, bundles, quotes, contracts, activity: null, analytics: null };
+    const scopes = await api('/scope-signoffs').catch(()=>[]);
+    data = { account, usage, invoices, ledger, packages, agents, bundles, quotes, contracts, scopes, activity: null, analytics: null };
     if(/^#surveys\b/.test(location.hash || '') && surveysOn()) currentTab = 'surveys';
     if(/^#customers\b/.test(location.hash || '')) currentTab = 'customers';
     if(/^#(leads|calendar)$/.test(location.hash || '')) currentTab = location.hash.slice(1);
@@ -587,11 +588,11 @@ function portalLabelTables(){
   });
 }
 function portalNavIcon(tab){
-  const paths={leads:'M4 4h16v16H4z M8 8h8m-8 4h8m-8 4h4',calendar:'M4 5h16v16H4z M8 3v4m8-4v4M4 10h16',overview:'M3 10l9-7 9 7v10H3z M9 20v-7h6v7',analytics:'M4 20V10m8 10V4m8 16v-7',customers:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M20 8v6m-3-3h6',surveys:'M4 4h16v12H9l-5 4z',agents:'M5 8h14v12H5z M12 3v5 M8 12h1m6 0h1 M8 16h8',usage:'M3 12h4l3-8 4 16 3-8h4',activity:'M12 8v5l3 2 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0',invoices:'M6 3h12v18l-3-2-3 2-3-2-3 2z M9 8h6m-6 4h6',ledger:'M4 4h16v16H4z M8 4v16m-4-10h16m-16 5h16',contracts:'M6 3h8l4 4v14H6z M14 3v5h4 M9 12h6m-6 4h6',packages:'M3 7l9-4 9 4v10l-9 4-9-4z M3 7l9 4 9-4 M12 11v10',quotes:'M5 4h14v16H5z M8 8h8m-8 4h8m-8 4h4',security:'M12 3l8 4v5c0 5-8 9-8 9s-8-4-8-9V7z M9 12l2 2 4-4'};
+  const paths={leads:'M4 4h16v16H4z M8 8h8m-8 4h8m-8 4h4',calendar:'M4 5h16v16H4z M8 3v4m8-4v4M4 10h16',overview:'M3 10l9-7 9 7v10H3z M9 20v-7h6v7',analytics:'M4 20V10m8 10V4m8 16v-7',customers:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M20 8v6m-3-3h6',surveys:'M4 4h16v12H9l-5 4z',agents:'M5 8h14v12H5z M12 3v5 M8 12h1m6 0h1 M8 16h8',usage:'M3 12h4l3-8 4 16 3-8h4',activity:'M12 8v5l3 2 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0',invoices:'M6 3h12v18l-3-2-3 2-3-2-3 2z M9 8h6m-6 4h6',ledger:'M4 4h16v16H4z M8 4v16m-4-10h16m-16 5h16',contracts:'M6 3h8l4 4v14H6z M14 3v5h4 M9 12h6m-6 4h6',packages:'M3 7l9-4 9 4v10l-9 4-9-4z M3 7l9 4 9-4 M12 11v10',quotes:'M5 4h14v16H5z M8 8h8m-8 4h8m-8 4h4',scope:'M6 3h12v18H6z M9 8h6 M9 12h6 M9 16l2 2 4-4',security:'M12 3l8 4v5c0 5-8 9-8 9s-8-4-8-9V7z M9 12l2 2 4-4'};
   return `<svg class="portal-nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[tab]||paths.overview}"/></svg>`;
 }
 function portalViewHeading(){
-  const titles={leads:['Your leads','Turn enquiries into opportunities with ownership and a clear next action.'],calendar:['Your calendar','Meetings, demos and follow-ups linked to your own leads.'],overview:['Account overview','Your service, usage, and account at a glance.'],analytics:['Vantriq Pulse','See the impact of your customer conversations.'],customers:['Your customers','Contacts, conversations, and the details that matter.'],surveys:['Vantriq Echo','Hear your customers and follow up on their feedback.'],agents:['Your agents','A clear view of the agents working for your business.'],usage:['Usage & allowance','Track your conversations and available allowance.'],activity:['Conversation activity','Explore the conversations behind your usage.'],invoices:['Invoices','Review your invoices and payment status.'],ledger:['Account statement','Your account movements and running balance.'],contracts:['Contracts','Your agreements and renewal dates.'],packages:['Packages & bundles','Explore your package and available add-ons.'],quotes:['Your quotes','Review the proposals shared with your business.'],security:['Account security','Manage your password and account access.']};
+  const titles={leads:['Your leads','Turn enquiries into opportunities with ownership and a clear next action.'],calendar:['Your calendar','Meetings, demos and follow-ups linked to your own leads.'],overview:['Account overview','Your service, usage, and account at a glance.'],analytics:['Vantriq Pulse','See the impact of your customer conversations.'],customers:['Your customers','Contacts, conversations, and the details that matter.'],surveys:['Vantriq Echo','Hear your customers and follow up on their feedback.'],agents:['Your agents','A clear view of the agents working for your business.'],usage:['Usage & allowance','Track your conversations and available allowance.'],activity:['Conversation activity','Explore the conversations behind your usage.'],invoices:['Invoices','Review your invoices and payment status.'],ledger:['Account statement','Your account movements and running balance.'],contracts:['Contracts','Your agreements and renewal dates.'],packages:['Packages & bundles','Explore your package and available add-ons.'],quotes:['Your quotes','Review the proposals shared with your business.'],scope:['Scope sign-off','What we will deliver, what we need from you, and the terms — signed before work starts.'],security:['Account security','Manage your password and account access.']};
   const [title,description]=titles[currentTab]||titles.overview;
   return `<header class="portal-view-heading"><div class="workspace-eyebrow">Customer workspace</div><h1>${title}</h1><p>${description}</p></header>`;
 }
@@ -635,6 +636,7 @@ function render(){
         ${data.contracts&&data.contracts.length?`<button type="button" class="tab ${currentTab==='contracts'?'active':''}" onclick="setTab('contracts')" aria-current="${currentTab==='contracts'?'page':'false'}">${portalNavIcon('contracts')}Contracts${data.contracts.some(c=>c.expiring_soon)?` <span class="tab-n tab-n-live">${data.contracts.filter(c=>c.expiring_soon).length}</span>`:''}</button>`:''}
         <button type="button" class="tab ${currentTab==='packages'?'active':''}" onclick="setTab('packages')" aria-current="${currentTab==='packages'?'page':'false'}">${portalNavIcon('packages')}Packages &amp; bundles</button>
         ${data.quotes&&data.quotes.length?`<button type="button" class="tab ${currentTab==='quotes'?'active':''}" onclick="setTab('quotes')" aria-current="${currentTab==='quotes'?'page':'false'}">${portalNavIcon('quotes')}Quotes${data.quotes.some(q=>q.status==='sent')?` <span class="tab-n tab-n-live">${data.quotes.filter(q=>q.status==='sent').length}</span>`:''}</button>`:''}
+        ${data.scopes&&data.scopes.length?`<button type="button" class="tab ${currentTab==='scope'?'active':''}" onclick="setTab('scope')" aria-current="${currentTab==='scope'?'page':'false'}">${portalNavIcon('scope')}Scope${data.scopes.some(x=>x.status==='sent'||x.status==='changes_requested')?` <span class="tab-n tab-n-live">${data.scopes.filter(x=>x.status==='sent'||x.status==='changes_requested').length}</span>`:''}</button>`:''}
         <button type="button" class="tab ${currentTab==='security'?'active':''}" onclick="setTab('security')" aria-current="${currentTab==='security'?'page':'false'}">${portalNavIcon('security')}Security</button>
       </nav>
       <main class="portal-main"><div id="tab-content">${renderTab()}</div>
@@ -694,6 +696,7 @@ function tabBody(){
   if(currentTab==='packages') return renderPackages();
   if(currentTab==='agents') return renderAgents();
   if(currentTab==='quotes') return renderQuotes();
+  if(currentTab==='scope') return renderScopes();
   if(currentTab==='security') return renderSecurity();
   return '';
 }
@@ -1019,7 +1022,12 @@ function renderPackages(){
         </div>
         <div class="kv"><span class="k">Included sessions / month</span><span class="v">${fmtNum(p.quota)}</span></div>
         <div class="kv"><span class="k">Overage rate</span><span class="v">${fmtMoney(p.overage_rate)} / session</span></div>
+        ${p.voice_minutes!=null?`<div class="kv"><span class="k">Voice-note minutes / month</span><span class="v">${fmtNum(p.voice_minutes)} included · then ${fmtMoney(p.voice_rate)} / min</span></div>`:''}
         <div class="kv"><span class="k">Channels</span><span class="v">${esc(p.channels||'—')}</span></div>
+        ${(p.includes||[]).length?`<details style="margin-top:8px;font-size:12.5px;"><summary style="cursor:pointer;font-weight:600;">What ${esc(p.name)} includes</summary>
+          <ul style="margin:8px 0 0 18px;padding:0;line-height:1.55;">${p.includes.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
+          ${(p.excludes||[]).length?`<div style="font-weight:600;margin-top:8px;">Not included</div><ul style="margin:6px 0 0 18px;padding:0;line-height:1.55;color:var(--muted);">${p.excludes.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}
+        </details>`:''}
         ${current || pending ? '' : `
         <button class="btn btn-primary" style="margin-top:12px;" onclick="requestPackage('${p.id}',${jsArg(p.name)})">Request this package</button>`}
       </div>`;
@@ -1213,6 +1221,17 @@ function renderUsage(){
     <div class="stat-card"><div class="label">Messages this month</div><div class="value">${fmtNum(u.messages)}</div></div>
     <div class="stat-card"><div class="label">Sessions this month</div><div class="value">${fmtNum(u.sessions_used)}</div></div>
   </div>
+
+  ${u.voice && u.voice.minutes_included!=null ? `
+  <div class="card">
+    <h3>Voice notes</h3>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;">
+      <span style="font-family:var(--f-head);font-size:22px;font-weight:600;">${fmtNum(u.voice.minutes_used)} min</span>
+      <span style="font-size:13px;color:var(--muted);">of ${fmtNum(u.voice.minutes_included)} minutes included</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill ${u.voice.minutes_used>=u.voice.minutes_included?'danger':u.voice.minutes_used>=u.voice.minutes_included*0.8?'warn':''}" style="width:${Math.min(100, Math.round(u.voice.minutes_used / Math.max(1,u.voice.minutes_included) * 100))}%"></div></div>
+    <div style="margin-top:10px;font-size:12.5px;color:var(--muted);">Customers' voice notes are transcribed and answered in text. Minutes past the allowance are ${fmtMoney(u.voice.rate_per_minute)} each${u.voice.minutes_over?` — <strong>${fmtNum(u.voice.minutes_over)} so far this month</strong>`:''}.</div>
+  </div>` : ''}
 
   <div class="card">
     <h3>Last 6 months</h3>
@@ -1501,7 +1520,7 @@ function renderQuotes(){
   if(!quotes.length) return `<div class="card"><div class="empty">No quotes right now.</div></div>`;
   const cur = (data.bundles && data.bundles.currency) || 'PKR';
   const money = (n)=>`${cur} ${Math.round(Number(n||0)).toLocaleString('en-US')}`;
-  const pill = { sent:['pill-pending','Awaiting your decision'], accepted:['pill-active','Accepted'],
+  const pill = { sent:['pill-pending','Awaiting your decision'], accepted:['pill-paid','Accepted'],
     declined:['pill-pending','Declined'], expired:['pill-pending','Expired'], cancelled:['pill-pending','Withdrawn'] };
 
   return quotes.map(q=>{
@@ -1532,6 +1551,13 @@ function renderQuotes(){
       </div>
       ${Number(q.tax_amount)>0?`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);">
         <span>Includes sales tax at ${q.tax_rate}%</span><span class="mono">${money(q.tax_amount)}</span></div>`:''}
+      ${(q.package_includes||[]).length||(q.package_excludes||[]).length?`
+      <details style="margin-top:12px;font-size:12.5px;" ${open?'open':''}>
+        <summary style="cursor:pointer;font-weight:600;">What the ${esc(q.product_name||'')} package includes</summary>
+        <ul style="margin:8px 0 0 18px;padding:0;line-height:1.55;">${(q.package_includes||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
+        ${(q.package_excludes||[]).length?`<div style="font-weight:600;margin-top:10px;">Not included</div>
+        <ul style="margin:6px 0 0 18px;padding:0;line-height:1.55;color:var(--muted);">${q.package_excludes.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}
+      </details>`:''}
       ${q.notes?`<p style="font-size:12.5px;color:var(--muted);margin:12px 0 0;white-space:pre-line;">${esc(q.notes)}</p>`:''}
       ${open && !expired ? `
       <div style="display:flex;gap:8px;margin-top:14px;">
@@ -1567,6 +1593,104 @@ async function declineQuote(id){
     toast('Thanks for letting us know.');
   }catch(e){ toast(e.message || 'Could not update that quote.', true); }
 }
+/* ---------------------------- Scope sign-off (v9.33) ---------------------------- */
+/**
+ * The scope of work to sign before configuration starts. The customer reads
+ * every section and the full terms, then signs with their name, position
+ * and three confirmations — against the exact version on screen (its
+ * fingerprint goes back with the signature). They can ask for changes
+ * instead, which the team answers with a new version.
+ */
+const SCOPE_SECTIONS = [
+  ['deliverables','What we will deliver'], ['channels','Channels and numbers'], ['package_includes','Included in your package'],
+  ['addons','Add-ons'], ['integrations','Integrations'], ['knowledge_sources','Knowledge the agent answers from'],
+  ['languages','Languages'], ['handover','Handover to your team'], ['access_required','Account access we need from you'],
+  ['client_responsibilities','Your responsibilities'], ['vantriq_responsibilities','Our responsibilities'],
+  ['milestones','Milestones'], ['acceptance_criteria','How the work is accepted'], ['out_of_scope','Not included / out of scope'],
+];
+function renderScopes(){
+  const list = data.scopes || [];
+  if(!list.length) return `<div class="card"><div class="empty">Nothing to sign right now.</div></div>`;
+  const pill = { sent:['pill-pending','Awaiting your signature'], changes_requested:['pill-pending','Changes requested — you can still sign'],
+    signed:['pill-paid','Signed'], superseded:['pill-pending','Replaced by a newer version'], withdrawn:['pill-pending','Withdrawn'] };
+  return list.map(s=>{
+    const [cls,label] = pill[s.status] || ['pill-pending', s.status];
+    const open = s.status==='sent' || s.status==='changes_requested';
+    const c = s.content || {}, com = c.commercial || {};
+    const cur = com.currency || 'PKR';
+    const money = n => n==null ? '—' : `${cur} ${Number(n).toLocaleString('en-US',{maximumFractionDigits:2})}`;
+    const t = s.terms || {};
+    const head = `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+        <div><div style="font-weight:700;font-size:15px;">${esc(s.title)}</div>
+          <div class="mono" style="font-size:11.5px;color:var(--muted);">${esc(s.number)} · version ${s.version}${s.sent_at?` · issued ${fmtDate(s.sent_at)}`:''} · Terms version ${esc(s.terms_version||'')}</div></div>
+        <span class="pill ${cls}"><span class="pill-dot"></span>${label}</span></div>`;
+    if(!open) return `<div class="card" style="margin-bottom:12px;">${head}
+      ${s.status==='signed'?`<p style="font-size:12.5px;margin:10px 0 0;">Signed by <strong>${esc(s.signer_name)}</strong>${s.signer_title?`, ${esc(s.signer_title)}`:''} on ${fmtDate(s.signed_at)}.</p>`:''}
+      <div style="margin-top:12px;"><button class="btn btn-ghost" onclick="downloadScope('${s.id}','${esc(s.number)}-v${s.version}')">Download PDF</button></div></div>`;
+    return `<div class="card" style="margin-bottom:12px;">${head}
+      <p style="font-size:12.5px;color:var(--muted);margin:10px 0 0;line-height:1.55;">Please read each section and the terms below. When you sign, work is scheduled against exactly this scope; anything not listed is outside it and would be a change request.</p>
+      ${c.package?`<div style="font-size:13px;background:var(--surface-2,#F7F5F0);border-radius:8px;padding:10px 12px;margin-top:12px;"><strong>${esc(c.package.name)}</strong> · ${Number(c.package.quota).toLocaleString('en-US')} conversations a month (one customer over a rolling 24 hours) · beyond that ${money(c.package.overage_rate)} per conversation</div>`:''}
+      ${SCOPE_SECTIONS.filter(([k])=>(c[k]||[]).length).map(([k,label])=>`<div style="margin-top:14px;">
+        <div style="font-weight:700;font-size:13px;">${esc(label)}</div>
+        <${k==='milestones'?'ol':'ul'} style="margin:6px 0 0 18px;padding:0;font-size:12.5px;line-height:1.55;">${c[k].map(x=>`<li>${esc(x)}</li>`).join('')}</${k==='milestones'?'ol':'ul'}></div>`).join('')}
+      <div style="margin-top:14px;"><div style="font-weight:700;font-size:13px;">Commercials</div>
+        <ul style="margin:6px 0 0 18px;padding:0;font-size:12.5px;line-height:1.55;">
+          ${(com.lines||[]).map(l=>`<li>${esc(l.description)}${l.detail?` — ${esc(l.detail)}`:''}: ${l.qty>1?`${l.qty} × `:''}${money(l.unit_price)}</li>`).join('')}
+          ${com.total!=null?`<li><strong>Quotation total ${money(com.total)}</strong>${com.tax_amount?` (including tax ${money(com.tax_amount)})`:''}</li>`:''}
+          ${com.setup_fee!=null?`<li>Setup ${money(com.setup_fee)} · monthly ${money(com.monthly_fee)} · ${esc(com.allowance||'')}</li>`:''}
+          ${com.payment_terms?`<li>${esc(com.payment_terms)}</li>`:''}
+        </ul></div>
+      ${c.notes?`<p style="font-size:12.5px;margin:12px 0 0;white-space:pre-line;"><strong>Notes:</strong> ${esc(c.notes)}</p>`:''}
+      <details style="margin-top:14px;font-size:12.5px;"><summary style="cursor:pointer;font-weight:700;">Terms & service information — version ${esc(t.version||s.terms_version||'')} (part of what you sign)</summary>
+        <p style="color:var(--muted);">${esc(t.intro||'')}</p>
+        ${(t.sections||[]).map(x=>`<div style="margin-top:10px;"><div style="font-weight:700;">${esc(x.heading)}</div>
+          ${(x.paragraphs||[]).map(p=>`<p style="margin:6px 0;line-height:1.55;">${esc(p)}</p>`).join('')}
+          ${(x.bullets||[]).length?`<ul style="margin:6px 0 0 18px;padding:0;line-height:1.55;">${x.bullets.map(b=>`<li>${esc(b)}</li>`).join('')}</ul>`:''}
+          ${(x.after||[]).map(p=>`<p style="margin:6px 0;line-height:1.55;">${esc(p)}</p>`).join('')}</div>`).join('')}
+      </details>
+      <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px;">
+        <div style="font-weight:700;font-size:14px;margin-bottom:8px;">Sign this scope</div>
+        <div class="field"><label>Your full name</label><input id="sg_name_${s.id}" autocomplete="name"></div>
+        <div class="field"><label>Your position at ${esc((s.client_snapshot||{}).company||'the business')}</label><input id="sg_title_${s.id}" autocomplete="organization-title"></div>
+        <div class="field"><label>Your email (optional)</label><input id="sg_email_${s.id}" type="email" autocomplete="email"></div>
+        <label style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;margin:6px 0;"><input type="checkbox" id="sg_scope_${s.id}"> I have read this scope and agree it is what will be delivered.</label>
+        <label style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;margin:6px 0;"><input type="checkbox" id="sg_terms_${s.id}"> I accept the Terms & service information, version ${esc(s.terms_version||'')}, printed above.</label>
+        <label style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;margin:6px 0;"><input type="checkbox" id="sg_auth_${s.id}"> I am authorised to sign for ${esc((s.client_snapshot||{}).company||'the business')}.</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+          <button class="btn btn-primary" onclick="signScope('${s.id}')">Sign</button>
+          <button class="btn btn-ghost" onclick="downloadScope('${s.id}','${esc(s.number)}-v${s.version}')">Download PDF</button>
+        </div>
+        <p style="font-size:11.5px;color:var(--muted);margin:10px 0 0;">Your name, position, the time and your network address are recorded with your signature. Document fingerprint: <span class="mono">${esc((s.content_hash||'').slice(0,16))}…</span></p>
+        <details style="margin-top:12px;font-size:12.5px;"><summary style="cursor:pointer;">Something needs changing?</summary>
+          <textarea id="sg_change_${s.id}" rows="3" style="width:100%;margin-top:8px;" placeholder="Tell us what should change">${esc(s.status==='changes_requested'?(s.client_feedback||''):'')}</textarea>
+          <button class="btn btn-ghost" style="margin-top:8px;" onclick="requestScopeChanges('${s.id}')">Send to the team</button>
+        </details>
+      </div></div>`;
+  }).join('');
+}
+async function signScope(id){
+  const s = (data.scopes||[]).find(x=>x.id===id); if(!s) return;
+  const v = k => (document.getElementById(`sg_${k}_${id}`)||{});
+  try{
+    await api(`/scope-signoffs/${id}/sign`, { method:'POST', body: JSON.stringify({
+      signer_name: v('name').value, signer_title: v('title').value, signer_email: v('email').value,
+      accept_scope: !!v('scope').checked, accept_terms: !!v('terms').checked, authorised: !!v('auth').checked,
+      content_hash: s.content_hash }) });
+    data.scopes = await api('/scope-signoffs');
+    data.contracts = await api('/contracts').catch(()=>data.contracts);
+    render(); toast('Signed — thank you. We will be in touch to schedule the work.');
+  }catch(e){ toast(e.message || 'Could not sign it.', true); }
+}
+async function requestScopeChanges(id){
+  const message = (document.getElementById(`sg_change_${id}`)||{}).value || '';
+  try{
+    await api(`/scope-signoffs/${id}/request-changes`, { method:'POST', body: JSON.stringify({ message }) });
+    data.scopes = await api('/scope-signoffs');
+    render(); toast('Sent — the team will send you a revised version.');
+  }catch(e){ toast(e.message || 'Could not send that.', true); }
+}
+function downloadScope(id, name){ portalDownload(`/scope-signoffs/${id}/pdf`, `${name}-scope.pdf`, 'Preparing the scope…'); }
+
 async function printQuote(id){
   const r = await openTaxInvoice(()=>api(`/quotes/${id}/document`));
   if(!r.ok) toast(r.error, true);
