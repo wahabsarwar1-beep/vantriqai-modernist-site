@@ -12,7 +12,7 @@ const crypto = require('crypto');
 const db = require('../src/db');
 
 async function ceoSession() {
-  const email = String(process.env.PRICING_EMAIL || 'ceo@vantriqai.com').trim().toLowerCase();
+  const email = String(process.env.PRICING_EMAIL || process.env.OWNER_EMAIL || 'ceo@vantriqai.com').trim().toLowerCase();
   let created = false;
   let { rows } = await db.query(`select id, is_owner from internal_users where lower(email) = $1`, [email]);
   if (!rows[0]) {

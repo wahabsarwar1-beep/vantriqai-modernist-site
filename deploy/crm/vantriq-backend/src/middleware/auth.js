@@ -233,7 +233,7 @@ function isAdminRequest(req) {
  * whose address is PRICING_EMAIL (ceo@vantriqai.com unless the server says
  * otherwise).
  */
-const PRICING_EMAIL = () => String(process.env.PRICING_EMAIL || 'ceo@vantriqai.com').trim().toLowerCase();
+const PRICING_EMAIL = () => String(process.env.PRICING_EMAIL || process.env.OWNER_EMAIL || 'ceo@vantriqai.com').trim().toLowerCase();
 
 function isPricingOwner(user) {
   return !!(user && user.is_owner && String(user.email || '').toLowerCase() === PRICING_EMAIL());
