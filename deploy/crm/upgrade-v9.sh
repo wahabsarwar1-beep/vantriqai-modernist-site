@@ -554,7 +554,7 @@ else
   # v9.21: Pricing, Financials and the business documents open for one
   # account only — the protected owner, at PRICING_EMAIL (ceo@vantriqai.com
   # unless crm_app says otherwise). Yes or no; nothing else is printed.
-  PRICING_TO=$(docker exec "$APP_CONTAINER" node -e "require('dotenv').config();process.stdout.write(String(process.env.PRICING_EMAIL||'ceo@vantriqai.com').trim().toLowerCase())" 2>/dev/null | tr -cd 'a-z0-9@._+-')
+  PRICING_TO=$(docker exec "$APP_CONTAINER" node -e "require('dotenv').config();process.stdout.write(String(process.env.PRICING_EMAIL||process.env.OWNER_EMAIL||'ceo@vantriqai.com').trim().toLowerCase())" 2>/dev/null | tr -cd 'a-z0-9@._+-')
   PRICING_TO=${PRICING_TO:-ceo@vantriqai.com}
   CEO_READY=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At \
     -c "select count(*) from internal_users where is_owner and active and lower(email) = '$PRICING_TO'" 2>/dev/null || echo '?')
