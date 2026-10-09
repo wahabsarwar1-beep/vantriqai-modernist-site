@@ -10,13 +10,13 @@ for(const suffix of ['?sslmode=require&uselibpqcompat=true','?sslmode=disable&ss
 }
 const html=fs.readFileSync(path.join(__dirname,'../public/index.html'),'utf8');
 for(const script of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g))new vm.Script(script[1]);
-const nodes={};let loaded=0;let user={must_change_password:true,must_setup_totp:true,is_owner:true,totp_enabled:false};
+const nodes={};let loaded=0,confirmCalls=0,setupCalls=0;let user={must_change_password:true,must_setup_totp:true,is_owner:true,totp_enabled:false};
 const ctx={console,URL,clearInterval:()=>{},usagePollTimer:null,authUser:null,bootNotice:'',apiConnected:false,connectError:'',window:{location:{origin:'https://crm.example'}},
  document:{getElementById:id=>nodes[id]||(nodes[id]={innerHTML:'',value:''})},esc:s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
  API:{configured:()=>true,base:'https://crm.example',session:'test',clearConfig:()=>{},post:async(url,body)=>{
  if(url.endsWith('change-password')){assert.equal(body.current_password,'initial');assert.equal(body.new_password,'ReplacementPassword!');user={...user,must_change_password:false};}
- if(url.endsWith('totp/setup')){assert.equal(body.password,'ReplacementPassword!');return {secret:'TESTSECRET'};}
- if(url.endsWith('totp/confirm')){assert.equal(body.code,'123456');user={...user,totp_enabled:true,must_setup_totp:false};}
+ if(url.endsWith('totp/setup')){setupCalls++;assert.equal(body.password,'ReplacementPassword!');return {secret:'TESTSECRET'+setupCalls};}
+ if(url.endsWith('totp/confirm')){confirmCalls++;assert.equal(body.code,'123456');user={...user,totp_enabled:true,must_setup_totp:false};}
  return {ok:true};}},
  fetch:async()=>({ok:true,json:async()=>user}),loadState:async()=>{loaded++;},render:()=>{},startUsagePolling:()=>{},renderConnectScreen:()=>{},ApiError:class extends Error{}};
 vm.createContext(ctx);
@@ -25,6 +25,10 @@ const start=html.indexOf('let requiredTotp = null;'),end=html.indexOf('\nboot();
  await ctx.boot();assert.equal(loaded,0);assert.match(nodes.app.innerHTML,/security_new/);
  nodes.security_current={value:'initial'};nodes.security_new={value:'ReplacementPassword!'};await ctx.completeRequiredPassword();assert.equal(loaded,0);assert.match(nodes.app.innerHTML,/startRequiredTotp/);
  nodes.security_current.value='ReplacementPassword!';await ctx.startRequiredTotp();assert.match(nodes.app.innerHTML,/TESTSECRET/);assert.equal(loaded,0);
+ assert.match(nodes.app.innerHTML,/Time-based \(TOTP\)/);assert.match(nodes.app.innerHTML,/Restart setup/);
+ nodes.security_code={value:'TESTSECRET1'};await ctx.completeRequiredTotp();assert.equal(confirmCalls,0);assert.equal(loaded,0);assert.match(nodes.app.innerHTML,/not the setup key/);
+ ctx.restartRequiredTotp();assert.doesNotMatch(nodes.app.innerHTML,/TESTSECRET1/);assert.match(nodes.app.innerHTML,/security_current/);
+ await ctx.startRequiredTotp();assert.match(nodes.app.innerHTML,/TESTSECRET2/);
  nodes.security_code={value:'123456'};await ctx.completeRequiredTotp();assert.equal(loaded,1);
  for(const file of ['index.html','portal.html']){
  const source=fs.readFileSync(path.join(__dirname,'../public',file),'utf8');
