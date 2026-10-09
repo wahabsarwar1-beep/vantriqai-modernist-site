@@ -90,7 +90,7 @@ Every day at 10:00 PKT it:
 2. picks the post dated today, or, if none is dated today, the next evergreen
    post in rotation;
 3. emails the draft to server@vantriqai.com with **Publish now** and **Skip
-   today** buttons (skipped if nobody answers in 6 hours);
+   today** buttons (skipped if nobody answers in 12 hours, i.e. by 22:00 PKT for the morning post);
 4. posts it to the Facebook Page (ID 1291897617346380) and to Instagram @vantriq_ai,
    as a single photo, a multi-photo/carousel post, or a video (Instagram Reel).
 
