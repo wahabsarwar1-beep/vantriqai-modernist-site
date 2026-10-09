@@ -10,6 +10,8 @@ async function run() {
   console.log('Applying schema.sql ...');
   await db.query(fs.readFileSync(schemaPath, 'utf8'));
   console.log('Schema applied.');
+  await db.query(fs.readFileSync(path.join(__dirname, '..', '..', 'db', 'security-hardening.sql'), 'utf8'));
+  console.log('Security migration applied.');
 
   console.log('Applying customer workspace migration ...');
   await db.query(fs.readFileSync(path.join(__dirname, '..', '..', 'db', 'portal-workspace.sql'), 'utf8'));

@@ -8,6 +8,7 @@ const { sendInvoice, previewInvoiceSend, deliveryHistory } = require('../utils/i
 const { renderInvoicePdf, invoiceFilename } = require('../utils/invoicePdf');
 const { blockAutomation } = require('../middleware/auth');
 const router = express.Router();
+const { requireAdmin } = require('../middleware/security');
 
 /**
  * Loads the ledger rows for a set of invoices in one query, keyed by
@@ -139,7 +140,7 @@ router.post('/', async (req, res) => {
  * cannot express: voiding an invoice raised in error, and an admin
  * correcting a status by hand.
  */
-router.patch('/:id/status', async (req, res) => {
+router.patch('/:id/status', requireAdmin, async (req, res) => {
   const { status } = req.body || {};
   if (!['pending', 'partial', 'paid', 'overdue', 'void'].includes(status)) {
     return res.status(400).json({ error: 'Invalid status' });

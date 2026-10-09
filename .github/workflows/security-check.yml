@@ -1,0 +1,32 @@
+name: Security regression checks
+on:
+  pull_request:
+    paths: ['app/api/**', 'lib/request-guard.ts', 'next.config.ts', 'package*.json', 'test/**', 'deploy/crm/vantriq-backend/**', '.github/workflows/security-check.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Website security and production build
+        run: |
+          npm ci --ignore-scripts
+          npm audit --omit=dev
+          node test/request-guard.test.cjs
+          node test/chat-route.test.cjs
+          node test/privacy.test.cjs
+          npm run build
+      - name: CRM security and customer isolation
+        working-directory: deploy/crm/vantriq-backend
+        run: |
+          npm ci --ignore-scripts
+          npm audit --omit=dev
+          npm run test:security
+          npm run test:portal-workspace
+          npm run test:calendar
+          npm run test:webhooks

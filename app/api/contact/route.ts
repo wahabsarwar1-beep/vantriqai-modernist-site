@@ -1,3 +1,4 @@
+import { limitPublicRequest, readBoundedBody } from '../../../lib/request-guard';
 /** Receives a "Send a brief" submission and files it as a lead in the CRM.
  *
  *  The CRM is the destination that matters: a brief lands in the pipeline at
@@ -32,11 +33,17 @@ const str = (v: unknown, max: number) =>
   typeof v === "string" ? v.trim().slice(0, max) : "";
 
 export async function POST(request: Request) {
+  if (!request.headers.get('content-type')?.startsWith('application/json')) return Response.json({ error: 'JSON required.' }, { status: 415 });
+  const limited = limitPublicRequest(request, 'contact', 5, 100);
+  if (limited) return limited;
   let body: Record<string, unknown>;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: "Invalid request." }, { status: 400 });
+    const parsed = JSON.parse(await readBoundedBody(request, 16000));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Invalid request');
+    body = parsed;
+  } catch (error) {
+    const status = error instanceof Error && error.message === 'Payload too large' ? 413 : 400;
+    return Response.json({ error: "Invalid request." }, { status });
   }
 
   // Honeypot: a field hidden from humans, so anything in it is a bot. Answer

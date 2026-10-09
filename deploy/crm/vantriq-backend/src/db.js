@@ -7,9 +7,13 @@ if (!process.env.DATABASE_URL) {
 
 const useSSL = String(process.env.DATABASE_SSL || 'true').toLowerCase() !== 'false';
 
+// URL flags must not override the explicit TLS verification policy.
+const databaseUrl = new URL(process.env.DATABASE_URL);
+for (const option of ['ssl', 'sslmode', 'uselibpqcompat']) databaseUrl.searchParams.delete(option);
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: useSSL ? { rejectUnauthorized: false } : false,
+  connectionString: databaseUrl.toString(),
+  ssl: useSSL ? { rejectUnauthorized: true, ...(process.env.DATABASE_SSL_CA ? { ca: process.env.DATABASE_SSL_CA.replace(/\\n/g, '\n') } : {}) } : false,
   max: 10,
   idleTimeoutMillis: 30000,
 });

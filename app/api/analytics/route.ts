@@ -1,10 +1,10 @@
+import { readBoundedBody, limitPublicRequest } from '../../../lib/request-guard';
 import { isIP } from "node:net";
 
 // Browser payloads contain fixed dimensions only. The server adds the proxy IP
 // for a local CRM lookup; the CRM stores country/city counters, never the IP.
 const events = ["page_view", "chat_open", "whatsapp_click", "brief_sent"];
 const sections = ["home", "products", "pricing", "industries", "contact", "how-it-works", "resources", "privacy", "cookies", "other"];
-const buckets = new Map<string, { count: number; until: number }>();
 export async function POST(request: Request) {
   const origin = request.headers.get("origin");
   // The hosting proxy uses an internal HTTP origin in request.url. Trust only
@@ -13,7 +13,9 @@ export async function POST(request: Request) {
   const allowed = origin === "https://www.vantriqai.com" || origin === "https://vantriqai.com" || (["localhost", "127.0.0.1"].includes(url.hostname) && origin === url.origin);
   if (!allowed) return Response.json({ error: "Same-origin requests only" }, { status: 403 });
   if (!request.headers.get("content-type")?.startsWith("application/json")) return Response.json({ error: "JSON required" }, { status: 415 });
-  const raw = await request.text();
+  let raw: string;
+  try { raw = await readBoundedBody(request, 512); }
+  catch (error) { return Response.json({ error: 'Invalid or oversized request' }, { status: error instanceof Error && error.message === 'Payload too large' ? 413 : 400 }); }
   if (raw.length > 512) return Response.json({ error: "Payload too large" }, { status: 413 });
   let b;
   try { b = JSON.parse(raw); } catch { return Response.json({ error: "Invalid JSON" }, { status: 400 }); }
@@ -21,11 +23,9 @@ export async function POST(request: Request) {
   // Hosting must overwrite X-Forwarded-For with its trusted client address.
   // IP is transient: rate limiting here, then a local lookup inside our CRM.
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown";
-  const now = Date.now();
-  for (const [key, value] of buckets) if (value.until < now) buckets.delete(key);
-  const bucket = buckets.get(ip) || { count: 0, until: now + 60000 };
-  if (++bucket.count > 60 || buckets.size > 10000) return Response.json({ error: "Rate limited" }, { status: 429 });
-  buckets.set(ip, bucket);
+  const limited = limitPublicRequest(request, "analytics", 60, 1000);
+  if (limited) return limited;
+
   const endpoint = process.env.CRM_WEBHOOK_URL, key = process.env.CRM_WEBHOOK_KEY;
   if (!endpoint || !key) return Response.json({ error: "Analytics unavailable" }, { status: 503 });
   try {

@@ -1,3 +1,4 @@
+import { readBoundedBody, limitPublicRequest } from '../../../lib/request-guard';
 /** Relays the website assistant's messages to its n8n chat workflow.
  *
  *  The browser used to POST straight to n8n.vantriqai.com. That made every
@@ -16,7 +17,6 @@ const TIMEOUT_MS = 90_000;
 const PUBLIC_ORIGINS = ["https://www.vantriqai.com", "https://vantriqai.com"];
 const SESSION_ID = /^[A-Za-z0-9-]{8,100}$/;
 
-const buckets = new Map<string, { count: number; until: number }>();
 
 /** The page's own origin, or our public domains. The hosting proxy puts an
  *  internal address in request.url, so the Host header is what the visitor used. */
@@ -35,7 +35,9 @@ function sameOrigin(request: Request): boolean {
 export async function POST(request: Request) {
   if (!sameOrigin(request)) return Response.json({ error: "Same-origin requests only" }, { status: 403 });
   if (!request.headers.get("content-type")?.startsWith("application/json")) return Response.json({ error: "JSON required" }, { status: 415 });
-  const raw = await request.text();
+  let raw: string;
+  try { raw = await readBoundedBody(request, 4000); }
+  catch (error) { return Response.json({ error: 'Invalid or oversized request' }, { status: error instanceof Error && error.message === 'Payload too large' ? 413 : 400 }); }
   if (raw.length > 4000) return Response.json({ error: "Message too long" }, { status: 413 });
   let b: { sessionId?: unknown; chatInput?: unknown };
   try {
@@ -48,12 +50,8 @@ export async function POST(request: Request) {
   if (!SESSION_ID.test(sessionId) || !chatInput) return Response.json({ error: "Invalid message" }, { status: 400 });
 
   // Every message spends model tokens; keep one visitor from spending many.
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown";
-  const now = Date.now();
-  for (const [key, value] of buckets) if (value.until < now) buckets.delete(key);
-  const bucket = buckets.get(ip) || { count: 0, until: now + 60_000 };
-  if (++bucket.count > 20 || buckets.size > 10_000) return Response.json({ error: "Too many messages — please wait a minute." }, { status: 429 });
-  buckets.set(ip, bucket);
+  const limited = limitPublicRequest(request, "chat", 20, 300);
+  if (limited) return limited;
 
   const webhook = process.env.N8N_CHAT_WEBHOOK_URL || process.env.NEXT_PUBLIC_N8N_CHAT_WEBHOOK_URL || DEFAULT_WEBHOOK_URL;
   try {

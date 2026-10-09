@@ -125,7 +125,7 @@ function requireScope(minScope) {
       if (bearer) {
         if (bearer.startsWith(BREAKGLASS_PREFIX)) return await breakglassSession(bearer, minScope, req, res, next);
         const { rows } = await db.query(
-          `select s.expires_at, u.id, u.email, u.name, u.role, u.active, u.must_change_password, u.is_owner
+          `select s.expires_at, u.id, u.email, u.name, u.role, u.active, u.must_change_password, u.must_setup_totp, u.totp_enabled, u.is_owner
              from staff_sessions s join internal_users u on u.id = s.user_id
             where s.token = $1`,
           [bearer]
@@ -136,6 +136,9 @@ function requireScope(minScope) {
         if (new Date(row.expires_at) < new Date()) {
           await db.query(`delete from staff_sessions where token = $1`, [bearer]);
           return res.status(401).json({ error: 'Your session has expired. Please sign in again.', signed_out: true });
+        }
+        if (row.must_change_password || row.must_setup_totp || (row.is_owner && !row.totp_enabled)) {
+          return res.status(403).json({ error: 'Complete your password and authenticator setup before accessing the workspace.', security_setup_required: true });
         }
         if (minScope === 'webhook') {
           return res.status(403).json({ error: 'Usage ingestion uses a webhook key, not a staff session.' });

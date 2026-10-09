@@ -7,6 +7,7 @@ const { quotaStatus } = require('../utils/quota');
 const { blockAutomation, isAdminRequest } = require('../middleware/auth');
 const { setSurveysEnabled, setClientIndustry, createStarterSurvey } = require('../utils/surveys');
 const router = express.Router();
+const { requireAdmin } = require('../middleware/security');
 
 const FIELDS = [
   'name','company','email','phone','external_ref','product_id','stage',
@@ -411,7 +412,7 @@ router.post('/:id/resume', blockAutomation, async (req, res) => {
 // back afterwards, including this API.
 const MIN_PORTAL_PASSWORD = 10;
 
-router.post('/:id/portal-credentials', blockAutomation, async (req, res) => {
+router.post('/:id/portal-credentials', requireAdmin, blockAutomation, async (req, res) => {
   const { rows: found } = await db.query(`select * from clients where id = $1`, [req.params.id]);
   const client = found[0];
   if (!client) return res.status(404).json({ error: 'Client not found' });
@@ -460,7 +461,7 @@ router.post('/:id/portal-credentials', blockAutomation, async (req, res) => {
 });
 
 // Revoke portal access entirely.
-router.delete('/:id/portal-credentials', blockAutomation, async (req, res) => {
+router.delete('/:id/portal-credentials', requireAdmin, blockAutomation, async (req, res) => {
   await db.query(
     `update clients set portal_username = null, portal_password_hash = null,
             portal_password_set_at = null, portal_password_set_by = null

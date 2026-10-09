@@ -48,6 +48,10 @@ const pricingDocsRoutes = require('./routes/pricingDocs');
 const addonsRoutes = require('./routes/addons');
 
 const app = express();
+const { rateLimit, securityHeaders } = require('./middleware/security');
+app.disable('x-powered-by');
+app.use(securityHeaders);
+app.use(['/api/auth', '/api/portal/login', '/api/portal/forgot-password', '/api/portal/reset-password'], rateLimit('auth-ip', { max: 60, seconds: 60 }), express.json({ limit: '16kb' }));
 
 const corsOrigin = process.env.CORS_ORIGIN && process.env.CORS_ORIGIN !== '*'
   ? process.env.CORS_ORIGIN.split(',').map((s) => s.trim())
@@ -60,7 +64,7 @@ app.use(cors({ origin: corsOrigin }));
 // Document uploads arrive base64-encoded in JSON, so this route needs room
 // for a 10 MB file plus a third for the encoding. Everything else stays at
 // 1mb — a generous default body limit is a cheap way to be knocked over.
-app.use('/api/clients/:id/documents', express.json({ limit: '15mb' }));
+app.use('/api/clients/:id/documents', requireScope('staff'), express.json({ limit: '15mb' }));
 // The CEO's business documents: a deck runs to several MB and base64 adds a
 // third. A body that size is read only once the request has proven it is the
 // CEO — nobody else gets to make the server parse 40 MB.
@@ -239,6 +243,9 @@ app.use(errorHandler);
 
 // Retention also runs while there are no new website events. No personal records are touched.
 const purgeWebsiteActivity = () => require('./utils/siteAnalytics').purgeSiteAnalytics().catch(err => console.error('[website retention]', err.message));
+const purgeSecurityCounters = () => db.query("delete from security_rate_limits where expires_at < now() - interval '1 hour'").catch(err => console.error('[security retention]', err.message));
+purgeSecurityCounters();
+setInterval(purgeSecurityCounters, 60 * 60 * 1000).unref();
 purgeWebsiteActivity();
 setInterval(purgeWebsiteActivity, 60 * 60 * 1000).unref();
 
