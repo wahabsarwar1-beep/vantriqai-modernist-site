@@ -13,6 +13,7 @@
     "test:webhooks": "node test/webhooks-lead.test.js",
     "seed-internal": "node src/utils/seedInternal.js",
     "seed-owner": "node src/utils/seedOwner.js",
+    "check-owner-access": "node src/utils/ownerAccess.js",
     "survey-smoke": "node src/utils/surveySmokeTest.js",
     "docs:api": "node tools/gen-api-docs.js",
     "test:proposal": "node test/proposal.test.js",
@@ -31,7 +32,7 @@
     "test:portal-workspace": "node test/portal-workspace.test.js && node test/portal-workspace-ui.test.js",
     "test:workspace-insights": "node test/workspace-insights.test.js && node test/workspace-insights-ui.test.js",
     "test:analytics-design": "node test/analytics-design.test.js",
-    "test:security": "node test/security-hardening.test.js && node test/security-ui.test.js",
+    "test:security": "node test/security-hardening.test.js && node test/security-ui.test.js && node test/owner-access.test.js",
     "test:scope": "node test/scope-signoff.test.js && node test/package-scope.test.js && node test/terms-sync.test.js",
     "test:voice": "node test/voice-metering.test.js"
   },

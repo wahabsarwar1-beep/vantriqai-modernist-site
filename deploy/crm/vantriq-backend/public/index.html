@@ -8292,10 +8292,16 @@ function renderSecuritySetup(){
     ${passwordStep ? `<div class="field"><label>Current password</label><input id="security_current" type="password" autocomplete="current-password"></div>
       <div class="field"><label>New password (at least 10 characters)</label><input id="security_new" type="password" autocomplete="new-password" minlength="10"></div>
       <button class="btn btn-primary" onclick="completeRequiredPassword()">Save password</button>` : requiredTotp ?
-      `<p>Add this secret to your authenticator app:</p><code style="word-break:break-all">${esc(requiredTotp.secret)}</code>
-       <div class="field"><label>Authenticator code</label><input id="security_code" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></div>
-       <button class="btn btn-primary" onclick="completeRequiredTotp()">Confirm authenticator</button>` :
+      `<ol style="padding-left:20px;line-height:1.6;"><li>Open your phone's authenticator app and choose <strong>Add account → Enter setup key</strong>.</li>
+       <li>Name the account <strong>Vantriq CRM</strong>, enter the setup key below, and select <strong>Time-based (TOTP)</strong>.</li>
+       <li>Enter the app's current <strong>6-digit code</strong> here. Complete setup within 15 minutes.</li></ol>
+       <div class="field"><label>Secret / setup key — enter this in your authenticator app</label><input readonly class="mono" value="${esc(requiredTotp.secret)}" onclick="this.select()"></div>
+       <p class="footnote">Keep this key private. The setup key is not the 6-digit code. Keep your authenticator account backed up securely before signing out.</p>
+       <div class="field"><label>6-digit code from your authenticator app</label><input id="security_code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" onkeydown="if(event.key==='Enter')completeRequiredTotp()"></div>
+       <button class="btn btn-primary" onclick="completeRequiredTotp()">Confirm authenticator</button>
+       <button class="btn btn-ghost" onclick="restartRequiredTotp()">Restart setup</button>` :
       `<div class="field"><label>Current password</label><input id="security_current" type="password" autocomplete="current-password"></div>
+       <p class="footnote">Use the password you sign into this CRM account with.</p>
        <button class="btn btn-primary" onclick="startRequiredTotp()">Set up authenticator</button>`}
     <button class="btn btn-ghost" onclick="signOut()">Sign out</button>
   </div></div>`;
@@ -8308,8 +8314,13 @@ async function startRequiredTotp(){
   try { requiredTotp=await API.post('/api/auth/totp/setup', {password:document.getElementById('security_current').value}); setupError='';renderSecuritySetup(); }
   catch(e){setupError=e.message;renderSecuritySetup();}
 }
+function restartRequiredTotp(){
+  requiredTotp=null;setupError='';renderSecuritySetup();
+}
 async function completeRequiredTotp(){
-  try { await API.post('/api/auth/totp/confirm',{code:document.getElementById('security_code').value}); requiredTotp=null;setupError='';await boot(); }
+  const code=document.getElementById('security_code').value.trim();
+  if(!/^\d{6}$/.test(code)){setupError='Enter the 6-digit code from your authenticator app, not the setup key.';renderSecuritySetup();return;}
+  try { await API.post('/api/auth/totp/confirm',{code}); requiredTotp=null;setupError='';await boot(); }
   catch(e){setupError=e.message;renderSecuritySetup();}
 }
 

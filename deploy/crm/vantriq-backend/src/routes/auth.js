@@ -562,7 +562,7 @@ router.post('/reset-password', async (req, res) => {
   const password = String((req.body || {}).password || '');
   const result = await redeemReset('staff', token, password);
   if (!result.ok) return res.status(result.status).json({ error: result.error });
-  res.json({ ok: true, message: 'Your password has been changed. Sign in with it — you will still be sent a code by email.' });
+  res.json({ ok: true, message: 'Your password has been changed. Sign in with it and complete your existing second factor. A password reset does not remove authenticator protection.' });
 });
 
 module.exports = { router, COMPANY_DOMAIN };
