@@ -2334,3 +2334,74 @@ begin
   insert into applied_migrations (name, note)
   values ('v9_33_internal_gpt5mini', 'Internal account token rates moved from gpt-4o-mini to gpt-5-mini.');
 end $$;
+
+-- v9.33 — what each package includes, and what it does not, in writing.
+--
+-- A quotation listed prices and an allowance and left the reader to guess
+-- what the monthly fee actually buys. Every quotation, proposal, portal quote
+-- and scope sign-off now prints these two lists, read live from the package,
+-- so the document a client accepts says exactly what they are getting and
+-- what is extra. Wording, not price: the CEO can edit it on any package
+-- (PATCH /api/products/:id/scope) without unlocking the business model's
+-- figures.
+--
+-- Seeded once from what the CRM actually sells: channels per tier as the
+-- products table has them, and web chat and voice as the priced add-ons they
+-- are. Never overwrites a list an admin has written.
+alter table products add column if not exists includes text[] not null default '{}';
+alter table products add column if not exists excludes text[] not null default '{}';
+
+do $$
+declare
+  common text[] := array[
+    'An AI agent configured to your catalogue, prices, FAQs, policies and tone of voice',
+    'Replies around the clock, in English, Urdu and Roman Urdu',
+    'Handover to your team, with the conversation so far, whenever a person is needed',
+    'Leads captured with the full conversation transcript',
+    'Vantriq Pulse analytics, the customer directory, and the client portal and Android app',
+    'Onboarding: discovery call, configuration, testing with you, and go-live',
+    'Monthly tuning with our team, and support for the agent we set up'];
+  excl text[] := array[
+    'Meta / WhatsApp Business Platform conversation and template fees — charged by Meta or your provider to your own account',
+    'Voice notes, website chat and voice calls — available as priced add-ons',
+    'Your own third-party subscriptions (CRM, booking, e-commerce, payment or other software the agent connects to)',
+    'Taxes, bank and payment-processing charges',
+    'Conversations beyond the monthly allowance — billed at the overage rate',
+    'Work beyond the signed scope — quoted separately as a change request',
+    'Professional advice: the agent answers only from information you provide and is not a substitute for medical, legal or financial advice'];
+begin
+  if exists (select 1 from applied_migrations where name = 'v9_33_package_scope') then
+    return;
+  end if;
+  update products set includes = array['Channel: WhatsApp — one WhatsApp Business number in your business''s name'] || common
+   where name = 'Starter' and includes = '{}';
+  update products set includes = array['Channels: WhatsApp and Instagram',
+      'CRM sync — every lead lands in your pipeline'] || common
+   where name = 'Growth' and includes = '{}';
+  update products set includes = array['Channels: WhatsApp and Instagram',
+      'CRM sync — every lead lands in your pipeline',
+      'Location-aware routing and availability across your branches'] || common
+   where name = 'Scale' and includes = '{}';
+  update products set includes = array['Channels: WhatsApp and Instagram',
+      'CRM sync — every lead lands in your pipeline',
+      'Location-aware routing and availability across your branches',
+      'Top-tier AI models for complex or detailed questions'] || common
+   where name = 'Pro' and includes = '{}';
+  update products set includes = array['Channels: WhatsApp and Instagram',
+      'CRM sync — every lead lands in your pipeline',
+      'Location-aware routing and availability across your branches',
+      'Top-tier AI models for complex or detailed questions',
+      'The option of a private on-premise deployment, priced separately after an infrastructure review'] || common
+   where name = 'Enterprise' and includes = '{}';
+  update products set includes = array['Channels: WhatsApp and Instagram',
+      'CRM sync — every lead lands in your pipeline',
+      'Location-aware routing and availability across your branches',
+      'Top-tier AI models for complex or detailed questions',
+      'The option of a private on-premise deployment, priced separately after an infrastructure review',
+      'A custom service level and custom integrations, as agreed in writing'] || common
+   where name = 'Enterprise+' and includes = '{}';
+  update products set excludes = excl
+   where name in ('Starter','Growth','Scale','Pro','Enterprise','Enterprise+') and excludes = '{}';
+  insert into applied_migrations (name, note)
+  values ('v9_33_package_scope', 'Packages carry written inclusions and exclusions, printed on every quote and proposal.');
+end $$;

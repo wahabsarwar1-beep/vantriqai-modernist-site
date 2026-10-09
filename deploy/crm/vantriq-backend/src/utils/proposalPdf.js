@@ -468,6 +468,7 @@ function packagesPage(doc, d) {
         LEFT, y, { width: WIDTH, lineGap: 1.5 });
     y += 24;
     taxNote(doc, y);
+    inclusionsPage(doc, packs);
   } else {
     // ---- detail cards for a small selection.
     packs.forEach((p) => {
@@ -483,7 +484,16 @@ function packagesPage(doc, d) {
           ? [['Extra number', `${round0(p.extra_agent_price, d.currency)}/mo after ${p.included_agents} included`]]
           : []),
       ];
-      const h = 34 + lines.length * 16 + 12;
+      // What the package includes and does not (v9.33), as bullets under the
+      // figures. Measured, so a long list grows the card instead of running
+      // off it, and a card that would not fit starts on a fresh page.
+      const inc = (p.includes || []).map((x) => `•  ${x}`).join('\n');
+      const exc = (p.excludes || []).map((x) => `•  ${x}`).join('\n');
+      const bulletW = WIDTH - 32;
+      const incH = inc ? 16 + measure(doc, inc, { size: 8, width: bulletW, lineGap: 1.5 }) + 6 : 0;
+      const excH = exc ? 16 + measure(doc, exc, { size: 8, width: bulletW, lineGap: 1.5 }) + 6 : 0;
+      const h = 34 + lines.length * 16 + 12 + incH + excH;
+      if (y + h > FOOT - 20 && y > PAGE.margin + 60) { doc.addPage(); y = PAGE.margin + 6; }
       const tint = p.recommended ? COBALT_WASH : WASH;
       doc.save().roundedRect(LEFT, y, WIDTH, h, 6).fillColor(tint).fill().restore();
       doc.save().roundedRect(LEFT, y, 3, h, 1.5).fillColor(p.recommended ? COBALT : RULE).fill().restore();
@@ -499,11 +509,61 @@ function packagesPage(doc, d) {
         doc.font('Helvetica-Bold').fontSize(8.5).fillColor(INK).text(v, LEFT + 172, cy, { width: WIDTH - 190 });
         cy += 16;
       });
+      if (inc) {
+        cy += 6;
+        doc.font('Helvetica-Bold').fontSize(8.5).fillColor(INK).text('Included', LEFT + 16, cy);
+        cy += 13;
+        doc.font('Helvetica').fontSize(8).fillColor(INK).text(inc, LEFT + 16, cy, { width: bulletW, lineGap: 1.5 });
+        cy += incH - 22;
+      }
+      if (exc) {
+        cy += 6;
+        doc.font('Helvetica-Bold').fontSize(8.5).fillColor(INK).text('Not included', LEFT + 16, cy);
+        cy += 13;
+        doc.font('Helvetica').fontSize(8).fillColor(MUTED).text(exc, LEFT + 16, cy, { width: bulletW, lineGap: 1.5 });
+      }
       y += h + 14;
     });
     taxNote(doc, y + 2);
   }
   return true;
+}
+
+/**
+ * The comparison's companion: what every package includes, and what each
+ * one adds (v9.33). Lines every package shares are printed once; each
+ * package then lists only what it has beyond them, so the ladder reads as
+ * "everything in the one below, plus".
+ */
+function inclusionsPage(doc, packs) {
+  const lists = packs.map((p) => p.includes || []);
+  if (!lists.some((l) => l.length)) return;
+  const common = lists[0].filter((x) => lists.every((l) => l.includes(x)));
+  const excl = packs[0].excludes || [];
+  const commonExcl = excl.filter((x) => packs.every((p) => (p.excludes || []).includes(x)));
+  doc.addPage();
+  let y = sectionHead(doc, 'What you get', 'Included in every package', PAGE.margin + 6,
+    'Then what each package adds. Anything not listed is outside the package and is quoted separately.');
+  // A heading always travels with its list: both are measured before
+  // anything is drawn, so a page break never strands a title at the foot.
+  const block = (title, items, { color = INK, titleColor = INK } = {}) => {
+    const text = items.map((x) => `•  ${x}`).join('\n');
+    const h = measure(doc, text, { size: 8.5, width: WIDTH - 10, lineGap: 1.5 });
+    const head = title ? 14 : 0;
+    if (y + head + h > FOOT - 20) { doc.addPage(); y = PAGE.margin + 6; }
+    if (title) {
+      doc.font('Helvetica-Bold').fontSize(9.5).fillColor(titleColor).text(title, LEFT, y);
+      y += head;
+    }
+    doc.font('Helvetica').fontSize(8.5).fillColor(color).text(text, LEFT + 6, y, { width: WIDTH - 10, lineGap: 1.5 });
+    y += h + 12;
+  };
+  block('', common);
+  packs.forEach((p) => {
+    const extra = (p.includes || []).filter((x) => !common.includes(x));
+    if (extra.length) block(p.name, extra, { titleColor: p.recommended ? COBALT : INK });
+  });
+  if (commonExcl.length) block('Not included in any package', commonExcl, { color: MUTED });
 }
 
 /** PAGE 6 — how the work runs. */

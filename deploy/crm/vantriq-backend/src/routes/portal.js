@@ -1083,7 +1083,8 @@ router.get('/quotes', async (req, res) => {
   const { rows } = await db.query(
     `select q.id, q.quote_number, q.title, q.status, q.valid_until, q.subtotal,
             q.tax_rate, q.tax_amount, q.total, q.notes, q.terms, q.sent_at, q.decided_at,
-            q.invoice_id, p.name as product_name, bp.name as bundle_product_name
+            q.invoice_id, p.name as product_name, bp.name as bundle_product_name,
+            p.includes as package_includes, p.excludes as package_excludes
        from quotes q
        left join products p on p.id = q.product_id
        left join products bp on bp.id = q.bundle_product_id

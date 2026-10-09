@@ -742,7 +742,8 @@ const INVOICE_TYPE_FROM_API = {'setup_fee':'Setup fee','retainer':'Retainer','ov
 
 function productFromApi(p){ return { id:p.id, name:p.name, isStandard:p.is_standard!==false, targetTier:p.target_tier, setupFee:+p.setup_fee, retainer:+p.retainer, msgsPerSession:+p.msgs_per_session, quota:+p.quota, overageRate:+p.overage_rate, deliveryCostFull:+p.delivery_cost_full, automation:p.automation, dataLayer:p.data_layer, aiModel:p.ai_model, channels:p.channels, order:p.sort_order,
   includedAgents:(p.included_agents===undefined||p.included_agents===null)?1:+p.included_agents,
-  extraAgentPrice:(p.extra_agent_price===undefined||p.extra_agent_price===null)?0:+p.extra_agent_price }; }
+  extraAgentPrice:(p.extra_agent_price===undefined||p.extra_agent_price===null)?0:+p.extra_agent_price,
+  includes:Array.isArray(p.includes)?p.includes:[], excludes:Array.isArray(p.excludes)?p.excludes:[] }; }
 function productToApi(p){ return { name:p.name, target_tier:p.targetTier, setup_fee:p.setupFee, retainer:p.retainer, msgs_per_session:p.msgsPerSession, quota:p.quota, overage_rate:p.overageRate, delivery_cost_full:p.deliveryCostFull, automation:p.automation, data_layer:p.dataLayer, ai_model:p.aiModel, channels:p.channels }; }
 
 function clientFromApi(c){ return { assignedAt:c.assigned_at||null, assignedBy:c.assigned_by||null, id:c.id, name:c.name, company:c.company, email:c.email, phone:c.phone, externalRef:c.external_ref||'', productId:c.product_id, stage:c.stage, estValue:+c.est_value||0, source:c.source, notes:c.notes, joinDate:c.join_date, sessionsUsedThisMonth:0, ownerRepId:c.owner_rep_id||null, salesStage:c.sales_stage||null, closeOutcome:c.close_outcome||null,
@@ -2672,6 +2673,7 @@ function renderProducts(){
             ? `<button class="btn btn-ghost btn-sm" onclick="openModal={type:'product',id:'${p.id}'};render()">${iconEdit(13)} Edit</button>`
             : `<span style="font-size:11.5px;color:var(--muted);display:inline-flex;align-items:center;gap:5px;">🔒 Fixed by the business model</span>`}
           <button class="btn btn-ghost btn-sm" onclick="openModal={type:'productAddon',id:'${p.id}'};render()">${iconEdit(13)} Extra-number price</button>
+          <button class="btn btn-ghost btn-sm" onclick="openModal={type:'productScope',id:'${p.id}'};render()">${iconEdit(13)} What's included</button>
         </div>
       </div>
     `).join('')}
@@ -5904,6 +5906,7 @@ function renderModal(){
   else if(openModal.type==='teamUser') html = teamUserModalHTML();
   else if(openModal.type==='product') html = productModalHTML(openModal.id);
   else if(openModal.type==='productAddon') html = productAddonModalHTML(openModal.id);
+  else if(openModal.type==='productScope') html = productScopeModalHTML(openModal.id);
   else if(openModal.type==='costing') html = costingModalHTML();
   else if(openModal.type==='vendor') html = vendorModalHTML(openModal.id);
   else if(openModal.type==='po') html = poModalHTML();
@@ -6531,6 +6534,43 @@ async function saveProductAddon(id){
     const updated = await API.patch(`/api/products/${id}/addon-pricing`, { included_agents: included, extra_agent_price: price });
     Object.assign(state.products.find(x=>x.id===id), productFromApi(updated));
     closeModal(); render(); showToast('Extra-number pricing saved');
+  }catch(e){ showToast(e.message||'Could not save that','warn'); }
+}
+
+/*
+ * What a package includes and does not (v9.33). Printed on every quotation,
+ * proposal, portal quote and scope sign-off, so it is wording a client signs
+ * against: one line per item. Editable on any package by the CEO — it is not
+ * one of the prices the business model locks.
+ */
+function productScopeModalHTML(id){
+  const p = state.products.find(x=>x.id===id);
+  if(!p) return '';
+  const ceo = isCeo();
+  return `
+  <div class="modal" style="max-width:720px;">
+    <div class="modal-head"><h3>What ${esc(p.name)} includes</h3><button class="close-x" onclick="closeModal()">${iconX(18)}</button></div>
+    <div class="modal-body">
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;line-height:1.6;">
+        One line per item. These lists print on every quotation and proposal for this package, in the client portal,
+        and in the scope sign-off the client signs — so write only what is genuinely delivered, and put anything
+        extra-cost under <b>Not included</b>.
+      </p>
+      <div class="field"><label>Included</label><textarea id="ps_inc" rows="10" ${ceo?'':'readonly'} style="width:100%;font-size:12.5px;line-height:1.5;">${esc((p.includes||[]).join('\n'))}</textarea></div>
+      <div class="field"><label>Not included</label><textarea id="ps_exc" rows="8" ${ceo?'':'readonly'} style="width:100%;font-size:12.5px;line-height:1.5;">${esc((p.excludes||[]).join('\n'))}</textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">${ceo?'Cancel':'Close'}</button>
+      ${ceo?`<button class="btn btn-primary" onclick="saveProductScope('${p.id}')">${iconCheck(14)} Save</button>`:''}
+    </div>
+  </div>`;
+}
+async function saveProductScope(id){
+  const lines = el => (document.getElementById(el).value||'').split('\n').map(x=>x.trim()).filter(Boolean);
+  try{
+    const updated = await API.patch(`/api/products/${id}/scope`, { includes: lines('ps_inc'), excludes: lines('ps_exc') });
+    Object.assign(state.products.find(x=>x.id===id), productFromApi(updated));
+    closeModal(); render(); showToast('Package scope saved');
   }catch(e){ showToast(e.message||'Could not save that','warn'); }
 }
 
