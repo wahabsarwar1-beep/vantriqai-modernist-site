@@ -2488,3 +2488,25 @@ alter table clients drop constraint if exists clients_conversation_retention_che
 alter table clients add constraint clients_conversation_retention_check
   check (conversation_retention_months is null or conversation_retention_months between 1 and 120);
 create index if not exists idx_conv_created on conversation_messages(created_at);
+
+-- v9.33 — client agents are costed on the business model's basis (approved
+-- 9 Oct 2026): gpt-4o-mini, 12 messages a session for every standard
+-- package, prompt caching on. Once, and only where the values are still the
+-- CRM's own defaults: a figure an admin changed is theirs to keep.
+do $$
+begin
+  if exists (select 1 from applied_migrations where name = 'v9_33_twelve_messages_cached') then
+    return;
+  end if;
+  update products p set msgs_per_session = 12
+    from (values ('Starter', 12), ('Growth', 14), ('Scale', 14), ('Pro', 16), ('Enterprise', 16), ('Enterprise+', 18)) as d(name, msgs)
+   where p.name = d.name and p.msgs_per_session = d.msgs;
+  -- The costing settings take the new defaults unless an admin saved
+  -- something other than the measured gpt-5-mini basis that preceded them.
+  update settings set costing = costing - 'bulk_model' where id = 1 and costing->>'bulk_model' = 'gpt-5-mini';
+  update settings set costing = costing - 'reply_tokens' where id = 1 and (costing->>'reply_tokens')::numeric = 220;
+  update settings set costing = costing - 'calls_per_turn' where id = 1 and (costing->>'calls_per_turn')::numeric = 1.2;
+  update settings set costing = costing - 'cache_share' where id = 1 and (costing->>'cache_share')::numeric = 0;
+  insert into applied_migrations (name, note)
+  values ('v9_33_twelve_messages_cached', 'Standard packages costed at 12 messages a session; costing defaults back to gpt-4o-mini with prompt caching.');
+end $$;

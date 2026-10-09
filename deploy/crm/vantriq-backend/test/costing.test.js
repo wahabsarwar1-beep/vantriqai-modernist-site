@@ -64,7 +64,7 @@ const LADDER = [
   // gpt-4o-mini, 1,200–3,000 context tokens, 80-token replies, one call a turn.
   const AUG_CTX = { Starter: 1200, Growth: 1500, Scale: 1800, Pro: 2200, Enterprise: 2600, 'Enterprise+': 3000 };
   const aug = V.model(LADDER.map((p) => ({ ...p, context_tokens: AUG_CTX[p.name] })), {},
-    { utilization: 0.7, bulk_model: 'gpt-4o-mini', reply_tokens: 80, calls_per_turn: 1, voice_allowance_share: 0 }, '2026-09-29');
+    { utilization: 0.7, bulk_model: 'gpt-4o-mini', reply_tokens: 80, calls_per_turn: 1, cache_share: 0, voice_allowance_share: 0 }, '2026-09-29');
   const augBy = Object.fromEntries(aug.packages.map((r) => [r.name, r]));
   // Starter: 6 turns; input = 6*1200 + 6*30 + 110*15 = 9,030; output = 480.
   ok(augBy.Starter.tokens.input === 9030 && augBy.Starter.tokens.output === 480, 'Starter session is 9,030 tokens in, 480 out',
@@ -77,24 +77,41 @@ const LADDER = [
   ok(aug.steady_state.margin === 0.714, 'steady-state contribution 71.4%', aug.steady_state.margin);
   ok(aug.flags.some((f) => /Enterprise\+: overage covers only 1\.8/.test(f.text)), 'flags Enterprise+ overage at 1.8x cost');
 
-  console.log('\n== at what the live agents measured (v9.33) ==');
-  // gpt-5-mini, 4,000 context tokens on Starter, 220-token replies with
-  // reasoning, 1.2 model calls a turn: input = 1.2*(6*4000 + 6*30 + 250*15)
-  // = 33,516; output = 1.2*6*220 = 1,584.
-  ok(by.Starter.tokens.input === 33516 && by.Starter.tokens.output === 1584, 'Starter session is 33,516 tokens in, 1,584 out',
-    JSON.stringify(by.Starter.tokens));
-  const usd = 0.98 * (33516 * 0.25 + 1584 * 2.00) / 1e6 + 0.02 * (33516 * 2 + 1584 * 10) / 1e6;
-  ok(Math.abs(by.Starter.cost_per_session - usd * 277.05) < 0.0001, 'and costs the GPT-5 mini blend: about PKR 3.59',
-    `${by.Starter.cost_per_session} vs ${usd * 277.05}`);
-  ok(m.flags.filter((f) => f.level === 'bad' && /overage rate/.test(f.text)).length === 6,
-    'every tier\'s overage rate is flagged as below the cost of a session', JSON.stringify(m.flags.map((f) => f.text)));
-  ok(by.Pro.margin_full < 0, 'Pro loses money at full use without prompt caching', by.Pro.margin_full);
-  const cached = V.model(LADDER, {}, { utilization: 0.7, cache_share: 0.7 }, '2026-09-29');
-  const cachedStarter = cached.packages.find((r) => r.name === 'Starter');
-  // 70% of 28,800 context tokens at $0.025 instead of $0.25.
-  const cachedUsd = 0.98 * ((33516 - 20160) * 0.25 + 20160 * 0.025 + 1584 * 2.00) / 1e6 + 0.02 * (33516 * 2 + 1584 * 10) / 1e6;
-  ok(Math.abs(cachedStarter.cost_per_session - cachedUsd * 277.05) < 0.0001,
-    'a cached share of the prompt is billed at the cached-input price', `${cachedStarter.cost_per_session} vs ${cachedUsd * 277.05}`);
+  console.log('\n== the business model basis, approved 9 Oct 2026 (v9.33) ==');
+  // gpt-4o-mini, 12 messages a session, 80% of the context at the cached
+  // price. Starter: input 9,030, of which 0.8 * 7,200 = 5,760 cached at
+  // $0.075; Claude Sonnet 5.5 has no cached price on the card, so its share
+  // pays full input.
+  const bm = V.model(LADDER.map((p) => ({ ...p, msgs_per_session: 12 })), {}, { utilization: 0.7 }, '2026-09-29');
+  const bmBy = Object.fromEntries(bm.packages.map((r) => [r.name, r]));
+  ok(bmBy.Starter.tokens.input === 9030 && bmBy.Starter.tokens.output === 480, 'Starter session is 9,030 tokens in, 480 out',
+    JSON.stringify(bmBy.Starter.tokens));
+  const usd = 0.98 * ((9030 - 5760) * 0.15 + 5760 * 0.075 + 480 * 0.60) / 1e6 + 0.02 * (9030 * 2 + 480 * 10) / 1e6;
+  ok(Math.abs(bmBy.Starter.cost_per_session - usd * 277.05) < 0.0001, 'and costs the cached GPT-4o mini blend: about PKR 0.46',
+    `${bmBy.Starter.cost_per_session} vs ${usd * 277.05}`);
+  ok(bm.packages.every((r) => r.msgs_per_session === 12), 'every package is costed at 12 messages');
+  ok(bm.flags.filter((f) => f.level === 'bad' && /overage rate/.test(f.text)).length === 0,
+    'no overage rate is below the cost of a session', JSON.stringify(bm.flags.map((f) => f.text)));
+  ok(bmBy['Enterprise+'].overage_cover >= 3, 'Enterprise+ overage covers at least 3x cost', bmBy['Enterprise+'].overage_cover);
+  ok(bmBy['Enterprise+'].margin_full >= 0.65, 'Enterprise+ keeps 65%+ at full use, voice included', bmBy['Enterprise+'].margin_full);
+  const uncached = V.model(LADDER.map((p) => ({ ...p, msgs_per_session: 12 })), {}, { utilization: 0.7, cache_share: 0 }, '2026-09-29');
+  ok(uncached.packages[0].cost_per_session > bmBy.Starter.cost_per_session, 'prompt caching lowers the cost per session',
+    `${uncached.packages[0].cost_per_session} vs ${bmBy.Starter.cost_per_session}`);
+
+  console.log('\n== the measured gpt-5-mini basis stays reproducible ==');
+  // VantriqAI's own showcase agent: gpt-5-mini, 4,000 context tokens on
+  // Starter, 220-token replies, 1.2 calls a turn, no caching:
+  // input = 1.2*(6*4000 + 6*30 + 250*15) = 33,516; output = 1.2*6*220 = 1,584.
+  const MEAS_CTX = { Starter: 4000, Growth: 4500, Scale: 5000, Pro: 5500, Enterprise: 6000, 'Enterprise+': 6500 };
+  const meas = V.model(LADDER.map((p) => ({ ...p, context_tokens: MEAS_CTX[p.name] })), {},
+    { utilization: 0.7, bulk_model: 'gpt-5-mini', reply_tokens: 220, calls_per_turn: 1.2, cache_share: 0 }, '2026-09-29');
+  const mBy = Object.fromEntries(meas.packages.map((r) => [r.name, r]));
+  ok(mBy.Starter.tokens.input === 33516 && mBy.Starter.tokens.output === 1584, 'Starter session is 33,516 tokens in, 1,584 out',
+    JSON.stringify(mBy.Starter.tokens));
+  const usd5 = 0.98 * (33516 * 0.25 + 1584 * 2.00) / 1e6 + 0.02 * (33516 * 2 + 1584 * 10) / 1e6;
+  ok(Math.abs(mBy.Starter.cost_per_session - usd5 * 277.05) < 0.0001, 'and costs the GPT-5 mini blend: about PKR 3.59',
+    `${mBy.Starter.cost_per_session} vs ${usd5 * 277.05}`);
+  ok(mBy.Pro.margin_full < 0, 'on that basis Pro loses money at full use', mBy.Pro.margin_full);
 
   const gem = m.what_if.find((w) => w.bulk_model === 'gemini-3-flash');
   ok(gem && gem.packages.find((p) => p.name === 'Enterprise+').margin_full < 0,
@@ -198,7 +215,7 @@ const LADDER = [
   const { rows: prod } = await db.query(`select delivery_cost_full, ai_model from products where id = $1`, [starter.id]);
   ok(Number(prod[0].delivery_cost_full) === moved.delivery_full && moved.delivery_full === moved.ai_full + moved.voice_full,
     'and writes the delivery cost Financials reads — conversations and voice', `${prod[0].delivery_cost_full} vs ${moved.delivery_full}`);
-  ok(/GPT-5 mini; 2% escalated to Claude Sonnet 5\.5/.test(prod[0].ai_model), 'the routing line on the package is the model\'s', prod[0].ai_model);
+  ok(/GPT-4o mini; 2% escalated to Claude Sonnet 5\.5/.test(prod[0].ai_model), 'the routing line on the package is the model\'s', prod[0].ai_model);
 
   // Financials' projection setting must not leak into the business model's
   // typical-use margin (production runs Financials at a cautious 100%).

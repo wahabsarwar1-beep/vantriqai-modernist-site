@@ -2453,7 +2453,7 @@ function unitEconomicsHTML(){
   </div>
   <p class="footnote">A session is one customer conversation in a rolling 24 hours. Cost per session = the tokens it sends and receives
     (system prompt and catalogue context of ${fmtNum(Math.min(...rows.map(r=>r.profile.context_tokens)))}–${fmtNum(Math.max(...rows.map(r=>r.profile.context_tokens)))} tokens per turn, the conversation so far,
-    ${a.user_tokens}-token messages and ${a.reply_tokens}-token replies including the model's reasoning, ${a.calls_per_turn} model calls a turn), priced on the rate card and converted at USD/PKR ${a.fx_usd_pkr}. These are what the live agents measured with OpenAI's real token counts in October 2026. Voice notes are included in every package up to ${Math.round((a.voice_allowance_share||0)*100)}% of its conversations in minutes, costed at full use on ${esc(((costingData.voice||{}).label)||'')}; minutes past that are billed at PKR 5. Labour: founder time at
+    ${a.user_tokens}-token messages and ${a.reply_tokens}-token replies, ${a.calls_per_turn} model calls a turn), priced on the rate card and converted at USD/PKR ${a.fx_usd_pkr}. This is the business model's basis for client agents (approved 9 Oct 2026). Voice notes are included in every package up to ${Math.round((a.voice_allowance_share||0)*100)}% of its conversations in minutes, costed at full use on ${esc(((costingData.voice||{}).label)||'')}; minutes past that are billed at PKR 5. Labour: founder time at
     ${fmtMoney(a.founder_rate)}/h, contracted time at ${fmtMoney(a.contractor_rate)}/h. Year one includes the setup fee, ${a.sales_hours_per_win} unbilled sales hours to win the client and
     ${a.adhoc_hours_per_month} h a month of ad-hoc requests. ${a.cache_share?`${Math.round(a.cache_share*100)}% of the prompt is billed at the cached-input price.`:'Prompt caching is not assumed — it would only lower these costs.'}</p>`;
 }
@@ -2713,9 +2713,9 @@ function costingModalHTML(){
         <div class="field"><label>Premium model — escalated turns</label><select id="cs_prem">${opt(a.premium_model)}</select></div>
       </div>
       <div class="field-row">
-        <div class="field"><label>Reply tokens (with reasoning)</label><input id="cs_reply" type="number" min="1" max="5000" step="1" value="${a.reply_tokens}"></div>
+        <div class="field"><label>Reply tokens</label><input id="cs_reply" type="number" min="1" max="5000" step="1" value="${a.reply_tokens}"></div>
         <div class="field"><label>Model calls per turn</label><input id="cs_calls" type="number" min="1" max="10" step="0.05" value="${a.calls_per_turn}"><div style="font-size:11px;color:var(--muted);margin-top:3px;">A tool call (knowledge base, CRM) is a second call.</div></div>
-        <div class="field"><label>Prompt billed as cached (%)</label><input id="cs_cache" type="number" min="0" max="100" step="1" value="${Math.round((a.cache_share||0)*100)}"><div style="font-size:11px;color:var(--muted);margin-top:3px;">0 until the cache hit rate is measured.</div></div>
+        <div class="field"><label>Prompt billed as cached (%)</label><input id="cs_cache" type="number" min="0" max="100" step="1" value="${Math.round((a.cache_share||0)*100)}"><div style="font-size:11px;color:var(--muted);margin-top:3px;">OpenAI caches the repeated prompt automatically; the business model assumes 80%.</div></div>
       </div>
       <div class="field-row">
         <div class="field"><label>Founder rate (PKR/h)</label><input id="cs_founder" type="number" value="${a.founder_rate}"></div>
