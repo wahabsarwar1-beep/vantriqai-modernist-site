@@ -76,6 +76,27 @@ module.exports = (function () {
       as_of: AS_OF, source: 'anthropic.com/pricing', note: '' },
   ];
 
+  /** The day the speech-to-text prices were last checked. */
+  const STT_AS_OF = '2026-10-09';
+
+  /**
+   * Speech-to-text prices, US dollars per minute of audio. A WhatsApp voice
+   * note is transcribed before the agent reads it, and this is billed by the
+   * minute, not by the token, so it needs its own list. Checked on STT_AS_OF
+   * against published price trackers; the vendors' own pages could not be
+   * read from where this was checked, so confirm them before a client quote.
+   */
+  const STT_RATES = [
+    { key: 'whisper-1', label: 'OpenAI Whisper', vendor: 'OpenAI', per_minute: 0.006,
+      as_of: STT_AS_OF, source: 'openai.com/api/pricing', note: 'What the WhatsApp agent used until 9 Oct 2026 (n8n\'s OpenAI node is fixed to it).' },
+    { key: 'gpt-4o-transcribe', label: 'GPT-4o Transcribe', vendor: 'OpenAI', per_minute: 0.006,
+      as_of: STT_AS_OF, source: 'openai.com/api/pricing', note: 'What the WhatsApp agent transcribes with. Same price as Whisper; as good or better on Urdu, Urdu-English and English in the 9 Oct 2026 test.' },
+    { key: 'gpt-4o-mini-transcribe', label: 'GPT-4o mini Transcribe', vendor: 'OpenAI', per_minute: 0.003,
+      as_of: STT_AS_OF, source: 'openai.com/api/pricing', note: 'Half the price, but NOT usable for Urdu: in the 9 Oct 2026 test it wrote Urdu in Hindi (Devanagari) script, even told the language.' },
+    { key: 'elevenlabs-scribe', label: 'ElevenLabs Scribe', vendor: 'ElevenLabs', per_minute: 0.22 / 60,
+      as_of: STT_AS_OF, source: 'elevenlabs.io/pricing/api', note: 'About $0.22 an hour. A second vendor and a second bill.' },
+  ];
+
   /** Everything else the model assumes. Editable in Products & Pricing. */
   const ASSUMPTIONS = {
     as_of: AS_OF,
@@ -92,6 +113,8 @@ module.exports = (function () {
     sales_hours_per_win: 5,       // unbilled selling to win one client
     adhoc_hours_per_month: 0.5,   // unplanned requests beyond the management budget
     hours_per_fte: 160,           // one full-time person, per month
+    stt_model: 'gpt-4o-transcribe', // what transcribes voice notes
+    voice_note_minutes: 0.5,      // the length of a typical voice note
     mix: { Starter: 6, Growth: 6, Scale: 3, Pro: 2, Enterprise: 1, 'Enterprise+': 0 },
   };
 
@@ -148,6 +171,78 @@ module.exports = (function () {
       if (r[k] !== undefined) c[k] = k === 'input' || k === 'output' ? num(r[k]) : String(r[k]);
     }
     return c;
+  }
+
+  /** The speech-to-text price list in force, built-in with stored overrides on top. */
+  function mergeSttRates(overrides) {
+    const o = overrides && typeof overrides === 'object' ? overrides : {};
+    const pick = (r) => {
+      const c = {};
+      for (const k of ['label', 'vendor', 'per_minute', 'as_of', 'source', 'note']) {
+        if (r[k] !== undefined) c[k] = k === 'per_minute' ? num(r[k]) : String(r[k]);
+      }
+      return c;
+    };
+    const out = STT_RATES.map((r) => (o[r.key] ? { ...r, ...pick(o[r.key]), key: r.key, overridden: true } : { ...r }));
+    for (const [key, r] of Object.entries(o)) {
+      if (!STT_RATES.some((x) => x.key === key) && r && isSet(r.per_minute)) {
+        out.push({ key, label: r.label || key, vendor: r.vendor || '', note: '', source: '', as_of: '', ...pick(r), custom: true, overridden: true });
+      }
+    }
+    return out;
+  }
+
+  /** What a minute, and a typical voice note, of transcription costs us. */
+  function voiceCost(a, sttRates) {
+    const rate = (sttRates || []).find((r) => r.key === a.stt_model) || null;
+    const usd = rate ? num(rate.per_minute) : 0;
+    const pkr = usd * num(a.fx_usd_pkr);
+    return {
+      stt_model: a.stt_model,
+      label: rate ? rate.label : a.stt_model,
+      per_minute_usd: Math.round(usd * 1e6) / 1e6,
+      per_minute_pkr: Math.round(pkr * 10000) / 10000,
+      voice_note_minutes: num(a.voice_note_minutes),
+      per_note_pkr: Math.round(pkr * num(a.voice_note_minutes) * 10000) / 10000,
+    };
+  }
+
+  /**
+   * A metered voice add-on's speech-to-text cost: the included minutes at the
+   * live rate, and how far its per-minute price covers a minute's cost.
+   * Null for an add-on that meters nothing.
+   */
+  function voiceAddonCost(addon, voice) {
+    if (!addon || addon.meter !== 'voice_minute') return null;
+    const included = num(addon.included_units);
+    const over = addon.overage_rate === null || addon.overage_rate === undefined ? null : num(addon.overage_rate);
+    const perMin = num(voice.per_minute_pkr);
+    return {
+      included_minutes: included,
+      stt_cost: Math.round(included * perMin),
+      overage_rate: over,
+      overage_cover: over !== null && perMin ? Math.round((over / perMin) * 10) / 10 : null,
+    };
+  }
+
+  /** Warnings about voice pricing, for the same list as the package flags. */
+  function voiceFlags(addons, voice, sttRates) {
+    const out = [];
+    if (!(sttRates || []).some((r) => r.key === voice.stt_model)) {
+      out.push({ level: 'bad', text: `The speech-to-text model "${voice.stt_model}" is not on the price list, so voice notes cost nothing in the model.` });
+    }
+    for (const ad of addons || []) {
+      const v = voiceAddonCost(ad, voice);
+      if (!v || ad.active === false) continue;
+      if (v.overage_rate === null || v.overage_rate === 0) {
+        out.push({ level: 'warn', text: `${ad.name}: voice minutes past the ${v.included_minutes} included have no price, so heavy use is free to the client.` });
+      } else if (v.overage_cover !== null && v.overage_cover < 1) {
+        out.push({ level: 'bad', text: `${ad.name}: PKR ${v.overage_rate} a minute is below what a minute of transcription costs (PKR ${voice.per_minute_pkr.toFixed(2)}).` });
+      } else if (v.overage_cover !== null && v.overage_cover < 2) {
+        out.push({ level: 'warn', text: `${ad.name}: the per-minute price covers only ${v.overage_cover}× a minute of transcription.` });
+      }
+    }
+    return out;
   }
 
   function mergeAssumptions(overrides, extra) {
@@ -364,7 +459,9 @@ module.exports = (function () {
   function model(products, stored, extra, today) {
     const s = stored && typeof stored === 'object' ? stored : {};
     const rates = mergeRates(s.rates);
+    const sttRates = mergeSttRates(s.stt_rates);
     const a = mergeAssumptions(s.assumptions, extra);
+    const voice = voiceCost(a, sttRates);
     const live = (products || []).filter((p) => !p.archived);
     const rows = live.map((p) => packageEconomics(p, a, rates));
     const whatIf = WHAT_IF_MODELS.filter((k) => rateFor(rates, k)).map((key) => {
@@ -385,6 +482,8 @@ module.exports = (function () {
       as_of: a.as_of,
       assumptions: a,
       rates,
+      stt_rates: sttRates,
+      voice,
       packages: rows,
       steady_state: steadyState(rows, a),
       what_if: whatIf,
@@ -396,8 +495,8 @@ module.exports = (function () {
   const routingText = (row) => row.routing;
 
   return {
-    AS_OF, RATES, ASSUMPTIONS, PROFILES, DEFAULT_PROFILE, PROFILE_FIELDS, WHAT_IF_MODELS,
-    mergeRates, mergeAssumptions, profileFor, sessionTokens, packageEconomics, steadyState, flags, model,
+    AS_OF, RATES, STT_AS_OF, STT_RATES, ASSUMPTIONS, PROFILES, DEFAULT_PROFILE, PROFILE_FIELDS, WHAT_IF_MODELS,
+    mergeRates, mergeSttRates, voiceCost, voiceAddonCost, voiceFlags, mergeAssumptions, profileFor, sessionTokens, packageEconomics, steadyState, flags, model,
     routingText,
   };
 }());

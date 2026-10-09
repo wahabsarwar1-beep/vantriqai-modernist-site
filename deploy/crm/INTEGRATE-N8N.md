@@ -102,6 +102,47 @@ Set the node's **Settings → Always Output Data** off and **On Error →
 Continue**, so a hiccup recording usage can never stop a customer getting their
 reply.
 
+### Real token counts, not estimates
+
+Send the provider's own counts. With an n8n **AI Agent** node the counts are
+not on its output, so the live VantriqAI agents do this (copy it for a client
+flow):
+
+1. On the **OpenAI Chat Model** node, turn **Use Responses API** off. With it
+   on, n8n never receives OpenAI's usage and stores only its own estimate.
+2. In the workflow's settings, turn on **Save execution progress**.
+3. Before the usage node, add an **n8n** node (Execution → Get, execution ID
+   `{{ $execution.id }}`, *Include execution details* on) using the
+   `n8n API (token metering)` credential. It reads this run back, and the usage
+   node sums `tokenUsage` over every run of the chat-model node — a tool call
+   means more than one model call per reply.
+4. Add `"estimated": false` when the counts came from the provider, `true`
+   when you had to fall back to an estimate.
+
+### Voice notes (v9.33)
+
+Voice notes are an add-on (**Voice-note transcription**, or **Voice
+understanding** with spoken replies). For a turn that started as a voice note,
+add the length of the audio and the speech-to-text model:
+
+```json
+  "voice_seconds": {{ $('Voice note length').item.json.voice_seconds }},
+  "stt_model": "gpt-4o-transcribe"
+```
+
+The live WhatsApp agent measures the length in a Code node (**Voice note
+length**) that reads the Ogg file's last granule position, then transcribes with
+**gpt-4o-transcribe** through an HTTP Request node. Do not use
+gpt-4o-mini-transcribe for Pakistani customers: in testing it wrote Urdu in
+Hindi script.
+
+Before transcribing, check the client has bought voice:
+`GET /api/webhooks/service-status` now returns `"voice": true` only when a
+**Voice-note minutes** rate card applies to the client (their own, an agent's,
+or their package's). On `voice: false`, reply asking the customer to type
+instead of transcribing. Minutes past the rate card's included minutes are
+billed on the monthly invoice like any other metered usage.
+
 ## 5. Import the billing workflow
 
 In n8n: **Workflows → ⋯ → Import from File** → pick

@@ -89,6 +89,9 @@ function contactFields(body) {
  *   "output_tokens": 340,
  *   "messages_count": 1,
  *   "handoff": false,                    // optional — true if a human had to take over (drives AI containment)
+ *   "voice_seconds": 34,                 // optional (v9.33) — length of the voice note this turn transcribed
+ *   "stt_model": "whisper-1",            // optional — the speech-to-text model that transcribed it
+ *   "estimated": false,                  // optional — true when the token counts are an estimate, not the provider's
  *   "occurred_at": "2026-08-16T10:32:00Z", // optional, defaults to now()
  *   "contact_name": "Ayesha"             // optional — the customer's WhatsApp profile name; also contact_email,
  *                                        // city, gender, age_band, or all of them as "contact": { … }.
@@ -102,7 +105,19 @@ function contactFields(body) {
 router.post('/usage', async (req, res) => {
   const body = req.body || {};
   const { external_ref, client_id, agent_ref, agent_id, session_id, channel, ai_model,
-    input_tokens, output_tokens, messages_count, occurred_at, handoff } = body;
+    input_tokens, output_tokens, messages_count, occurred_at, handoff, stt_model, estimated } = body;
+
+  // Voice-note length, in seconds. A WhatsApp voice note is capped well under
+  // an hour; anything outside 0–3600 is a broken measurement, and billing a
+  // client for it would be worse than recording nothing.
+  let voiceSeconds = 0;
+  if (body.voice_seconds !== undefined && body.voice_seconds !== null && body.voice_seconds !== '') {
+    voiceSeconds = Number(body.voice_seconds);
+    if (!Number.isFinite(voiceSeconds) || voiceSeconds < 0 || voiceSeconds > 3600) {
+      return res.status(400).json({ error: 'voice_seconds must be a number of seconds from 0 to 3600.' });
+    }
+    voiceSeconds = Math.round(voiceSeconds * 10) / 10;
+  }
 
   if (!session_id) return res.status(400).json({ error: 'session_id is required' });
   if (!external_ref && !client_id && !agent_ref && !agent_id) {
@@ -159,8 +174,9 @@ router.post('/usage', async (req, res) => {
   }
 
   const { rows: inserted } = await db.query(
-    `insert into usage_events (client_id, agent_id, session_id, channel, ai_model, input_tokens, output_tokens, messages_count, occurred_at, raw_payload, handoff)
-     values ($1,$2,$3,$4,$5,$6,$7,$8, coalesce($9, now()), $10, $11) returning id`,
+    `insert into usage_events (client_id, agent_id, session_id, channel, ai_model, input_tokens, output_tokens, messages_count, occurred_at, raw_payload, handoff,
+                               voice_seconds, stt_model, tokens_estimated)
+     values ($1,$2,$3,$4,$5,$6,$7,$8, coalesce($9, now()), $10, $11, $12, $13, $14) returning id`,
     [
       resolvedClientId, resolvedAgentId, session_id, resolvedChannel, ai_model || '',
       input_tokens || 0, output_tokens || 0, messages_count || 1,
@@ -168,6 +184,9 @@ router.post('/usage', async (req, res) => {
       // Left null unless the flow actually says, so containment is never
       // claimed for an agent that does not report handoffs at all.
       typeof handoff === 'boolean' ? handoff : null,
+      voiceSeconds,
+      voiceSeconds ? String(stt_model || '').slice(0, 80) : '',
+      typeof estimated === 'boolean' ? estimated : null,
     ]
   );
 
@@ -212,9 +231,14 @@ router.post('/usage', async (req, res) => {
  * Ask before replying: should this client's customers be answered right now?
  * n8n calls this at the top of the WhatsApp flow and branches on `allow`.
  *
- *   { "allow": true,  "reason": "ok" }
+ *   { "allow": true,  "reason": "ok", "voice": true }
  *   { "allow": false, "reason": "suspended",  "detail": "..." }
  *   { "allow": false, "reason": "over_quota", "detail": "..." }
+ *
+ * `voice` (v9.33) says whether this client has bought voice notes: true when
+ * a voice-minute rate applies to them (and always for our own account). A
+ * flow that gets voice:false should ask the customer to type rather than
+ * transcribe a recording nobody is paying for.
  *
  * Out of the box `allow` is always true — the default policy is to keep
  * serving and settle overage on the invoice, which is what the business model
@@ -234,7 +258,7 @@ router.get('/service-status', async (req, res) => {
     res.json(await serviceStatusFor({ external_ref, client_id, agent_ref }));
   } catch (err) {
     console.error('service-status check failed, allowing', err);
-    res.json({ allow: true, reason: 'check_failed', detail: 'The status check failed, so service continues.' });
+    res.json({ allow: true, reason: 'check_failed', voice: true, detail: 'The status check failed, so service continues.' });
   }
 });
 

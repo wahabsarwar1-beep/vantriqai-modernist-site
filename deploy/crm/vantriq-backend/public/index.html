@@ -2405,6 +2405,7 @@ function pricingBasisHTML(){
           As of <strong>${fmtDate(a.as_of)}</strong> · USD/PKR <strong>${a.fx_usd_pkr}</strong> ·
           <strong>${esc(rate(a.bulk_model).label||a.bulk_model)}</strong> for most turns, ${shareText} escalated to
           <strong>${esc(rate(a.premium_model).label||a.premium_model)}</strong> · typical use ${Math.round((a.utilization||0.7)*100)}% of the allowance
+          ${costingData.voice?`· voice notes on <strong>${esc(costingData.voice.label)}</strong>, ${pkr2(costingData.voice.per_minute_pkr)} a minute (${pkr2(costingData.voice.per_note_pkr)} a typical note)`:''}
         </div>
         <div style="font-size:11.5px;color:var(--muted);margin-top:4px;">Package prices stay fixed by the business model. What moves is what serving them costs — every figure below is recomputed from the rate card, and Financials uses the same numbers.</div>
       </div>
@@ -2486,7 +2487,7 @@ function addonsHTML(){
             <div style="font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.45;">${esc(a.summary)}</div></td>
           <td class="mono" style="white-space:nowrap;max-width:260px;">${addonPrice(a)}</td>
           <td style="font-size:12px;">${esc(a.availability||'')}</td>
-          ${admin?`<td class="mono">${a.price_basis==='fixed'||a.price_basis==='from'?fmtMoney(a.est_monthly_cost):'—'}</td>
+          ${admin?`<td class="mono">${a.price_basis==='fixed'||a.price_basis==='from'?fmtMoney(a.total_monthly_cost!=null?a.total_monthly_cost:a.est_monthly_cost):'—'}${a.stt_cost!=null?`<div style="font-family:var(--f-body);font-size:10.5px;color:var(--muted);white-space:normal;">incl. ${fmtMoney(a.stt_cost)} transcription · overage ${a.overage_cover}× cost</div>`:''}</td>
           <td class="mono" style="color:${marginTone(a.monthly_margin)};">${pctText(a.monthly_margin)}</td>
           <td class="mono">${pctText(a.setup_margin)}</td>`:''}
         </tr>`).join('')}
@@ -2494,7 +2495,7 @@ function addonsHTML(){
       </table>
     </div>`;
   }).join('')}
-  ${admin?`<p class="footnote">Our cost is an estimate per add-on (model, voice and telephony usage at a typical volume); setup margin assumes build hours split evenly between founder and contracted time. Vantriq Echo is priced on what it costs to run — it has no AI or messaging cost of its own, only setup time and a short monthly review — so it is a base for the first location and a smaller step for each further one: PKR 6,000 a month for one branch, 12,000 for five, 19,500 for ten, at a monthly margin of 75% or more at every size. Human Support is new since the August model and carries the September proposal. Change any add-on through the API (PUT /api/addons/:id).</p>`:''}`;
+  ${admin?`<p class="footnote">Our cost is an estimate per add-on (model, voice and telephony usage at a typical volume); setup margin assumes build hours split evenly between founder and contracted time. Vantriq Echo is priced on what it costs to run — it has no AI or messaging cost of its own, only setup time and a short monthly review — so it is a base for the first location and a smaller step for each further one: PKR 6,000 a month for one branch, 12,000 for five, 19,500 for ten, at a monthly margin of 75% or more at every size. Human Support is new since the August model and carries the September proposal. Voice add-ons include an allowance of voice-note minutes: their cost is the rest of the service plus those minutes at the live speech-to-text price, so it moves when the vendor's price does; minutes past the allowance are billed through a Voice-note minutes rate card on the client. Change any add-on through the API (PUT /api/addons/:id).</p>`:''}`;
 }
 
 /* The CEO's business documents (v9.21): the business model, the client pitch
@@ -2712,6 +2713,22 @@ function costingModalHTML(){
         <div class="field"><label>Contractor rate (PKR/h)</label><input id="cs_contract" type="number" value="${a.contractor_rate}"></div>
         <div class="field"><label>Infrastructure (PKR/mo)</label><input id="cs_infra" type="number" value="${a.infra_monthly}"></div>
       </div>
+      <div class="field-row">
+        <div class="field"><label>Voice notes transcribed by</label><select id="cs_stt">${(costingData.stt_rates||[]).map(r=>`<option value="${esc(r.key)}" ${r.key===a.stt_model?'selected':''}>${esc(r.label)} (${esc(r.vendor)})</option>`).join('')}</select></div>
+        <div class="field"><label>A typical voice note (minutes)</label><input id="cs_vnm" type="number" min="0.05" max="15" step="0.05" value="${a.voice_note_minutes}"></div>
+      </div>
+      <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin:10px 0 6px;">Speech-to-text prices — USD per minute of audio</label>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Model</th><th>Per minute</th><th>Checked</th><th>Note</th></tr></thead>
+        <tbody>
+        ${(costingData.stt_rates||[]).map(r=>`<tr>
+          <td><strong>${esc(r.label)}</strong><div style="font-size:11px;color:var(--muted);">${esc(r.vendor)} · ${esc(r.source||'')}</div></td>
+          <td style="width:104px;"><input class="cs-stt" data-key="${esc(r.key)}" type="number" step="0.0001" min="0" value="${r.per_minute}" style="width:96px;"></td>
+          <td style="font-size:11.5px;white-space:nowrap;">${r.as_of?fmtDate(r.as_of):'—'}</td>
+          <td style="font-size:11px;color:var(--muted);max-width:260px;">${esc(r.note||'')}</td>
+        </tr>`).join('')}
+        </tbody>
+      </table></div>
       <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin:10px 0 6px;">Model prices — USD per million tokens</label>
       <div class="table-wrap"><table>
         <thead><tr><th>Model</th><th>Input</th><th>Output</th><th>Checked</th><th>Note</th></tr></thead>
@@ -2752,15 +2769,23 @@ async function saveCosting(){
       rates[r.key][el.dataset.side] = val;
     }
   });
+  const sttRates = {};
+  document.querySelectorAll('.cs-stt').forEach(el=>{
+    const r = (costingData.stt_rates||[]).find(x=>x.key===el.dataset.key);
+    const val = parseFloat(el.value);
+    if(r && Number.isFinite(val) && val !== Number(r.per_minute)) sttRates[r.key] = { per_minute: val };
+  });
   try{
     const model = await API.put('/api/costing', {
       rates,
+      stt_rates: sttRates,
       utilization: (parseFloat(v('cs_util'))||70)/100,
       assumptions: {
         fx_usd_pkr: parseFloat(v('cs_fx')),
         bulk_model: v('cs_bulk'), premium_model: v('cs_prem'),
         founder_rate: parseFloat(v('cs_founder')), contractor_rate: parseFloat(v('cs_contract')),
         infra_monthly: parseFloat(v('cs_infra')),
+        stt_model: v('cs_stt'), voice_note_minutes: parseFloat(v('cs_vnm')),
       },
     });
     await afterCostingChange(model);
@@ -5156,7 +5181,7 @@ async function ignoreCredit(id){
 function opsRatesHTML(){
   const rates = opsData.rates || [];
   const METRIC_LABEL = { session:'Conversations', message:'Messages', input_token:'Input tokens',
-    output_token:'Output tokens', automation_run:'Automation runs' };
+    output_token:'Output tokens', automation_run:'Automation runs', voice_minute:'Voice-note minutes' };
   return `
   <div class="card" style="max-width:720px;">
     <h3 style="margin-top:0;font-size:14.5px;">Metered rates</h3>
@@ -5165,6 +5190,8 @@ function opsRatesHTML(){
       something else instead — messages, tokens, automation runs — which is what a negotiated contract
       usually needs. The most specific one wins: an agent's beats a client's, a client's beats a
       package's, and a package's beats the tier's built-in overage.
+      A <b>Voice-note minutes</b> rate also marks voice notes as bought: the service-status check
+      tells the client's agents <code>voice: true</code> only when one exists.
     </p>
     <button class="btn btn-primary" onclick="openModal={type:'rate'};render()">${iconPlus(14)} New rate card</button>
   </div>
@@ -5329,6 +5356,7 @@ function rateModalHTML(){
           <option value="input_token">Input tokens</option>
           <option value="output_token">Output tokens</option>
           <option value="automation_run">Automation runs</option>
+          <option value="voice_minute">Voice-note minutes</option>
         </select>
       </div>
       <div class="field-row">

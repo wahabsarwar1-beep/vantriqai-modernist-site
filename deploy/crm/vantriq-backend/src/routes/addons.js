@@ -16,6 +16,7 @@ const router = express.Router();
 
 const FAMILIES = ['capability', 'solution', 'insight', 'deployment'];
 const BASES = ['fixed', 'from', 'included', 'scope'];
+const METERS = ['voice_minute'];
 const PRIVATE = ['est_monthly_cost', 'est_build_hours', 'cost_note'];
 
 class AddonError extends Error {
@@ -67,6 +68,19 @@ function fields(body, { creating }) {
     if (!Number.isFinite(h) || h < 0 || h > 5000) throw new AddonError(400, 'Build hours must be 0 or more.');
     out.est_build_hours = h;
   }
+  // A metered allowance (v9.33): what the monthly fee includes, and the
+  // price of each unit past it. Only voice minutes are metered so far.
+  if (b.meter !== undefined) {
+    const m = b.meter === null || b.meter === '' ? null : String(b.meter);
+    if (m !== null && !METERS.includes(m)) throw new AddonError(400, `Meter must be one of: ${METERS.join(', ')}.`);
+    out.meter = m;
+  }
+  if (b.included_units !== undefined) {
+    const u = Number(b.included_units || 0);
+    if (!Number.isFinite(u) || u < 0 || u > 10000000) throw new AddonError(400, 'Included units must be 0 or more.');
+    out.included_units = u;
+  }
+  if (b.overage_rate !== undefined) out.overage_rate = money(b.overage_rate, 'The per-unit price');
   if (b.sort_order !== undefined) out.sort_order = Math.round(Number(b.sort_order) || 0);
   if (b.is_new !== undefined) out.is_new = b.is_new === true || b.is_new === 'true';
   if (b.active !== undefined) out.active = b.active === true || b.active === 'true';
@@ -90,7 +104,7 @@ router.get('/', async (req, res) => {
   );
   if (!admin) return res.json(rows.map(strip));
   const model = await costingModel({ withAddons: false });
-  res.json(rows.map((r) => ({ ...r, ...addonEconomics(r, model.assumptions) })));
+  res.json(rows.map((r) => ({ ...r, ...addonEconomics(r, model.assumptions, model.voice) })));
 });
 
 router.post('/', adminOnly, async (req, res) => {
