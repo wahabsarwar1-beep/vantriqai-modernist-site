@@ -39,7 +39,7 @@ export const products = (region: Region): Product[] => [
   },
   {
     kicker: "Channel", name: "Voice Agent", tier: "Add-on module", tint: "accent", mark: "voice",
-    body: "Answers your business phone in a natural voice, handles the same reception and booking as the chat agent, and hands off cleanly when a call needs a person. Priced separately, with call minutes included.",
+    body: "Answers your business phone in a natural voice, handles the same reception and booking as the chat agent, and hands off cleanly when a call needs a person. Priced separately: a monthly fee plus call minutes.",
   },
   {
     kicker: "Capability", name: "Booking Agent", tier: "Add-on module", tint: "dark", mark: "booking",

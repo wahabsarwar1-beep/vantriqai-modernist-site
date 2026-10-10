@@ -81,6 +81,10 @@ function fields(body, { creating }) {
     out.included_units = u;
   }
   if (b.overage_rate !== undefined) out.overage_rate = money(b.overage_rate, 'The per-unit price');
+  // The US-dollar price book (v9.34): what a USD client is quoted and billed.
+  for (const [k, label] of [['setup_fee_usd', 'The US$ setup fee'], ['monthly_fee_usd', 'The US$ monthly fee'], ['overage_rate_usd', 'The US$ per-unit price']]) {
+    if (b[k] !== undefined) out[k] = b[k] === null || b[k] === '' ? null : money(b[k], label);
+  }
   if (b.sort_order !== undefined) out.sort_order = Math.round(Number(b.sort_order) || 0);
   if (b.is_new !== undefined) out.is_new = b.is_new === true || b.is_new === 'true';
   if (b.active !== undefined) out.active = b.active === true || b.active === 'true';

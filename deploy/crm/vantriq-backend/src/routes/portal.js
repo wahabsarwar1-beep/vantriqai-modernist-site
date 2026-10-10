@@ -197,13 +197,13 @@ router.get('/usage', async (req, res) => {
   // Voice notes (v9.33): included up to the voice-minute allowance on the
   // rate card that applies to this client — their package's, unless one was
   // agreed for them — then billed per minute.
-  const { ratesFor } = require('../utils/subscriptions');
+  const { ratesFor, rateIn } = require('../utils/subscriptions');
   const voiceRate = (await ratesFor(client, null, new Date())).find((r) => r.metric === 'voice_minute') || null;
   const voiceUsed = Math.round((+current.voice_minutes || 0) * 10) / 10;
   const voice = voiceRate ? {
     minutes_used: voiceUsed,
     minutes_included: +voiceRate.included_units,
-    rate_per_minute: +voiceRate.unit_rate,
+    rate_per_minute: rateIn(voiceRate, client, null),
     minutes_over: Math.max(0, Math.round((voiceUsed - +voiceRate.included_units) * 10) / 10),
   } : (voiceUsed ? { minutes_used: voiceUsed, minutes_included: null, rate_per_minute: null, minutes_over: 0 } : null);
   // Phone calls (the Voice Agent add-on): their own allowance and rate,
@@ -213,7 +213,7 @@ router.get('/usage', async (req, res) => {
   const calls = callRate ? {
     minutes_used: callUsed,
     minutes_included: +callRate.included_units,
-    rate_per_minute: +callRate.unit_rate,
+    rate_per_minute: rateIn(callRate, client, null),
     minutes_over: Math.max(0, Math.round((callUsed - +callRate.included_units) * 10) / 10),
   } : (callUsed ? { minutes_used: callUsed, minutes_included: null, rate_per_minute: null, minutes_over: 0 } : null);
   const overSessions = quota != null ? Math.max(0, sessionsUsed - quota) : 0;
@@ -740,13 +740,16 @@ router.get('/activity', async (req, res) => {
 router.get('/packages', async (req, res) => {
   const { rows } = await db.query(
     `select id, name, target_tier, setup_fee, retainer, quota, overage_rate,
-            msgs_per_session, automation, data_layer, channels, includes, excludes,
+            setup_fee_usd, retainer_usd, overage_rate_usd, msgs_per_session, automation, data_layer, channels, includes, excludes,
             (select r.included_units from usage_rates r
               where r.product_id = products.id and r.client_id is null and r.agent_id is null
                 and r.metric = 'voice_minute' and r.effective_to is null limit 1) as voice_minutes,
             (select r.unit_rate from usage_rates r
               where r.product_id = products.id and r.client_id is null and r.agent_id is null
-                and r.metric = 'voice_minute' and r.effective_to is null limit 1) as voice_rate
+                and r.metric = 'voice_minute' and r.effective_to is null limit 1) as voice_rate,
+            (select r.unit_rate_usd from usage_rates r
+              where r.product_id = products.id and r.client_id is null and r.agent_id is null
+                and r.metric = 'voice_minute' and r.effective_to is null limit 1) as voice_rate_usd
        from products
       where archived = false and is_standard = true
       order by sort_order asc, created_at asc`
@@ -760,14 +763,17 @@ router.get('/packages', async (req, res) => {
   );
   res.json({
     current_product_id: req.portalClient.product_id,
-    packages: rows.map((r) => ({
+    // A USD client sees the dollar list (v9.34), the same figures they will be billed.
+    packages: rows.map((r) => ({ r, eff: effectivePackage(req.portalClient, r) })).map(({ r, eff }) => ({
       id: r.id, name: r.name, target_tier: r.target_tier,
-      setup_fee: +r.setup_fee, retainer: +r.retainer, quota: +r.quota,
-      overage_rate: +r.overage_rate, msgs_per_session: +r.msgs_per_session,
+      setup_fee: eff.setup_fee, retainer: eff.retainer, quota: +r.quota,
+      overage_rate: eff.overage_rate, msgs_per_session: +r.msgs_per_session,
+      currency: eff.currency || null,
       automation: r.automation, data_layer: r.data_layer, channels: r.channels,
       includes: r.includes || [], excludes: r.excludes || [],
       voice_minutes: r.voice_minutes == null ? null : +r.voice_minutes,
-      voice_rate: r.voice_rate == null ? null : +r.voice_rate,
+      voice_rate: r.voice_rate == null ? null
+        : (eff.currency === 'USD' && r.voice_rate_usd != null ? +r.voice_rate_usd : +r.voice_rate),
     })),
     pending_request: pending.rows[0] || null,
   });

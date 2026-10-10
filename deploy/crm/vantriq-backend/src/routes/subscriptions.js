@@ -1,7 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const subs = require('../utils/subscriptions');
-const { effectivePackage } = require('../utils/pkg');
+const { effectivePackage, inUsd } = require('../utils/pkg');
 const { ROUND } = require('../utils/billing');
 const { blockAutomation } = require('../middleware/auth');
 const router = express.Router();
@@ -38,6 +38,33 @@ async function priceFromProduct(client, productId, overrides = {}) {
   };
 }
 
+/**
+ * Prices a bundle from a catalogue add-on (v9.34), in the client's currency.
+ * An add-on carries no conversations of its own; a metered one (the Voice
+ * Agent's call minutes) gets its rate card when the bundle is created.
+ */
+async function priceFromAddon(client, key, overrides = {}) {
+  const { rows } = await db.query(`select * from catalog_addons where key = $1 and active = true`, [key]);
+  const a = rows[0];
+  if (!a) return null;
+  if (a.price_basis === 'scope' || a.price_basis === 'included') return { error: `${a.name} is ${a.price_basis === 'scope' ? 'priced on scope' : 'already included'}: add it as a named bundle with the agreed figures.` };
+  const usd = inUsd(client);
+  const pick = (col) => (usd && a[`${col}_usd`] !== null && a[`${col}_usd`] !== undefined ? Number(a[`${col}_usd`]) : Number(a[col] || 0));
+  return {
+    product_id: null,
+    addon: a,
+    addon_key: a.key,
+    name: overrides.name || a.name,
+    unit_setup_fee: overrides.unit_setup_fee !== undefined ? Number(overrides.unit_setup_fee) : pick('setup_fee'),
+    unit_retainer: overrides.unit_retainer !== undefined ? Number(overrides.unit_retainer) : pick('monthly_fee'),
+    unit_quota: 0,
+    overage_rate: 0,
+    meter_rate: a.meter ? (overrides.meter_rate !== undefined ? Number(overrides.meter_rate) : pick('overage_rate')) : null,
+  };
+}
+
+const METER_LABEL = { call_minute: 'Phone-call minutes (Voice Agent)', voice_minute: 'Voice-note minutes' };
+
 router.get('/bundles', async (req, res) => {
   const { client_id, status } = req.query;
   const clauses = [];
@@ -66,7 +93,11 @@ router.post('/bundles', async (req, res) => {
   if (!client) return res.status(404).json({ error: 'Client not found' });
 
   let priced;
-  if (body.product_id) {
+  if (body.addon_key) {
+    priced = await priceFromAddon(client, String(body.addon_key), body);
+    if (!priced) return res.status(404).json({ error: 'That add-on is not in the catalogue.' });
+    if (priced.error) return res.status(400).json({ error: priced.error });
+  } else if (body.product_id) {
     priced = await priceFromProduct(client, body.product_id, body);
     if (!priced) return res.status(404).json({ error: 'That package is not available.' });
   } else {
@@ -96,18 +127,38 @@ router.post('/bundles', async (req, res) => {
   const { rows } = await db.query(
     `insert into client_bundles
        (client_id, agent_id, product_id, name, qty, unit_setup_fee, unit_retainer, unit_quota,
-        overage_rate, recurring, status, starts_on, ends_on, added_by, note)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) returning *`,
+        overage_rate, recurring, status, starts_on, ends_on, added_by, note, addon_key)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) returning *`,
     [
       client.id, body.agent_id || null, priced.product_id, priced.name,
       Number(body.qty || 1), priced.unit_setup_fee, priced.unit_retainer, priced.unit_quota,
       priced.overage_rate, body.recurring !== false, status,
       startsOn, body.ends_on || null,
-      body.added_by || 'admin', body.note || '',
+      body.added_by || 'admin', body.note || '', priced.addon_key || null,
     ]
   );
+  // A metered add-on bills its units from the day it starts: the rate card
+  // is created with it and ended with it.
+  if (priced.addon && priced.addon.meter) {
+    await db.query(
+      `insert into usage_rates (client_id, metric, unit_rate, included_units, unit_size, label, effective_from, effective_to, bundle_id)
+       values ($1, $2, $3, $4, 1, $5, $6, $7, $8)`,
+      [client.id, priced.addon.meter, priced.meter_rate, Number(priced.addon.included_units || 0),
+        METER_LABEL[priced.addon.meter] || priced.addon.name, startsOn, body.ends_on || null, rows[0].id]
+    );
+  }
   res.status(201).json(rows[0]);
 });
+
+/** Ends the rate card a metered add-on created, on the day the add-on ends. */
+async function endBundleRates(bundle) {
+  if (!bundle || !['ended', 'cancelled'].includes(bundle.status) && !bundle.ends_on) return;
+  await db.query(
+    `update usage_rates set effective_to = coalesce($2::date, current_date)
+      where bundle_id = $1 and (effective_to is null or effective_to > coalesce($2::date, current_date))`,
+    [bundle.id, bundle.ends_on]
+  );
+}
 
 router.patch('/bundles/:id', async (req, res) => {
   const allowed = ['name', 'qty', 'unit_setup_fee', 'unit_retainer', 'unit_quota',
@@ -124,6 +175,7 @@ router.patch('/bundles/:id', async (req, res) => {
     `update client_bundles set ${sets.join(', ')} where id = $1 returning *`, params
   );
   if (!rows[0]) return res.status(404).json({ error: 'Bundle not found' });
+  await endBundleRates(rows[0]);
   res.json(rows[0]);
 });
 
@@ -151,6 +203,7 @@ router.delete('/bundles/:id', blockAutomation, async (req, res) => {
       where id = $1 returning *`,
     [req.params.id]
   );
+  await endBundleRates(rows[0]);
   res.json(rows[0]);
 });
 

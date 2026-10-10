@@ -2544,3 +2544,74 @@ begin
   insert into applied_migrations (name, note)
   values ('v9_33_voice_agent_addon', 'Voice Agent priced as an add-on: 500 call minutes included, PKR 85 a minute beyond.');
 end $$;
+
+-- =====================================================================
+-- v9.34 — one price list per currency, overage that never undercuts the
+-- next package, and the Voice Agent priced as platform fee + minutes.
+-- Approved 10 Oct 2026.
+-- =====================================================================
+
+-- A US-dollar price book beside the rupee one. A client whose currency is
+-- USD is quoted, bundled and billed from these columns; a column left null
+-- falls back to the rupee figure, as before.
+alter table products add column if not exists setup_fee_usd numeric;
+alter table products add column if not exists retainer_usd numeric;
+alter table products add column if not exists overage_rate_usd numeric;
+alter table catalog_addons add column if not exists setup_fee_usd numeric;
+alter table catalog_addons add column if not exists monthly_fee_usd numeric;
+alter table catalog_addons add column if not exists overage_rate_usd numeric;
+-- A package's own rate card (voice-note minutes) priced for USD clients.
+alter table usage_rates add column if not exists unit_rate_usd numeric;
+-- A bundle can be a catalogue add-on, so add-ons bill monthly like bundles.
+alter table client_bundles add column if not exists addon_key text;
+-- The rate card a metered add-on created, ended with the add-on.
+alter table usage_rates add column if not exists bundle_id uuid references client_bundles(id) on delete set null;
+
+do $$
+begin
+  if exists (select 1 from applied_migrations where name = 'v9_34_price_books') then
+    return;
+  end if;
+
+  -- Overage: one flat rate per extra conversation on every package, the
+  -- lowest at which running over any package costs more than moving up
+  -- (Starter at 4,000 conversations: 20,000 + 2,500 x 7 = 37,500 > Growth's
+  -- 35,000). Only where the rate is still the seeded one.
+  update products p set overage_rate = 7
+    from (values ('Starter', 2), ('Growth', 2), ('Scale', 3), ('Pro', 4), ('Enterprise', 4), ('Enterprise+', 5)) as d(name, rate)
+   where p.name = d.name and p.overage_rate = d.rate;
+
+  -- The global list (US$), anchored to what managed AI-agent services charge
+  -- abroad. Enterprise and Enterprise+ are "from" figures, quoted after review.
+  update products p set setup_fee_usd = d.setup, retainer_usd = d.monthly, overage_rate_usd = 0.10
+    from (values ('Starter', 750, 299), ('Growth', 1500, 499), ('Scale', 2000, 799),
+                 ('Pro', 2900, 1390), ('Enterprise', 3900, 1990), ('Enterprise+', 5400, 3690)) as d(name, setup, monthly)
+   where p.name = d.name and p.retainer_usd is null;
+
+  -- Voice-note minutes past a package's allowance: PKR 5, or US$0.02.
+  update usage_rates set unit_rate_usd = 0.02
+   where product_id is not null and metric = 'voice_minute' and unit_rate = 5 and unit_rate_usd is null;
+
+  -- The Voice Agent: a monthly platform fee for our work, and every call
+  -- minute at about 30% over what ElevenLabs and the phone line cost us
+  -- (about PKR 28 / US$0.10). Was PKR 35,000 with 500 minutes, then PKR 85.
+  update catalog_addons set
+      monthly_fee = 20000, setup_fee_usd = 900, monthly_fee_usd = 149,
+      meter = 'call_minute', included_units = 0, overage_rate = 40, overage_rate_usd = 0.15,
+      price_note = 'Plus PKR 40 a call minute (US$0.15) from the first minute; the rate follows the dollar',
+      est_monthly_cost = 6500,
+      cost_note = 'Management, tuning and the phone number. Call minutes are billed through: they cost us about PKR 28 (US$0.10) — ElevenLabs Agents at US$0.08, the model and a local line — and are sold at PKR 40 (US$0.15), about 30%, enough to absorb a 10% fall in the rupee and ElevenLabs'' double rate on busy hours.'
+   where key = 'voice-call-agent' and est_monthly_cost = 13853;
+
+  update catalog_addons a set setup_fee_usd = d.setup, monthly_fee_usd = d.monthly
+    from (values ('website-chat', 500, 149), ('voice-understanding', 500, 179), ('image-recognition', 400, 129),
+                 ('echo', 250, 89), ('echo-location', 50, 19), ('human-support', 400, 199),
+                 ('lead-generation', 1900, 649), ('sales-assistant', 1990, 690),
+                 ('support-after-sales', 950, 319), ('document-processing', 1790, 579)) as d(key, setup, monthly)
+   where a.key = d.key and a.monthly_fee_usd is null;
+  update catalog_addons set price_note = 'Typically PKR 35,000–110,000 setup and 16,000–55,000 a month (US$750–2,500 and US$250–790)'
+   where price_basis = 'scope' and price_note = 'Typically PKR 35,000–110,000 setup and 16,000–55,000 a month';
+
+  insert into applied_migrations (name, note)
+  values ('v9_34_price_books', 'Flat PKR 7 / US$0.10 overage, a US$ price book, and the Voice Agent at PKR 20,000 a month plus PKR 40 a minute.');
+end $$;

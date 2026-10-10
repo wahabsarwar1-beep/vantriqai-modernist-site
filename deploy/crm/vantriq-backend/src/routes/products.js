@@ -5,7 +5,8 @@ const router = express.Router();
 
 const FIELDS = [
   'name','target_tier','setup_fee','retainer','msgs_per_session','quota',
-  'overage_rate','delivery_cost_full','automation','data_layer','ai_model','channels','sort_order'
+  'overage_rate','delivery_cost_full','automation','data_layer','ai_model','channels','sort_order',
+  'setup_fee_usd','retainer_usd','overage_rate_usd'
 ];
 
 /**

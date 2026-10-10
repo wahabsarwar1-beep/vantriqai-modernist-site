@@ -743,10 +743,11 @@ const INVOICE_TYPE_FROM_API = {'setup_fee':'Setup fee','retainer':'Retainer','ov
 function productFromApi(p){ return { id:p.id, name:p.name, isStandard:p.is_standard!==false, targetTier:p.target_tier, setupFee:+p.setup_fee, retainer:+p.retainer, msgsPerSession:+p.msgs_per_session, quota:+p.quota, overageRate:+p.overage_rate, deliveryCostFull:+p.delivery_cost_full, automation:p.automation, dataLayer:p.data_layer, aiModel:p.ai_model, channels:p.channels, order:p.sort_order,
   includedAgents:(p.included_agents===undefined||p.included_agents===null)?1:+p.included_agents,
   extraAgentPrice:(p.extra_agent_price===undefined||p.extra_agent_price===null)?0:+p.extra_agent_price,
-  includes:Array.isArray(p.includes)?p.includes:[], excludes:Array.isArray(p.excludes)?p.excludes:[] }; }
+  includes:Array.isArray(p.includes)?p.includes:[], excludes:Array.isArray(p.excludes)?p.excludes:[],
+  setupFeeUsd:p.setup_fee_usd==null?null:+p.setup_fee_usd, retainerUsd:p.retainer_usd==null?null:+p.retainer_usd, overageRateUsd:p.overage_rate_usd==null?null:+p.overage_rate_usd }; }
 function productToApi(p){ return { name:p.name, target_tier:p.targetTier, setup_fee:p.setupFee, retainer:p.retainer, msgs_per_session:p.msgsPerSession, quota:p.quota, overage_rate:p.overageRate, delivery_cost_full:p.deliveryCostFull, automation:p.automation, data_layer:p.dataLayer, ai_model:p.aiModel, channels:p.channels }; }
 
-function clientFromApi(c){ return { assignedAt:c.assigned_at||null, assignedBy:c.assigned_by||null, id:c.id, name:c.name, company:c.company, email:c.email, phone:c.phone, externalRef:c.external_ref||'', productId:c.product_id, stage:c.stage, estValue:+c.est_value||0, source:c.source, notes:c.notes, joinDate:c.join_date, sessionsUsedThisMonth:0, ownerRepId:c.owner_rep_id||null, salesStage:c.sales_stage||null, closeOutcome:c.close_outcome||null,
+function clientFromApi(c){ return { currency:c.currency||null, assignedAt:c.assigned_at||null, assignedBy:c.assigned_by||null, id:c.id, name:c.name, company:c.company, email:c.email, phone:c.phone, externalRef:c.external_ref||'', productId:c.product_id, stage:c.stage, estValue:+c.est_value||0, source:c.source, notes:c.notes, joinDate:c.join_date, sessionsUsedThisMonth:0, ownerRepId:c.owner_rep_id||null, salesStage:c.sales_stage||null, closeOutcome:c.close_outcome||null,
   portalEnabled:!!c.portal_enabled, portalUsername:c.portal_username||'',
   portalPasswordSetBy:c.portal_password_set_by||'', portalPasswordSetAt:c.portal_password_set_at||null,
   parentClientId:c.parent_client_id||null,
@@ -2498,7 +2499,7 @@ function addonsHTML(){
       </table>
     </div>`;
   }).join('')}
-  ${admin?`<p class="footnote">Our cost is an estimate per add-on (model, voice and telephony usage at a typical volume); setup margin assumes build hours split evenly between founder and contracted time. Vantriq Echo is priced on what it costs to run — it has no AI or messaging cost of its own, only setup time and a short monthly review — so it is a base for the first location and a smaller step for each further one: PKR 6,000 a month for one branch, 12,000 for five, 19,500 for ten, at a monthly margin of 75% or more at every size. Human Support is new since the August model and carries the September proposal. Voice add-ons include an allowance of voice-note minutes: their cost is the rest of the service plus those minutes at the live speech-to-text price, so it moves when the vendor's price does; minutes past the allowance are billed through a Voice-note minutes rate card on the client. Change any add-on through the API (PUT /api/addons/:id).</p>`:''}`;
+  ${admin?`<p class="footnote">Our cost is an estimate per add-on (model, voice and telephony usage at a typical volume); setup margin assumes build hours split evenly between founder and contracted time. Vantriq Echo is priced on what it costs to run — it has no AI or messaging cost of its own, only setup time and a short monthly review — so it is a base for the first location and a smaller step for each further one: PKR 6,000 a month for one branch, 12,000 for five, 19,500 for ten, at a monthly margin of 75% or more at every size. Human Support is new since the August model and carries the September proposal. The Voice Agent is a monthly fee plus every call minute (PKR 40 / US$0.15, about 30% over what ElevenLabs and the phone line cost us); adding it to a client as a bundle creates its call-minute rate card automatically. A client billed in US dollars is priced from the US$ columns throughout. Change any add-on through the API (PUT /api/addons/:id).</p>`:''}`;
 }
 
 /* The CEO's business documents (v9.21): the business model, the client pitch
@@ -4759,7 +4760,7 @@ function quoteModalHTML(){
     <div class="modal-body">
       <div class="field">
         <label>Client *</label>
-        <select id="qt_client">
+        <select id="qt_client" onchange="quoteClientChanged()">
           ${state.clients.filter(c=>!c.isInternal).sort((a,b)=>a.company.localeCompare(b.company))
             .map(c=>`<option value="${c.id}">${esc(c.company)}</option>`).join('')}
         </select>
@@ -4772,10 +4773,16 @@ function quoteModalHTML(){
         <label>Price a package (fills the lines in for you)</label>
         <select id="qt_product" onchange="quotePriceFromPackage()">
           <option value="">— type the lines myself —</option>
-          ${state.products.filter(p=>!p.archived).map(p=>`<option value="${p.id}" data-retainer="${p.retainer}" data-setup="${p.setupFee}" data-quota="${p.quota}">${esc(p.name)}</option>`).join('')}
+          ${state.products.filter(p=>!p.archived).map(p=>`<option value="${p.id}" data-retainer="${p.retainer}" data-setup="${p.setupFee}" data-retainer-usd="${p.retainerUsd??''}" data-setup-usd="${p.setupFeeUsd??''}" data-quota="${p.quota}">${esc(p.name)}</option>`).join('')}
         </select>
         <div style="font-size:11px;color:var(--muted);margin-top:4px;">Choosing one also proposes the move — accepting the quote puts them on it.</div>
       </div>
+
+      <div class="field">
+        <label>Add an add-on (priced from the catalogue)</label>
+        <select id="qt_addon" onchange="quoteAddAddon()"><option value="">— pick an add-on to add its lines —</option>${quoteAddonOptions()}</select>
+      </div>
+      <div id="qt_cur_note" style="font-size:11px;color:var(--muted);margin:-4px 0 6px;">${quoteCurrencyNote()}</div>
 
       <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin:14px 0 6px;">Lines</label>
       <div id="qt_lines">${quoteLinesHTML()}</div>
@@ -4843,14 +4850,51 @@ function quoteRecalc(){
   const el = document.getElementById('qt_total_v');
   if(el) el.textContent = fmtMoney(total);
 }
+/* Quotes are priced in the client's billing currency (v9.34): a USD client
+   gets the dollar list, everyone else the rupee one. */
+function quoteClientUsd(){
+  const id = (document.getElementById('qt_client')||{}).value;
+  const c = (state.clients||[]).find(x=>x.id===id);
+  return !!c && String(c.currency||'').toUpperCase()==='USD';
+}
+function quoteCurrencyNote(){
+  return quoteClientUsd() ? 'This client is billed in US dollars: package and add-on lines are priced from the dollar list.' : '';
+}
+function quoteClientChanged(){
+  const n = document.getElementById('qt_cur_note'); if(n) n.textContent = quoteCurrencyNote();
+  if((document.getElementById('qt_product')||{}).value) quotePriceFromPackage();
+}
+let quoteAddonCatalog = null;
+function quoteAddonOptions(){
+  if(!quoteAddonCatalog){
+    API.get('/api/addons').then(a=>{ quoteAddonCatalog = (a||[]).filter(x=>x.active!==false && ['fixed','from'].includes(x.price_basis));
+      const el = document.getElementById('qt_addon'); if(el) el.innerHTML = '<option value="">— pick an add-on to add its lines —</option>'+quoteAddonOptions(); }).catch(()=>{});
+    return '';
+  }
+  return quoteAddonCatalog.map(a=>`<option value="${esc(a.key)}">${esc(a.name)}</option>`).join('');
+}
+function quoteAddAddon(){
+  const sel = document.getElementById('qt_addon'); const key = sel.value; sel.value = '';
+  const a = (quoteAddonCatalog||[]).find(x=>x.key===key); if(!a) return;
+  const usd = quoteClientUsd();
+  const pick = col => usd && a[col+'_usd']!=null ? Number(a[col+'_usd']) : Number(a[col]||0);
+  quoteLines = quoteLines.filter(l=>l.description && l.description.trim());
+  if(pick('setup_fee')>0) quoteLines.push({description:`${a.name} — setup`, qty:1, unit_price:pick('setup_fee')});
+  if(pick('monthly_fee')>0) quoteLines.push({description:`${a.name} — monthly${a.price_note?` (${a.price_note})`:''}`, qty:1, unit_price:pick('monthly_fee')});
+  document.getElementById('qt_lines').innerHTML = quoteLinesHTML();
+  quoteRecalc();
+}
 function quotePriceFromPackage(){
   const opt = document.getElementById('qt_product').selectedOptions[0];
   if(!opt || !opt.value) return;
+  const usd = quoteClientUsd() && opt.dataset.retainerUsd !== '';
+  const setup = Number(usd ? opt.dataset.setupUsd : opt.dataset.setup);
+  const retainer = Number(usd ? opt.dataset.retainerUsd : opt.dataset.retainer);
   quoteLines = [];
-  if(Number(opt.dataset.setup) > 0){
-    quoteLines.push({description:`${opt.text} — setup and onboarding`, qty:1, unit_price:Number(opt.dataset.setup)});
+  if(setup > 0){
+    quoteLines.push({description:`${opt.text} — setup and onboarding`, qty:1, unit_price:setup});
   }
-  quoteLines.push({description:`${opt.text} — monthly retainer`, qty:1, unit_price:Number(opt.dataset.retainer)});
+  quoteLines.push({description:`${opt.text} — monthly retainer`, qty:1, unit_price:retainer});
   document.getElementById('qt_lines').innerHTML = quoteLinesHTML();
   if(!document.getElementById('qt_title').value) document.getElementById('qt_title').value = `Moving to ${opt.text}`;
   quoteRecalc();

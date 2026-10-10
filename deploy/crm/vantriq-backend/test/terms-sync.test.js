@@ -20,7 +20,7 @@ const crm = path.join(__dirname, '..', 'src', 'content', 'terms.json');
 const site = path.join(__dirname, '..', '..', '..', '..', 'lib', 'terms.json');
 
 const t = JSON.parse(fs.readFileSync(crm, 'utf8'));
-ok(/^\d{4}-\d{2}-\d{2}$/.test(t.version), 'the terms carry a dated version', t.version);
+ok(/^\d{4}-\d{2}-\d{2}(\.\d+)?$/.test(t.version), 'the terms carry a dated version (with a revision number when one day has two)', t.version);
 ok(Array.isArray(t.sections) && t.sections.length >= 10, 'and their sections', t.sections && t.sections.length);
 ok(t.sections.every((s) => s.id && s.heading && ((s.paragraphs || []).length || (s.bullets || []).length)),
   'every section has an id, a heading and some text');
