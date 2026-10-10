@@ -125,8 +125,8 @@ const ok = (c, m, x = '') => { c ? pass++ : fail++; console.log((c ? '  PASS ' :
     ok(call && Math.abs(call.amount - 85 * (95 / 60 - 1)) < 1, 'call minutes past the allowance are billed at the add-on rate', JSON.stringify(call));
     await db.query(`delete from usage_rates where client_id = $1 and metric = 'call_minute'`, [client.id]);
     const { rows: va } = await db.query(`select meter, included_units, overage_rate from catalog_addons where key = 'voice-call-agent'`);
-    ok(va[0] && va[0].meter === 'call_minute' && Number(va[0].included_units) === 500 && Number(va[0].overage_rate) === 85,
-      'the Voice Agent add-on includes 500 call minutes, then PKR 85 a minute', JSON.stringify(va[0]));
+    ok(va[0] && va[0].meter === 'call_minute' && Number(va[0].included_units) === 0 && Number(va[0].overage_rate) === 40,
+      'the Voice Agent add-on bills every call minute at PKR 40 (v9.34)', JSON.stringify(va[0]));
 
     const { rows: own } = await db.query(`select external_ref from clients where is_internal limit 1`);
     if (own[0] && own[0].external_ref) {

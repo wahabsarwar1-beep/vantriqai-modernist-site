@@ -195,7 +195,7 @@ const details = (region: Region): Record<string, ModuleDetail> => ({
       { q: "Do we keep our number?", a: "Yes. Calls to your existing number are forwarded to the agent on the conditions you choose." },
       { q: "Can callers ask for a person?", a: "Always. Asking for a person transfers the call, with a summary passed to whoever picks up." },
       { q: "Which languages does it speak?", a: "The languages your business needs, agreed during configuration and tested before go-live." },
-      { q: "Is it included in a package?", a: `No. The Voice Agent is an add-on on any package, priced separately, because every call minute carries real-time voice and phone-line costs that a chat does not. It includes ${VOICE_AGENT.minutes} call minutes a month; minutes beyond that are ${region.key === "pk" ? VOICE_AGENT.over : VOICE_AGENT.overUsd}. Voice notes sent on WhatsApp are different: those are included in every package.` },
+      { q: "Is it included in a package?", a: `No. The Voice Agent is an add-on on any package, priced separately, because every call minute carries real-time voice and phone-line costs that a chat does not. It carries a monthly fee for the service, and every call minute is billed at ${region.key === "pk" ? VOICE_AGENT.over : VOICE_AGENT.overUsd} — close to what the voice and phone line cost us, so a busy month never balloons. Voice notes sent on WhatsApp are different: those are included in every package.` },
     ],
   },
   "Booking Agent": {

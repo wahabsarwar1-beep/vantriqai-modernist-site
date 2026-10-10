@@ -1,6 +1,6 @@
 const express = require('express');
 const db = require('../db');
-const { createInvoice, getSettings, resolveTaxRate, ROUND } = require('../utils/billing');
+const { createInvoice, getSettings, resolveTaxRate, resolveCurrency, ROUND } = require('../utils/billing');
 const { formatDay, isoDay } = require('../utils/formatDate');
 const { effectivePackage } = require('../utils/pkg');
 const { blockAutomation } = require('../middleware/auth');
@@ -338,7 +338,7 @@ router.post('/:id/decline', async (req, res) => {
 async function buildQuoteDocument(quoteId) {
   const [{ rows }, settings] = await Promise.all([
     db.query(
-      `select q.*, c.company, c.name, c.email, c.phone, c.ntn, c.strn, c.billing_address
+      `select q.*, c.company, c.name, c.email, c.phone, c.ntn, c.strn, c.billing_address, c.currency as client_currency
          from quotes q join clients c on c.id = q.client_id where q.id = $1`,
       [quoteId]
     ),
@@ -355,14 +355,14 @@ async function buildQuoteDocument(quoteId) {
   let packageScope = null;
   if (q.product_id) {
     const { rows: pr } = await db.query(
-      `select name, quota, overage_rate, includes, excludes from products where id = $1`, [q.product_id]);
+      `select name, quota, overage_rate, overage_rate_usd, retainer_usd, includes, excludes from products where id = $1`, [q.product_id]);
     if (pr[0]) {
       packageScope = {
         name: pr[0].name,
         quota: Number(pr[0].quota),
-        overage_rate: Number(pr[0].overage_rate),
-        includes: pr[0].includes || [],
-        excludes: pr[0].excludes || [],
+        overage_rate: Number(priceIn(pr[0], q.client_currency).overage_rate ?? pr[0].overage_rate),
+        includes: inCurrency(pr[0].includes || [], q.client_currency),
+        excludes: inCurrency(pr[0].excludes || [], q.client_currency),
       };
     }
   }
@@ -376,7 +376,9 @@ async function buildQuoteDocument(quoteId) {
     issued_date: isoDay(q.created_at),
     due_date: isoDay(q.valid_until),
     status: q.status,
-    currency: settings.currency || 'PKR',
+    // Quoted in the currency the client is billed in (v9.34), so a USD
+    // client's quotation, proposal and invoices all speak dollars.
+    currency: resolveCurrency({ currency: q.client_currency }, settings),
     amount_due: Number(q.total),
     seller: {
       name: settings.company_name,
@@ -429,6 +431,22 @@ router.get('/:id/document', async (req, res) => {
  * from the products table, so a proposal can never quote a price the CRM
  * would not honour.
  */
+/** Rupee figures written into a package's scope lines, restated for a USD client. */
+function inCurrency(lines, currency) {
+  if (String(currency || '').toUpperCase() !== 'USD') return lines;
+  return lines.map((l) => String(l).replace(/PKR 5 a minute/g, 'US$0.02 a minute'));
+}
+
+/** A package's list prices in a currency: the dollar book for USD, falling back to rupees. */
+function priceIn(p, currency) {
+  if (String(currency || '').toUpperCase() !== 'USD' || p.retainer_usd === null || p.retainer_usd === undefined) return {};
+  return {
+    setup_fee: p.setup_fee_usd ?? p.setup_fee,
+    retainer: p.retainer_usd,
+    overage_rate: p.overage_rate_usd ?? p.overage_rate,
+  };
+}
+
 async function buildProposalDocument(quoteId) {
   const base = await buildQuoteDocument(quoteId);
   if (!base) return null;
@@ -436,7 +454,7 @@ async function buildProposalDocument(quoteId) {
   const { rows: qr } = await db.query(
     `select q.title, q.quote_number, q.valid_until, q.product_id,
             q.cover_letter, q.selected_product_ids, q.show_all_packages,
-            q.recommended_product_id, q.created_by, c.name as contact_name, c.company
+            q.recommended_product_id, q.created_by, c.name as contact_name, c.company, c.currency
        from quotes q join clients c on c.id = q.client_id where q.id = $1`,
     [quoteId]
   );
@@ -482,7 +500,7 @@ async function buildProposalDocument(quoteId) {
       || require('../content/proposal').defaultCoverLetter({
         contactName: q.contact_name, company: q.company,
       }),
-    packages: packages.map((p) => ({
+    packages: packages.map((p) => ({ ...p, ...priceIn(p, q.currency) })).map((p) => ({
       id: p.id,
       name: p.name,
       // 'Typically 300–600 sessions/mo' -> '300–600 sessions/mo'. The hedge
@@ -496,8 +514,8 @@ async function buildProposalDocument(quoteId) {
       quota: Number(p.quota),
       overage_rate: Number(p.overage_rate),
       channels: p.channels || '',
-      includes: p.includes || [],
-      excludes: p.excludes || [],
+      includes: inCurrency(p.includes || [], q.currency),
+      excludes: inCurrency(p.excludes || [], q.currency),
       included_agents: Number(p.included_agents),
       extra_agent_price: Number(p.extra_agent_price),
       recommended: !!q.recommended_product_id && p.id === q.recommended_product_id,

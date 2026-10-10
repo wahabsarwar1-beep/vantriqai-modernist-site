@@ -66,24 +66,21 @@ export const BMK = [
 ];
 
 /**
- * `over` is the Pakistan rate, `overUsd` the one the /global pages show.
- *
- * THE USD COLUMN IS A PLACEHOLDER. It is not a conversion of the PKR column —
- * at the interbank rate PKR 2 is under a cent, which would price the global
- * site below anyone's cost. It keeps the PKR column's shape (flat for the
- * first two tiers, then stepping up) against a $0.05 base, which sits inside
- * the usual range for per-conversation overage. Replace these six figures
- * with the real ones before the global site is promoted anywhere.
+ * `over` is the Pakistan rate per extra conversation, `overUsd` the one the
+ * /global pages show. One flat rate on every package (approved 10 Oct 2026):
+ * the lowest at which running any package up to the next one's allowance
+ * costs more than moving up, so overage never undercuts an upgrade. The USD
+ * figure is the global price list's, not a conversion.
  */
 /**
  * The Voice Agent (phone calls) is an add-on on every package, not part of
  * one: each call minute carries real-time voice and telephony costs of about
  * US$0.10 (PKR 28), against well under a rupee for a chat conversation.
- * Approved 10 Oct 2026 and set the same in the CRM: 500 call minutes a month
- * included with the add-on, then PKR 85 a minute (three times cost, the
- * overage rule). The USD figure is a conversion at about 277 to the dollar.
+ * Approved 10 Oct 2026 and set the same in the CRM: a monthly platform fee
+ * for the service, then every call minute at about 30% over that cost —
+ * PKR 40, or US$0.15 on the global list.
  */
-export const VOICE_AGENT = { minutes: "500", over: "PKR 85 / min", overUsd: "US$ 0.31 / min" };
+export const VOICE_AGENT = { over: "PKR 40 / min", overUsd: "US$ 0.15 / min" };
 
 /*
  * `voice` is the voice-note minutes each package includes a month: 10% of its
@@ -93,12 +90,12 @@ export const VOICE_AGENT = { minutes: "500", over: "PKR 85 / min", overUsd: "US$
  * a conversion, unlike the session overage placeholders above.
  */
 export const USAGE = [
-  { plan: "Starter", typical: "300–600 / mo", sessions: "1,500", perday: "50", head: "5.0×", over: "PKR 2 / session", overUsd: "US$ 0.05 / session" , voice: "150", voiceOver: "PKR 5 / min", voiceOverUsd: "US$ 0.02 / min" },
-  { plan: "Growth", typical: "800–1,500 / mo", sessions: "4,000", perday: "133", head: "5.0×", over: "PKR 2 / session", overUsd: "US$ 0.05 / session" , voice: "400", voiceOver: "PKR 5 / min", voiceOverUsd: "US$ 0.02 / min" },
-  { plan: "Scale", typical: "2,000–4,000 / mo", sessions: "9,000", perday: "300", head: "4.5×", over: "PKR 3 / session", overUsd: "US$ 0.08 / session" , voice: "900", voiceOver: "PKR 5 / min", voiceOverUsd: "US$ 0.02 / min" },
-  { plan: "Pro", typical: "4,000–8,000 / mo", sessions: "15,000", perday: "500", head: "3.8×", over: "PKR 4 / session", overUsd: "US$ 0.10 / session" , voice: "1,500", voiceOver: "PKR 5 / min", voiceOverUsd: "US$ 0.02 / min" },
-  { plan: "Enterprise", typical: "8,000–15,000 / mo", sessions: "25,000", perday: "833", head: "3.1×", over: "PKR 4 / session", overUsd: "US$ 0.10 / session" , voice: "2,500", voiceOver: "PKR 5 / min", voiceOverUsd: "US$ 0.02 / min" },
-  { plan: "Enterprise+", typical: "15,000+ / mo", sessions: "40,000", perday: "1,333", head: "2.7×", over: "PKR 5 / session", overUsd: "US$ 0.13 / session" , voice: "4,000", voiceOver: "PKR 5 / min", voiceOverUsd: "US$ 0.02 / min" },
+  { plan: "Starter", typical: "300–600 / mo", sessions: "1,500", perday: "50", head: "5.0×", over: "PKR 7 / session", overUsd: "US$ 0.10 / session" , voice: "150", voiceOver: "PKR 5 / min", voiceOverUsd: "US$ 0.02 / min" },
+  { plan: "Growth", typical: "800–1,500 / mo", sessions: "4,000", perday: "133", head: "5.0×", over: "PKR 7 / session", overUsd: "US$ 0.10 / session" , voice: "400", voiceOver: "PKR 5 / min", voiceOverUsd: "US$ 0.02 / min" },
+  { plan: "Scale", typical: "2,000–4,000 / mo", sessions: "9,000", perday: "300", head: "4.5×", over: "PKR 7 / session", overUsd: "US$ 0.10 / session" , voice: "900", voiceOver: "PKR 5 / min", voiceOverUsd: "US$ 0.02 / min" },
+  { plan: "Pro", typical: "4,000–8,000 / mo", sessions: "15,000", perday: "500", head: "3.8×", over: "PKR 7 / session", overUsd: "US$ 0.10 / session" , voice: "1,500", voiceOver: "PKR 5 / min", voiceOverUsd: "US$ 0.02 / min" },
+  { plan: "Enterprise", typical: "8,000–15,000 / mo", sessions: "25,000", perday: "833", head: "3.1×", over: "PKR 7 / session", overUsd: "US$ 0.10 / session" , voice: "2,500", voiceOver: "PKR 5 / min", voiceOverUsd: "US$ 0.02 / min" },
+  { plan: "Enterprise+", typical: "15,000+ / mo", sessions: "40,000", perday: "1,333", head: "2.7×", over: "PKR 7 / session", overUsd: "US$ 0.10 / session" , voice: "4,000", voiceOver: "PKR 5 / min", voiceOverUsd: "US$ 0.02 / min" },
 ];
 
 export const INCLUDED = [

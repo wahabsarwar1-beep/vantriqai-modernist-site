@@ -175,7 +175,8 @@ async function meteredCharges(client, month) {
     const billable = Math.max(0, quantity - Number(r.included_units || 0));
     if (billable <= 0) continue;
     const units = Number(r.unit_size || 1) > 1 ? billable / Number(r.unit_size) : billable;
-    const amount = M(units * Number(r.unit_rate));
+    const unitRate = rateIn(r, client, settings);
+    const amount = M(units * unitRate);
     if (amount <= 0) continue;
     out.push({
       metric: r.metric,
@@ -185,12 +186,22 @@ async function meteredCharges(client, month) {
       // fraction of a unit. Rounded to two places that shows as 0, and the
       // line reads "0 x 0.15 = 0.000405", which is nonsense on an invoice.
       qty: Math.round(units * 1e6) / 1e6,
-      unit_price: Number(r.unit_rate),
+      unit_price: unitRate,
       amount,
       kind: 'overage',
     });
   }
   return out;
+}
+
+/**
+ * A rate card's price in the client's currency: a package's own card carries
+ * a US-dollar figure for USD clients (v9.34); a card made for one client is
+ * already in theirs.
+ */
+function rateIn(r, client, settings) {
+  const usd = resolveCurrency(client, settings) === 'USD';
+  return usd && r.unit_rate_usd !== null && r.unit_rate_usd !== undefined ? Number(r.unit_rate_usd) : Number(r.unit_rate);
 }
 
 /** Metrics a rate card prices instead of the package's own per-conversation figure. */
@@ -547,7 +558,7 @@ async function stampLines(invoiceId, lines) {
 }
 
 module.exports = {
-  bundlesFor, allowanceOf, subscriptionOf, ratesFor, meteredCharges,
+  bundlesFor, allowanceOf, subscriptionOf, ratesFor, meteredCharges, rateIn,
   buildMonthlyBill, applyDuePhases, expireBundles, runMonthlyBilling, stampLines,
   MONTH_START, monthEnd, DAY, METRIC_LABEL,
 };
