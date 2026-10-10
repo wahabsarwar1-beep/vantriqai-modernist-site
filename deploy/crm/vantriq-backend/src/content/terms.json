@@ -1,6 +1,6 @@
 {
-  "version": "2026-10-09",
-  "updated": "9 October 2026",
+  "version": "2026-10-10",
+  "updated": "10 October 2026",
   "title": "Terms & service information",
   "intro": "The terms that apply to every VantriqAI quotation, scope sign-off and service. A signed agreement or scope sign-off can add to them or change them for your deployment; where it does, the signed document prevails.",
   "sections": [
@@ -55,7 +55,7 @@
         "Allowances are monthly. Unused conversations, minutes or credits do not roll over to the next month, cannot be transferred and are not refunded or exchanged for cash, except where the law requires otherwise.",
         "Usage is measured from the AI provider's own counts where the provider reports them, and from our systems otherwise. Your client portal shows conversations and other metered usage for the month as it happens. If you believe a figure is wrong, tell us within 30 days of the invoice and we will review the records with you.",
         "Each action an agent or tool takes consumes AI processing, which varies with the complexity of the request and the tools used and is not quoted in advance. Session counts and capacity figures describe expected capacity, not a guaranteed entitlement.",
-        "Voice notes are included in every package, up to the voice-note minutes stated for it: 10% of its monthly conversation allowance (for example 150 minutes a month on Starter and 4,000 on Enterprise+). Minutes are measured from the length of each recording. Minutes beyond the allowance are billed at PKR 5 a minute, or at the rate in your quotation or agreement. Spoken replies to voice notes and voice calls are add-ons. Where a deployment does not include voice, the agent may ask your customer to type instead.",
+        "Voice notes are included in every package, up to the voice-note minutes stated for it: 10% of its monthly conversation allowance (for example 150 minutes a month on Starter and 4,000 on Enterprise+). Minutes are measured from the length of each recording. Minutes beyond the allowance are billed at PKR 5 a minute, or at the rate in your quotation or agreement. Spoken replies to voice notes are an add-on. Phone calls answered by the Voice Agent are an add-on on every package and are not included in any package's allowances: the add-on includes 500 call minutes a month, measured from the connected length of each call, and minutes beyond that are billed at PKR 85 a minute, or at the rate in your quotation or agreement. Phone-line and call-forwarding charges from your own telephone provider remain yours. Where a deployment does not include voice, the agent may ask your customer to type instead.",
         "We may limit, queue or pause automated replies to protect the service from abuse, floods of messages, spam or attacks, including messages that try to make the agent act outside its instructions. Such traffic may still count towards usage where it reached the AI provider."
       ]
     },

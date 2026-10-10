@@ -91,6 +91,24 @@ const ok = (c, m, x = '') => { c ? pass++ : fail++; console.log((c ? '  PASS ' :
     ok(s.voice === true, 'a voice rate on their package switches it on too', JSON.stringify(s));
     await db.query(`delete from usage_rates where product_id = $1 and label = 'Voice test package rate'`, [prod[0].id]);
 
+    console.log('\n== the Voice Agent bills phone-call minutes ==');
+    let c = await post({ external_ref: ref, session_id: `${session}-call`, channel: 'voice', input_tokens: 900, output_tokens: 120, call_seconds: 95 });
+    ok(c.status === 201, 'a phone call reports its connected length', c.status);
+    c = await post({ external_ref: ref, session_id: `${session}-call`, call_seconds: 99999 });
+    ok(c.status === 400 && /call_seconds/.test(c.body.error), 'a call longer than four hours is refused', c.status);
+    const { rows: cm } = await db.query(`select call_minutes from v_monthly_usage where client_id = $1`, [client.id]);
+    ok(Math.abs(Number(cm[0].call_minutes) - 1.58) < 0.01, 'the month rolls up 95 seconds as 1.58 call minutes', cm[0] && cm[0].call_minutes);
+    await db.query(
+      `insert into usage_rates (client_id, metric, unit_rate, included_units, unit_size, label)
+       values ($1, 'call_minute', 85, 1, 1, 'Phone-call minutes')`, [client.id]);
+    lines = await meteredCharges(client, month);
+    const call = lines.find((l) => l.metric === 'call_minute');
+    ok(call && Math.abs(call.amount - 85 * (95 / 60 - 1)) < 1, 'call minutes past the allowance are billed at the add-on rate', JSON.stringify(call));
+    await db.query(`delete from usage_rates where client_id = $1 and metric = 'call_minute'`, [client.id]);
+    const { rows: va } = await db.query(`select meter, included_units, overage_rate from catalog_addons where key = 'voice-call-agent'`);
+    ok(va[0] && va[0].meter === 'call_minute' && Number(va[0].included_units) === 500 && Number(va[0].overage_rate) === 85,
+      'the Voice Agent add-on includes 500 call minutes, then PKR 85 a minute', JSON.stringify(va[0]));
+
     const { rows: own } = await db.query(`select external_ref from clients where is_internal limit 1`);
     if (own[0] && own[0].external_ref) {
       const o = await fetch(`${B}/api/webhooks/service-status?external_ref=${encodeURIComponent(own[0].external_ref)}`, { headers: H }).then((x) => x.json());

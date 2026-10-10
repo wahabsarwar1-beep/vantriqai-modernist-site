@@ -38,8 +38,8 @@ export const products = (region: Region): Product[] => [
     body: "The embedded assistant on your own site — the widget in the corner of this page. Same brain, same actions, no app to download.",
   },
   {
-    kicker: "Channel", name: "Voice Agent", tier: "From Growth", tint: "accent", mark: "voice",
-    body: "Answers your business phone in a natural voice, handles the same reception and booking as the chat agent, and hands off cleanly when a call needs a person.",
+    kicker: "Channel", name: "Voice Agent", tier: "Add-on module", tint: "accent", mark: "voice",
+    body: "Answers your business phone in a natural voice, handles the same reception and booking as the chat agent, and hands off cleanly when a call needs a person. Priced separately, with call minutes included.",
   },
   {
     kicker: "Capability", name: "Booking Agent", tier: "Add-on module", tint: "dark", mark: "booking",

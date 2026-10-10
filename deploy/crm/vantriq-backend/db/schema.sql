@@ -153,6 +153,7 @@ create index if not exists idx_usage_session on usage_events(session_id);
 -- null when an older flow did not say.
 -- Here, ahead of the view below, so the view can sum them on a fresh install.
 alter table usage_events add column if not exists voice_seconds numeric not null default 0;
+alter table usage_events add column if not exists call_seconds numeric not null default 0;
 alter table usage_events add column if not exists stt_model text not null default '';
 alter table usage_events add column if not exists tokens_estimated boolean;
 
@@ -170,7 +171,8 @@ select
   sum(output_tokens) as output_tokens,
   -- v9.33: appended, never reordered, so `create or replace` keeps working
   -- on a database that already has the earlier columns.
-  round(coalesce(sum(voice_seconds), 0) / 60.0, 2) as voice_minutes
+  round(coalesce(sum(voice_seconds), 0) / 60.0, 2) as voice_minutes,
+  round(coalesce(sum(call_seconds), 0) / 60.0, 2) as call_minutes
 from usage_events
 group by client_id, date_trunc('month', occurred_at);
 
@@ -2257,14 +2259,19 @@ create table if not exists website_location_activity (
 -- what it adds — spoken replies — since transcription is now in the package.
 alter table usage_rates drop constraint if exists usage_rates_metric_check;
 alter table usage_rates add constraint usage_rates_metric_check
-  check (metric in ('session','message','input_token','output_token','automation_run','voice_minute'));
+  check (metric in ('session','message','input_token','output_token','automation_run','voice_minute','call_minute'));
 
 -- Add-ons can carry a metered allowance (meter, included_units,
 -- overage_rate), so a future metered add-on says what its fee includes.
 alter table catalog_addons add column if not exists meter text
-  check (meter is null or meter in ('voice_minute'));
+  check (meter is null or meter in ('voice_minute','call_minute'));
 alter table catalog_addons add column if not exists included_units numeric not null default 0;
 alter table catalog_addons add column if not exists overage_rate numeric;
+-- A database that added the column before call minutes existed carries the
+-- older check, so it is replaced by name rather than relied on.
+alter table catalog_addons drop constraint if exists catalog_addons_meter_check;
+alter table catalog_addons add constraint catalog_addons_meter_check
+  check (meter is null or meter in ('voice_minute','call_minute'));
 
 do $$
 begin
@@ -2509,4 +2516,29 @@ begin
   update settings set costing = costing - 'cache_share' where id = 1 and (costing->>'cache_share')::numeric = 0;
   insert into applied_migrations (name, note)
   values ('v9_33_twelve_messages_cached', 'Standard packages costed at 12 messages a session; costing defaults back to gpt-4o-mini with prompt caching.');
+end $$;
+
+-- v9.33 — the Voice Agent (phone calls) is an add-on on every package, never
+-- part of one, because each call minute carries real-time voice and phone
+-- line costs: ElevenLabs Agents at about US$0.08 a minute, the model behind
+-- it and a local SIP line bring it to about US$0.10 (PKR 28), against well
+-- under a rupee for a chat conversation. Approved 10 Oct 2026: PKR 35,000 a
+-- month with 500 call minutes included, then PKR 85 a minute (three times
+-- cost, the overage rule). The old running cost of 15,000 assumed 1,000
+-- minutes at PKR 15, half the real rate. Once, and only for the row the
+-- CRM seeded: an admin's edit stands.
+do $$
+begin
+  if exists (select 1 from applied_migrations where name = 'v9_33_voice_agent_addon') then
+    return;
+  end if;
+  update catalog_addons set
+      price_note = '500 call minutes a month included, then PKR 85 a minute',
+      est_monthly_cost = 13853,
+      cost_note = 'Real-time voice (ElevenLabs Agents, about US$0.08 a minute), the model and a local phone line: about US$0.10 (PKR 28) a call minute, costed at the 500 included minutes. Vendor prices checked through published trackers on 10 Oct 2026; confirm the local SIP rate before the first client goes live.',
+      meter = 'call_minute', included_units = 500, overage_rate = 85,
+      availability = 'Any package (add-on)'
+   where key = 'voice-call-agent' and est_monthly_cost = 15000;
+  insert into applied_migrations (name, note)
+  values ('v9_33_voice_agent_addon', 'Voice Agent priced as an add-on: 500 call minutes included, PKR 85 a minute beyond.');
 end $$;

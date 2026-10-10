@@ -5338,7 +5338,7 @@ async function ignoreCredit(id){
 function opsRatesHTML(){
   const rates = opsData.rates || [];
   const METRIC_LABEL = { session:'Conversations', message:'Messages', input_token:'Input tokens',
-    output_token:'Output tokens', automation_run:'Automation runs', voice_minute:'Voice-note minutes' };
+    output_token:'Output tokens', automation_run:'Automation runs', voice_minute:'Voice-note minutes', call_minute:'Phone-call minutes' };
   return `
   <div class="card" style="max-width:720px;">
     <h3 style="margin-top:0;font-size:14.5px;">Metered rates</h3>
@@ -5514,6 +5514,7 @@ function rateModalHTML(){
           <option value="output_token">Output tokens</option>
           <option value="automation_run">Automation runs</option>
           <option value="voice_minute">Voice-note minutes</option>
+          <option value="call_minute">Phone-call minutes (Voice Agent)</option>
         </select>
       </div>
       <div class="field-row">

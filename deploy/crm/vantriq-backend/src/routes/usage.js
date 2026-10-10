@@ -91,6 +91,7 @@ function contactFields(body) {
  *   "handoff": false,                    // optional — true if a human had to take over (drives AI containment)
  *   "voice_seconds": 34,                 // optional (v9.33) — length of the voice note this turn transcribed
  *   "stt_model": "whisper-1",            // optional — the speech-to-text model that transcribed it
+ *   "call_seconds": 95,                  // optional (v9.33) — connected length of a Voice Agent phone call
  *   "estimated": false,                  // optional — true when the token counts are an estimate, not the provider's
  *   "occurred_at": "2026-08-16T10:32:00Z", // optional, defaults to now()
  *   "contact_name": "Ayesha"             // optional — the customer's WhatsApp profile name; also contact_email,
@@ -117,6 +118,17 @@ router.post('/usage', async (req, res) => {
       return res.status(400).json({ error: 'voice_seconds must be a number of seconds from 0 to 3600.' });
     }
     voiceSeconds = Math.round(voiceSeconds * 10) / 10;
+  }
+
+  // Phone-call length, in seconds (the Voice Agent add-on). Four hours is
+  // far past any real call; beyond it the measurement is broken.
+  let callSeconds = 0;
+  if (body.call_seconds !== undefined && body.call_seconds !== null && body.call_seconds !== '') {
+    callSeconds = Number(body.call_seconds);
+    if (!Number.isFinite(callSeconds) || callSeconds < 0 || callSeconds > 14400) {
+      return res.status(400).json({ error: 'call_seconds must be a number of seconds from 0 to 14400.' });
+    }
+    callSeconds = Math.round(callSeconds * 10) / 10;
   }
 
   if (!session_id) return res.status(400).json({ error: 'session_id is required' });
@@ -175,8 +187,8 @@ router.post('/usage', async (req, res) => {
 
   const { rows: inserted } = await db.query(
     `insert into usage_events (client_id, agent_id, session_id, channel, ai_model, input_tokens, output_tokens, messages_count, occurred_at, raw_payload, handoff,
-                               voice_seconds, stt_model, tokens_estimated)
-     values ($1,$2,$3,$4,$5,$6,$7,$8, coalesce($9, now()), $10, $11, $12, $13, $14) returning id`,
+                               voice_seconds, stt_model, tokens_estimated, call_seconds)
+     values ($1,$2,$3,$4,$5,$6,$7,$8, coalesce($9, now()), $10, $11, $12, $13, $14, $15) returning id`,
     [
       resolvedClientId, resolvedAgentId, session_id, resolvedChannel, ai_model || '',
       input_tokens || 0, output_tokens || 0, messages_count || 1,
@@ -187,6 +199,7 @@ router.post('/usage', async (req, res) => {
       voiceSeconds,
       voiceSeconds ? String(stt_model || '').slice(0, 80) : '',
       typeof estimated === 'boolean' ? estimated : null,
+      callSeconds,
     ]
   );
 
