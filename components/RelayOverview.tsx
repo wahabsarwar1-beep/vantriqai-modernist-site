@@ -10,7 +10,7 @@ export default function RelayOverview() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/vantriq-relay-logo.svg?v=headset-20261010" alt="Vantriq Relay" width="720" height="148" className="relay-lockup" />
       </div>
-      <span className="relay-scope">Pakistan · incoming calls</span>
+      <span className="relay-scope">Call Center-Voice Agents</span>
     </div>
     <p className="relay-lede">An AI call-centre agent for your Pakistani business number. Relay answers local incoming calls, handles enquiries, books appointments and hands over to your team where configured.</p>
     <div className="relay-plan-grid">

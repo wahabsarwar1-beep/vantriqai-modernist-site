@@ -38,7 +38,7 @@ export const products = (region: Region): Product[] => [
     body: "The embedded assistant on your own site — the widget in the corner of this page. Same brain, same actions, no app to download.",
   },
   {
-    kicker: "Channel", name: "Vantriq Relay", tier: "Pakistan · incoming calls", tint: "accent", mark: "voice", isNew: true,
+    kicker: "Channel", name: "Vantriq Relay", tier: "Call Center-Voice Agents", tint: "accent", mark: "voice", isNew: true,
     body: "Answers incoming calls from callers in Pakistan on Pakistani business numbers, handles enquiries and appointment booking, and hands over where configured. Your answering shift, seat capacity and connected-minute allowance are agreed in a written quote. Pakistan only: incoming calls on local numbers.",
   },
   {
