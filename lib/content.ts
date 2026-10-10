@@ -78,9 +78,9 @@ export const BMK = [
  * US$0.10 (PKR 28), against well under a rupee for a chat conversation.
  * Approved 10 Oct 2026 and set the same in the CRM: a monthly platform fee
  * for the service, then every call minute at about 30% over that cost —
- * PKR 40, or US$0.15 on the global list.
+ * PKR 40 for domestic incoming calls only. No global Voice Agent offer.
  */
-export const VOICE_AGENT = { over: "PKR 40 / min", overUsd: "US$ 0.15 / min" };
+export const VOICE_AGENT = { over: "PKR 40 / incoming min" };
 
 /*
  * `voice` is the voice-note minutes each package includes a month: 10% of its

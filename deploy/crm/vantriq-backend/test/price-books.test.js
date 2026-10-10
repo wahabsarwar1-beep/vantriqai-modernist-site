@@ -4,7 +4,7 @@
  * One rupee and one US-dollar price list: a USD client is quoted, bundled
  * and billed in dollars from the same packages. Overage is one flat rate
  * that never undercuts the next package. A catalogue add-on can be billed
- * monthly as a bundle, and a metered one (the Voice Agent's call minutes)
+ * monthly as a bundle, and a metered one (the Vantriq Relay's call minutes)
  * creates its own rate card, ended with the add-on.
  *
  * Needs Postgres (DATABASE_URL in .env) and the API on 8099.
@@ -67,27 +67,27 @@ const ok = (c, m, x = '') => { c ? pass++ : fail++; console.log((c ? '  PASS ' :
     const ret = bill.lines.find((l) => l.kind === 'retainer');
     ok(ret && ret.amount === 299, 'their monthly bill charges US$299', JSON.stringify(ret));
 
-    console.log('\n== an add-on bills monthly, and the Voice Agent brings its minute rate ==');
-    let r = await api('POST', '/api/subscriptions/bundles', { client_id: pkr.id, addon_key: 'voice-call-agent' });
-    ok(r.status === 201 && Number(r.body.unit_setup_fee) === 60000 && Number(r.body.unit_retainer) === 20000 && r.body.addon_key === 'voice-call-agent',
-      'the Voice Agent added to a PKR client: PKR 60,000 setup, PKR 20,000 a month', JSON.stringify(r.body));
+    console.log('\n== an add-on bills monthly, and the Vantriq Relay brings its minute rate ==');
+    let r = await api('POST', '/api/subscriptions/bundles', { client_id: pkr.id, addon_key: 'relay-starter' });
+    ok(r.status === 201 && Number(r.body.unit_setup_fee) === 60000 && Number(r.body.unit_retainer) === 40000 && r.body.addon_key === 'relay-starter',
+      'the Vantriq Relay added to a PKR client: PKR 60,000 setup, PKR 40,000 a month', JSON.stringify(r.body));
     const bundle = r.body;
     let { rows: rate } = await db.query(`select * from usage_rates where bundle_id = $1`, [bundle.id]);
-    ok(rate[0] && rate[0].metric === 'call_minute' && Number(rate[0].unit_rate) === 40 && Number(rate[0].included_units) === 0 && !rate[0].effective_to,
-      'and its call minutes are billed at PKR 40 from the first minute', JSON.stringify(rate[0]));
+    ok(rate[0] && rate[0].metric === 'call_minute' && Number(rate[0].unit_rate) === 40 && Number(rate[0].included_units) === 500 && !rate[0].effective_to,
+      'and its call minutes are billed at PKR 40 beyond 500 included minutes', JSON.stringify(rate[0]));
 
-    r = await api('POST', '/api/subscriptions/bundles', { client_id: usd.id, addon_key: 'voice-call-agent' });
-    ok(r.status === 201 && Number(r.body.unit_setup_fee) === 900 && Number(r.body.unit_retainer) === 149,
-      'for a USD client: US$900 setup, US$149 a month', JSON.stringify(r.body));
-    const { rows: urate } = await db.query(`select * from usage_rates where bundle_id = $1`, [r.body.id]);
-    ok(urate[0] && Number(urate[0].unit_rate) === 0.15, 'and US$0.15 a call minute', JSON.stringify(urate[0]));
+    r = await api('POST', '/api/subscriptions/bundles', { client_id: usd.id, addon_key: 'relay-starter' });
+    ok(r.status === 400 && /Pakistan only/.test(r.body.error),
+      'USD clients cannot order the Pakistan-only incoming Vantriq Relay', JSON.stringify(r.body));
+    const { rows: rejectedBundles } = await db.query(`select id from client_bundles where client_id = $1 and addon_key = 'relay-starter'`, [usd.id]);
+    ok(rejectedBundles.length === 0, 'the rejected USD request creates no Vantriq Relay bundle');
 
-    await db.query(`insert into usage_events (client_id, session_id, channel, call_seconds) values ($1, $2, 'voice', 600)`,
+    await db.query(`insert into usage_events (client_id, session_id, channel, call_seconds) values ($1, $2, 'voice', 30600)`,
       [pkr.id, 'pb-call-' + tag]);
     const c = (await meteredCharges(pkr, month)).find((l) => l.metric === 'call_minute');
-    ok(c && c.amount === 400, 'a 10-minute call bills PKR 400', JSON.stringify(c));
+    ok(c && c.amount === 400, '510 connected minutes with 500 included bill PKR 400', JSON.stringify(c));
     const pbill = await buildMonthlyBill(pkr, month);
-    const lineFor = pbill.lines.find((l) => /Voice call agent/.test(l.description));
+    const lineFor = pbill.lines.find((l) => /Vantriq Relay/.test(l.description));
     ok(!!lineFor, 'the add-on\'s monthly fee is on the bill', JSON.stringify(pbill.lines.map((l) => l.description)));
 
     r = await api('DELETE', `/api/subscriptions/bundles/${bundle.id}`);

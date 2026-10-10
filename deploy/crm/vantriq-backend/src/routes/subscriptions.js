@@ -47,7 +47,9 @@ async function priceFromAddon(client, key, overrides = {}) {
   const { rows } = await db.query(`select * from catalog_addons where key = $1 and active = true`, [key]);
   const a = rows[0];
   if (!a) return null;
+  if ((a.key === 'voice-call-agent' || a.key.startsWith('relay-')) && inUsd(client)) return { error: 'The Voice Agent is Pakistan only, for incoming calls from Pakistan on Pakistani numbers; it is not available to USD clients.' };
   if (a.price_basis === 'scope' || a.price_basis === 'included') return { error: `${a.name} is ${a.price_basis === 'scope' ? 'priced on scope' : 'already included'}: add it as a named bundle with the agreed figures.` };
+  if (a.key.startsWith('relay-') && overrides.qty !== undefined && Number(overrides.qty) !== 1) return { error: 'Each Relay bundle is one AI seat. Additional seats require a separate capacity quote.' };
   const usd = inUsd(client);
   const pick = (col) => (usd && a[`${col}_usd`] !== null && a[`${col}_usd`] !== undefined ? Number(a[`${col}_usd`]) : Number(a[col] || 0));
   return {
@@ -63,7 +65,7 @@ async function priceFromAddon(client, key, overrides = {}) {
   };
 }
 
-const METER_LABEL = { call_minute: 'Phone-call minutes (Voice Agent)', voice_minute: 'Voice-note minutes' };
+const METER_LABEL = { call_minute: 'Vantriq Relay connected minutes (Pakistan incoming)', voice_minute: 'Voice-note minutes' };
 
 router.get('/bundles', async (req, res) => {
   const { client_id, status } = req.query;
@@ -97,6 +99,15 @@ router.post('/bundles', async (req, res) => {
     priced = await priceFromAddon(client, String(body.addon_key), body);
     if (!priced) return res.status(404).json({ error: 'That add-on is not in the catalogue.' });
     if (priced.error) return res.status(400).json({ error: priced.error });
+    if (priced.addon_key.startsWith('relay-')) {
+      const { rows: existing } = await db.query(
+        `select id from client_bundles where client_id=$1 and status in ('active','scheduled')
+          and (ends_on is null or ends_on >= $2::date)
+          and (addon_key='voice-call-agent' or addon_key like 'relay-%') limit 1`,
+        [client.id, body.starts_on || new Date().toISOString().slice(0,10)]
+      );
+      if (existing.length) return res.status(400).json({error:'This account already has an incoming-call bundle. End it before replacing the plan; additional Relay seats require a separate capacity quote.'});
+    }
   } else if (body.product_id) {
     priced = await priceFromProduct(client, body.product_id, body);
     if (!priced) return res.status(404).json({ error: 'That package is not available.' });

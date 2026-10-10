@@ -2499,7 +2499,7 @@ function addonsHTML(){
       </table>
     </div>`;
   }).join('')}
-  ${admin?`<p class="footnote">Our cost is an estimate per add-on (model, voice and telephony usage at a typical volume); setup margin assumes build hours split evenly between founder and contracted time. Vantriq Echo is priced on what it costs to run — it has no AI or messaging cost of its own, only setup time and a short monthly review — so it is a base for the first location and a smaller step for each further one: PKR 6,000 a month for one branch, 12,000 for five, 19,500 for ten, at a monthly margin of 75% or more at every size. Human Support is new since the August model and carries the September proposal. The Voice Agent is a monthly fee plus every call minute (PKR 40 / US$0.15, about 30% over what ElevenLabs and the phone line cost us); adding it to a client as a bundle creates its call-minute rate card automatically. A client billed in US dollars is priced from the US$ columns throughout. Change any add-on through the API (PUT /api/addons/:id).</p>`:''}`;
+  ${admin?`<p class="footnote">Our cost is an estimate per add-on (model, voice and telephony usage at a typical volume); setup margin assumes build hours split evenly between founder and contracted time. Vantriq Echo is priced on what it costs to run — it has no AI or messaging cost of its own, only setup time and a short monthly review — so it is a base for the first location and a smaller step for each further one: PKR 6,000 a month for one branch, 12,000 for five, 19,500 for ten, at a monthly margin of 75% or more at every size. Human Support is new since the August model and carries the September proposal. Vantriq Relay is Pakistan only: PKR 60,000 setup, Starter PKR 40,000/500 minutes, Business PKR 60,000/1,000 or Scale PKR 100,000/2,000 monthly; PKR 40 per extra connected minute from Pakistan on Pakistani numbers. Outgoing calls, international callers and USD clients are outside the current service. Each plan includes one simultaneous call, 8 hours/day on 22 agreed days/month in Pakistan time. Adding it as a bundle creates its included-minute rate card automatically. A client billed in US dollars is priced from the US$ columns throughout. Change any add-on through the API (PUT /api/addons/:id).</p>`:''}`;
 }
 
 /* The CEO's business documents (v9.21): the business model, the client pitch
@@ -2687,6 +2687,7 @@ function renderProducts(){
     </div>
   </div>
   ${unitEconomicsHTML()}
+  <img src="/vantriq-relay-logo.svg" alt="Vantriq Relay" width="360" height="74" style="max-width:100%;height:auto;margin:20px 0;"><p><a href="/pricing/VantriqAI-Pricing-2026-Pakistan.pdf" download>Download Relay pricing brochure ↓</a></p>
   ${addonsHTML()}
   `;
 }
@@ -4862,6 +4863,7 @@ function quoteCurrencyNote(){
 }
 function quoteClientChanged(){
   const n = document.getElementById('qt_cur_note'); if(n) n.textContent = quoteCurrencyNote();
+  const a = document.getElementById('qt_addon'); if(a) a.innerHTML = '<option value="">— pick an add-on to add its lines —</option>'+quoteAddonOptions();
   if((document.getElementById('qt_product')||{}).value) quotePriceFromPackage();
 }
 let quoteAddonCatalog = null;
@@ -4871,12 +4873,13 @@ function quoteAddonOptions(){
       const el = document.getElementById('qt_addon'); if(el) el.innerHTML = '<option value="">— pick an add-on to add its lines —</option>'+quoteAddonOptions(); }).catch(()=>{});
     return '';
   }
-  return quoteAddonCatalog.map(a=>`<option value="${esc(a.key)}">${esc(a.name)}</option>`).join('');
+  return quoteAddonCatalog.filter(a=>!quoteClientUsd() || !(a.key==='voice-call-agent' || a.key.startsWith('relay-'))).map(a=>`<option value="${esc(a.key)}">${esc(a.name)}</option>`).join('');
 }
 function quoteAddAddon(){
   const sel = document.getElementById('qt_addon'); const key = sel.value; sel.value = '';
   const a = (quoteAddonCatalog||[]).find(x=>x.key===key); if(!a) return;
   const usd = quoteClientUsd();
+  if(usd && (a.key==='voice-call-agent' || a.key.startsWith('relay-'))){ showToast('Vantriq Relay is Pakistan only and unavailable to USD clients','warn'); return; }
   const pick = col => usd && a[col+'_usd']!=null ? Number(a[col+'_usd']) : Number(a[col]||0);
   quoteLines = quoteLines.filter(l=>l.description && l.description.trim());
   if(pick('setup_fee')>0) quoteLines.push({description:`${a.name} — setup`, qty:1, unit_price:pick('setup_fee')});
@@ -5558,7 +5561,7 @@ function rateModalHTML(){
           <option value="output_token">Output tokens</option>
           <option value="automation_run">Automation runs</option>
           <option value="voice_minute">Voice-note minutes</option>
-          <option value="call_minute">Phone-call minutes (Voice Agent)</option>
+          <option value="call_minute">Phone-call minutes (Vantriq Relay)</option>
         </select>
       </div>
       <div class="field-row">
@@ -7907,6 +7910,7 @@ function bundleModalHTML(clientId){
           ${state.products.filter(p=>!p.archived).map(p=>`<option value="${p.id}" data-retainer="${p.retainer}" data-quota="${p.quota}" data-setup="${p.setupFee}" data-over="${p.overageRate}">${esc(p.name)} — ${fmtMoney(p.retainer)}/mo, ${fmtNum(p.quota)} conversations</option>`).join('')}
         </select>
       </div>
+      ${c && c.currency==='USD' ? '' : `<div class="field"><label>Vantriq Relay AI seat plan (Pakistan incoming)</label><select id="bn_relay" onchange="bundleRelayChanged()"><option value="">— no Relay plan —</option>${bundleRelayOptions(clientId)}</select><p id="bn_relay_note" class="footnote">One simultaneous call, 8 hours/day on 22 agreed days/month. Select a plan to attach its connected-minute allowance and PKR 40 overage automatically.</p></div>`}
       <div class="field-row">
         <div class="field"><label>How many</label><input id="bn_qty" type="number" min="1" value="1" onchange="bundleProductChanged()"></div>
         <div class="field">
@@ -7945,6 +7949,23 @@ function bundleModalHTML(clientId){
     </div>
   </div>`;
 }
+function bundleRelayOptions(clientId){
+  if(addonsData===null){
+    API.get('/api/addons').then(a=>{addonsData=a||[];const el=document.getElementById('bn_relay');if(el) el.innerHTML='<option value="">— no Relay plan —</option>'+bundleRelayOptions(clientId);}).catch(()=>showToast('Could not load Relay plans','warn'));
+    return '';
+  }
+  return addonsData.filter(a=>a.active!==false && a.key.startsWith('relay-')).map(a=>`<option value="${esc(a.key)}">${esc(a.name)} — PKR ${fmtNum(a.monthly_fee)}/month, ${fmtNum(a.included_units)} connected minutes</option>`).join('');
+}
+function bundleRelayChanged(){
+  const key=(document.getElementById('bn_relay')||{}).value;
+  const a=(addonsData||[]).find(a=>a.key===key);
+  const isRelay=!!a;
+  for(const id of ['bn_product','bn_qty','bn_agent','bn_retainer','bn_quota','bn_setup','bn_over','bn_recurring']) document.getElementById(id).disabled=isRelay;
+  if(!a){bundleProductChanged();return;}
+  document.getElementById('bn_product').value='';document.getElementById('bn_qty').value=1;document.getElementById('bn_agent').value='';document.getElementById('bn_recurring').value='true';
+  document.getElementById('bn_name').value=a.name;document.getElementById('bn_retainer').value=a.monthly_fee;document.getElementById('bn_quota').value=0;document.getElementById('bn_setup').value=a.setup_fee;document.getElementById('bn_over').value=0;
+  document.getElementById('bn_summary').textContent=`${a.name}: PKR ${fmtNum(a.monthly_fee)}/month with ${fmtNum(a.included_units)} connected minutes, PKR ${fmtNum(a.overage_rate)}/extra minute, PKR ${fmtNum(a.setup_fee)} setup. One simultaneous call, 8 hours/day on 22 days/month in Pakistan time. Unused minutes expire monthly. Additional capacity requires a quote.`;
+}
 function bundleProductChanged(){
   const sel = document.getElementById('bn_product');
   const opt = sel.selectedOptions[0];
@@ -7978,7 +7999,9 @@ async function saveBundle(clientId){
     ends_on: v('bn_end') || undefined,
     recurring: v('bn_recurring') !== 'false',
   };
-  if(!body.product_id && !body.name){ showToast('Give the bundle a name, or base it on a package','warn'); return; }
+  const relayKey=v('bn_relay');
+  if(relayKey){body.addon_key=relayKey;delete body.product_id;delete body.unit_retainer;delete body.unit_setup_fee;delete body.overage_rate;body.qty=1;body.recurring=true;}
+  if(!body.product_id && !body.addon_key && !body.name){ showToast('Give the bundle a name, or base it on a package','warn'); return; }
   try{
     await API.post('/api/subscriptions/bundles', body);
     closeModal();

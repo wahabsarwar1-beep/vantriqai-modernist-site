@@ -1,3 +1,4 @@
+import RelayPricing from "@/components/RelayPricing";
 import JsonLd from "@/components/JsonLd";
 import { breadcrumbSchema, faqSchema, serviceSchema } from "@/lib/schema";
 import PageHero from "@/components/PageHero";
@@ -32,7 +33,7 @@ export default function PricingPage({ region }: { region: Region }) {
     { key: "social", label: "Instagram & Facebook", from: Math.max(0, tierOf("Social Agent")) },
     // The Voice Agent is an add-on on every package, so phone calls never
     // raise the recommendation; the finder names the add-on instead.
-    { key: "voice", label: "Phone calls", from: 0, addon: "Voice Agent add-on for phone calls, priced separately" },
+    ...(region.key === "pk" ? [{ key: "voice", label: "Incoming calls in Pakistan", from: 0, addon: "Vantriq Relay: PKR 60,000 setup; from PKR 40,000/month with 500 connected minutes; PKR 40 per extra minute" }] : []),
     { key: "website", label: "Our website", from: Math.max(0, tierOf("Website Agent")) },
   ];
   const needOptions = [
@@ -126,6 +127,10 @@ export default function PricingPage({ region }: { region: Region }) {
         </GlowGrid>
         <p aria-hidden="true" className="swipe-hint">Swipe through all {pkgs.length} packages →</p>
       </section>
+
+      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(20px,5vw,64px) 32px" }}>
+        <a href={`/pricing/VantriqAI-Pricing-2026-${region.key === "pk" ? "Pakistan" : "Global"}.pdf`} className="btn btn-secondary" download>Download the pricing brochure <span aria-hidden="true">↓</span></a>
+      </div>
 
       {/* ---------- Find your package ---------- */}
       <section className="dark-band">
@@ -226,6 +231,8 @@ export default function PricingPage({ region }: { region: Region }) {
         </div>
 
       </div>
+
+      {region.key === "pk" && <RelayPricing />}
 
       <PosterCTA
         headline="Get your numbers in writing."

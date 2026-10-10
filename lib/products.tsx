@@ -38,8 +38,8 @@ export const products = (region: Region): Product[] => [
     body: "The embedded assistant on your own site — the widget in the corner of this page. Same brain, same actions, no app to download.",
   },
   {
-    kicker: "Channel", name: "Voice Agent", tier: "Add-on module", tint: "accent", mark: "voice",
-    body: "Answers your business phone in a natural voice, handles the same reception and booking as the chat agent, and hands off cleanly when a call needs a person. Priced separately: a monthly fee plus call minutes.",
+    kicker: "Channel", name: "Vantriq Relay", tier: "From PKR 40,000 / month", tint: "accent", mark: "voice", isNew: true,
+    body: "Answers incoming calls from callers in Pakistan on Pakistani business numbers, handles enquiries and appointment booking, and hands over where configured. Pakistan only: PKR 60,000 setup, from PKR 40,000 monthly with 500 connected minutes. One AI seat, 8 hours a day, 22 days a month; PKR 40 per extra connected minute. No outgoing calls or international callers.",
   },
   {
     kicker: "Capability", name: "Booking Agent", tier: "Add-on module", tint: "dark", mark: "booking",
@@ -93,7 +93,7 @@ export const products = (region: Region): Product[] => [
     kicker: "Deployment", name: "Custom Module", tier: "From Scale", tint: "dark", mark: "custom",
     body: "The one thing only your business does, built during onboarding: your name for it, your tone, your rules, your sign-off before it acts.",
   },
-];
+].filter((p) => region.key === "pk" || p.name !== "Vantriq Relay") as Product[];
 
 /** The anchor a module's card carries, and the menu links to. */
 export const productSlug = (name: string) =>
