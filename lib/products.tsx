@@ -38,8 +38,8 @@ export const products = (region: Region): Product[] => [
     body: "The embedded assistant on your own site — the widget in the corner of this page. Same brain, same actions, no app to download.",
   },
   {
-    kicker: "Channel", name: "Vantriq Relay", tier: "From PKR 40,000 / month", tint: "accent", mark: "voice", isNew: true,
-    body: "Answers incoming calls from callers in Pakistan on Pakistani business numbers, handles enquiries and appointment booking, and hands over where configured. Pakistan only: PKR 60,000 setup, from PKR 40,000 monthly with 500 connected minutes. One AI seat, 8 hours a day, 22 days a month; PKR 40 per extra connected minute. No outgoing calls or international callers.",
+    kicker: "Channel", name: "Vantriq Relay", tier: "Pakistan · incoming calls", tint: "accent", mark: "voice", isNew: true,
+    body: "Answers incoming calls from callers in Pakistan on Pakistani business numbers, handles enquiries and appointment booking, and hands over where configured. Your answering shift, seat capacity and connected-minute allowance are agreed in a written quote. Pakistan only: incoming calls on local numbers.",
   },
   {
     kicker: "Capability", name: "Booking Agent", tier: "Add-on module", tint: "dark", mark: "booking",

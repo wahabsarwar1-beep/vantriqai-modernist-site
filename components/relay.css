@@ -25,3 +25,5 @@
 .relay-notes{display:grid;grid-template-columns:1fr 1fr;gap:28px;font-size:12px;line-height:1.8;color:var(--color-neutral-600);margin:18px 0 24px}
 @media(max-width:900px){.relay-heading{align-items:flex-start;flex-direction:column}.relay-plan{padding:22px}.relay-amount{font-size:27px}}
 @media(max-width:680px){.relay-plan-grid,.relay-fees,.relay-notes{grid-template-columns:1fr}.relay-plan{padding:28px}.relay-amount{font-size:36px}.relay-fees{gap:18px}.relay-notes{gap:0}.relay-lockup{width:100%}}
+
+.relay-feature-heading{font:600 16px var(--font-heading);line-height:1.5;margin:0 0 12px}.relay-feature-body{font-size:14px;line-height:1.8;color:var(--color-neutral-600);margin:0}.relay-actions{display:flex;flex-wrap:wrap;gap:14px}.relay-hero-logo{display:block;width:min(100%,420px);height:auto;margin:0 0 24px}

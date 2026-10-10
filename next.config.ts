@@ -15,6 +15,11 @@ const nextConfig: NextConfig = {
      briefly, so anyone holding the old link lands on the new page. */
   async redirects() {
     return [
+      { source: "/pulse", destination: "/products/vantriq-pulse", permanent: true },
+      { source: "/echo", destination: "/products/vantriq-echo", permanent: true },
+      { source: "/products/pulse", destination: "/products/vantriq-pulse", permanent: true },
+      { source: "/products/echo", destination: "/products/vantriq-echo", permanent: true },
+      { source: "/products/relay", destination: "/products/vantriq-relay", permanent: true },
       { source: "/relay", destination: "/products/vantriq-relay", permanent: true },
       { source: "/products/voice-agent", destination: "/products/vantriq-relay", permanent: true },
       { source: "/global/products/voice-agent", destination: "/global/products", permanent: true },

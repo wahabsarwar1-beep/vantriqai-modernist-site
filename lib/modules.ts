@@ -1,7 +1,6 @@
 import type { ChatBubble } from "@/components/HeroChatCard";
 import { productSlug, products, type Product } from "@/lib/products";
 import type { Region } from "@/lib/region";
-import { VOICE_AGENT } from "@/lib/content";
 
 /**
  * One page per platform module, keyed by the module's name in lib/products.
@@ -195,7 +194,7 @@ const details = (region: Region): Record<string, ModuleDetail> => ({
       { q: "Do we keep our number?", a: "Where supported by your Pakistani carrier. Number rental, routing, domestic-only call controls and any forwarding charges are confirmed before activation." },
       { q: "Can callers ask for a person?", a: "Handover is configured and tested with your team. Any carrier charge for a transfer leg is quoted separately before enabling it." },
       { q: "Which languages does it speak?", a: "The languages your business needs, agreed during configuration and tested before go-live." },
-      { q: "Is it included in a package?", a: `The Vantriq Relay is a Pakistan-only add-on: PKR 60,000 setup, Starter PKR 40,000/month with 500 connected minutes, Business PKR 60,000 with 1,000, or Scale PKR 100,000 with 2,000; ${VOICE_AGENT.over} beyond the allowance. Each includes one simultaneous call, 8 hours/day over 22 agreed days/month in Pakistan time. Availability hours are not connected-minute allowances, and unused minutes expire monthly. It answers incoming calls from Pakistan on Pakistani numbers. Outgoing calls and international callers are outside the current service. The minute rate may change on at least 30 days’ written notice if exchange rates or provider prices move by more than 5%. WhatsApp voice notes retain their separate package allowances.` },
+      { q: "How do we get a quote?", a: "Relay is a separate Pakistan-only service. We quote your setup, answering shift, seat capacity, connected-minute allowance and extra usage after reviewing your call flow and carrier. A standard seat handles one simultaneous call during an agreed 8-hour shift on 22 days each month. Availability hours are separate from connected talk minutes; unused minutes expire monthly. Your accepted quote governs charges and allowances. WhatsApp conversations and voice-note allowances remain separate." },
     ],
   },
   "Booking Agent": {
