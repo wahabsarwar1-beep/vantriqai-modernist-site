@@ -206,6 +206,16 @@ router.get('/usage', async (req, res) => {
     rate_per_minute: +voiceRate.unit_rate,
     minutes_over: Math.max(0, Math.round((voiceUsed - +voiceRate.included_units) * 10) / 10),
   } : (voiceUsed ? { minutes_used: voiceUsed, minutes_included: null, rate_per_minute: null, minutes_over: 0 } : null);
+  // Phone calls (the Voice Agent add-on): their own allowance and rate,
+  // shown whenever a call-minute rate applies or calls were made.
+  const callRate = (await ratesFor(client, null, new Date())).find((r) => r.metric === 'call_minute') || null;
+  const callUsed = Math.round((+current.call_minutes || 0) * 10) / 10;
+  const calls = callRate ? {
+    minutes_used: callUsed,
+    minutes_included: +callRate.included_units,
+    rate_per_minute: +callRate.unit_rate,
+    minutes_over: Math.max(0, Math.round((callUsed - +callRate.included_units) * 10) / 10),
+  } : (callUsed ? { minutes_used: callUsed, minutes_included: null, rate_per_minute: null, minutes_over: 0 } : null);
   const overSessions = quota != null ? Math.max(0, sessionsUsed - quota) : 0;
 
   // Service does not stop at the quota line, so say plainly what is happening
@@ -233,6 +243,7 @@ router.get('/usage', async (req, res) => {
     state,
     notice: NOTICE[state],
     voice,
+    calls,
     history: historyRes.rows.map((r) => ({
       period_month: r.period_month, sessions: +r.sessions || 0, messages: +r.messages || 0,
     })),

@@ -154,7 +154,7 @@ async function meteredCharges(client, month) {
   if (!rates.length) return [];
 
   const { rows } = await db.query(
-    `select count(distinct session_id)::numeric as session,
+    `select (count(distinct session_id) filter (where coalesce(channel, '') <> 'voice' and call_seconds = 0))::numeric as session,
             coalesce(sum(messages_count),0)::numeric as message,
             coalesce(sum(input_tokens),0)::numeric  as input_token,
             coalesce(sum(output_tokens),0)::numeric as output_token,
@@ -191,6 +191,13 @@ async function meteredCharges(client, month) {
     });
   }
   return out;
+}
+
+/** Metrics a rate card prices instead of the package's own per-conversation figure. */
+const REPLACING_METRICS = ['session', 'message', 'input_token', 'output_token', 'automation_run'];
+/** Minutes metered beside the conversations: billed in addition, never instead. */
+async function replacesTierOverage(client, onDate) {
+  return (await ratesFor(client, null, onDate)).some((r) => REPLACING_METRICS.includes(r.metric));
 }
 
 const METRIC_LABEL = {
@@ -232,8 +239,8 @@ async function buildUsageOnlyBill(client, eff, month, from, to, period) {
   let sessionsBilled = 0;
 
   const metered = await meteredCharges(client, month);
-  if (metered.length) {
-    lines.push(...metered);
+  lines.push(...metered);
+  if (await replacesTierOverage(client, to)) {
     const s = metered.find((m) => m.metric === 'session');
     if (s) sessionsBilled = Math.round(s.qty);
   } else {
@@ -338,11 +345,13 @@ async function buildMonthlyBill(client, month) {
     }
   }
 
-  // Overage. Rate cards, where they exist, replace the tier's flat figure.
+  // Overage. A conversation or token rate card, where one exists, replaces
+  // the tier's flat figure; voice-note and call minutes are billed on top of
+  // it, never instead of it.
   const metered = await meteredCharges(client, month);
+  lines.push(...metered);
   let overageSessions = 0;
-  if (metered.length) {
-    lines.push(...metered);
+  if (await replacesTierOverage(client, to)) {
     const s = metered.find((m) => m.metric === 'session');
     if (s) overageSessions = Math.round(s.qty);
   } else {

@@ -165,7 +165,9 @@ create or replace view v_monthly_usage as
 select
   client_id,
   date_trunc('month', occurred_at)::date as period_month,
-  count(distinct session_id) as sessions,
+  -- Phone calls (the Voice Agent add-on, v9.33) are billed by the minute on
+  -- their own allowance, so they never count as package conversations.
+  count(distinct session_id) filter (where coalesce(channel, '') <> 'voice' and call_seconds = 0) as sessions,
   sum(messages_count) as messages,
   sum(input_tokens) as input_tokens,
   sum(output_tokens) as output_tokens,
