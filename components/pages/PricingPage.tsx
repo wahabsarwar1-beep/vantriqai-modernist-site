@@ -33,7 +33,7 @@ export default function PricingPage({ region }: { region: Region }) {
     { key: "social", label: "Instagram & Facebook", from: Math.max(0, tierOf("Social Agent")) },
     // The Voice Agent is an add-on on every package, so phone calls never
     // raise the recommendation; the finder names the add-on instead.
-    ...(region.key === "pk" ? [{ key: "voice", label: "Incoming calls in Pakistan", from: 0, addon: "Vantriq Relay · Pakistan incoming calls · Request a quote" }] : []),
+    ...(region.key === "pk" ? [{ key: "voice", label: "Call Center-Voice Agents", from: 0, addon: "Vantriq Relay · Call Center-Voice Agents · Request a quote" }] : []),
     { key: "website", label: "Our website", from: Math.max(0, tierOf("Website Agent")) },
   ];
   const needOptions = [
