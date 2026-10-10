@@ -30,7 +30,9 @@ export default function PricingPage({ region }: { region: Region }) {
   const channelOptions = [
     { key: "whatsapp", label: "WhatsApp", from: Math.max(0, tierOf("WhatsApp Agent")) },
     { key: "social", label: "Instagram & Facebook", from: Math.max(0, tierOf("Social Agent")) },
-    { key: "voice", label: "Phone calls", from: Math.max(0, tierOf("Voice Agent")) },
+    // The Voice Agent is an add-on on every package, so phone calls never
+    // raise the recommendation; the finder names the add-on instead.
+    { key: "voice", label: "Phone calls", from: 0, addon: "Voice Agent add-on for phone calls, priced separately" },
     { key: "website", label: "Our website", from: Math.max(0, tierOf("Website Agent")) },
   ];
   const needOptions = [

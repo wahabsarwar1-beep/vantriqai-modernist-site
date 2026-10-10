@@ -16,7 +16,7 @@ const router = express.Router();
 
 const FAMILIES = ['capability', 'solution', 'insight', 'deployment'];
 const BASES = ['fixed', 'from', 'included', 'scope'];
-const METERS = ['voice_minute'];
+const METERS = ['voice_minute', 'call_minute'];
 const PRIVATE = ['est_monthly_cost', 'est_build_hours', 'cost_note'];
 
 class AddonError extends Error {
@@ -69,7 +69,7 @@ function fields(body, { creating }) {
     out.est_build_hours = h;
   }
   // A metered allowance (v9.33): what the monthly fee includes, and the
-  // price of each unit past it. Only voice minutes are metered so far.
+  // price of each unit past it: voice-note minutes, or phone-call minutes.
   if (b.meter !== undefined) {
     const m = b.meter === null || b.meter === '' ? null : String(b.meter);
     if (m !== null && !METERS.includes(m)) throw new AddonError(400, `Meter must be one of: ${METERS.join(', ')}.`);

@@ -15,7 +15,7 @@ require('dotenv').config();
 const crypto = require('crypto');
 const db = require('../src/db');
 const { hashKey } = require('../src/middleware/auth');
-const { meteredCharges } = require('../src/utils/subscriptions');
+const { meteredCharges, buildMonthlyBill } = require('../src/utils/subscriptions');
 
 const B = 'http://127.0.0.1:8099';
 let pass = 0, fail = 0;
@@ -89,7 +89,44 @@ const ok = (c, m, x = '') => { c ? pass++ : fail++; console.log((c ? '  PASS ' :
        values ($1, 'voice_minute', 5, 0, 1, 'Voice test package rate')`, [prod[0].id]);
     s = await status();
     ok(s.voice === true, 'a voice rate on their package switches it on too', JSON.stringify(s));
+    // Over both allowances: a voice-note rate card and the conversation
+    // quota (Enterprise+, the tier whose quota can be set per client). Both
+    // must be billed.
+    await post({ external_ref: ref, session_id: `${session}-second`, input_tokens: 500, output_tokens: 80 });
+    const { rows: ep } = await db.query(`select id from products where name = 'Enterprise+'`);
+    await db.query(`update clients set product_id = $2, custom_quota = 1, custom_overage_rate = 7 where id = $1`, [client.id, ep[0].id]);
+    await db.query(
+      `insert into usage_rates (client_id, metric, unit_rate, included_units, unit_size, label)
+       values ($1, 'voice_minute', 5, 1, 1, 'Voice test client rate')`, [client.id]);
+    const { rows: fresh } = await db.query(`select * from clients where id = $1`, [client.id]);
+    const bill = await buildMonthlyBill(fresh[0], month);
+    const kinds = bill ? bill.lines.map((l) => l.metric || l.kind) : [];
+    ok(kinds.includes('voice_minute') && kinds.includes('overage'),
+      'voice-note overage is billed beside conversation overage, not instead of it', JSON.stringify(kinds));
+    await db.query(`delete from usage_rates where client_id = $1 and label = 'Voice test client rate'`, [client.id]);
+    await db.query(`update clients set product_id = $2 where id = $1`, [client.id, prod[0].id]);
+    await db.query(`update clients set custom_quota = null, custom_overage_rate = null where id = $1`, [client.id]);
     await db.query(`delete from usage_rates where product_id = $1 and label = 'Voice test package rate'`, [prod[0].id]);
+
+    console.log('\n== the Voice Agent bills phone-call minutes ==');
+    let c = await post({ external_ref: ref, session_id: `${session}-call`, channel: 'voice', input_tokens: 900, output_tokens: 120, call_seconds: 95 });
+    ok(c.status === 201, 'a phone call reports its connected length', c.status);
+    c = await post({ external_ref: ref, session_id: `${session}-call`, call_seconds: 99999 });
+    ok(c.status === 400 && /call_seconds/.test(c.body.error), 'a call longer than four hours is refused', c.status);
+    const { rows: cm } = await db.query(`select call_minutes from v_monthly_usage where client_id = $1`, [client.id]);
+    ok(Math.abs(Number(cm[0].call_minutes) - 1.58) < 0.01, 'the month rolls up 95 seconds as 1.58 call minutes', cm[0] && cm[0].call_minutes);
+    const { rows: ses } = await db.query(`select sessions from v_monthly_usage where client_id = $1`, [client.id]);
+    ok(Number(ses[0].sessions) === 2, 'a phone call is not counted as a package conversation (2 chats, 1 call)', ses[0] && ses[0].sessions);
+    await db.query(
+      `insert into usage_rates (client_id, metric, unit_rate, included_units, unit_size, label)
+       values ($1, 'call_minute', 85, 1, 1, 'Phone-call minutes')`, [client.id]);
+    lines = await meteredCharges(client, month);
+    const call = lines.find((l) => l.metric === 'call_minute');
+    ok(call && Math.abs(call.amount - 85 * (95 / 60 - 1)) < 1, 'call minutes past the allowance are billed at the add-on rate', JSON.stringify(call));
+    await db.query(`delete from usage_rates where client_id = $1 and metric = 'call_minute'`, [client.id]);
+    const { rows: va } = await db.query(`select meter, included_units, overage_rate from catalog_addons where key = 'voice-call-agent'`);
+    ok(va[0] && va[0].meter === 'call_minute' && Number(va[0].included_units) === 500 && Number(va[0].overage_rate) === 85,
+      'the Voice Agent add-on includes 500 call minutes, then PKR 85 a minute', JSON.stringify(va[0]));
 
     const { rows: own } = await db.query(`select external_ref from clients where is_internal limit 1`);
     if (own[0] && own[0].external_ref) {

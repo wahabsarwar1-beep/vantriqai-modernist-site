@@ -546,7 +546,7 @@ async function quotaPace(clientId, quota) {
   if (!quota) return null;
   const { rows } = await db.query(
     `with b as (select date_trunc('month', now() at time zone $2) as m, now() at time zone $2 as n)
-     select count(distinct u.session_id)::int as used,
+     select (count(distinct u.session_id) filter (where coalesce(u.channel, '') <> 'voice' and u.call_seconds = 0))::int as used,
             extract(epoch from (b.n - b.m)) / extract(epoch from ((b.m + interval '1 month') - b.m)) as frac
        from b left join usage_events u
          on u.client_id = $1 and u.occurred_at >= (b.m at time zone $2)

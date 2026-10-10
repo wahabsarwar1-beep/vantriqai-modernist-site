@@ -21,7 +21,7 @@ export type FinderPackage = {
   previous?: string;
   highlights: string[];
 };
-export type FinderOption = { key: string; label: string; from: number };
+export type FinderOption = { key: string; label: string; from: number; /** Set when the option is met by an add-on rather than a package. */ addon?: string };
 
 const VOLUMES = [100, 300, 600, 1000, 1500, 2500, 4000, 6000, 8000, 12000, 15000, 25000];
 /** Slider stops labelled under the track: the ends and two package boundaries. */
@@ -54,11 +54,12 @@ export default function PackageFinder({
   const volume = VOLUMES[vol];
   const drivers = [
     { tier: volumeTier(volume), why: `${fmt(volume)} conversations a month` },
-    ...[...channels, ...needs].filter((o) => picked.has(o.key)).map((o) => ({ tier: o.from, why: o.label })),
+    ...[...channels, ...needs].filter((o) => picked.has(o.key) && !o.addon).map((o) => ({ tier: o.from, why: o.label })),
   ];
   const tier = Math.max(...drivers.map((d) => d.tier));
   const rec = packages[tier];
   const deciding = drivers.filter((d) => d.tier === tier);
+  const addons = [...channels, ...needs].filter((o) => o.addon && picked.has(o.key)).map((o) => o.addon as string);
 
   return (
     <div className="finder">
@@ -146,6 +147,16 @@ export default function PackageFinder({
             <li key={h}>{h}</li>
           ))}
         </ul>
+        {addons.length ? (
+          <>
+            <p className="finder-why-k">Plus</p>
+            <ul className="finder-inc">
+              {addons.map((a) => (
+                <li key={a}>{a}</li>
+              ))}
+            </ul>
+          </>
+        ) : null}
         <div className="finder-actions">
           <Link href={rec.href} className="btn hh-btn-primary">
             See {rec.name} <span aria-hidden="true">→</span>

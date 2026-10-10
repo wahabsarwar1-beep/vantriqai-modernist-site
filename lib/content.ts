@@ -75,6 +75,16 @@ export const BMK = [
  * the usual range for per-conversation overage. Replace these six figures
  * with the real ones before the global site is promoted anywhere.
  */
+/**
+ * The Voice Agent (phone calls) is an add-on on every package, not part of
+ * one: each call minute carries real-time voice and telephony costs of about
+ * US$0.10 (PKR 28), against well under a rupee for a chat conversation.
+ * Approved 10 Oct 2026 and set the same in the CRM: 500 call minutes a month
+ * included with the add-on, then PKR 85 a minute (three times cost, the
+ * overage rule). The USD figure is a conversion at about 277 to the dollar.
+ */
+export const VOICE_AGENT = { minutes: "500", over: "PKR 85 / min", overUsd: "US$ 0.31 / min" };
+
 /*
  * `voice` is the voice-note minutes each package includes a month: 10% of its
  * session allowance, approved 9 Oct 2026 and set the same in the CRM. Past it,
