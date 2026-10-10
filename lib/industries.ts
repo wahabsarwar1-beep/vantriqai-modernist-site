@@ -223,7 +223,7 @@ export const industries = (region: Region): Industry[] => {
         chat: { them: "The pain has got worse since yesterday.", us: "I'm passing this to the nurse now — she'll message you within minutes.", done: "Escalated to clinical staff" },
       },
     ],
-    modules: ["WhatsApp Agent", "Booking Agent", "Voice Agent", "Escalation Desk", "Private Deployment"],
+    modules: ["WhatsApp Agent", "Booking Agent", "Vantriq Relay", "Escalation Desk", "Private Deployment"],
     systems: ["Appointment calendar or clinic system", "Patient records (read-only where agreed)", "SMS or email reminders", "Staff escalation inbox"],
     faqs: [
       { q: "Will it give medical advice?", a: "No. It answers administrative questions from content your clinic approves, and anything clinical — symptoms, results, medication — is escalated to your staff with the conversation attached." },
@@ -329,12 +329,12 @@ export const industries = (region: Region): Industry[] => {
         chat: { them: "Food was cold this time.", us: "I'm sorry. I've passed this to the manager, who will message you tonight.", done: "Escalated to manager" },
       },
     ],
-    modules: ["WhatsApp Agent", "Booking Agent", "Catalogue Agent", "Voice Agent", "Outreach Agent"],
+    modules: ["WhatsApp Agent", "Booking Agent", "Catalogue Agent", "Vantriq Relay", "Outreach Agent"],
     systems: ["Menu and prices", "Kitchen or POS", "Reservation book", "Delivery riders"],
     faqs: [
       { q: "Can it take orders in the way customers actually write?", a: "Yes. It understands shorthand and mixed-language orders, and reads the order back before placing it so mistakes are caught in the chat, not at the table." },
       { q: "Does it work for hotels as well as restaurants?", a: "Yes — room enquiries, bookings, check-in details and guest requests follow the same pattern." },
-      { q: "Can it answer the phone too?", a: "With the Voice Agent, it answers calls with the same menu and booking rules as the chat." },
+      { q: "Can it answer the phone too?", a: region.key === "pk" ? "The Vantriq Relay answers incoming calls from callers in Pakistan on Pakistani numbers, with the same menu and booking rules as chat. Outgoing calls and international callers are outside the current service." : "The Vantriq Relay is currently offered only in Pakistan for domestic incoming calls, and is unavailable on global packages." },
     ],
     seoTitle: "AI Agents for Restaurants & Hospitality",
     seoDescription: "AI agents that take orders and table reservations on WhatsApp through the dinner rush, and bring regulars back on quiet nights.",
@@ -595,7 +595,7 @@ export const industries = (region: Region): Industry[] => {
         chat: { them: "The box arrived damaged.", us: "I'm sorry — could you send a photo? I'll open a claim now.", done: "Claim opened · ops notified" },
       },
     ],
-    modules: ["WhatsApp Agent", "Voice Agent", "Escalation Desk", "Insights Digest", "Custom Module"],
+    modules: ["WhatsApp Agent", "Vantriq Relay", "Escalation Desk", "Insights Digest", "Custom Module"],
     systems: ["Tracking or TMS", "Rider or dispatch app", "Claims process", "Customer notifications"],
     faqs: [
       { q: "Can it handle our volume on dispatch days?", a: "Yes. It answers every tracking query at once, whether that is a hundred a day or thousands on a peak." },

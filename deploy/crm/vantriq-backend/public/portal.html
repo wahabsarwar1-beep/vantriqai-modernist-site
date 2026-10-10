@@ -1235,13 +1235,13 @@ function renderUsage(){
 
   ${u.calls && u.calls.minutes_included!=null ? `
   <div class="card">
-    <h3>Phone calls</h3>
+    <h3>Vantriq Relay</h3><img src="/vantriq-relay-logo.svg" alt="Vantriq Relay" width="360" height="74" style="max-width:100%;height:auto;margin-bottom:12px;"><p><a href="/pricing/VantriqAI-Pricing-2026-Pakistan.pdf" download>Download Relay pricing brochure ↓</a></p>
     <div style="display:flex;justify-content:space-between;align-items:baseline;">
       <span style="font-family:var(--f-head);font-size:22px;font-weight:600;">${fmtNum(u.calls.minutes_used)} min</span>
       <span style="font-size:13px;color:var(--muted);">of ${fmtNum(u.calls.minutes_included)} minutes included</span>
     </div>
     <div class="progress-track"><div class="progress-fill ${u.calls.minutes_used>=u.calls.minutes_included?'danger':u.calls.minutes_used>=u.calls.minutes_included*0.8?'warn':''}" style="width:${Math.min(100, Math.round(u.calls.minutes_used / Math.max(1,u.calls.minutes_included) * 100))}%"></div></div>
-    <div style="margin-top:10px;font-size:12.5px;color:var(--muted);">Calls answered by your Voice Agent, measured from their connected length. Minutes past the allowance are ${fmtMoney(u.calls.rate_per_minute)} each${u.calls.minutes_over?` — <strong>${fmtNum(u.calls.minutes_over)} so far this month</strong>`:''}.</div>
+    <div style="margin-top:10px;font-size:12.5px;color:var(--muted);">Incoming calls from Pakistan answered by Vantriq Relay on Pakistani numbers, measured from their connected length. Standard plans provide one simultaneous call during an agreed 8-hour shift on 22 days per month, in Pakistan time. Shift hours are availability, not talk minutes. Unused minutes expire monthly; your accepted agreement governs your plan. Minutes past the allowance are ${fmtMoney(u.calls.rate_per_minute)} each${u.calls.minutes_over?` — <strong>${fmtNum(u.calls.minutes_over)} so far this month</strong>`:''}.</div>
   </div>` : ''}
 
   <div class="card">

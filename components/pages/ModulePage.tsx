@@ -1,3 +1,4 @@
+import RelayPricing from "@/components/RelayPricing";
 import ProductDisclosures from "@/components/ProductDisclosures";
 import type { CSSProperties } from "react";
 import Link from "next/link";
@@ -306,6 +307,8 @@ export default function ModulePage({ region, module: m }: { region: Region; modu
           ))}
         </ul>
       </section>
+
+      {m.name === "Vantriq Relay" && region.key === "pk" && <RelayPricing />}
 
       <ProductDisclosures />
 

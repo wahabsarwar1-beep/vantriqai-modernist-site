@@ -2615,3 +2615,41 @@ begin
   insert into applied_migrations (name, note)
   values ('v9_34_price_books', 'Flat PKR 7 / US$0.10 overage, a US$ price book, and the Voice Agent at PKR 20,000 a month plus PKR 40 a minute.');
 end $$;
+
+
+-- v9.35: current Voice Agent scope is domestic incoming calls in Pakistan.
+do $$
+begin
+  if exists (select 1 from applied_migrations where name = 'v9_35_voice_pakistan_incoming') then return; end if;
+  update catalog_addons set
+    name = 'Voice call agent Pakistan incoming',
+    summary = 'Answers incoming calls from callers in Pakistan on Pakistani business numbers. Enquiries and appointment booking, with handover where configured. No outgoing calls or international callers.',
+    availability = 'Pakistan only, incoming calls',
+    setup_fee_usd = null, monthly_fee_usd = null, overage_rate_usd = null,
+    price_note = 'PKR 40 per connected incoming minute from the first minute. Pakistan only; rate changes on 30 days notice under the dollar clause.',
+    cost_note = 'Local incoming SIP cost is an assumption to confirm in writing before go-live. Include number rental, management and the allocated voice-platform subscription in each client quote; first-client margins differ from shared-plan margins.'
+    where key = 'voice-call-agent';
+  insert into applied_migrations(name,note) values ('v9_35_voice_pakistan_incoming', 'Voice Agent limited to domestic incoming calls in Pakistan; USD catalogue prices removed. Existing accepted prices are not rewritten.');
+end $$;
+
+-- v9.36: Vantriq Relay packages, one domestic incoming AI seat each.
+do $$
+begin
+  if exists (select 1 from applied_migrations where name = 'v9_36_relay') then return; end if;
+  -- Historical bundles and their rate cards keep their accepted snapshots.
+  update catalog_addons set active = false where key = 'voice-call-agent';
+  insert into catalog_addons
+    (key,name,family,summary,setup_fee,monthly_fee,price_basis,price_note,availability,
+     est_monthly_cost,est_build_hours,cost_note,is_new,sort_order,active,meter,included_units,overage_rate)
+  select d.key,'Vantriq Relay '||d.plan,'capability',
+    'AI inbound call-center agent for callers in Pakistan on Pakistani numbers. One simultaneous call during an agreed 8-hour shift on 22 days/month in Pakistan time. No outbound or international calls.',
+    60000,d.fee,'fixed',d.mins||' connected minutes/month included; PKR 40 per extra minute. Unused minutes expire monthly. Additional seats, hours and billable transfers quoted separately.',
+    'Pakistan only, incoming calls',d.cost,20,
+    'Planning estimate at PKR 280/USD: standard ElevenLabs US$0.08/min with subscription allowances counted once, LLM budget PKR 1/min, free inbound SIP minutes assumed, PKR 6500 number/service support. Before tax and wider overhead. Carrier quote required. Burst is not included; cap workspace concurrency within the subscribed limit.',
+    true,d.sort,true,'call_minute',d.mins,40
+  from (values ('relay-starter','Starter',40000,500,18200,31),
+               ('relay-business','Business',60000,1000,29900,32),
+               ('relay-scale','Scale',100000,2000,53300,33)) as d(key,plan,fee,mins,cost,sort)
+  on conflict(key) do nothing;
+  insert into applied_migrations(name,note) values ('v9_36_relay','Relay packages 40k/500, 60k/1000 and 100k/2000; setup 60k, overage 40, domestic incoming only. Existing bundles unchanged.');
+end $$;

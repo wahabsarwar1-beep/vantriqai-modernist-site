@@ -157,9 +157,9 @@ const details = (region: Region): Record<string, ModuleDetail> => ({
       { q: "Does it work with any website?", a: "Yes. It is added with a small snippet, whatever your site is built on." },
     ],
   },
-  "Voice Agent": {
+  "Vantriq Relay": {
     headline: ["It answers", "the phone too"],
-    lede: "A natural voice on your business line that handles the same reception and booking as the chat agent — and hands the call to a person cleanly when it needs one.",
+    lede: "A natural voice answering incoming calls from callers in Pakistan on Pakistani business numbers, handling enquiries and appointment booking. Pakistan only; outgoing calls and international callers are outside the current service scope.",
     hero: {
       channel: "Voice",
       time: "19:05",
@@ -171,14 +171,14 @@ const details = (region: Region): Record<string, ModuleDetail> => ({
       outcome: ["Appointment set · Sat 10:30", "Confirmation sent by message"],
     },
     steps: [
-      { title: "The phone rings", body: "Busy line, after hours or overflow — you choose when the agent answers." },
+      { title: "The phone rings", body: "Choose an 8-hour answering shift on 22 agreed days each month, in Pakistan time." },
       { title: "It listens and understands", body: "Natural speech, interruptions and accents, not press-one menus." },
       { title: "It books and confirms", body: "Checks availability, books, and sends a written confirmation afterwards." },
       { title: "Or it transfers", body: "Routes the call to the right person with a summary of what was said." },
     ],
     capabilities: [
       { title: "Natural voice", body: "Speaks like a receptionist, not a phone tree." },
-      { title: "After-hours and overflow", body: "Answers when you are closed or every line is busy." },
+      { title: "An agreed answering shift", body: "One simultaneous call during your agreed 8-hour shift, 22 days a month." },
       { title: "Same rules as chat", body: "Uses the same content, bookings and limits as your other channels." },
       { title: "Written follow-up", body: "Confirms bookings by message so nothing depends on memory." },
       { title: "Warm transfer", body: "Passes the caller to a person with a summary, not a cold hand-off." },
@@ -187,15 +187,15 @@ const details = (region: Region): Record<string, ModuleDetail> => ({
     sectors: [
       { slug: "healthcare", line: "Monday-morning booking calls answered on ring two." },
       { slug: "hospitality", line: "Reservations taken when nobody can reach the phone." },
-      { slug: "logistics", line: "\"Where is my parcel\" calls answered at any volume." },
+      { slug: "logistics", line: "\"Where is my parcel\" calls answered during the agreed shift." },
     ],
     pairs: ["Booking Agent", "Escalation Desk", "WhatsApp Agent"],
     systems: ["Your business phone line", "Calendar", "CRM", "SMS or WhatsApp confirmations"],
     faqs: [
-      { q: "Do we keep our number?", a: "Yes. Calls to your existing number are forwarded to the agent on the conditions you choose." },
-      { q: "Can callers ask for a person?", a: "Always. Asking for a person transfers the call, with a summary passed to whoever picks up." },
+      { q: "Do we keep our number?", a: "Where supported by your Pakistani carrier. Number rental, routing, domestic-only call controls and any forwarding charges are confirmed before activation." },
+      { q: "Can callers ask for a person?", a: "Handover is configured and tested with your team. Any carrier charge for a transfer leg is quoted separately before enabling it." },
       { q: "Which languages does it speak?", a: "The languages your business needs, agreed during configuration and tested before go-live." },
-      { q: "Is it included in a package?", a: `No. The Voice Agent is an add-on on any package, priced separately, because every call minute carries real-time voice and phone-line costs that a chat does not. It carries a monthly fee for the service, and every call minute is billed at ${region.key === "pk" ? VOICE_AGENT.over : VOICE_AGENT.overUsd} — close to what the voice and phone line cost us, so a busy month never balloons. Voice notes sent on WhatsApp are different: those are included in every package.` },
+      { q: "Is it included in a package?", a: `The Vantriq Relay is a Pakistan-only add-on: PKR 60,000 setup, Starter PKR 40,000/month with 500 connected minutes, Business PKR 60,000 with 1,000, or Scale PKR 100,000 with 2,000; ${VOICE_AGENT.over} beyond the allowance. Each includes one simultaneous call, 8 hours/day over 22 agreed days/month in Pakistan time. Availability hours are not connected-minute allowances, and unused minutes expire monthly. It answers incoming calls from Pakistan on Pakistani numbers. Outgoing calls and international callers are outside the current service. The minute rate may change on at least 30 days’ written notice if exchange rates or provider prices move by more than 5%. WhatsApp voice notes retain their separate package allowances.` },
     ],
   },
   "Booking Agent": {
@@ -230,7 +230,7 @@ const details = (region: Region): Record<string, ModuleDetail> => ({
       { slug: "legal-consulting", line: "Consultations booked once intake is complete." },
       { slug: "hospitality", line: "Tables held and confirmed without a notebook." },
     ],
-    pairs: ["WhatsApp Agent", "Voice Agent", "Payments Agent"],
+    pairs: ["WhatsApp Agent", "Vantriq Relay", "Payments Agent"],
     systems: ["Google Calendar", "Outlook / Microsoft 365", "Calendly", "Clinic or booking systems"],
     faqs: [
       { q: "Which calendars does it work with?", a: "Google Calendar, Outlook and Calendly directly; other booking systems where they offer an API, confirmed during scoping." },
@@ -349,7 +349,7 @@ const details = (region: Region): Record<string, ModuleDetail> => ({
       { slug: "finance-insurance", line: "Hardship and advice questions to a licensed person." },
       { slug: "logistics", line: "Damaged or lost parcels to operations with photos." },
     ],
-    pairs: ["WhatsApp Agent", "Insights Digest", "Voice Agent"],
+    pairs: ["WhatsApp Agent", "Insights Digest", "Vantriq Relay"],
     systems: ["Team inbox", "WhatsApp or email alerts", "Helpdesk", "CRM"],
     faqs: [
       { q: "Is this included in every plan?", a: "Yes. A clean handover to a person is part of every VantriqAI agent." },

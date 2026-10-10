@@ -50,9 +50,8 @@ function MarkGlyph({ id }: { id: MarkId }) {
     case "voice":
       return (
         <>
-          <rect x="18" y="5" width="12" height="22" rx="6" fill="var(--color-bg)" />
-          <path d="M13 23a11 11 0 0022 0" stroke="var(--color-bg)" strokeWidth="4" fill="none" strokeLinecap="round" />
-          <rect x="21" y="36" width="6" height="7" fill="var(--color-bg)" />
+          <path d="M30 11h10v27H19v-8" fill="none" stroke="var(--color-bg)" strokeWidth="4" strokeLinejoin="round" />
+          <path d="M5 21h23m-8-8 8 8-8 8" fill="none" stroke="var(--color-bg)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
         </>
       );
     case "social":
@@ -190,6 +189,10 @@ function MarkGlyph({ id }: { id: MarkId }) {
  * of the size and without the card's bottom margin.
  */
 export default function ProductMark({ id, size = 76 }: { id: MarkId; size?: number }) {
+  if (id === "voice") return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src="/vantriq-relay-mark.svg" alt="" aria-hidden="true" width={size} height={size} style={{display:"block",flex:"none",marginBottom:size<48?0:24}} />
+  );
   const small = size < 48;
   return (
     <span
