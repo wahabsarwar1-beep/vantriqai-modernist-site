@@ -1,4 +1,4 @@
-# Verified customer-workspace release using existing repository deployment secrets.
+# Approved headset identity release using existing repository deployment secrets.
 name: Release Vantriq Relay
 
 # Explicit apply release after tests and upgrade dry run.
@@ -123,7 +123,7 @@ jobs:
         run: |
           set -euo pipefail
           ssh -p "$PORT" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
-            "docker exec crm_app node -e \"const fs=require('fs');const assert=require('assert');assert(fs.readFileSync('public/vantriq-relay-logo.svg','utf8').includes('Relay'));const terms=JSON.parse(fs.readFileSync('src/content/terms.json','utf8'));assert(JSON.stringify(terms).includes('2026-10-10.4'));console.log('Relay branding and terms verified');\""
+            "docker exec crm_app node -e \"const fs=require('fs');const assert=require('assert');assert(fs.readFileSync('public/vantriq-relay-logo.svg','utf8').includes('Relay'));assert(fs.readFileSync('public/vantriq-relay-mark.svg','utf8').includes('headset'));const terms=JSON.parse(fs.readFileSync('src/content/terms.json','utf8'));assert(JSON.stringify(terms).includes('2026-10-10.5'));console.log('Relay branding and terms verified');\""
 
       - name: Summary
         if: always()

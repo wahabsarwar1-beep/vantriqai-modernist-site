@@ -2487,7 +2487,7 @@ function addonsHTML(){
         <thead><tr><th style="width:30%;">${esc(label)} <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0;">— ${esc(hint)}</span></th><th>Price</th><th>Available</th>${admin?'<th>Our cost / mo</th><th>Monthly margin</th><th>Setup margin</th>':''}</tr></thead>
         <tbody>
         ${items.map(a=>`<tr>
-          <td><strong>${esc(a.name)}</strong>${a.is_new?' <span class="pill pill-active" style="font-size:10px;padding:1px 7px;">New</span>':''}
+          <td>${a.key==='voice-call-agent'||a.key.startsWith('relay-')?'<img src="/vantriq-relay-mark.svg?v=headset-20261010" alt="" width="28" height="28" style="vertical-align:middle;margin-right:8px;">':''}<strong>${esc(a.name)}</strong>${a.is_new?' <span class="pill pill-active" style="font-size:10px;padding:1px 7px;">New</span>':''}
             <div style="font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.45;">${esc(a.summary)}</div></td>
           <td class="mono" style="white-space:nowrap;max-width:260px;">${addonPrice(a)}</td>
           <td style="font-size:12px;">${esc(a.availability||'')}</td>
@@ -2687,7 +2687,7 @@ function renderProducts(){
     </div>
   </div>
   ${unitEconomicsHTML()}
-  <img src="/vantriq-relay-logo.svg" alt="Vantriq Relay" width="360" height="74" style="max-width:100%;height:auto;margin:20px 0;"><p><a href="/pricing/VantriqAI-Pricing-2026-Pakistan.pdf" download>Download Relay pricing brochure ↓</a></p>
+  <img src="/vantriq-relay-logo.svg?v=headset-20261010" alt="Vantriq Relay" width="360" height="74" style="max-width:100%;height:auto;margin:20px 0;"><p><a href="/pricing/VantriqAI-Pricing-2026-Pakistan.pdf" download>Download Relay pricing brochure ↓</a></p>
   ${addonsHTML()}
   `;
 }

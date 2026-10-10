@@ -191,7 +191,7 @@ function MarkGlyph({ id }: { id: MarkId }) {
 export default function ProductMark({ id, size = 76 }: { id: MarkId; size?: number }) {
   if (id === "voice") return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src="/vantriq-relay-mark.svg" alt="" aria-hidden="true" width={size} height={size} style={{display:"block",flex:"none",marginBottom:size<48?0:24}} />
+    <img src="/vantriq-relay-mark.svg?v=headset-20261010" alt="" aria-hidden="true" width={size} height={size} style={{display:"block",flex:"none",marginBottom:size<48?0:24}} />
   );
   const small = size < 48;
   return (

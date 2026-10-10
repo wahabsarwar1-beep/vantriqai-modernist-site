@@ -1,4 +1,4 @@
-import RelayPricing from "@/components/RelayPricing";
+import RelayOverview from "@/components/RelayOverview";
 import ProductDisclosures from "@/components/ProductDisclosures";
 import type { CSSProperties } from "react";
 import Link from "next/link";
@@ -95,10 +95,13 @@ export default function ModulePage({ region, module: m }: { region: Region; modu
                 <li aria-current="page">{m.name}</li>
               </ol>
             </nav>
-            <p className="hh-eyebrow mod-eyebrow">
+            {m.name === "Vantriq Relay" ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src="/vantriq-relay-logo.svg?v=headset-20261010" alt="Vantriq Relay" width="720" height="148" className="relay-hero-logo" />
+            ) : <p className="hh-eyebrow mod-eyebrow">
               {m.mark ? <ProductMark id={m.mark} size={24} /> : null}
               {m.name} · {m.tier}
-            </p>
+            </p>}
             <h1 className="ph-title" style={{ maxWidth: "15ch" }}>
               <LineReveal>
                 <span style={{ color: "var(--color-accent)" }}>{m.headline[0]}</span>
@@ -111,7 +114,7 @@ export default function ModulePage({ region, module: m }: { region: Region; modu
             <div data-anim="" className="hh-actions">
               <Magnetic>
                 <a className="btn hh-btn-primary" href={waLink()} target="_blank" rel="noopener">
-                  See it on WhatsApp <span aria-hidden="true">→</span>
+                  {m.name === "Vantriq Relay" ? "Discuss your call flow" : m.visual ? "Discuss your workflow" : "See it on WhatsApp"} <span aria-hidden="true">→</span>
                 </a>
               </Magnetic>
               <Magnetic>
@@ -308,7 +311,7 @@ export default function ModulePage({ region, module: m }: { region: Region; modu
         </ul>
       </section>
 
-      {m.name === "Vantriq Relay" && region.key === "pk" && <RelayPricing />}
+      {m.name === "Vantriq Relay" && region.key === "pk" && <RelayOverview />}
 
       <ProductDisclosures />
 
